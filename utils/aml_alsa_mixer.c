@@ -63,7 +63,8 @@ static struct aml_mixer_list gAmlMixerList[] = {
     /* for Speaker master volume */
     {AML_MIXER_ID_EQ_MASTER_VOLUME,     "EQ master volume"},
     /* ARCIN and SPDIFIN switch*/
-    {AML_MIXER_ID_SPDIFIN_ARCIN_SWITCH, "AudioIn Switch"}
+    {AML_MIXER_ID_SPDIFIN_ARCIN_SWITCH, "AudioIn Switch"},
+    {AML_MIXER_ID_SPDIFIN_PAO,          "SPDIFIN PAO"},
 };
 
 static char *get_mixer_name_by_id(int mixer_id)

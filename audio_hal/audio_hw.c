@@ -3075,11 +3075,13 @@ static int start_input_stream(struct aml_stream_in *in)
             port = PORT_I2S;
     }
      /* check to update port */
+
     port = alsa_device_update_pcm_index(port, CAPTURE);
     ALOGD("*%s, open card(%d) port(%d), in_device:0x%x\n",
         __FUNCTION__, card, port, adev->in_device);
 
-    in->config.period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
+    //in->config.period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
+
 #if defined(IS_ATOM_PROJECT)
     /*mic and linein share the same input device*/
     if (in->device & (AUDIO_DEVICE_IN_BUILTIN_MIC | AUDIO_DEVICE_IN_LINE)) {
@@ -3431,6 +3433,43 @@ static ssize_t read_frames (struct aml_stream_in *in, void *buffer, ssize_t fram
 #define TIMESTAMP_LEN (8)
 
 static uint32_t mic_buf_print_count = 0;
+
+
+static void in_reset_preroid_size(struct audio_stream_in *stream , unsigned int period_size)
+{
+    int ret = 0;
+    struct aml_stream_in *in = (struct aml_stream_in *) stream;
+    struct aml_audio_device *adev = in->dev;
+    pthread_mutex_lock(&in->lock);
+
+    /*in buffer is allocated in adev_open_input_stream according to the
+    period_size, is it safe to change the size?*/
+    in->config.period_size = period_size;
+    ALOGD("Config Period size to %d\n", in->config.period_size);
+    if (in->standby) {
+        ret = start_input_stream(in);
+        if (ret < 0) {
+            goto exit;
+        }
+    } else {
+        do_input_standby(in);
+        start_input_stream(in);
+        if (ret < 0) {
+            goto exit;
+        }
+
+    }
+
+    in->standby = 0;
+exit:
+    if (ret < 0) {
+        ALOGE("in_reset err!!!");
+    }
+
+    pthread_mutex_unlock(&in->lock);
+    return;
+}
+
 
 static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t bytes)
 {
@@ -3947,6 +3986,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
             } else if (out->config.channels == 2 && out->config.rate >= 32000 && out->config.rate <= 48000) {
                 if (adev->audio_type == DTS) {
                     out->hal_internal_format = AUDIO_FORMAT_DTS;
+                    adev->dts_hd.is_dtscd = -1;
                     adev->dolby_lib_type = eDolbyDcvLib;
                 } else {
                     out->hal_internal_format = AUDIO_FORMAT_AC3;
@@ -5741,6 +5781,7 @@ ssize_t aml_audio_spdif_output (struct audio_stream_out *stream,
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *aml_dev = aml_out->dev;
     struct pcm *pcm = aml_dev->pcm_handle[DIGITAL_DEVICE];
+    struct aml_audio_patch *patch = aml_dev->audio_patch;
     struct pcm_config config;
     int ret = 0;
     int codec_type = 0;
@@ -5756,7 +5797,6 @@ ssize_t aml_audio_spdif_output (struct audio_stream_out *stream,
     if (aml_dev->patch_src == SRC_DTV && aml_dev->parental_control_av_mute) {
         memset(buffer,0x0,byte);
     }
-
     if (!pcm) {
         /* init pcm configs, no DDP case in dual output */
         memset(&config, 0, sizeof(struct pcm_config));
@@ -5766,6 +5806,15 @@ ssize_t aml_audio_spdif_output (struct audio_stream_out *stream,
         } else {
             config.rate = MM_FULL_POWER_SAMPLING_RATE;
         }
+        // reset the sample rate
+        if (patch && (patch->input_src == AUDIO_DEVICE_IN_HDMI || patch->input_src == AUDIO_DEVICE_IN_SPDIF)) {
+            if (patch->aformat == AUDIO_FORMAT_DTS ||
+                patch->aformat == AUDIO_FORMAT_DTS_HD) {
+                config.rate = aml_out->config.rate;
+                //ALOGD("rate=%d setrate=%d\n",config.rate,aml_out->config.rate);
+            }
+        }
+
         config.period_size = DEFAULT_PLAYBACK_PERIOD_SIZE * 2;
         config.period_count = PLAYBACK_PERIOD_COUNT;
         config.start_threshold = DEFAULT_PLAYBACK_PERIOD_SIZE * 2 * PLAYBACK_PERIOD_COUNT;
@@ -6651,7 +6700,7 @@ static void config_output(struct audio_stream_out *stream)
     /*get sink format*/
     get_sink_format (stream);
     ALOGE("%s() adev->dolby_lib_type = %d", __FUNCTION__, adev->dolby_lib_type);
-    if (aml_out->hal_internal_format != AUDIO_FORMAT_DTS) {
+    if (aml_out->hal_internal_format != AUDIO_FORMAT_DTS && aml_out->hal_internal_format != AUDIO_FORMAT_DTS_HD) {
         if (eDolbyMS12Lib == adev->dolby_lib_type) {
             pthread_mutex_lock(&adev->lock);
             get_dolby_ms12_cleanup(&adev->ms12);
@@ -7124,8 +7173,15 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
                 release_spdif_encoder_output_buffer(stream);
                 adev->spdif_encoder_init_flag = false;
             }
+
+            if (cur_aformat == AUDIO_FORMAT_INVALID) {
+                // the input data is invalid, mute it
+                memset((void *)buffer, 0, bytes);
+            }
         }
-    } else if (aml_out->hal_internal_format == AUDIO_FORMAT_IEC61937) {
+    } else if (aml_out->hal_format== AUDIO_FORMAT_IEC61937 &&
+            aml_out->hal_internal_format == AUDIO_FORMAT_DTS &&
+            adev->dts_hd.is_dtscd == -1) {
         audio_channel_mask_t cur_ch_mask;
         audio_format_t cur_aformat;
         int package_size;
@@ -7138,20 +7194,7 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         } else {
             adev->dts_hd.is_dtscd = 0;
         }
-        if (cur_aformat == AUDIO_FORMAT_DTS || cur_aformat == AUDIO_FORMAT_AC3) {
-            aml_out->hal_internal_format = cur_aformat;
-            if (aml_out->hal_internal_format == AUDIO_FORMAT_DTS) {
-                adev->dolby_lib_type = eDolbyDcvLib;
-            } else if (aml_out->hal_internal_format == AUDIO_FORMAT_AC3) {
-                adev->dolby_lib_type = adev->dolby_lib_type_last;
-            }
-        } else {
-            return return_bytes;
-        }
-    } else if (aml_out->hal_internal_format != AUDIO_FORMAT_DTS) {
-        adev->dolby_lib_type = adev->dolby_lib_type_last;
     }
-
 
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         if (adev->need_reset_for_dual_decoder == true) {
@@ -7223,7 +7266,8 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
     }
     aml_out->input_bytes_size += write_bytes;
 
-    if ((patch && patch->aformat == AUDIO_FORMAT_DTS) || (aml_out->hal_internal_format == AUDIO_FORMAT_DTS)) {
+    if ((patch && patch->aformat == AUDIO_FORMAT_DTS) || (aml_out->hal_internal_format == AUDIO_FORMAT_DTS)
+        || (patch && patch->aformat == AUDIO_FORMAT_DTS_HD)) {
         audio_format_t output_format;
         if (adev->dtslib_bypass_enable) {
             if (aml_out->hal_format == AUDIO_FORMAT_IEC61937) {
@@ -7241,30 +7285,118 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         } else {
             config_output(stream);
         }
+
+#if 1
         //wirte raw data
         if (dts_dec->digital_raw == 1 && aml_out->dual_output_flag) {
-            //aml_audio_spdif_output(stream, (void *)dts_dec->outbuf_raw, dts_dec->outlen_raw);
-            aml_audio_spdif_output(stream, (void *)buffer, bytes);
+            /* all the HDMI in we goes through into decoder, because sometimes it is 44.1 khz, we don't know
+                such info if we doesn't decoded it.
+            */
+            if (patch && (patch->input_src == AUDIO_DEVICE_IN_HDMI || patch->input_src == AUDIO_DEVICE_IN_SPDIF)) {
+                if (ret == 0) {
+                    // we only support 44.1 Khz & 48 Khz raw output
+                    if (dts_dec->pcm_out_info.sample_rate == 44100 ) {
+                        aml_out->config.rate = dts_dec->pcm_out_info.sample_rate;
+                    }else {
+                        aml_out->config.rate = 48000;
+                    }
+                    //ALOGD("~~~~ rate=%d set =%d dts_dec->outlen_raw=%d\n",aml_out->config.rate,dts_dec->pcm_out_info.sample_rate,dts_dec->outlen_raw);
+                    if (dts_dec->outlen_raw) {
+                        aml_audio_spdif_output(stream, (void *)dts_dec->outbuf_raw, dts_dec->outlen_raw);
+                    }
+                }
+            } else {
+                aml_audio_spdif_output(stream, (void *)buffer, bytes);
+            }
+        }
+#endif
+
+        if (ret < 0) {
+            return bytes;
+        }
+
+        /* if one frame size is too big, such as 4096 frames = 85ms, but the alsa buffer only 42ms
+           it will block the whole pipeline, we must increase the alsa buffer
+        */
+        if (dts_dec->outlen_pcm >= 4096*2*2) {
+            aml_out->config.period_size = DEFAULT_PLAYBACK_PERIOD_SIZE*4;
+        } else {
+
+            aml_out->config.period_size = DEFAULT_PLAYBACK_PERIOD_SIZE;
+
         }
         if (ret < 0) {
             return bytes;
         }
 
+
         //add by lianlian.zhu ,for dts cerfication becase dts cd hdmi in pcm output distortion
+
         //if (dts_dec->is_dtscd == 1) {
             //memset(dts_dec->outbuf, 0, dts_dec->outlen_pcm);
         //}
 
+
         //write pcm data
-        void *tmp_buffer = (void *) dts_dec->outbuf;
-        output_format = AUDIO_FORMAT_PCM_16_BIT;
-        aml_hw_mixer_mixing(&adev->hw_mixer, tmp_buffer, write_bytes, output_format);
-        if (audio_hal_data_processing(stream, tmp_buffer, dts_dec->outlen_pcm, &output_buffer, &output_buffer_bytes, output_format) == 0) {
-            hw_write(stream, output_buffer, output_buffer_bytes, output_format);
-            aml_out->frame_write_sum = aml_out->input_bytes_size  / audio_stream_out_frame_size(stream) ;
-            aml_out->last_frames_postion = aml_out->frame_write_sum;
+        int read_bytes =  PLAYBACK_PERIOD_COUNT * DEFAULT_PLAYBACK_PERIOD_SIZE ;
+        bytes  = read_bytes;
+
+        while (get_buffer_read_space(&dts_dec->output_ring_buf) > (int)bytes) {
+            ring_buffer_read(&dts_dec->output_ring_buf, dts_dec->outbuf, bytes);
+
+#if defined(IS_ATOM_PROJECT)
+            audio_format_t output_format = AUDIO_FORMAT_PCM_32_BIT;
+            if (!adev->output_tmp_buf || adev->output_tmp_buf_size < 2 * bytes) {
+                adev->output_tmp_buf = realloc(adev->output_tmp_buf, 2 * bytes);
+                adev->output_tmp_buf_size = 2 * bytes;
+            }
+            uint16_t *p = (uint16_t *)dts_dec->outbuf;
+            int32_t *p1 = (int32_t *)adev->output_tmp_buf;
+            void *tmp_buffer = (void *)adev->output_tmp_buf;
+            for (unsigned i = 0; i < bytes / 2; i++) {
+                p1[i] = ((int32_t)p[i]) << 16;
+            }
+
+            bytes *= 2;
+            double lfe;
+            if (dts_dec->pcm_out_info.channel_num == 6) {
+                int samplenum = bytes / (dts_dec->pcm_out_info.channel_num * 4);
+                //ALOGI("dts_dec->pcm_out_info.channel_num:%d samplenum:%d bytes:%d",dts_dec->pcm_out_info.channel_num,samplenum,bytes);
+                //Lt = L + (C *  -3 dB)  - (Ls * -1.2 dB)  -  (Rs * -6.2 dB)
+                //Rt = R + (C * -3 dB) + (Ls * -6.2 dB) + (Rs *  -1.2 dB)
+                for (int i = 0; i < samplenum; i++ ) {
+                    lfe = (double)p1[6 * i + 3]*(1.678804f / 4);
+                    p1[6 * i] = p1[6 * i] + p1[6 * i + 2] * 0.707945 - p1[6 * i + 4] * 0.870963 - p1[6 * i + 5] * 0.489778;
+                    p1[6 * i + 1] = p1[6 * i + 1] + p1[6 * i + 2] * 0.707945 + p1[6 * i + 4] * 0.489778 + p1[6 * i + 5] * 0.870963;
+                    p1[2 * i ] = (p1[6 * i] >> 2) + (int32_t)lfe;
+                    p1[2 * i  + 1] = (p1[6 * i + 1] >> 2) + (int32_t)lfe;
+                }
+                bytes /= 3;
+             }
+#if 0
+if (getprop_bool("media.audio_hal.dts.outdump")) {
+FILE *fp1 = fopen("/data/tmp/dd_mix.raw", "a+");
+if (fp1) {
+    int flen = fwrite((char *)tmp_buffer, 1, bytes, fp1);
+    fclose(fp1);
+} else {
+    ALOGD("could not open files!");
+}
+}
+#endif
+
+#else
+            void *tmp_buffer = (void *) dts_dec->outbuf;
+            audio_format_t output_format = AUDIO_FORMAT_PCM_16_BIT;
+#endif
+            aml_hw_mixer_mixing(&adev->hw_mixer, tmp_buffer, bytes, output_format);
+            if (audio_hal_data_processing(stream, tmp_buffer, bytes, &output_buffer, &output_buffer_bytes, output_format) == 0) {
+                hw_write(stream, output_buffer, output_buffer_bytes, output_format);
+            }
         }
 
+        aml_out->frame_write_sum = aml_out->input_bytes_size  / audio_stream_out_frame_size(stream);
+        aml_out->last_frames_postion = aml_out->frame_write_sum;
         return return_bytes;
     }
 
@@ -7904,15 +8036,23 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
     ALOGD("%s: exit", __func__);
 }
 
-int calc_time_interval_ms(struct timespec ts0, struct timespec ts1)
+int calc_time_interval_us(struct timespec *ts0, struct timespec *ts1)
 {
-    int sec, nsec;
+    int64_t start_us, end_us;
+    int64_t interval_us;
 
-    sec = ts1.tv_sec - ts0.tv_sec;
-    nsec = ts1.tv_nsec - ts1.tv_nsec;
 
-    return (1000 * sec + nsec / 1000000);
+    start_us = ts0->tv_sec * 1000000LL +
+               ts0->tv_nsec / 1000LL;
+
+    end_us   = ts1->tv_sec * 1000000LL +
+               ts1->tv_nsec / 1000LL;
+
+    interval_us = end_us - start_us;
+
+    return interval_us;
 }
+
 
 static void ts_wait_time(struct timespec *ts, uint32_t time)
 {
@@ -7940,7 +8080,13 @@ void *audio_patch_input_threadloop(void *data)
     // FIXME: add calc for read_bytes;
     read_bytes = DEFAULT_CAPTURE_PERIOD_SIZE * CAPTURE_PERIOD_COUNT;
     int ret = 0, retry = 0;
-    audio_format_t cur_aformat;
+    audio_format_t cur_aformat  = AUDIO_FORMAT_INVALID;
+    audio_format_t last_aformat = AUDIO_FORMAT_INVALID;
+    int cur_samplerate = 0;
+    int last_samplerate = 0;
+    int ring_buffer_size = 0;
+    bool bSpdifin_PAO = false;
+
     ALOGI("++%s", __FUNCTION__);
 
     ALOGD("%s: enter", __func__);
@@ -7976,6 +8122,9 @@ void *audio_patch_input_threadloop(void *data)
 
     int first_start = 1;
     prctl(PR_SET_NAME, (unsigned long)"audio_input_patch");
+    if (ringbuffer) {
+        ring_buffer_size = ringbuffer->size;
+    }
     while (!patch->input_thread_exit) {
 #if defined(IS_ATOM_PROJECT)
         if ((in->device & AUDIO_DEVICE_IN_LINE) && in->ref_count == 2) {
@@ -8006,8 +8155,19 @@ void *audio_patch_input_threadloop(void *data)
 #endif
         {
             int bytes_avail = 0;
-            int period_mul = (patch->aformat == AUDIO_FORMAT_E_AC3) ? EAC3_MULTIPLIER : 1;
+            int period_mul = 1;
             int read_threshold = 0;
+            switch (patch->aformat) {
+            case AUDIO_FORMAT_E_AC3:
+                period_mul = EAC3_MULTIPLIER;
+                break;
+            case AUDIO_FORMAT_DTS_HD:
+                // 192Khz
+                period_mul = 4 * 4;
+                break;
+            default:
+                period_mul = 1;
+            }
             if (patch->input_src == AUDIO_DEVICE_IN_LINE) {
                 read_threshold = 4 * read_bytes * period_mul;
             }
@@ -8021,7 +8181,72 @@ void *audio_patch_input_threadloop(void *data)
                 patch->in_buf_size = read_bytes * period_mul;
             }
 
+            if (patch) {
+                if (patch->input_src == AUDIO_DEVICE_IN_HDMI) {
+                    cur_aformat = audio_parse_get_audio_type(patch->audio_parse_para);
+                    cur_samplerate = get_hdmiin_samplerate(&aml_dev->alsa_mixer);
+
+                    if (cur_samplerate != -1 && cur_samplerate != 0) {
+                        int period_size = 0;
+
+                        int buf_size = 0;;
+                        // HDMI in samplerate is stable
+                        if (last_samplerate != cur_samplerate) {
+                            ALOGD("HDMI Format Switch from 0x%x to 0x%x rate=%d\n", last_aformat, cur_aformat, cur_samplerate);
+                            if (cur_samplerate != 7 /*192000*/) {
+                                bSpdifin_PAO = false;
+                                period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
+                                // reset to original one
+                                buf_size = ring_buffer_size;
+
+                            } else if (cur_samplerate == 7 /*192000*/) {
+                            // if it is high bitrate bitstream, use PAO and increase the buffer size
+                                bSpdifin_PAO = true;
+                                period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
+                                // increase the buffer size
+                                buf_size = ring_buffer_size * 4;
+                            }
+                            ring_buffer_reset_size(ringbuffer, buf_size);
+                            set_spdifin_pao(&aml_dev->alsa_mixer,bSpdifin_PAO);
+                            in_reset_preroid_size(stream_in, period_size);
+
+                        }
+                        // some DTS HD file is 48Khz, but we still need to use PAO mode
+                        if (cur_aformat == AUDIO_FORMAT_DTS_HD && bSpdifin_PAO == false) {
+                            bSpdifin_PAO = true;
+                            if (cur_samplerate == 3/*48000*/) {
+                                period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
+                            }else {
+                                period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
+                            }
+                            // increase the buffer size
+                            buf_size = ring_buffer_size * 4;
+                            ring_buffer_reset_size(ringbuffer, buf_size);
+                            set_spdifin_pao(&aml_dev->alsa_mixer,bSpdifin_PAO);
+                            in_reset_preroid_size(stream_in, period_size);
+
+                        }
+                        last_aformat = cur_aformat;
+                        last_samplerate = cur_samplerate;
+                    }
+
+                }
+            }
+#if 0
+            struct timespec before_read;
+            struct timespec after_read;
+            int us = 0;
+            clock_gettime(CLOCK_MONOTONIC, &before_read);
+#endif
+
             bytes_avail = in_read(stream_in, patch->in_buf, read_bytes * period_mul);
+
+#if 0
+            clock_gettime(CLOCK_MONOTONIC, &after_read);
+            us = calc_time_interval_us(&before_read, &after_read);
+            ALOGD("function gap =%d \n", us);
+#endif
+
             ALOGV("++%s in read over read_bytes = %d, in_read returns = %d",
                   __FUNCTION__, read_bytes * period_mul, bytes_avail);
             if (bytes_avail > 0) {
@@ -8152,7 +8377,18 @@ void *audio_patch_output_threadloop(void *data)
     }
     prctl(PR_SET_NAME, (unsigned long)"audio_output_patch");
     while (!patch->output_thread_exit) {
-        int period_mul = (patch->aformat == AUDIO_FORMAT_E_AC3) ? EAC3_MULTIPLIER : 1;
+        int period_mul = 1;
+        switch (patch->aformat) {
+        case AUDIO_FORMAT_E_AC3:
+            period_mul = EAC3_MULTIPLIER;
+            break;
+        case AUDIO_FORMAT_DTS_HD:
+            period_mul = 4;
+            break;
+        default:
+            period_mul = 1;
+        }
+
 
         // buffer size diff from allocation size, need to resize.
         if (patch->out_buf_size < (size_t)write_bytes * period_mul) {
@@ -8179,12 +8415,23 @@ void *audio_patch_output_threadloop(void *data)
             if (ret == 0) {
                 ALOGE("%s(), ring_buffer read 0 data!", __func__);
             }
+#if 0
+            struct timespec before_read;
+            struct timespec after_read;
+            int us = 0;
+            clock_gettime(CLOCK_MONOTONIC, &before_read);
+#endif
 
             ALOGV("++%s ringbuf get data ok, start to out write, bytes-%d",
                   __FUNCTION__, ret);
             ret = out_write_new(stream_out, patch->out_buf, ret);
             ALOGV("++%s ringbuf get data ok, out write over!, retbytes = %d",
                   __FUNCTION__, ret);
+#if 0
+            clock_gettime(CLOCK_MONOTONIC, &after_read);
+            us = calc_time_interval_us(&before_read, &after_read);
+            ALOGD("function gap =%d \n", us);
+#endif
             if (patch->avsync_sample_interval >= AVSYNC_SAMPLE_INTERVAL * period_mul) {
                 aml_dev_try_avsync(patch);
                 patch->avsync_sample_interval = 0;

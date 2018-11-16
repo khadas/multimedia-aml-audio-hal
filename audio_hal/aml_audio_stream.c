@@ -75,7 +75,8 @@ void get_sink_format (struct audio_stream_out *stream)
     if ((source_format != AUDIO_FORMAT_PCM_16_BIT) && \
         (source_format != AUDIO_FORMAT_AC3) && \
         (source_format != AUDIO_FORMAT_E_AC3) && \
-        (source_format != AUDIO_FORMAT_DTS)) {
+        (source_format != AUDIO_FORMAT_DTS) &&
+        (source_format != AUDIO_FORMAT_DTS_HD)) {
         /*unsupport format [dts-hd/true-hd]*/
         ALOGI("%s() source format %#x change to %#x", __FUNCTION__, source_format, AUDIO_FORMAT_PCM_16_BIT);
         source_format = AUDIO_FORMAT_PCM_16_BIT;
@@ -101,7 +102,7 @@ void get_sink_format (struct audio_stream_out *stream)
             optical_audio_format = sink_audio_format;
             break;
         case AUTO:
-            sink_audio_format = (source_format != AUDIO_FORMAT_DTS) ? min(source_format, sink_capability) : AUDIO_FORMAT_DTS;
+            sink_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? min(source_format, sink_capability) : AUDIO_FORMAT_DTS;
             if ((source_format == AUDIO_FORMAT_PCM_16_BIT) && (adev->continuous_audio_mode == 1) && (sink_capability >= AUDIO_FORMAT_AC3)) {
                 sink_audio_format = AUDIO_FORMAT_AC3;
                 ALOGI("%s continuous_audio_mode %d source_format %#x sink_capability %#x\n", __FUNCTION__, adev->continuous_audio_mode, source_format, sink_capability);
@@ -134,11 +135,12 @@ void get_sink_format (struct audio_stream_out *stream)
         case AUTO:
             if (adev->continuous_audio_mode == 0) {
                 sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;
-                optical_audio_format = source_format != AUDIO_FORMAT_DTS ? \
-                                       min(source_format, AUDIO_FORMAT_AC3) : AUDIO_FORMAT_DTS;
+                optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD)
+                                       ? min(source_format, AUDIO_FORMAT_AC3)
+                                       : AUDIO_FORMAT_DTS;
             } else {
                 sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;
-                optical_audio_format = source_format != AUDIO_FORMAT_DTS ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_DTS;
+                optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_DTS;
             }
             ALOGI("%s() source_format %d sink_audio_format %d "
                   "optical_audio_format %d  \n",
@@ -270,6 +272,22 @@ int set_audio_source(struct aml_mixer_handle *mixer_handle, int audio_source)
     return aml_mixer_ctrl_set_int (mixer_handle, AML_MIXER_ID_AUDIO_IN_SRC, audio_source);
 }
 
+int set_spdifin_pao(struct aml_mixer_handle *mixer_handle,int enable)
+{
+    return aml_mixer_ctrl_set_int(mixer_handle,AML_MIXER_ID_SPDIFIN_PAO, enable);
+}
+
+int get_hdmiin_samplerate(struct aml_mixer_handle *mixer_handle)
+{
+    int stable = 0;
+
+    stable = aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_HDMI_IN_AUDIO_STABLE);
+    if (!stable) {
+        return -1;
+    }
+
+    return aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_HDMI_IN_SAMPLERATE);
+}
 int enable_HW_resample(struct aml_mixer_handle *mixer_handle, int enable)
 {
     if (enable == 0)

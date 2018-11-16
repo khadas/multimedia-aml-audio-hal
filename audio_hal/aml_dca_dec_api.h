@@ -36,7 +36,12 @@ struct dca_dts_dec {
     int is_dtscd;
     int digital_raw;
     //int (*get_parameters) (void *, int *, int *, int *);
-    int (*decoder_process)(unsigned char*, int, unsigned char *, int *, char *, int *);
+    int (*decoder_process)(unsigned char*, int, unsigned char *, int *, char *, int *,struct pcm_info *);
+    pthread_mutex_t lock;
+    struct pcm_info pcm_out_info;
+    struct resample_para aml_resample;
+    unsigned char *resample_outbuf;
+    ring_buffer_t output_ring_buf;
 };
 
 int dca_decode_init(struct aml_audio_parser *parser);

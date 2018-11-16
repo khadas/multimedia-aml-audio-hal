@@ -241,6 +241,8 @@ int enable_HW_resample(struct aml_mixer_handle *mixer_handle, int enable);
 bool Stop_watch(struct timespec start_ts, int64_t time);
 bool signal_status_check(audio_devices_t in_device, int *mute_time,
                          struct audio_stream_in *stream);
+int set_spdifin_pao(struct aml_mixer_handle *mixer_handle, int enable);
+int get_hdmiin_samplerate(struct aml_mixer_handle *mixer_handle);
 
 /*
  *@brief clean the tmp_buffer_8ch&audioeffect_tmp_buffer and release audio stream
