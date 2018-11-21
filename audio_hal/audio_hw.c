@@ -4486,18 +4486,27 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     */
     ret = str_parms_get_str(parms, "audio", value, sizeof(value));
     if (ret >= 0) {
-        if (strncmp(value, "linein", 6) == 0) {
+        bool is_linein_audio = strncmp(value, "linein", 6) == 0;
+        bool is_hdmiin_audio = strncmp(value, "hdmi", 4) == 0;
+        if (is_linein_audio || is_hdmiin_audio) {
 
             struct audio_patch *pAudPatchTmp = NULL;
 
-            get_audio_patch_by_src_dev(dev, AUDIO_DEVICE_IN_HDMI, &pAudPatchTmp);
+            if (is_linein_audio) {
+                get_audio_patch_by_src_dev(dev, AUDIO_DEVICE_IN_HDMI, &pAudPatchTmp);
+            } else if (is_hdmiin_audio) {
+                get_audio_patch_by_src_dev(dev, AUDIO_DEVICE_IN_LINE, &pAudPatchTmp);
+            }
 
             if (pAudPatchTmp == NULL) {
-                ALOGE("%s,There is no autio patch using HDMI as input", __func__);
+                ALOGE("%s,There is no audio patch using HDMI as input", __func__);
                 goto exit;
             }
-            if (pAudPatchTmp->sources[0].ext.device.type != AUDIO_DEVICE_IN_HDMI) {
+            if (is_linein_audio && pAudPatchTmp->sources[0].ext.device.type != AUDIO_DEVICE_IN_HDMI) {
                 ALOGE("%s, pAudPatchTmp->sources[0].ext.device.type != AUDIO_DEVICE_IN_HDMI", __func__);
+                goto exit;
+            } else if (is_hdmiin_audio && pAudPatchTmp->sources[0].ext.device.type != AUDIO_DEVICE_IN_LINE) {
+                ALOGE("%s, pAudPatchTmp->sources[0].ext.device.type != AUDIO_DEVICE_IN_LINE", __func__);
                 goto exit;
             }
 
@@ -4507,7 +4516,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 // This "adev->audio_patch" will be created in create_patch() function
                 // which in current design is only in "dev->dev" case
                 // make sure everything is matching, no error
-                if (adev->audio_patch && (adev->patch_src == SRC_HDMIIN) /*&& pAudPatchTmp->id == adev->audio_patch->patch_hdl*/) {
+                if (is_linein_audio && adev->audio_patch && (adev->patch_src == SRC_HDMIIN) /*&& pAudPatchTmp->id == adev->audio_patch->patch_hdl*/) {
                     // TODO: notices
                     // These codes must corresponding to the same case in adev_create_audio_patch() and adev_release_audio_patch()
                     // Anything change in the adev_create_audio_patch() . Must also change code here..
@@ -4517,24 +4526,40 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                     set_audio_source(&adev->alsa_mixer, LINEIN);
                     ret = create_patch_ext(dev, AUDIO_DEVICE_IN_LINE, pAudPatchTmp->sinks[0].ext.device.type, pAudPatchTmp->id);
                     pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_LINE;
+                } else if (is_hdmiin_audio && adev->audio_patch /* && (adev->patch_src == SRC_LINEIN) && pAudPatchTmp->id == adev->audio_patch->patch_hdl*/) {
+                    ALOGI("%s, create dvi-hdmi patching dev->dev", __func__);
+                    release_patch(adev);
+                    adev->active_inport = INPORT_HDMIIN;
+                    set_audio_source(&adev->alsa_mixer, HDMIIN);
+                    ret = create_patch_ext(dev, AUDIO_DEVICE_IN_HDMI, pAudPatchTmp->sinks[0].ext.device.type, pAudPatchTmp->id);
+                    pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_HDMI;
                 }
             }
 
             // dev->mix (example: HDMI in-> USB out)
             if (pAudPatchTmp->sources[0].type == AUDIO_PORT_TYPE_DEVICE
                 && pAudPatchTmp->sinks[0].type == AUDIO_PORT_TYPE_MIX) {
-                ALOGI("%s, !!create hdmi-dvi patching dev->mix", __func__);
-                if (adev->patch_src == SRC_HDMIIN) {
+                if (is_linein_audio && adev->audio_patch && (adev->patch_src == SRC_HDMIIN) /*&& pAudPatchTmp->id == adev->audio_patch->patch_hdl*/) {
+                    ALOGI("%s, !!create hdmi-dvi patching dev->mix", __func__);
                     release_parser(adev);
+
+                    //adev->in_device &= ~AUDIO_DEVICE_IN_ALL;
+                    //adev->in_device = AUDIO_DEVICE_IN_LINE;
+                    adev->active_inport = INPORT_LINEIN;
+                    adev->patch_src == SRC_LINEIN;
+                    pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_LINE;
+
+                    set_audio_source(&adev->alsa_mixer, LINEIN);
+                } else if (is_hdmiin_audio && adev->audio_patch /* && (adev->patch_src == SRC_LINEIN) && pAudPatchTmp->id == adev->audio_patch->patch_hdl*/) {
+                    ALOGI("%s, !!create dvi-hdmi patching dev->mix", __func__);
+                    release_parser(adev);
+
+                    adev->active_inport = INPORT_HDMIIN;
+                    adev->patch_src == SRC_HDMIIN;
+                    pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_HDMI;
+
+                    set_audio_source(&adev->alsa_mixer, HDMIIN);
                 }
-
-                //adev->in_device &= ~AUDIO_DEVICE_IN_ALL;
-                //adev->in_device = AUDIO_DEVICE_IN_LINE;
-                adev->active_inport = INPORT_LINEIN;
-                adev->patch_src == SRC_LINEIN;
-                pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_LINE;
-
-                set_audio_source(&adev->alsa_mixer, LINEIN);
             }
 
         }
@@ -6840,7 +6865,7 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         int package_size;
         int cur_audio_type = audio_type_parse(write_buf, write_bytes, &package_size, &cur_ch_mask);
 
-        cur_aformat = andio_type_convert_to_android_audio_format_t(cur_audio_type);
+        cur_aformat = audio_type_convert_to_android_audio_format_t(cur_audio_type);
         ALOGI("cur_aformat:%0x cur_audio_type:%d", cur_aformat, cur_audio_type);
         if (cur_audio_type == DTSCD) {
             adev->dts_hd.is_dtscd = 1;

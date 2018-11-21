@@ -104,7 +104,7 @@ void exit_pthread_for_audio_type_parse(
 /*
  *@brief convert the audio type to android audio format
  */
-audio_format_t andio_type_convert_to_android_audio_format_t(int codec_type);
+audio_format_t audio_type_convert_to_android_audio_format_t(int codec_type);
 
 
 /*
