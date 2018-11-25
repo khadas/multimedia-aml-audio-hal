@@ -434,7 +434,7 @@ void exit_pthread_for_audio_type_parse(
 /*
  *@brief convert the audio type to android audio format
  */
-audio_format_t andio_type_convert_to_android_audio_format_t(int codec_type)
+audio_format_t audio_type_convert_to_android_audio_format_t(int codec_type)
 {
     switch (codec_type) {
     case AC3:
@@ -497,7 +497,7 @@ audio_format_t audio_parse_get_audio_type(audio_type_parse_t *status)
         ALOGE("NULL pointer of audio_type_parse_t\n");
         return AUDIO_FORMAT_INVALID;
     }
-    return andio_type_convert_to_android_audio_format_t(status->audio_type);
+    return audio_type_convert_to_android_audio_format_t(status->audio_type);
 }
 
 audio_channel_mask_t audio_parse_get_audio_channel_mask(audio_type_parse_t *status)
