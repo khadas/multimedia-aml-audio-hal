@@ -16,6 +16,19 @@ ifeq ($(strip $(BOARD_ALSA_AUDIO)),tiny)
 
     LOCAL_PATH := $(call my-dir)
 
+include $(CLEAR_VARS)
+LOCAL_MODULE := libnano
+LOCAL_SRC_FILES_arm := ../rcaudio/libnano32.so
+LOCAL_SRC_FILES_arm64 := ../rcaudio/libnano64.so
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_OWNER := nanosic
+LOCAL_MODULE_SUFFIX := .so
+LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_TARGET_ARCH:= arm arm64
+LOCAL_MULTILIB := both
+include $(BUILD_PREBUILT)
+
 # The default audio HAL module, which is a stub, that is loaded if no other
 # device specific modules are present. The exact load order can be seen in
 # libhardware/hardware.c
@@ -78,7 +91,8 @@ ifeq ($(strip $(BOARD_ALSA_AUDIO)),tiny)
     LOCAL_SHARED_LIBRARIES := \
         liblog libcutils libtinyalsa \
         libaudioutils libdl libaudioroute libutils \
-        libdroidaudiospdif libamaudioutils libamlaudiorc libamadec
+        libdroidaudiospdif libamaudioutils libamlaudiorc libamadec \
+        libnano
 
 ifeq ($(BOARD_ENABLE_NANO), true)
     LOCAL_SHARED_LIBRARIES += libnano
