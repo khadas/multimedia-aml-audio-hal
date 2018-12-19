@@ -3062,8 +3062,12 @@ static int start_input_stream(struct aml_stream_in *in)
                (adev->in_device & AUDIO_DEVICE_IN_SPDIF)) {
         /* fix auge tv input, hdmirx, tunner */
         if (alsa_device_is_auge() &&
-            (adev->in_device & AUDIO_DEVICE_IN_HDMI))
-            port = PORT_TV;
+            (adev->in_device & AUDIO_DEVICE_IN_HDMI)) {
+            /*use spdif in also*/
+            port = PORT_SPDIF;
+            /* use spdif in for hdmi in source */
+            aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIFIN_SRC,3);
+        }
         else
             port = PORT_SPDIF;
     } else {
@@ -8913,7 +8917,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
             outport = OUTPORT_REMOTE_SUBMIX;
             break;
         default:
-            ALOGE("%s: invalid sink device type %#x",
+            ALOGE("d-m %s: invalid sink device type %#x",
                   __func__, sink_config->ext.device.type);
         }
 
@@ -9052,7 +9056,7 @@ else
             outport = OUTPORT_REMOTE_SUBMIX;
             break;
         default:
-            ALOGE("%s: invalid sink device type %#x",
+            ALOGE("d-d %s: invalid sink device type %#x",
                   __func__, sink_config->ext.device.type);
         }
 

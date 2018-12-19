@@ -1,5 +1,5 @@
 
-#define LOG_TAG "audio_hwsync_cbks"
+#define LOG_TAG "audio_hw_hwsync_cbks"
 //#define LOG_NDEBUG 0
 
 #include <errno.h>

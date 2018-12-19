@@ -125,7 +125,11 @@ static audio_channel_mask_t get_dolby_channel_mask(const unsigned char *frameBuf
 static int hw_audio_format_detection(struct aml_mixer_handle *mixer_handle)
 {
     int type = 0;
-    type = aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_SPDIFIN_AUDIO_TYPE);
+    /* PAO have format switch issue TODO*/
+    if (1/*!alsa_device_is_auge()*/)
+        type = aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_SPDIFIN_AUDIO_TYPE);
+    else
+        type = aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_HDMIIN_AUDIO_TYPE);
     if (type >= LPCM && type <= DTS) {
         return type;
     } else {
@@ -343,7 +347,10 @@ void* audio_type_parse_threadloop(void *data)
             period_mul = 1;
         }
         read_bytes = bytes * period_mul;
-        ret = pcm_read(audio_type_status->in, audio_type_status->parse_buffer + 3, read_bytes);
+        if (txlx_chip)
+            ret = pcm_read(audio_type_status->in, audio_type_status->parse_buffer + 3, read_bytes);
+        else
+            ret = -1;
         if (ret >= 0) {
 #if 0
             if (getprop_bool("media.audiohal.parsedump")) {
@@ -357,24 +364,26 @@ void* audio_type_parse_threadloop(void *data)
                 }
             }
 #endif
-            if (alsa_device_is_auge()) {
-                audio_type_status->cur_audio_type = LPCM;
-                continue;
-            }
-
             audio_type_status->cur_audio_type = audio_type_parse(audio_type_status->parse_buffer,
                                                 read_bytes, &(audio_type_status->package_size), &(audio_type_status->audio_ch_mask));
             //ALOGD("cur_audio_type=%d\n", audio_type_status->cur_audio_type);
-            //for txl chip,the PAO sw audio format detection is not ready yet.
-            //we use the hw audio format detection.
-            //TODO
-            if (!txlx_chip && audio_type_status->cur_audio_type == LPCM) {
-                audio_type_status->cur_audio_type = hw_audio_format_detection(audio_type_status->mixer_handle);
-            }
-
             memcpy(audio_type_status->parse_buffer, audio_type_status->parse_buffer + read_bytes, 3);
             update_audio_type(audio_type_status, read_bytes);
         } else {
+            //for txl chip,the PAO sw audio format detection is not ready yet.
+            //we use the hw audio format detection.
+            //TODO
+            if (!txlx_chip) {
+                audio_type_status->cur_audio_type = hw_audio_format_detection(audio_type_status->mixer_handle);
+                if (audio_type_status->audio_type != LPCM && audio_type_status->cur_audio_type == LPCM) {
+                    enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_ENABLE);
+                }
+                else {
+                    ALOGV("Raw data found: type(%d)\n", audio_type_status->audio_type);
+                    enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_DISABLE);
+                }
+                audio_type_status->audio_type = audio_type_status->cur_audio_type;
+            }            
             usleep(10 * 1000);
             //ALOGE("fail to read bytes = %d\n", bytes);
         }

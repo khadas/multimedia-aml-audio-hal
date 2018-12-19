@@ -1,5 +1,5 @@
 
-#define LOG_TAG "audio-subMixingFactory"
+#define LOG_TAG "audio_hw_subMixingFactory"
 //#define LOG_NDEBUG 0
 
 #include <errno.h>
