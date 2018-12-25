@@ -8256,7 +8256,7 @@ void *audio_patch_input_threadloop(void *data)
                                 bSpdifin_PAO = true;
                                 period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
                                 // increase the buffer size
-                                buf_size = ring_buffer_size * 4;
+                                buf_size = ring_buffer_size * 8;
                             }
                             ring_buffer_reset_size(ringbuffer, buf_size);
                             set_spdifin_pao(&aml_dev->alsa_mixer,bSpdifin_PAO);
@@ -8272,7 +8272,7 @@ void *audio_patch_input_threadloop(void *data)
                                 period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
                             }
                             // increase the buffer size
-                            buf_size = ring_buffer_size * 4;
+                            buf_size = ring_buffer_size * 8;
                             ring_buffer_reset_size(ringbuffer, buf_size);
                             set_spdifin_pao(&aml_dev->alsa_mixer,bSpdifin_PAO);
                             in_reset_preroid_size(stream_in, period_size);
