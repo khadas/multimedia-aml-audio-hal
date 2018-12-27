@@ -55,7 +55,16 @@ ifeq ($(strip $(BOARD_ALSA_AUDIO)),tiny)
         hw_avsync_callbacks.c \
         audio_port.c \
         sub_mixing_factory.c \
-        audio_data_process.c
+        audio_data_process.c \
+        ../../../../frameworks/av/media/libaudioprocessing/AudioResampler.cpp.arm \
+        ../../../../frameworks/av/media/libaudioprocessing/AudioResamplerCubic.cpp.arm \
+        ../../../../frameworks/av/media/libaudioprocessing/AudioResamplerSinc.cpp.arm \
+        ../../../../frameworks/av/media/libaudioprocessing/AudioResamplerDyn.cpp.arm \
+        aml_resample_wrap.cpp \
+        audio_simple_resample_api.c \
+        aml_audio_resample_manager.c \
+        audio_android_resample_api.c
+
 
     LOCAL_C_INCLUDES += \
         external/tinyalsa/include \
@@ -70,7 +79,10 @@ ifeq ($(strip $(BOARD_ALSA_AUDIO)),tiny)
         $(LOCAL_PATH)/../utils/ini/include \
         $(LOCAL_PATH)/../rcaudio \
         $(LOCAL_PATH)/../../LibAudio/amadec/include \
-        $(LOCAL_PATH)/../bt_voice/kehwin
+        $(LOCAL_PATH)/../bt_voice/kehwin \
+        frameworks/native/include \
+        frameworks/av/include
+
     LOCAL_LDFLAGS_arm += $(LOCAL_PATH)/lib_aml_ng.a
     LOCAL_LDFLAGS_arm += $(LOCAL_PATH)/../bt_voice/kehwin/32/btmic.a
     LOCAL_LDFLAGS_arm64 += $(LOCAL_PATH)/../bt_voice/kehwin/64/btmic.a

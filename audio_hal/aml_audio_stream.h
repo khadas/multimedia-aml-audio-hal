@@ -42,6 +42,15 @@ typedef enum {
    AM_AOUT_OUTPUT_DUAL_RIGHT, /**< Right audio output to dual channel*/
    AM_AOUT_OUTPUT_SWAP        /**< Swap left and right channel*/
 } AM_AOUT_OutputMode_t;
+
+enum sample_bitwidth {
+    SAMPLE_8BITS =  8,
+    SAMPLE_16BITS = 16,
+    SAMPLE_24BITS = 24,
+    SAMPLE_32BITS = 32,
+};
+
+
 static inline bool is_main_write_usecase(stream_usecase_t usecase)
 {
     return usecase > 0;

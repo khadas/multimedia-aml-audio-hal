@@ -35,7 +35,8 @@
 
 #include "audio_hw_utils.h"
 #include "aml_dca_dec_api.h"
-//#include "aml_ac3_parser.h"
+#include "aml_audio_resample_manager.h"
+
 
 
 enum {
@@ -208,12 +209,12 @@ int dca_decoder_release_patch(struct dca_dts_dec *dts_dec)
         //dts_dec->get_parameters = NULL;
         dts_dec->decoder_process = NULL;
         memset(&dts_dec->pcm_out_info, 0, sizeof(struct pcm_info));
-        memset(&dts_dec->aml_resample, 0, sizeof(struct resample_para));
-        ring_buffer_release(&dts_dec->output_ring_buf);
-        if (!dts_dec->resample_outbuf) {
-            free(dts_dec->resample_outbuf);
-            dts_dec->resample_outbuf = NULL;
+        if (dts_dec->resample_handle) {
+            aml_audio_resample_close(dts_dec->resample_handle);
+            dts_dec->resample_handle = NULL;
         }
+        ring_buffer_release(&dts_dec->output_ring_buf);
+
     }
     ALOGI("---%s", __func__);
     return 1;
@@ -235,6 +236,7 @@ int dca_decoder_process_patch(struct dca_dts_dec *dts_dec, unsigned char*buffer,
     bool SyncFlag = false;
     bool  little_end = false;
     int data_offset = 0;
+    int ret = -1;
     if (dts_dec->is_dtscd == 1) {
         main_frame_buffer = read_pointer;
         main_frame_size = mFrame_size = dts_dec->remain_size;
@@ -395,28 +397,42 @@ int dca_decoder_process_patch(struct dca_dts_dec *dts_dec, unsigned char*buffer,
     }
 
     if (dts_dec->outlen_pcm > 0 && dts_dec->pcm_out_info.sample_rate > 0 && dts_dec->pcm_out_info.sample_rate != 48000) {
-        if ((int)dts_dec->aml_resample.input_sr != dts_dec->pcm_out_info.sample_rate) {
-            ALOGI("init resampler from %d to 48000!\n", dts_dec->pcm_out_info.sample_rate);
-            dts_dec->aml_resample.input_sr = dts_dec->pcm_out_info.sample_rate;
-            dts_dec->aml_resample.output_sr = 48000;
-            dts_dec->aml_resample.channels = dts_dec->pcm_out_info.channel_num;
-            resampler_init (&dts_dec->aml_resample);
-            /*max buffer from 32K to 48K*/
-            if (!dts_dec->resample_outbuf) {
-                dts_dec->resample_outbuf = (unsigned char*) malloc (MAX_DECODER_FRAME_LENGTH *3/2);
-                if (!dts_dec->resample_outbuf) {
-                    ALOGE ("malloc buffer failed\n");
-                    goto EXIT;
-                }
+
+        if (dts_dec->resample_handle) {
+            if (dts_dec->pcm_out_info.sample_rate != (int)dts_dec->resample_handle->resample_config.input_sr) {
+                audio_resample_config_t resample_config;
+                ALOGD("Sample rate is changed from %d to %d, reset the resample\n",dts_dec->resample_handle->resample_config.input_sr, dts_dec->pcm_out_info.sample_rate);
+                aml_audio_resample_close(dts_dec->resample_handle);
+                dts_dec->resample_handle = NULL;
             }
         }
-        int out_frame = dts_dec->outlen_pcm >> 2;
-        out_frame = resample_process (&dts_dec->aml_resample, out_frame,
-                (int16_t *) dts_dec->outbuf, (int16_t *) dts_dec->resample_outbuf);
-        dts_dec->outlen_pcm = out_frame << 2;
+
+        if (dts_dec->resample_handle == NULL) {
+            audio_resample_config_t resample_config;
+            ALOGI("init resampler from %d to 48000!\n", dts_dec->pcm_out_info.sample_rate);
+            resample_config.aformat   = AUDIO_FORMAT_PCM_16_BIT;
+            resample_config.channels  = 2;
+            resample_config.input_sr  = dts_dec->pcm_out_info.sample_rate;
+            resample_config.output_sr = 48000;
+            ret = aml_audio_resample_init((aml_audio_resample_t **)&dts_dec->resample_handle, AML_AUDIO_ANDROID_RESAMPLE, &resample_config);
+            if (ret < 0) {
+                ALOGE("resample init error\n");
+                return -1;
+            }
+        }
+
+
+
+        ret = aml_audio_resample_process(dts_dec->resample_handle, dts_dec->outbuf, dts_dec->outlen_pcm);
+        if (ret < 0) {
+            ALOGE("resample process error\n");
+            return -1;
+        }
+        //ALOGD("resample in size =%d out=%d\n",dts_dec->outlen_pcm, dts_dec->resample_handle->resample_size);
+        dts_dec->outlen_pcm = dts_dec->resample_handle->resample_size;
 
         if (get_buffer_write_space(&dts_dec->output_ring_buf) > dts_dec->outlen_pcm) {
-            ring_buffer_write(&dts_dec->output_ring_buf, dts_dec->resample_outbuf,
+            ring_buffer_write(&dts_dec->output_ring_buf, dts_dec->resample_handle->resample_buffer,
                     dts_dec->outlen_pcm, UNCOVER_WRITE);
             ALOGV("mFrame_size:%d, outlen_pcm:%d, used = %d\n", mFrame_size , dts_dec->outlen_pcm, used_size);
         } else {
