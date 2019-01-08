@@ -44,4 +44,6 @@ int aml_alsa_output_get_letancy(struct audio_stream_out *stream);
  *@brief close continuous audio device
  */
 void aml_close_continuous_audio_device(struct aml_audio_device *adev);
+
+int alsa_depop(int card);
 #endif // _ALSA_MANAGER_H_

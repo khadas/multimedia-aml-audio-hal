@@ -427,3 +427,34 @@ void aml_close_continuous_audio_device(struct aml_audio_device *adev)
     ALOGI("-%s(), when continuous is at end, the pcm/spdif devices(single/dual output) are closed!\n\n", __FUNCTION__);
     return ;
 }
+
+int alsa_depop(int card)
+{
+    struct pcm_config pcm_cfg_out = {
+        .channels = 2,
+        .rate = MM_FULL_POWER_SAMPLING_RATE,
+        .period_size = DEFAULT_PLAYBACK_PERIOD_SIZE,
+        .period_count = PLAYBACK_PERIOD_COUNT,
+        .start_threshold = DEFAULT_PLAYBACK_PERIOD_SIZE,
+        .format = PCM_FORMAT_S16_LE,
+    };
+    int port = alsa_device_update_pcm_index(PORT_I2S, PLAYBACK);
+
+    struct pcm *pcm = pcm_open(card, port, PCM_OUT, &pcm_cfg_out);
+    char *buf = calloc(1, 2048);
+    if (buf == NULL)
+        return -ENOMEM;
+
+    if (pcm_is_ready(pcm)) {
+        pcm_write(pcm, buf, 2048);
+        pcm_close(pcm);
+    } else {
+        ALOGE("%s(), open fail", __func__);
+    }
+    usleep(10000);
+    if (buf)
+        free(buf);
+
+    ALOGI("%s, card %d, device %d", __func__, card, port);
+    return 0;
+}

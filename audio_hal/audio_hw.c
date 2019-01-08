@@ -9807,7 +9807,12 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         ret = -EINVAL;
         goto err;
     }
-
+#if defined(TV_AUDIO_OUTPUT)
+    // is_auge depend on this func...
+    card = alsa_device_get_card_index();
+    if (alsa_device_is_auge())
+        alsa_depop(card);
+#endif
     adev = calloc(1, sizeof(struct aml_audio_device));
     if (!adev) {
         ret = -ENOMEM;
@@ -9841,6 +9846,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->hw_device.get_microphones = adev_get_microphones;
     adev->hw_device.get_audio_port = adev_get_audio_port;
     adev->hw_device.dump = adev_dump;
+    adev->active_outport = -1;
 
     card = alsa_device_get_card_index();
     if ((card < 0) || (card > 7)) {
