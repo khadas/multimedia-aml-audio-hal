@@ -3842,7 +3842,7 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             parental_mute = 1;
 
         /*if need mute input source, don't read data from hardware anymore*/
-        if (adev->mic_mute || in_mute || parental_mute || in->spdif_fmt_hw == SPDIFIN_AUDIO_TYPE_PAUSE) {
+        if (adev->mic_mute || in_mute || parental_mute || in->spdif_fmt_hw == SPDIFIN_AUDIO_TYPE_PAUSE || adev->source_mute) {
             if (adev->in_device & AUDIO_DEVICE_IN_TV_TUNER) {
                 in->first_buffer_discard = true;
             }
@@ -4944,7 +4944,16 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         adev->eq_data.s_gain.hdmi, adev->eq_data.s_gain.av);
         goto exit;
     }
-
+    ret = str_parms_get_str(parms, "SOURCE_MUTE", value, sizeof(value));
+    if (ret >= 0) {
+        sscanf(value,"%d", &adev->eq_data.s_mute.mute);
+        ALOGI("%s() set audio mute: mute:%d",__func__,adev->eq_data.s_mute.mute);
+        if (adev->eq_data.s_mute.mute == 1)
+            adev->source_mute = 1;
+        else if (adev->eq_data.s_mute.mute == 0)
+            adev->source_mute = 0;
+        goto exit;
+    }
     ret = str_parms_get_str(parms, "POST_GAIN", value, sizeof(value));
     if (ret >= 0) {
         sscanf(value,"%f %f %f", &adev->eq_data.p_gain.speaker, &adev->eq_data.p_gain.spdif_arc,
@@ -5228,6 +5237,9 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         ALOGI("ms12_enable :%d", ms12_enable);
         sprintf(temp_buf, "dolby_ms12_enable=%d", ms12_enable);
         return  strdup(temp_buf);
+    } else if (!strcmp(keys, "SOURCE_MUTE")) {
+        sprintf(temp_buf, "source_mute = %d", adev->eq_data.s_mute.mute);
+        return strdup(temp_buf);
     }
     return strdup("");
 }
@@ -8590,7 +8602,7 @@ static int create_patch(struct audio_hw_device *dev,
     if (!patch) {
         return -ENOMEM;
     }
-
+    aml_dev->source_mute = 0;
     patch->dev = dev;
     patch->input_src = input;
     patch->aformat = AUDIO_FORMAT_PCM_16_BIT;

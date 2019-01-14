@@ -401,6 +401,7 @@ struct aml_audio_device {
     void* aml_ng_handle;
     int aml_ng_enable;
     float aml_ng_level;
+    int source_mute;
     int aml_ng_attrack_time;
     int aml_ng_release_time;
     int system_app_mixing_status;
