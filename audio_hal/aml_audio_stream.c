@@ -288,6 +288,12 @@ int get_hdmiin_samplerate(struct aml_mixer_handle *mixer_handle)
 
     return aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_HDMI_IN_SAMPLERATE);
 }
+
+int get_HW_resample(struct aml_mixer_handle *mixer_handle)
+{
+    return aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_HW_RESAMPLE_ENABLE);
+}
+
 int enable_HW_resample(struct aml_mixer_handle *mixer_handle, int enable)
 {
     if (enable == 0)
