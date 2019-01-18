@@ -325,6 +325,7 @@ void* audio_type_parse_threadloop(void *data)
     int cur_samplerate = 0;
     int read_bytes = 0;
     int txlx_chip = is_txlx_chip();
+    int txl_chip = is_txl_chip();
 
     ret = audio_type_parse_init(audio_type_status);
     if (ret < 0) {
@@ -374,15 +375,38 @@ void* audio_type_parse_threadloop(void *data)
             //we use the hw audio format detection.
             //TODO
             if (!txlx_chip) {
-                audio_type_status->cur_audio_type = hw_audio_format_detection(audio_type_status->mixer_handle);
-                if (audio_type_status->audio_type != LPCM && audio_type_status->cur_audio_type == LPCM) {
-                    enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_ENABLE);
+                if (txl_chip) {
+                    hdmiin_audio_packet_t audio_packet = AUDIO_PACKET_NONE;
+                    audio_packet = get_hdmiin_audio_packet(audio_type_status->mixer_handle);
+                    if (audio_packet == AUDIO_PACKET_HBR) {
+                        /* we let software detect it */
+                        enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_DISABLE);
+
+                    } else {
+                        audio_type_status->cur_audio_type = hw_audio_format_detection(audio_type_status->mixer_handle);
+                        if (audio_type_status->audio_type != LPCM && audio_type_status->cur_audio_type == LPCM) {
+                            enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_ENABLE);
+                        }
+                        else if (audio_type_status->audio_type == LPCM && audio_type_status->cur_audio_type != LPCM){
+                            ALOGV("Raw data found: type(%d)\n", audio_type_status->audio_type);
+                            enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_DISABLE);
+                        }
+                        audio_type_status->audio_type = audio_type_status->cur_audio_type;
+
+                    }
+
+                } else {
+                    audio_type_status->cur_audio_type = hw_audio_format_detection(audio_type_status->mixer_handle);
+                    if (audio_type_status->audio_type != LPCM && audio_type_status->cur_audio_type == LPCM) {
+                        enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_ENABLE);
+                    }
+                    else if (audio_type_status->audio_type == LPCM && audio_type_status->cur_audio_type != LPCM){
+                        ALOGV("Raw data found: type(%d)\n", audio_type_status->audio_type);
+                        enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_DISABLE);
+                    }
+                    audio_type_status->audio_type = audio_type_status->cur_audio_type;
+
                 }
-                else if (audio_type_status->audio_type == LPCM && audio_type_status->cur_audio_type != LPCM){
-                    ALOGV("Raw data found: type(%d)\n", audio_type_status->audio_type);
-                    enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_DISABLE);
-                }
-                audio_type_status->audio_type = audio_type_status->cur_audio_type;
             }
             usleep(10 * 1000);
             //ALOGE("fail to read bytes = %d\n", bytes);
@@ -534,3 +558,110 @@ audio_channel_mask_t audio_parse_get_audio_channel_mask(audio_type_parse_t *stat
     }
     return status->audio_ch_mask;
 }
+
+void feeddata_audio_type_parse(void **status, char * input, int size)
+{
+    audio_type_parse_t *audio_type_status = (audio_type_parse_t *)(*status);
+    int type = 0;
+
+    if (audio_type_status == NULL) {
+        ALOGD("parse is not existed\n");
+        return;
+    }
+    type = audio_type_parse(input, size, &(audio_type_status->package_size), &(audio_type_status->audio_ch_mask));
+    // if (type == TRUEHD)
+    //     ALOGI("parser audio type %s\n", AUDIO_FORMAT_STRING(type));
+    switch (audio_type_status->state) {
+    case IEC61937_UNSYNC: {
+        if (type == LPCM) {
+            if (audio_type_status->audio_type == MUTE) {
+                audio_type_status->parsed_size += size;
+                if (audio_type_status->parsed_size <= 32768) {
+                    // during IEC header finding,we mute it
+                    memset(input, 0, size);
+                    audio_type_status->audio_type = MUTE;
+                } else {
+                    // we alread checked some bytes, not found IEC header, we will treate it as PCM
+                    audio_type_status->audio_type = LPCM;
+                }
+            } else {
+                audio_type_status->parsed_size = 0;
+                audio_type_status->audio_type = LPCM;
+            }
+
+        } else if (type == PAUSE || type == MUTE) {
+            // set all the data as 0, keep the original data type
+            memset(input, 0, size);
+            audio_type_status->parsed_size = 0;
+            audio_type_status->audio_type = MUTE;
+
+        } else {
+            audio_type_status->state = IEC61937_SYNCING;
+            memset(input, 0, size);
+            audio_type_status->audio_type = type;
+            audio_type_status->parsed_size = 0;
+        }
+        break;
+    }
+    case IEC61937_SYNCING: {
+        if (type == LPCM) {
+            audio_type_status->parsed_size += size;
+            // during two package, we don't find a new IEC header
+            if (audio_type_status->parsed_size > audio_type_status->package_size * 2) {
+                // no found new IEC header, back to unsync state
+                audio_type_status->state = IEC61937_UNSYNC;
+                audio_type_status->audio_type = MUTE;
+                audio_type_status->parsed_size = 0;
+            }
+
+        } else if (type == PAUSE || type == MUTE) {
+            memset(input, 0, size);
+            audio_type_status->state = IEC61937_UNSYNC;
+            audio_type_status->audio_type = MUTE;
+            audio_type_status->parsed_size = 0;
+        } else {
+            // find a new IEC header, we set it as synced
+            audio_type_status->audio_type = type;
+            audio_type_status->state = IEC61937_SYNCED;
+            audio_type_status->parsed_size = 0;
+
+        }
+        // mute all the data during syncing
+        // memset(input, 0, size);
+        break;
+    }
+    case IEC61937_SYNCED: {
+        if (type == LPCM) {
+            audio_type_status->parsed_size += size;
+            // from raw to pcm, we check more data
+            if (audio_type_status->parsed_size > audio_type_status->package_size * 4) {
+                // no found new IEC header, back to unsync state
+                audio_type_status->state = IEC61937_UNSYNC;
+                audio_type_status->audio_type = MUTE;
+                audio_type_status->parsed_size = 0;
+            }
+
+        } else if (type == PAUSE || type == MUTE) {
+            memset(input, 0, size);
+            audio_type_status->state = IEC61937_UNSYNC;
+            audio_type_status->audio_type = MUTE;
+            audio_type_status->parsed_size = 0;
+
+        } else {
+            audio_type_status->audio_type = type;
+            audio_type_status->parsed_size = 0;
+        }
+        break;
+    }
+    default:
+        return;
+    }
+
+    if (audio_type_status->audio_type != audio_type_status->cur_audio_type) {
+        ALOGE("Parsing state=%d cur type=%d parse type=%d\n", audio_type_status->state, audio_type_status->audio_type, type);
+        audio_type_status->cur_audio_type = audio_type_status->audio_type;
+    }
+    return;
+}
+
+

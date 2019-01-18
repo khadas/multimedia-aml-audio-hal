@@ -50,6 +50,15 @@ enum sample_bitwidth {
     SAMPLE_32BITS = 32,
 };
 
+typedef enum hdmiin_audio_packet {
+    AUDIO_PACKET_NONE,
+    AUDIO_PACKET_AUDS,
+    AUDIO_PACKET_OBA,
+    AUDIO_PACKET_DST,
+    AUDIO_PACKET_HBR,
+    AUDIO_PACKET_OBM,
+    AUDIO_PACKET_MAS
+} hdmiin_audio_packet_t;
 
 static inline bool is_main_write_usecase(stream_usecase_t usecase)
 {
@@ -255,6 +264,7 @@ bool signal_status_check(audio_devices_t in_device, int *mute_time,
                          struct audio_stream_in *stream);
 int set_spdifin_pao(struct aml_mixer_handle *mixer_handle, int enable);
 int get_hdmiin_samplerate(struct aml_mixer_handle *mixer_handle);
+hdmiin_audio_packet_t get_hdmiin_audio_packet(struct aml_mixer_handle *mixer_handle);
 
 /*
  *@brief clean the tmp_buffer_8ch&audioeffect_tmp_buffer and release audio stream

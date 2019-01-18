@@ -71,6 +71,13 @@ enum auge_input_source {
 	FRHDMIRX = 8,
 };
 
+enum parser_state {
+    IEC61937_UNSYNC,
+    IEC61937_SYNCING,
+    IEC61937_SYNCED,
+};
+
+
 typedef struct audio_type_parse {
     struct pcm_config config_in;
     struct pcm *in;
@@ -91,6 +98,9 @@ typedef struct audio_type_parse {
     int package_size;
 
     int running_flag;
+    // used for software detection
+    int state;
+    int parsed_size;
 } audio_type_parse_t;
 
 int creat_pthread_for_audio_type_parse(
@@ -127,5 +137,11 @@ int audio_parse_get_audio_type_direct(audio_type_parse_t *status);
  *@brief gget current audio type from buffer data
  */
 int audio_type_parse(void *buffer, size_t bytes, int *package_size, audio_channel_mask_t *cur_ch_mask);
+
+/*
+ *@brief feed data to software format detection
+ */
+void feeddata_audio_type_parse(void **status, char * input, int size);
+
 
 #endif

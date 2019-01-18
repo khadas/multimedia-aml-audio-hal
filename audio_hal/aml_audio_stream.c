@@ -21,6 +21,7 @@
 
 #include "aml_alsa_mixer.h"
 #include "aml_audio_stream.h"
+#include "audio_hw_utils.h"
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #define PCM  0/*AUDIO_FORMAT_PCM_16_BIT*/
@@ -174,10 +175,21 @@ bool is_hdmi_in_stable_hw (struct audio_stream_in *stream)
     struct aml_audio_device *aml_dev = in->dev;
     int type = 0;
     int stable = 0;
+    int txl_chip = is_txl_chip();
+    hdmiin_audio_packet_t audio_packet = AUDIO_PACKET_NONE;
+
 
     stable = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_HDMI_IN_AUDIO_STABLE);
     if (!stable)
         return false;
+
+    if (txl_chip) {
+        audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
+        /*txl chip, we don't use hardware format detect for HBR*/
+        if (audio_packet == AUDIO_PACKET_HBR) {
+            return true;
+        }
+    }
 
     type = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIFIN_AUDIO_TYPE);
     if (type != in->spdif_fmt_hw) {
@@ -277,6 +289,21 @@ int set_spdifin_pao(struct aml_mixer_handle *mixer_handle,int enable)
     return aml_mixer_ctrl_set_int(mixer_handle,AML_MIXER_ID_SPDIFIN_PAO, enable);
 }
 
+/*
+refer to misc.c in common/sound/soc/amlogic/common
+static const char *const hdmi_in_samplerate[] = {
+    "N/A",
+    "32000",
+    "44100",
+    "48000",
+    "88200",
+    "96000",
+    "176400",
+    "192000"
+};
+
+*/
+
 int get_hdmiin_samplerate(struct aml_mixer_handle *mixer_handle)
 {
     int stable = 0;
@@ -339,5 +366,16 @@ bool signal_status_check(audio_devices_t in_device, int *mute_time,
         return false;
     }
     return true;
+}
+
+
+hdmiin_audio_packet_t get_hdmiin_audio_packet(struct aml_mixer_handle *mixer_handle)
+{
+    int audio_packet = 0;
+    audio_packet = aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_HDMIIN_AUDIO_PACKET);
+    if (audio_packet < 0) {
+        return AUDIO_PACKET_NONE;
+    }
+    return (hdmiin_audio_packet_t)audio_packet;
 }
 
