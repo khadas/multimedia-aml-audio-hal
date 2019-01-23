@@ -78,6 +78,12 @@
 #include <SPDIFEncoderAD.h>
 #include "audio_hw_ms12.h"
 #include "dolby_lib_api.h"
+
+#define ENABLE_NANO_NEW_PATH 1
+#if ENABLE_NANO_NEW_PATH
+#include "jb_nano.h"
+#endif
+
 // for dtv playback
 #include "audio_hw_dtv.h"
 #include "../bt_voice/kehwin/audio_kw.h"
@@ -5516,6 +5522,13 @@ exit:
     *stream_in = &in->stream;
     ALOGD("%s: exit", __func__);
 
+#if ENABLE_NANO_NEW_PATH
+    ret = nano_input_open(*stream_in, config);
+    if (ret < 0) {
+        ALOGD("%s: nano_input_open : %d",__func__,ret);
+    }
+#endif
+
     return 0;
 err:
     if (in->resampler) {
@@ -5538,6 +5551,9 @@ static void adev_close_input_stream(struct audio_hw_device *dev,
         kehwin_adev_close_input_stream(dev,stream);
         return;
     }
+#if ENABLE_NANO_NEW_PATH
+    nano_close(stream);
+#endif
     struct aml_audio_device *adev = (struct aml_audio_device *)dev;
     struct aml_stream_in *in = (struct aml_stream_in *)stream;
 
@@ -10004,6 +10020,10 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         memset(&adev->ddp, 0, sizeof(struct dolby_ddp_dec));
         adev->dcvlib_bypass_enable = 1;
     }
+
+#if ENABLE_NANO_NEW_PATH
+    nano_init();
+#endif
 
     ALOGI("%s() adev->dolby_lib_type = %d", __FUNCTION__, adev->dolby_lib_type);
     adev->patch_src = SRC_INVAL;
