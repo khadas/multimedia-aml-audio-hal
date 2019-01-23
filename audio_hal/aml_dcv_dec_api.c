@@ -319,12 +319,8 @@ static int Get_Parameters(void *buf, int *sample_rate, int *frame_size, int *ChN
     return 0;
 }
 
-static  int unload_ddp_decoder_lib()
+int unload_ddp_decoder_lib()
 {
-    if (ddp_decoder_cleanup != NULL && handle != NULL) {
-        (*ddp_decoder_cleanup)(handle);
-        handle = NULL;
-    }
     ddp_decoder_init = NULL;
     ddp_decoder_process = NULL;
     ddp_decoder_cleanup = NULL;
@@ -335,7 +331,7 @@ static  int unload_ddp_decoder_lib()
     return 0;
 }
 
-static int dcv_decoder_init(int digital_raw)
+int load_ddp_decoder_lib()
 {
     //int digital_raw = 1;
     gDDPDecoderLibHandler = dlopen("/vendor/lib/libHwAudio_dcvdec.so", RTLD_NOW);
@@ -371,8 +367,6 @@ static int dcv_decoder_init(int digital_raw)
         ALOGV("<%s::%d>--[ddp_decoder_cleanup:]", __FUNCTION__, __LINE__);
     }
 
-    /*TODO: always decode*/
-    (*ddp_decoder_init)(1, digital_raw,&handle);
     return 0;
 Error:
     unload_ddp_decoder_lib();
@@ -477,8 +471,8 @@ void *decode_threadloop(void *data)
         free(outbuf);
         return NULL;
     }
-
-    ret = dcv_decoder_init(digital_raw);
+       /*TODO: always decode*/
+    ret = (*ddp_decoder_init)(1, digital_raw,&handle);
     if (ret) {
         ALOGW("dec init failed, maybe no lisensed ddp decoder.\n");
         valid_lib = 0;
@@ -584,6 +578,10 @@ void *decode_threadloop(void *data)
         }
     }
 
+    if (ddp_decoder_cleanup != NULL && handle != NULL) {
+        (*ddp_decoder_cleanup)(handle);
+        handle = NULL;
+    }
     parser->decode_enabled = 0;
     if (inbuf) {
         free(inbuf);
@@ -592,7 +590,6 @@ void *decode_threadloop(void *data)
         free(outbuf);
     }
 
-    unload_ddp_decoder_lib();
     ALOGI("-- %s\n", __func__);
     return NULL;
 }
@@ -635,7 +632,8 @@ int dcv_decode_release(struct aml_audio_parser *parser)
 
 int dcv_decoder_init_patch(struct dolby_ddp_dec *ddp_dec)
 {
-    ddp_dec->status = dcv_decoder_init(ddp_dec->digital_raw);
+    //ddp_dec->status = dcv_decoder_init(ddp_dec->digital_raw);
+    ddp_dec->status = (*ddp_decoder_init)(1, ddp_dec->digital_raw,&handle);
     if (ddp_dec->status < 0) {
         return -1;
     }

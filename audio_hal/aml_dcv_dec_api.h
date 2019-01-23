@@ -45,6 +45,8 @@ struct dolby_ddp_dec {
 };
 
 
+int load_ddp_decoder_lib();
+int unload_ddp_decoder_lib();
 
 int dcv_decode_init(struct aml_audio_parser *parser);
 int dcv_decode_release(struct aml_audio_parser *parser);
