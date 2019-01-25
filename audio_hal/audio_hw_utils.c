@@ -203,6 +203,21 @@ int is_txlx_chip()
     return false;
 }
 
+int is_txl_chip()
+{
+    char buf[PROPERTY_VALUE_MAX];
+    int ret = -1;
+
+    ret = property_get("ro.board.platform", buf, NULL);
+    if (ret > 0) {
+        if (strcasecmp(buf, "txl") == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 /*
 convert audio formats to supported audio format
 8 ch goes to 32 bit

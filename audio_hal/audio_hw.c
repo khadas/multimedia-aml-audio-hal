@@ -8222,6 +8222,8 @@ void *audio_patch_input_threadloop(void *data)
     int last_samplerate = 0;
     int ring_buffer_size = 0;
     bool bSpdifin_PAO = false;
+    hdmiin_audio_packet_t audio_packet = AUDIO_PACKET_NONE;
+    int txl_chip = is_txl_chip();
 
     ALOGI("++%s", __FUNCTION__);
 
@@ -8321,6 +8323,7 @@ void *audio_patch_input_threadloop(void *data)
                 if (patch->input_src == AUDIO_DEVICE_IN_HDMI) {
                     cur_aformat = audio_parse_get_audio_type(patch->audio_parse_para);
                     cur_samplerate = get_hdmiin_samplerate(&aml_dev->alsa_mixer);
+                    audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
 
                     if (cur_samplerate != -1 && cur_samplerate != 0) {
                         int period_size = 0;
@@ -8328,33 +8331,32 @@ void *audio_patch_input_threadloop(void *data)
                         int buf_size = 0;;
                         // HDMI in samplerate is stable
                         if (last_samplerate != cur_samplerate) {
-                            ALOGD("HDMI Format Switch from 0x%x to 0x%x rate=%d\n", last_aformat, cur_aformat, cur_samplerate);
-                            if (cur_samplerate != 7 /*192000*/) {
-                                bSpdifin_PAO = false;
-                                period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
-                                // reset to original one
-                                buf_size = ring_buffer_size;
+                            ALOGD("HDMI Format Switch from 0x%x to 0x%x rate=%d packet type=%d\n", last_aformat, cur_aformat, cur_samplerate,audio_packet);
 
-                            } else if (cur_samplerate == 7 /*192000*/) {
+                            if (audio_packet == AUDIO_PACKET_HBR) {
                             // if it is high bitrate bitstream, use PAO and increase the buffer size
                                 bSpdifin_PAO = true;
                                 period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
                                 // increase the buffer size
                                 buf_size = ring_buffer_size * 8;
+                            } else {
+                                bSpdifin_PAO = false;
+                                period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
+                                // reset to original one
+                                buf_size = ring_buffer_size;
+
                             }
+                            
                             ring_buffer_reset_size(ringbuffer, buf_size);
                             set_spdifin_pao(&aml_dev->alsa_mixer,bSpdifin_PAO);
                             in_reset_preroid_size(stream_in, period_size);
 
                         }
-                        // some DTS HD file is 48Khz, but we still need to use PAO mode
-                        if (cur_aformat == AUDIO_FORMAT_DTS_HD && bSpdifin_PAO == false) {
+
+                        //ALOGE("spdif pao=%d audio packet=%d\n",bSpdifin_PAO, audio_packet);
+                        if ((audio_packet == AUDIO_PACKET_HBR) && bSpdifin_PAO == false) {
                             bSpdifin_PAO = true;
-                            if (cur_samplerate == 3/*48000*/) {
-                                period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
-                            }else {
-                                period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
-                            }
+                            period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
                             // increase the buffer size
                             buf_size = ring_buffer_size * 8;
                             ring_buffer_reset_size(ringbuffer, buf_size);
@@ -8387,6 +8389,12 @@ void *audio_patch_input_threadloop(void *data)
                   __FUNCTION__, read_bytes * period_mul, bytes_avail);
             if (bytes_avail > 0) {
                 //DoDumpData(patch->in_buf, bytes_avail, CC_DUMP_SRC_TYPE_INPUT);
+
+                /*if it is txl & 88.2k~192K, we will use software detect*/
+                if (txl_chip && (audio_packet == AUDIO_PACKET_HBR) && (patch->input_src == AUDIO_DEVICE_IN_HDMI)) {
+                    feeddata_audio_type_parse(&patch->audio_parse_para, patch->in_buf, bytes_avail);
+                }
+
                 do {
                     if (get_buffer_write_space(ringbuffer) >= bytes_avail) {
                         retry = 0;

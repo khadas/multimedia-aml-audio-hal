@@ -70,6 +70,7 @@ static struct aml_mixer_list gAmlMixerList[] = {
     {AML_MIXER_ID_HDMIIN_AUDIO_TYPE,    "HDMIIN Audio Type"},
     /* SPDIF IN audio SRC select */
     {AML_MIXER_ID_SPDIFIN_SRC,          "Audio spdifin source"},
+    {AML_MIXER_ID_HDMIIN_AUDIO_PACKET,  "HDMIIN Audio Packet"},
 };
 
 static char *get_mixer_name_by_id(int mixer_id)
