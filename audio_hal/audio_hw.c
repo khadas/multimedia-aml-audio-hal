@@ -3914,7 +3914,9 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             if (in->resampler) {
                 ret = read_frames(in, buffer, in_frames);
             } else {
+                //ALOGI("%s, %d,byte:%d,pcm %p",__func__,__LINE__,bytes,in->pcm);
                 ret = pcm_read(in->pcm, buffer, bytes);
+                //ALOGI("%s, %d,ret:%d",__func__,__LINE__,ret);
             }
             if (ret < 0)
                 goto exit;
@@ -5757,9 +5759,9 @@ int do_output_standby_l(struct audio_stream *stream)
     if continous mode,we need always have output.
     so we should not disable the output.
     */
+    pthread_mutex_lock(&adev->alsa_pcm_lock);
     if (aml_out->status == STREAM_HW_WRITING && !continous_mode(adev)) {
         ALOGI("%s aml_out(%p)standby close", __func__, aml_out);
-        pthread_mutex_lock(&adev->alsa_pcm_lock);
         aml_alsa_output_close(out);
         if (eDolbyDcvLib == adev->dolby_lib_type && (adev->ddp.digital_raw == 1 || adev->dts_hd.digital_raw == 1)) {
             struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
@@ -5771,8 +5773,8 @@ int do_output_standby_l(struct audio_stream *stream)
                 aml_out->dual_output_flag = 0;
             }
         }
-        pthread_mutex_unlock(&adev->alsa_pcm_lock);
     }
+    aml_out->status = STREAM_STANDBY;
 
     if (adev->continuous_audio_mode == 0) {
         // release buffers
@@ -5788,6 +5790,7 @@ int do_output_standby_l(struct audio_stream *stream)
     }
     stream_usecase_t usecase = aml_out->usecase;
     usecase_change_validate_l (aml_out, true);
+    pthread_mutex_unlock(&adev->alsa_pcm_lock);
     if (is_usecase_mix (usecase) ) {
         ALOGI ("%s current usecase_masks %x",__func__,adev->usecase_masks);
         /* only relesae hw mixer when no direct output left */
@@ -5870,7 +5873,6 @@ int do_output_standby_l(struct audio_stream *stream)
             //release_spdif_encoder_output_buffer(out);
         }
     }
-    aml_out->status = STREAM_STANDBY;
     if (aml_out->is_normal_pcm) {
         set_system_app_mixing_status(aml_out, aml_out->status);
         aml_out->normal_pcm_mixing_config = false;
@@ -6502,10 +6504,11 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             else
                 source_gain = 1.0;
             if (adev->patch_src == SRC_DTV && adev->audio_patch != NULL) {
+                AM_AOUT_OutputMode_t amode = adev->audio_patch->mode;
                 int16_t tmp;
                 int16_t *buf = (int16_t *)effect_tmp_buf;
                 for (unsigned int i= 0; i < bytes / 2; i = i + 2) {
-                    switch ( adev->audio_patch->mode) {
+                    switch (amode) {
                         case AM_AOUT_OUTPUT_DUAL_LEFT:
                           buf[i + 1] = buf[i];
                           break;
@@ -6741,9 +6744,8 @@ ssize_t hw_write (struct audio_stream_out *stream
             }
         }
     }
-    pthread_mutex_unlock(&adev->alsa_pcm_lock);
-
     latency_frames = out_get_latency_frames(stream);
+    pthread_mutex_unlock(&adev->alsa_pcm_lock);
     if (output_format == AUDIO_FORMAT_E_AC3) {
         latency_frames /= 4;
     }
@@ -6938,13 +6940,13 @@ static void config_output(struct audio_stream_out *stream)
             store_stream_presentation(adev);
             pthread_mutex_unlock(&adev->lock);
         } else if (eDolbyDcvLib == adev->dolby_lib_type) {
-
+            pthread_mutex_lock(&adev->alsa_pcm_lock);
             if (aml_out->status == STREAM_HW_WRITING) {
                 aml_alsa_output_close(stream);
                 aml_out->status = STREAM_STANDBY;
                 aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
             }
-
+            pthread_mutex_unlock(&adev->alsa_pcm_lock);
             /*init or close ddp decoder*/
             struct dolby_ddp_dec *ddp_dec = & (adev->ddp);
             switch (adev->hdmi_format) {
@@ -7031,11 +7033,13 @@ static void config_output(struct audio_stream_out *stream)
             ALOGE("%s() no DOLBY lib avaliable ", __FUNCTION__);
         }
     } else {
+        pthread_mutex_lock(&adev->alsa_pcm_lock);
         if (aml_out->status == STREAM_HW_WRITING) {
             aml_alsa_output_close(stream);
             aml_out->status = STREAM_STANDBY;
             aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
         }
+        pthread_mutex_unlock(&adev->alsa_pcm_lock);
 
         /*init or close dts decoder*/
         struct dca_dts_dec *dts_dec = & (adev->dts_hd);
@@ -7848,12 +7852,11 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
     bool hw_mix = need_hw_mix(adev->usecase_masks);
 
     ALOGV("++%s()\n", __func__);
+    pthread_mutex_lock(&adev->alsa_pcm_lock);
     if ((aml_out->status == STREAM_HW_WRITING) && hw_mix) {
         ALOGI("%s(), aux do alsa close\n", __func__);
 
-        pthread_mutex_lock(&adev->alsa_pcm_lock);
         aml_alsa_output_close(stream);
-        pthread_mutex_unlock(&adev->alsa_pcm_lock);
 
         ALOGI("%s(), aux alsa close done\n", __func__);
         aml_out->status = STREAM_MIXING;
@@ -7862,6 +7865,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
     if (aml_out->status == STREAM_STANDBY) {
         aml_out->status = STREAM_MIXING;
     }
+    pthread_mutex_unlock(&adev->alsa_pcm_lock);
 
     if (adev->useSubMix) {
         // For compatible by lianlian
