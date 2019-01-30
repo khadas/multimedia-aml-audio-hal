@@ -32,8 +32,10 @@
 /*
  *@brief get sink capability
  */
-static audio_format_t get_sink_capability (struct aml_audio_device *adev)
+static audio_format_t get_sink_capability (struct audio_stream_out *stream)
 {
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev = aml_out->dev;
     struct aml_arc_hdmi_desc *hdmi_desc = &adev->hdmi_descs;
 
     bool dd_is_support = hdmi_desc->dd_fmt.is_support;
@@ -41,12 +43,29 @@ static audio_format_t get_sink_capability (struct aml_audio_device *adev)
 
     audio_format_t sink_capability = AUDIO_FORMAT_PCM_16_BIT;
 
-    if (ddp_is_support) {
-        sink_capability = AUDIO_FORMAT_E_AC3;
-    } else if (dd_is_support) {
-        sink_capability = AUDIO_FORMAT_AC3;
+    //STB case
+    if (adev->is_STB)
+    {
+        char *cap = NULL;
+        cap = (char *) get_hdmi_sink_cap (AUDIO_PARAMETER_STREAM_SUP_FORMATS,0,&(adev->hdmi_descs));
+        if (cap) {
+            if (strstr(cap, "AUDIO_FORMAT_E_AC3") != NULL) {
+                sink_capability = AUDIO_FORMAT_E_AC3;
+            } else if (strstr(cap, "AUDIO_FORMAT_AC3") != NULL) {
+                sink_capability = AUDIO_FORMAT_AC3;
+            }
+            ALOGI ("%s mbox+dvb case sink_capability =  %d\n", __FUNCTION__, sink_capability);
+            free(cap);
+            cap = NULL;
+        }
+    } else {
+        if (ddp_is_support) {
+            sink_capability = AUDIO_FORMAT_E_AC3;
+        } else if (dd_is_support) {
+            sink_capability = AUDIO_FORMAT_AC3;
+        }
+        ALOGI ("%s dd support %d ddp support %d\n", __FUNCTION__, dd_is_support, ddp_is_support);
     }
-    ALOGI ("%s dd support %d ddp support %d\n", __FUNCTION__, dd_is_support, ddp_is_support);
     return sink_capability;
 }
 
@@ -67,7 +86,7 @@ void get_sink_format (struct audio_stream_out *stream)
     audio_format_t sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;
     audio_format_t optical_audio_format = AUDIO_FORMAT_PCM_16_BIT;
 
-    audio_format_t sink_capability = get_sink_capability(adev);
+    audio_format_t sink_capability = get_sink_capability(stream);
     audio_format_t source_format = aml_out->hal_internal_format;
 
     /*when device is HDMI_ARC*/
@@ -88,8 +107,10 @@ void get_sink_format (struct audio_stream_out *stream)
     // "adev->active_outport" was set when HDMI ARC cable plug in/off
     // condition 1: ARC port, single output.
     // condition 2: for BOX with continous mode, there are no speaker, only on HDMI outport, same use case
+    // condition 3: for STB case
     if (adev->active_outport == OUTPORT_HDMI_ARC
-         || ((eDolbyMS12Lib == adev->dolby_lib_type) && adev->continuous_audio_mode && !adev->is_TV)) {
+         || ((eDolbyMS12Lib == adev->dolby_lib_type) && adev->continuous_audio_mode && !adev->is_TV)
+         || adev->is_STB) {
         ALOGI("%s() HDMI ARC case", __FUNCTION__);
         switch (adev->hdmi_format) {
         case PCM:

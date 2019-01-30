@@ -21,6 +21,7 @@
 #include <pthread.h>
 #include "aml_ringbuffer.h"
 #include "audio_hw.h"
+#include "audio_hw_profile.h"
 
 #define RAW_USECASE_MASK ((1<<STREAM_RAW_DIRECT) | (1<<STREAM_RAW_HWSYNC) | (1<<STREAM_RAW_PATCH))
 
