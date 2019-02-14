@@ -107,12 +107,13 @@ public:
 
     virtual void    DolbyMS12GetBitstreamOutputSize(unsigned long long *all_output_size, unsigned long long *ms12_generate_zero_size);
 
-    virtual int     DolbyMS12GetMainBufferAvail(void);
+    virtual int     DolbyMS12GetMainBufferAvail(int * max_size);
 
     virtual int     DolbyMS12GetAssociateBufferAvail(void);
 
-    virtual int     DolbyMS12GetSystemBufferAvail(void);
+    virtual int     DolbyMS12GetSystemBufferAvail(int * max_size);
 
+    virtual int     DolbyMS12GetGain(int);
 
     // protected:
 

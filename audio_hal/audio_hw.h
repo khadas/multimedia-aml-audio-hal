@@ -384,6 +384,7 @@ struct aml_audio_device {
     size_t frame_trigger_thred;
     struct aml_audio_parser *aml_parser;
     int continuous_audio_mode;
+    bool atoms_lock_flag;
     bool need_remove_conti_mode;
     int debug_flag;
     int dcvlib_bypass_enable;
