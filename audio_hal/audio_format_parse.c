@@ -388,7 +388,7 @@ void* audio_type_parse_threadloop(void *data)
                             enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_ENABLE);
                         }
                         else if (audio_type_status->audio_type == LPCM && audio_type_status->cur_audio_type != LPCM){
-                            ALOGV("Raw data found: type(%d)\n", audio_type_status->audio_type);
+                            ALOGV("Raw data found: type(%d)\n", audio_type_status->cur_audio_type);
                             enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_DISABLE);
                         }
                         audio_type_status->audio_type = audio_type_status->cur_audio_type;
@@ -401,7 +401,7 @@ void* audio_type_parse_threadloop(void *data)
                         enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_ENABLE);
                     }
                     else if (audio_type_status->audio_type == LPCM && audio_type_status->cur_audio_type != LPCM){
-                        ALOGV("Raw data found: type(%d)\n", audio_type_status->audio_type);
+                        ALOGV("1 Raw data found: type(%d)\n", audio_type_status->cur_audio_type);
                         enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_DISABLE);
                     }
                     audio_type_status->audio_type = audio_type_status->cur_audio_type;

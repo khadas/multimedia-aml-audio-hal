@@ -7059,7 +7059,7 @@ static void config_output(struct audio_stream_out *stream)
             if (adev->active_outport == OUTPORT_HDMI_ARC) {
                 if (adev->hdmi_descs.dts_fmt.is_support) {
                     dts_dec->digital_raw = 1;
-                    if (dts_dec->is_dtscd) {
+                    if (dts_dec->is_dtscd == 1) {
                         adev->dtslib_bypass_enable = 0;
                         dtscd_flag = true;
                     } else {
@@ -7085,7 +7085,7 @@ static void config_output(struct audio_stream_out *stream)
                 int status = dca_decoder_init_patch(dts_dec);
                 if ((patch && audio_parse_get_audio_type_direct(patch->audio_parse_para) == DTSCD) || dtscd_flag) {
                     dts_dec->is_dtscd = 1;
-                    ALOGI("dts cd stream");
+                    ALOGI("dts cd stream,dtscd_flag %d,type %d",dtscd_flag,audio_parse_get_audio_type_direct(patch->audio_parse_para));
                 }
                 ALOGI("dca_decoder_init_patch return :%d", status);
             } else if (dts_dec->status == 1 && (aml_out->hal_internal_format == AUDIO_FORMAT_DTS
