@@ -3907,8 +3907,10 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
                 in->first_buffer_discard = true;
             }
             memset(buffer, 0, bytes);
-            usleep(bytes * 1000000 / audio_stream_in_frame_size(stream) /
-                in_get_sample_rate(&stream->common));
+            int estimated_sched_time_us = 1000;
+            uint64_t time_us = bytes * 1000000 / audio_stream_in_frame_size(stream) /
+                    in_get_sample_rate(&stream->common) - estimated_sched_time_us;
+            usleep(time_us);
             ret = 0;
         } else {
             if (in->resampler) {
