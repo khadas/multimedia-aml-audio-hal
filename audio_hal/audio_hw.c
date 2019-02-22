@@ -5527,7 +5527,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
     if (!in)
         return -ENOMEM;
 
-	if (remoteDeviceOnline()) {
+	if (remoteDeviceOnline() && (devices ==  AUDIO_DEVICE_IN_BUILTIN_MIC)) {
         in->stream.common.set_sample_rate = kehwin_in_set_sample_rate;
         in->stream.common.get_sample_rate = kehwin_in_get_sample_rate;
         in->stream.common.get_buffer_size = kehwin_in_get_buffer_size;
@@ -5701,17 +5701,18 @@ err:
 static void adev_close_input_stream(struct audio_hw_device *dev,
                                 struct audio_stream_in *stream)
 {
-    if (remoteDeviceOnline()) {
+
+    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
+    struct aml_stream_in *in = (struct aml_stream_in *)stream;
+
+    ALOGD("%s: enter: dev(%p) stream(%p) in->device(0x%x)", __func__, dev, stream,in->device);
+    if (remoteDeviceOnline() && (in->device & AUDIO_DEVICE_IN_BUILTIN_MIC)) {
         kehwin_adev_close_input_stream(dev,stream);
-        return;
+        //return;
     }
 #if ENABLE_NANO_NEW_PATH
     nano_close(stream);
 #endif
-    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
-    struct aml_stream_in *in = (struct aml_stream_in *)stream;
-
-    ALOGD("%s: enter: dev(%p) stream(%p)", __func__, dev, stream);
 
     in_standby(&stream->common);
 
@@ -9226,11 +9227,11 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
     unsigned int i = 0;
     int ret = -1;
 
-    if (src_config->ext.device.type == AUDIO_DEVICE_IN_WIRED_HEADSET) {
+    ALOGI("++%s, src_config->ext.device.type(0x%x)", __FUNCTION__,src_config->ext.device.type);
+    if ((src_config->ext.device.type == AUDIO_DEVICE_IN_WIRED_HEADSET) || (remoteDeviceOnline() && (src_config->ext.device.type == AUDIO_DEVICE_IN_BUILTIN_MIC))) {
         ALOGD("bluetooth voice search is in use, bypass adev_create_audio_patch()!!\n");
         goto err;
     }
-    ALOGI("++%s", __FUNCTION__);
     if (!sources || !sinks || !handle) {
         ALOGE("%s: null pointer!", __func__);
         ret = -EINVAL;
