@@ -5353,6 +5353,37 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         sprintf(temp_buf, "source_mute = %d", adev->eq_data.s_mute.mute);
         return strdup(temp_buf);
     }
+
+    //1.HDMI in samplerate
+    else if (strstr(keys, "HDMIIN audio samplerate")) {
+        int cur_samplerate = aml_mixer_ctrl_get_int(&adev->alsa_mixer,AML_MIXER_ID_HDMI_IN_SAMPLERATE);
+        ALOGD("cur_samplerate :%d", cur_samplerate);
+        sprintf(temp_buf, "%d", cur_samplerate);
+        return  strdup(temp_buf);
+    }
+    //3.HDMI in channels
+    else if (strstr(keys, "HDMIIN audio channels")) {
+        int cur_channels = aml_mixer_ctrl_get_int(&adev->alsa_mixer,AML_MIXER_ID_HDMI_IN_CHANNELS);
+        ALOGD("cur_channels :%d", cur_channels);
+        sprintf(temp_buf, "%d", cur_channels);
+        return  strdup(temp_buf);
+    }
+    //4.audio format
+    else if (strstr(keys, "HDMIIN audio format")) {
+        int cur_format = aml_mixer_ctrl_get_int(&adev->alsa_mixer,AML_MIXER_ID_HDMI_IN_FORMATS);
+        ALOGD("cur_format :%d", cur_format);
+        sprintf(temp_buf, "%d", cur_format);
+        return  strdup(temp_buf);
+    }
+    //5.HDMI Passthrough audio data type
+    else if (strstr(keys, "HDMIIN Audio Type")) {
+        int cur_type = aml_mixer_ctrl_get_int(&adev->alsa_mixer,AML_MIXER_ID_HDMIIN_AUDIO_TYPE);
+        ALOGD("cur_type :%d", cur_type);
+        sprintf(temp_buf, "%d", cur_type);
+        return  strdup(temp_buf);
+    }
+
+
     return strdup("");
 }
 
