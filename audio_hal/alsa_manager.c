@@ -27,6 +27,7 @@
 #include "audio_hw_utils.h"
 #include "alsa_device_parser.h"
 #include "dolby_lib_api.h"
+#include "aml_audio_stream.h"
 
 #define AML_ZERO_ADD_MIN_SIZE 1024
 
@@ -459,5 +460,38 @@ int alsa_depop(int card)
         free(buf);
 
     ALOGI("%s, card %d, device %d", __func__, card, port);
+    return 0;
+}
+
+size_t aml_alsa_input_read(struct audio_stream_in *stream,
+                        const void *buffer,
+                        size_t bytes)
+{
+    struct aml_stream_in *in = (struct aml_stream_in *)stream;
+    struct aml_audio_device *aml_dev = in->dev;
+    struct aml_audio_patch *patch = aml_dev->audio_patch;
+    char  *read_buf = (char *)buffer;
+    int ret = 0;
+    size_t  read_bytes = 0;
+    struct pcm *pcm_handle = in->pcm;
+    size_t frame_size = in->config.channels * pcm_format_to_bits(in->config.format) / 8;
+    while (read_bytes < bytes) {
+        ret = pcm_read(pcm_handle, (unsigned char *)buffer + read_bytes, bytes - read_bytes);
+        if (ret >= 0) {
+            read_bytes += ret*frame_size;
+        }
+        if (patch && patch->input_thread_exit) {
+            memset((void*)buffer,0,bytes);
+            return 0;
+        }
+        if (ret >= 0) {
+            ALOGV("ret:%d read_bytes:%d, bytes:%d ",ret,read_bytes,bytes);
+        } else if (ret != -EAGAIN ) {
+            return ret;
+        } else {
+             usleep( (bytes - read_bytes) * 1000000 / audio_stream_in_frame_size(stream) /
+                in->requested_rate / 2);
+        }
+    }
     return 0;
 }

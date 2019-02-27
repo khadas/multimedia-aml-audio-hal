@@ -3228,7 +3228,7 @@ static int start_input_stream(struct aml_stream_in *in)
 #endif
     ALOGI("%s: card(%d), port(%d)", __func__, card, port);
     /* this assumes routing is done previously */
-    in->pcm = pcm_open(card, port, PCM_IN, &in->config);
+    in->pcm = pcm_open(card, port, PCM_IN | PCM_NONEBLOCK, &in->config);
     if (!pcm_is_ready(in->pcm)) {
         ALOGE("%s: cannot open pcm_in driver: %s", __func__, pcm_get_error(in->pcm));
         pcm_close (in->pcm);
@@ -3492,7 +3492,7 @@ static int get_next_buffer (struct resampler_buffer_provider *buffer_provider,
     }
 
     if (in->frames_in == 0) {
-        in->read_status = pcm_read (in->pcm, (void*) in->buffer,
+        in->read_status = aml_alsa_input_read ((struct audio_stream_in *)in, (void*) in->buffer,
                                     in->config.period_size * audio_stream_in_frame_size (&in->stream) );
         if (in->read_status != 0) {
             ALOGE ("get_next_buffer() pcm_read error %d", in->read_status);
@@ -3712,7 +3712,7 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             in->tmp_buffer_8ch_size = 4 * cur_in_bytes;
         }
 
-        ret = pcm_read(in->pcm, in->tmp_buffer_8ch, 4 * cur_in_bytes);
+        ret = aml_alsa_input_read(stream, in->tmp_buffer_8ch, 4 * cur_in_bytes);
         if (ret < 0)
             goto exit;
 
@@ -3923,7 +3923,7 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
                 ret = read_frames(in, buffer, in_frames);
             } else {
                 //ALOGI("%s, %d,byte:%d,pcm %p",__func__,__LINE__,bytes,in->pcm);
-                ret = pcm_read(in->pcm, buffer, bytes);
+                ret = aml_alsa_input_read(stream, buffer, bytes);
                 //ALOGI("%s, %d,ret:%d",__func__,__LINE__,ret);
             }
             if (ret < 0)
