@@ -3197,10 +3197,7 @@ static int start_input_stream(struct aml_stream_in *in)
         /* fix auge tv input, hdmirx, tunner */
         if (alsa_device_is_auge() &&
             (adev->in_device & AUDIO_DEVICE_IN_HDMI)) {
-            /*use spdif in also*/
-            port = PORT_SPDIF;
-            /* use spdif in for hdmi in source */
-            aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIFIN_SRC,3);
+            port = PORT_TV;
         }
         else
             port = PORT_SPDIF;
@@ -8609,7 +8606,6 @@ void *audio_patch_input_threadloop(void *data)
                     cur_aformat = audio_parse_get_audio_type(patch->audio_parse_para);
                     cur_samplerate = get_hdmiin_samplerate(&aml_dev->alsa_mixer);
                     audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
-
                     if (cur_samplerate != -1 && cur_samplerate != 0) {
                         int period_size = 0;
 
@@ -8618,7 +8614,8 @@ void *audio_patch_input_threadloop(void *data)
                         if (last_samplerate != cur_samplerate) {
                             ALOGD("HDMI Format Switch from 0x%x to 0x%x rate=%d packet type=%d\n", last_aformat, cur_aformat, cur_samplerate,audio_packet);
 
-                            if (audio_packet == AUDIO_PACKET_HBR) {
+                            if (audio_packet == AUDIO_PACKET_HBR ||
+                                (patch->aformat == AUDIO_FORMAT_DTS_HD)) {
                             // if it is high bitrate bitstream, use PAO and increase the buffer size
                                 bSpdifin_PAO = true;
                                 period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
@@ -8632,14 +8629,21 @@ void *audio_patch_input_threadloop(void *data)
 
                             }
 
-                            ring_buffer_reset_size(ringbuffer, buf_size);
-                            set_spdifin_pao(&aml_dev->alsa_mixer,bSpdifin_PAO);
-                            in_reset_preroid_size(stream_in, period_size);
+                            if (alsa_device_is_auge()) {
+                                ring_buffer_reset_size(ringbuffer, buf_size);
+                                /* for tl1, pcm using PAO too. */
+                                set_spdifin_pao(&aml_dev->alsa_mixer,true);
+                                in_reset_preroid_size(stream_in, period_size);
+                            } else {
+                                ring_buffer_reset_size(ringbuffer, buf_size);
+                                set_spdifin_pao(&aml_dev->alsa_mixer,bSpdifin_PAO);
+                                in_reset_preroid_size(stream_in, period_size);
+                            }
 
                         }
 
-                        //ALOGE("spdif pao=%d audio packet=%d\n",bSpdifin_PAO, audio_packet);
-                        if ((audio_packet == AUDIO_PACKET_HBR) && bSpdifin_PAO == false) {
+                        if (((audio_packet == AUDIO_PACKET_HBR) && bSpdifin_PAO == false) ||
+                            ((patch->aformat == AUDIO_FORMAT_DTS_HD) && bSpdifin_PAO == false)) {
                             bSpdifin_PAO = true;
                             period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
                             // increase the buffer size

@@ -36,10 +36,10 @@ enum audio_type {
     AC3,
     EAC3,
     DTS,
-    DTSCD,
     DTSHD,
     TRUEHD,
     PAUSE,
+    DTSCD,
     MUTE,
 };
 

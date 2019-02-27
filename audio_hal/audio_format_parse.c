@@ -125,12 +125,13 @@ static audio_channel_mask_t get_dolby_channel_mask(const unsigned char *frameBuf
 static int hw_audio_format_detection(struct aml_mixer_handle *mixer_handle)
 {
     int type = 0;
-    /* PAO have format switch issue TODO*/
-    if (1/*!alsa_device_is_auge()*/)
-        type = aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_SPDIFIN_AUDIO_TYPE);
-    else
+
+    if (alsa_device_is_auge())
         type = aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_HDMIIN_AUDIO_TYPE);
-    if (type >= LPCM && type <= DTS) {
+    else
+        type = aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_SPDIFIN_AUDIO_TYPE);
+
+    if (type >= LPCM && type <= DTSHD) {
         return type;
     } else {
         return LPCM;
