@@ -71,6 +71,11 @@ struct dolby_ms12_desc {
     */
     int latency_frame;
     int curDBGain;
+
+    // for DDP stream, the input frame is 768/1537/1792(each 32ms)
+    // May change through playback.
+    // here to caculate average frame size;
+    int avgDdpFramesize;
 };
 
 /*

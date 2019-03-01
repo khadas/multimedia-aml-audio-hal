@@ -879,7 +879,7 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
     case AUDIO_FORMAT_DTS:
         if (stream->get_format(stream) == AUDIO_FORMAT_IEC61937) {
             size = AC3_PERIOD_SIZE;
-            //ALOGI("%s AUDIO_FORMAT_IEC61937 %zu)", __FUNCTION__, size);
+            ALOGI("%s AUDIO_FORMAT_IEC61937 %zu)", __FUNCTION__, size);
             if ((eDolbyDcvLib == adev->dolby_lib_type) &&
                 (out->flags & AUDIO_OUTPUT_FLAG_DIRECT)) {
                 // local file playback, data from audio flinger direct mode
@@ -1449,7 +1449,7 @@ static char *out_get_parameters (const struct audio_stream *stream, const char *
             if (out->out_device & AUDIO_DEVICE_OUT_HDMI_ARC) {
                 cap = (char *) strdup_hdmi_arc_cap_default (AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES, format);
             } else {
-                cap = (char *) get_hdmi_sink_cap (AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES,format);
+                cap = (char *) get_hdmi_sink_cap (AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES,format,&(adev->hdmi_descs));
             }
         }
         if (cap) {
@@ -1468,7 +1468,7 @@ static char *out_get_parameters (const struct audio_stream *stream, const char *
             if (out->out_device & AUDIO_DEVICE_OUT_HDMI_ARC) {
                 cap = (char *) strdup_hdmi_arc_cap_default (AUDIO_PARAMETER_STREAM_SUP_CHANNELS, format);
             } else {
-                cap = (char *) get_hdmi_sink_cap (AUDIO_PARAMETER_STREAM_SUP_CHANNELS,format);
+                cap = (char *) get_hdmi_sink_cap (AUDIO_PARAMETER_STREAM_SUP_CHANNELS,format,&(adev->hdmi_descs));
             }
         }
         if (cap) {
@@ -1491,7 +1491,7 @@ static char *out_get_parameters (const struct audio_stream *stream, const char *
     cap = strdup ("sup_formats=AUDIO_FORMAT_PCM_16_BIT");
 #endif
             } else {
-                cap = (char *) get_hdmi_sink_cap (AUDIO_PARAMETER_STREAM_SUP_FORMATS,format);
+                cap = (char *) get_hdmi_sink_cap (AUDIO_PARAMETER_STREAM_SUP_FORMATS,format,&(adev->hdmi_descs));
             }
         }
         if (cap) {
@@ -4983,6 +4983,19 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             }
             pthread_mutex_lock(&adev->lock);
             if (continous_mode(adev) && disable_continuous) {
+                // If the Netflix application is terminated, your platform must disable Atmos locking.
+                // For more information, see When to enable/disable Atmos lock.
+                // The following Netflix application state transition scenarios apply (state definitions described in Always Ready):
+                // Running->Not Running
+                // Not Running->Running
+                // Hidden->Visible
+                // Visible->Hidden
+                // Application crash / abnormal shutdown
+               if (eDolbyMS12Lib == adev->dolby_lib_type) {
+                    adev->atoms_lock_flag = 0;
+                    dolby_ms12_set_atmos_lock_flag(adev->atoms_lock_flag);
+                }
+
                 if (dolby_stream_active(adev) || hwsync_lpcm_active(adev)) {
                     ALOGI("%s later release MS12 when direct stream active", __func__);
                     adev->need_remove_conti_mode = true;
@@ -5003,6 +5016,36 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             pthread_mutex_unlock(&adev->lock);
             goto exit;
         }
+
+        ret = str_parms_get_int(parms, "hdmi_dolby_atmos_lock", &val);
+        if (ret >= 0) {
+            ALOGI("%s hdmi_dolby_atmos_lock set to %d\n", __func__ , val);
+            char buf[PROPERTY_VALUE_MAX];
+            int b_atmos_lock = val;
+
+            if (eDolbyMS12Lib == adev->dolby_lib_type) {
+            // Note: some guide from www.netflix.com
+            // In the Netflix application, enable/disable Atmos locking
+            // when you receive the signal from the Netflix application.
+            pthread_mutex_lock(&adev->lock);
+            if (continous_mode(adev)) {
+                if (b_atmos_lock == adev->atoms_lock_flag) {
+                    ALOGI("%s already adev->atoms_lock_flag = %d, need to do nothing.\n", __func__,adev->atoms_lock_flag);
+                } else {
+                    // enable/disable atoms lock
+                    dolby_ms12_set_atmos_lock_flag(b_atmos_lock);
+                    aml_ms12_update_runtime_params(&(adev->ms12));
+                    adev->atoms_lock_flag = b_atmos_lock;
+                    ALOGI("%s set adev->atoms_lock_flag = %d, \n", __func__,adev->atoms_lock_flag);
+                }
+            } else {
+                ALOGI("%s not in continous mode, do nothing\n", __func__);
+            }
+            pthread_mutex_unlock(&adev->lock);
+            }
+            goto exit;
+        }
+
     }
     ret = str_parms_get_str(parms, "SOURCE_GAIN", value, sizeof(value));
     if (ret >= 0) {
@@ -5939,7 +5982,12 @@ static void aml_tinymix_set_spdif_format(audio_format_t output_format,struct aml
         aml_spdif_format = AML_DOLBY_DIGITAL;
     } else if (output_format == AUDIO_FORMAT_E_AC3) {
         aml_spdif_format = AML_DOLBY_DIGITAL_PLUS;
-        spdif_mute = 1;
+        // for BOX with ms12 continous mode, need DDP output
+        if ((eDolbyMS12Lib == aml_dev->dolby_lib_type) && aml_dev->continuous_audio_mode && !aml_dev->is_TV) {
+            // do nothing
+        } else {
+            spdif_mute = 1;
+        }
     } else if (output_format == AUDIO_FORMAT_DTS) {
         aml_spdif_format = AML_DTS;
     } else {
@@ -6326,7 +6374,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             }
             spdif_encoder_ad_flush_output_current_position();
 
-            ALOGI("%s: SPDIF", __func__);
+            //ALOGI("%s: SPDIF", __func__);
             *output_buffer = adev->temp_buf;
             *output_buffer_bytes = adev->temp_buf_pos;
         }
@@ -6630,6 +6678,7 @@ ssize_t hw_write (struct audio_stream_out *stream
     if (adev->debug_flag) {
         ALOGI("+%s() buffer %p bytes %zu, format %d", __func__, buffer, bytes, output_format);
     }
+
     pthread_mutex_lock(&adev->alsa_pcm_lock);
     if (aml_out->status != STREAM_HW_WRITING) {
         ALOGI("%s, aml_out %p alsa open output_format %#x\n", __func__, aml_out, output_format);
@@ -6675,6 +6724,8 @@ ssize_t hw_write (struct audio_stream_out *stream
             // in this case dolby_ms12_get_consumed_payload() always return 0, no AV sync can be done zzz
             if (aml_out->hwsync->aout) {
                 aml_audio_hwsync_audio_process(aml_out->hwsync, dolby_ms12_get_consumed_payload(), &adjust_ms);
+            } else {
+                ALOGW("%s,aml_out->hwsync->aout == NULL",__FUNCTION__);
             }
         }
     }
@@ -6807,7 +6858,7 @@ ssize_t hw_write (struct audio_stream_out *stream
             else {
                 /*system volume prestation caculatation is done inside aux write thread*/
                 total_frame = 0;
-                //write_frames = (aml_out->input_bytes_size - dolby_ms12_get_system_buffer_avail()) / 4;
+                //write_frames = (aml_out->input_bytes_size - dolby_ms12_get_system_buffer_avail(NULL)) / 4;
                 //total_frame = write_frames;
             }
         }
@@ -6839,7 +6890,7 @@ ssize_t hw_write (struct audio_stream_out *stream
             //ms12 internal buffer avail(main/associate/system)
             if (adev->ms12.dolby_ms12_enable == true)
                 ALOGI("%s MS12 buffer avail main %d associate %d system %d\n",
-                      __FUNCTION__, dolby_ms12_get_main_buffer_avail(), dolby_ms12_get_associate_buffer_avail(), dolby_ms12_get_system_buffer_avail());
+                      __FUNCTION__, dolby_ms12_get_main_buffer_avail(NULL), dolby_ms12_get_associate_buffer_avail(), dolby_ms12_get_system_buffer_avail(NULL));
         }
 
         if ((aml_out->hal_internal_format == AUDIO_FORMAT_AC3) || (aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3)) {
@@ -6893,6 +6944,8 @@ static void config_output(struct audio_stream_out *stream)
     if (adev->active_outport == OUTPORT_HDMI_ARC && !is_arc_connected) {
         out_port = OUTPORT_SPEAKER;
     }
+
+    ALOGI("%s, out_port = %d",__func__,out_port);
 
     ret = aml_audio_output_routing((struct audio_hw_device *)adev, out_port, true);
     if (ret < 0) {
@@ -7151,7 +7204,8 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
     int write_retry = 0;
     audio_hwsync_t *hw_sync = aml_out->hwsync;
     if (adev->debug_flag) {
-        ALOGI("%s write in %zu!, format = 0x%x\n", __FUNCTION__, bytes, aml_out->hal_internal_format);
+        ALOGI("%s out=%p write in %zu!, format = 0x%x , ms12_ott = %d,conti = %d, hw_sync = %d\n", __FUNCTION__,
+              aml_out,bytes, aml_out->hal_internal_format,adev->ms12_ott_enable,adev->continuous_audio_mode,aml_out->hw_sync_mode);
     }
     int return_bytes = bytes;
 
@@ -7329,7 +7383,7 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
             write_buf = hw_sync->hw_sync_body_buf;
 
             // Tunnel Mode PCM is 16bits
-            if (aml_out->hw_sync_mode && (eDolbyMS12Lib == adev->dolby_lib_type) &&
+            if ((eDolbyMS12Lib == adev->dolby_lib_type) && continous_mode(adev) &&
                 audio_is_linear_pcm(aml_out->hal_internal_format) && aml_out->config.channels == 2) {
                 short *sample = (short*) write_buf;
                 int l, r;
@@ -7978,7 +8032,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
            48K 2 ch 16 bit audio.
            */
         alsa_latency_frame = adev->ms12.latency_frame;
-        int system_latency = dolby_ms12_get_system_buffer_avail() / frame_size;
+        int system_latency = dolby_ms12_get_system_buffer_avail(NULL) / frame_size;
         aml_out->last_frames_postion = aml_out->frame_write_sum - system_latency;
         if (aml_out->last_frames_postion >= alsa_latency_frame) {
             aml_out->last_frames_postion -= alsa_latency_frame;
@@ -9577,7 +9631,7 @@ static int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd)
 
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
         if (aml_dev->ms12.dolby_ms12_enable == true) {
-            int dolby_main_avail = dolby_ms12_get_main_buffer_avail();
+            int dolby_main_avail = dolby_ms12_get_main_buffer_avail(NULL);
             if (dolby_main_avail > 0) {
                 ms12_ltcy = dolby_main_avail / frame_size / SAMPLE_RATE_MS;
                 if (patch && patch->aformat == AUDIO_FORMAT_E_AC3) {
@@ -10107,6 +10161,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         adev->hw_device.close_output_stream = adev_close_output_stream_new;
         ALOGI("%s,in ms12 case, use new method no matter if current platform is TV or BOX", __FUNCTION__);
     }
+    adev->atoms_lock_flag = false;
 
     if (eDolbyDcvLib == adev->dolby_lib_type) {
         memset(&adev->ddp, 0, sizeof(struct dolby_ddp_dec));
@@ -10172,12 +10227,10 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         adev->rawtopcm_flag = false;
     }
 
-    if ((eDolbyMS12Lib == adev->dolby_lib_type) && (!adev->is_TV)) {
-        // For BOX with MS12 , always set continous mode to true
-        adev->continuous_audio_mode = 1;
-        //ALOGI("%s continuous_audio_mode = %d, dual_outflag= %d, optical = %d",__FUNCTION__,aml_dev->continuous_audio_mode,aml_out->dual_output_flag,aml_dev->optical_format);
-    }
-
+    // adev->debug_flag is set in hw_write()
+    // however, sometimes function didn't goto hw_write() before encounting error.
+    // set debug_flag here to see more debug log when debugging.
+    adev->debug_flag = aml_audio_get_debug_flag();
     ALOGD("%s: exit", __func__);
     return 0;
 

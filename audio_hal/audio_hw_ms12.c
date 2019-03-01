@@ -161,6 +161,7 @@ int get_the_dolby_ms12_prepared(
 
     /*set the continous output flag*/
     set_dolby_ms12_continuous_mode((bool)adev->continuous_audio_mode);
+    dolby_ms12_set_atmos_lock_flag(adev->atoms_lock_flag);
     /* create  the ms12 output stream here */
     /*************************************/
     if (continous_mode(adev)) {
@@ -668,10 +669,7 @@ int bitstream_output(void *buffer, void *priv_data, size_t size)
         struct audio_stream_out *stream_out = (struct audio_stream_out *)aml_out;
         ret = aml_audio_spdif_output(stream_out, buffer, size);
     } else {
-        // ms12: netflix not able to output with this branch.zzz
-        // TODO: Fix Me
         output_format = adev->sink_format;
-        ALOGI("+%s() size %zu,dual_output = %d, optical_format = %d, sink_format = %d", __FUNCTION__, size, aml_out->dual_output_flag, adev->optical_format, adev->sink_format);
         if (audio_hal_data_processing((struct audio_stream_out *)aml_out, buffer, size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
             ret = hw_write((struct audio_stream_out *)aml_out, output_buffer, output_buffer_bytes, output_format);
         }

@@ -22,6 +22,7 @@
 #include "aml_alsa_mixer.h"
 #include "aml_audio_stream.h"
 #include "audio_hw_utils.h"
+#include "dolby_lib_api.h"
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #define PCM  0/*AUDIO_FORMAT_PCM_16_BIT*/
@@ -83,8 +84,12 @@ void get_sink_format (struct audio_stream_out *stream)
         source_format = AUDIO_FORMAT_PCM_16_BIT;
     }
 
-
-    if (adev->active_outport == OUTPORT_HDMI_ARC) {
+    // "adev->hdmi_format" is the UI selection item.
+    // "adev->active_outport" was set when HDMI ARC cable plug in/off
+    // condition 1: ARC port, single output.
+    // condition 2: for BOX with continous mode, there are no speaker, only on HDMI outport, same use case
+    if (adev->active_outport == OUTPORT_HDMI_ARC
+         || ((eDolbyMS12Lib == adev->dolby_lib_type) && adev->continuous_audio_mode && !adev->is_TV)) {
         ALOGI("%s() HDMI ARC case", __FUNCTION__);
         switch (adev->hdmi_format) {
         case PCM:
@@ -105,7 +110,9 @@ void get_sink_format (struct audio_stream_out *stream)
         case AUTO:
             sink_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? min(source_format, sink_capability) : AUDIO_FORMAT_DTS;
             if ((source_format == AUDIO_FORMAT_PCM_16_BIT) && (adev->continuous_audio_mode == 1) && (sink_capability >= AUDIO_FORMAT_AC3)) {
-                sink_audio_format = AUDIO_FORMAT_AC3;
+                // For continous output, we need to continous output data
+                // when input is PCM, we still need to output AC3/EAC3 according to sink capability
+                sink_audio_format = sink_capability;
                 ALOGI("%s continuous_audio_mode %d source_format %#x sink_capability %#x\n", __FUNCTION__, adev->continuous_audio_mode, source_format, sink_capability);
             }
             optical_audio_format = sink_audio_format;
