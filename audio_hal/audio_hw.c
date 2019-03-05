@@ -881,7 +881,8 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
             size = AC3_PERIOD_SIZE;
             ALOGI("%s AUDIO_FORMAT_IEC61937 %zu)", __FUNCTION__, size);
             if ((eDolbyDcvLib == adev->dolby_lib_type) &&
-                (out->flags & AUDIO_OUTPUT_FLAG_DIRECT)) {
+                (out->flags & AUDIO_OUTPUT_FLAG_DIRECT) &&
+                adev->is_TV) {
                 // local file playback, data from audio flinger direct mode
                 // the data is packed by DCV decoder by OMX, 1536 samples per packet
                 // to match with it, set the size to 1536
