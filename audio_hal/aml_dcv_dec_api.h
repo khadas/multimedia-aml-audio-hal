@@ -42,6 +42,7 @@ struct dolby_ddp_dec {
     struct resample_para aml_resample;
     unsigned char *resample_outbuf;
     ring_buffer_t output_ring_buf;
+    int is_dolby_atmos;
 };
 
 

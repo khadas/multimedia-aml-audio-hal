@@ -494,6 +494,7 @@ MAIN_INPUT:
                 *use_size = input_bytes;
             }
         }
+        ms12->is_dolby_atmos = dolby_ms12_get_input_atmos_info();
 exit:
         pthread_mutex_unlock(&ms12->main_lock);
         return 0;
@@ -578,6 +579,7 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12)
     aml_ms12_cleanup(ms12);
     ms12->output_format = AUDIO_FORMAT_INVALID;
     ms12->dolby_ms12_enable = false;
+    ms12->is_dolby_atmos = false;
     ALOGI("--%s(), locked", __FUNCTION__);
     pthread_mutex_unlock(&ms12->main_lock);
     pthread_mutex_unlock(&ms12->lock);

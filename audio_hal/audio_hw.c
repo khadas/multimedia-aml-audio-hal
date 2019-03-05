@@ -5382,6 +5382,21 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         sprintf(temp_buf, "%d", cur_type);
         return  strdup(temp_buf);
     }
+    else if (strstr(keys, "is_dolby_atmos")) {
+        if (dolby_stream_active(adev)) {
+            if (eDolbyMS12Lib == adev->dolby_lib_type)
+                sprintf(temp_buf, "is_dolby_atmos=%d", adev->ms12.is_dolby_atmos);
+            else
+                sprintf(temp_buf, "is_dolby_atmos=%d", adev->ddp.is_dolby_atmos);
+        }
+        else {
+            adev->ms12.is_dolby_atmos = 0;
+            adev->ddp.is_dolby_atmos = 0;
+            sprintf(temp_buf, "is_dolby_atmos=%d", adev->ms12.is_dolby_atmos);
+        }
+        ALOGD("temp_buf %s", temp_buf);
+        return strdup(temp_buf);
+    }
 
 
     return strdup("");

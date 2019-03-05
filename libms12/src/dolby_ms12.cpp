@@ -352,3 +352,15 @@ extern "C" int dolby_ms12_get_system_buffer_avail(int * max_size)
         return -1;
     }
 }
+
+
+extern "C" int dolby_ms12_get_input_atmos_info()
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetInputISDolbyAtmos();
+    } else {
+        return -1;
+    }
+}
