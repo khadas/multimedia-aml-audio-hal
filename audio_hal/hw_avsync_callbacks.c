@@ -99,10 +99,22 @@ int on_meta_data_cbk(void *cookie,
 
     if (!out->first_pts_set) {
         uint32_t latency = 0;
+        int vframe_ready_cnt = 0;
+        int delay_count = 0;
         hwsync_header_construct(header);
         pts32 -= latency*90;
         ALOGD("%s(), set tsync start pts %d, latency %d, last position %lld",
             __func__, pts32, latency, out->last_frames_postion);
+        while (delay_count < 10) {
+            vframe_ready_cnt = get_sysfs_int("/sys/class/video/vframe_ready_cnt");
+            ALOGV("/sys/class/video/vframe_ready_cnt is %d", vframe_ready_cnt);
+            if (vframe_ready_cnt < 2) {
+                usleep(10000);
+                delay_count++;
+                continue;
+            }
+            break;
+        }
         aml_hwsync_set_tsync_start_pts(pts32);
         out->first_pts_set = true;
         //*delay_ms = 40;

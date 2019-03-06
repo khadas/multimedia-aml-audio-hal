@@ -291,6 +291,8 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
 {
     uint32_t pts32;
     char tempbuf[128];
+    int vframe_ready_cnt = 0;
+    int delay_count = 0;
 
     if (p_hwsync == NULL) {
         return -1;
@@ -304,6 +306,16 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     pts32 = (uint32_t)pts;
     p_hwsync->first_apts_flag = true;
     p_hwsync->first_apts = pts;
+    while (delay_count < 10) {
+        vframe_ready_cnt = get_sysfs_int("/sys/class/video/vframe_ready_cnt");
+        ALOGV("/sys/class/video/vframe_ready_cnt is %d", vframe_ready_cnt);
+        if (vframe_ready_cnt < 2) {
+            usleep(10000);
+            delay_count++;
+            continue;
+        }
+        break;
+    }
 
     if (aml_hwsync_set_tsync_start_pts(pts32) < 0)
         return -EINVAL;
