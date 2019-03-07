@@ -801,6 +801,7 @@ static int check_input_parameters(uint32_t sample_rate, audio_format_t format, i
     case 32000:
     case 44100:
     case 48000:
+    case 96000:
         break;
     default:
         ALOGE("%s: unsupported (%d) samplerate passed ", __func__, sample_rate);
