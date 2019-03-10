@@ -918,10 +918,10 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
             size = EAC3_PERIOD_SIZE;//one iec61937 packet size
         } else {
             /*frame align*/
-            if (adev->continuous_audio_mode) {
+            if (1 /* adev->continuous_audio_mode */) {
                 /*Tunnel sync HEADER is 16 bytes*/
                 if (out->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
-                    size = out->ddp_frame_size + 16;
+                    size = out->ddp_frame_size + 20;
                 } else {
                     size = out->ddp_frame_size * 4;
                 }
@@ -962,7 +962,7 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
             // bug_id - 158018, modify size value from PERIOD_SIZE to (PERIOD_SIZE * PLAYBACK_PERIOD_COUNT)
             size = DEFAULT_PLAYBACK_PERIOD_SIZE*2/* * PLAYBACK_PERIOD_COUNT*/;
     }
-    size = ( (size + 15) / 16) * 16;
+    // size = ( (size + 15) / 16) * 16;
     return size * audio_stream_out_frame_size ( (struct audio_stream_out *) stream);
 }
 
@@ -2753,13 +2753,14 @@ static ssize_t out_write_direct(struct audio_stream_out *stream, const void* buf
             return hwsync_cost_bytes;
         }
         if (cur_pts != 0xffffffff && outsize > 0) {
+			int hwsync_hdmi_latency = aml_audio_get_hwsync_latency_offset();
             // if we got the frame body,which means we get a complete frame.
             //we take this frame pts as the first apts.
             //this can fix the seek discontinue,we got a fake frame,which maybe cached before the seek
             if (hw_sync->first_apts_flag == false) {
-                if (cur_pts >= ((out_get_latency (stream)/4) + HDMI_LATENCY_MS) * 90
+                if (cur_pts >= (out_get_latency(stream) + hwsync_hdmi_latency) * 90
                     /*&& out->last_frames_postion > 0*/) {
-                    cur_pts -= ((out_get_latency (stream)/4) + HDMI_LATENCY_MS) * 90;
+                    cur_pts -= (out_get_latency(stream) + hwsync_hdmi_latency) * 90;
                     aml_audio_hwsync_set_first_pts(out->hwsync, cur_pts);
                 } else {
                     ALOGI("%s(), first pts not set, cur_pts %lld, last position %lld",
@@ -2770,7 +2771,7 @@ static ssize_t out_write_direct(struct audio_stream_out *stream, const void* buf
                 uint32_t apts32;
                 uint pcr = 0;
                 uint apts_gap = 0;
-                uint64_t latency = ((out_get_latency (stream)/4) + HDMI_LATENCY_MS) * 90;
+                uint64_t latency = (out_get_latency(stream) + hwsync_hdmi_latency) * 90;
                 // check PTS discontinue, which may happen when audio track switching
                 // discontinue means PTS calculated based on first_apts and frame_write_sum
                 // does not match the timestamp of next audio samples
@@ -2985,7 +2986,13 @@ static ssize_t out_write_direct(struct audio_stream_out *stream, const void* buf
 exit:
     total_frame = out->frame_write_sum + out->frame_skip_sum;
     latency_frames = out_get_latency_frames(stream);
-    latency_frames += HDMI_LATENCY_MS * 48;
+    //latency_frames += HDMI_LATENCY_MS * 48;
+	int tuning_latency = aml_audio_get_arc_latency_offset(adev->sink_format);
+	if ((latency_frames + tuning_latency * 48) < 0) {
+		latency_frames = 0;
+	} else {
+		latency_frames += tuning_latency * 48;
+	}
     clock_gettime (CLOCK_MONOTONIC, &out->timestamp);
     out->lasttimestamp.tv_sec = out->timestamp.tv_sec;
     out->lasttimestamp.tv_nsec = out->timestamp.tv_nsec;
@@ -2995,8 +3002,8 @@ exit:
         out->last_frames_postion = 0;//total_frame;
     }
     if (adev->debug_flag)
-        ALOGD("out %p,out->last_frames_postion %"PRId64", latency = %d, skp sum %lld\n",
-            out, out->last_frames_postion, latency_frames, out->frame_skip_sum);
+        ALOGD("out %p,out->last_frames_postion %"PRId64", latency = %d, skp sum %lld , tune frames %d\n",
+            out, out->last_frames_postion, latency_frames, out->frame_skip_sum, tuning_latency);
     pthread_mutex_unlock (&out->lock);
     if (ret != 0) {
         usleep (bytes * 1000000 / audio_stream_out_frame_size (stream) /
