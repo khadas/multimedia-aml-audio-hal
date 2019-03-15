@@ -240,6 +240,8 @@ static RECORDING_DEVICE recording_device = RECORDING_DEVICE_OTHER;
 /*[SEN5-autumn.zhao-2018-01-11] add for B06 audio support } */
 #endif
 
+static bool is_bypass_dolbyms12(struct audio_stream_out *stream);
+
 static inline short CLIP (int r)
 {
     return (r >  0x7fff) ? 0x7fff :
@@ -320,6 +322,7 @@ static void store_stream_presentation(struct aml_audio_device *adev)
 
             aml_out->last_frames_postion = write_frames;
             aml_out->frame_write_sum = write_frames;
+            aml_out->last_playload_used = 0;
             aml_out->continuous_audio_offset = aml_out->input_bytes_size;
             if (continous_mode(adev) && adev->ms12_out) {
                 adev->ms12_out->continuous_audio_offset = aml_out->input_bytes_size;
@@ -3017,8 +3020,13 @@ static int out_get_render_position (const struct audio_stream_out *stream,
         }
     }
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
-        /* handle the case hal_rate != 48KHz */
-        if (out->hal_rate != MM_FULL_POWER_SAMPLING_RATE) {
+        /*
+         *1.after MS12, output(pcm/dd/dd+) samplerate is changed to 48kHz,
+         *handle the case hal_rate != 48KHz
+         *2.Bypass MS12, do not go through this process.
+         */
+        if ((out->hal_rate != MM_FULL_POWER_SAMPLING_RATE) &&
+            (!is_bypass_dolbyms12((struct audio_stream_out *)stream))) {
             dsp_frame_int64 = (dsp_frame_int64 * out->hal_rate) / MM_FULL_POWER_SAMPLING_RATE;
         }
         *dsp_frames = (uint32_t)(dsp_frame_int64 & 0xffffffff);
@@ -3129,8 +3137,13 @@ static int out_get_presentation_position (const struct audio_stream_out *stream,
     }
 
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
-        /* handle the case hal_rate != 48KHz */
-        if (out->hal_rate != MM_FULL_POWER_SAMPLING_RATE) {
+        /*
+         *1.after MS12, output(pcm/dd/dd+) samplerate is changed to 48kHz,
+         *handle the case hal_rate != 48KHz
+         *2.Bypass MS12, do not go through this process.
+         */
+        if ((out->hal_rate != MM_FULL_POWER_SAMPLING_RATE) &&
+            (!is_bypass_dolbyms12((struct audio_stream_out *)stream))) {
             frames_written_hw = (frames_written_hw * out->hal_rate) / MM_FULL_POWER_SAMPLING_RATE;
         }
     }
@@ -6027,7 +6040,6 @@ static bool is_iec61937_format (struct audio_stream_out *stream)
 
     if ( (adev->disable_pcm_mixing == true) && \
          (aml_out->hal_format == AUDIO_FORMAT_IEC61937) && \
-         (aml_out->hal_channel_mask == AUDIO_CHANNEL_OUT_7POINT1) && \
          (adev->sink_format == AUDIO_FORMAT_E_AC3) ) {
         /*
          *case 1.With Kodi APK Dolby passthrough
@@ -6729,6 +6741,21 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
     return 0;
 }
 
+/*
+ *The audio data(direct/offload/hwsync) should bypass Dolby MS12,
+ *if Audio Mixing is Off, and (Sink & Output) format are both EAC3,
+ *specially, the dual decoder is false and continuous audio mode is false.
+ *because Dolby MS12 is working at LiveTV+(Dual Decoder) or Continuous Mode.
+ */
+static bool is_bypass_dolbyms12(struct audio_stream_out *stream)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
+    struct aml_audio_device *adev = aml_out->dev;
+
+    return ((adev->disable_pcm_mixing == true) && (adev->dual_decoder_support == false) && \
+            (adev->continuous_audio_mode == false) && (get_output_format(stream) == AUDIO_FORMAT_E_AC3));
+}
+
 ssize_t hw_write (struct audio_stream_out *stream
                   , const void *buffer
                   , size_t bytes
@@ -6804,7 +6831,10 @@ ssize_t hw_write (struct audio_stream_out *stream
             // one case is no main audio playing, only aux audio playing (Netflix main screen)
             // in this case dolby_ms12_get_consumed_payload() always return 0, no AV sync can be done zzz
             if (aml_out->hwsync->aout) {
-                aml_audio_hwsync_audio_process(aml_out->hwsync, dolby_ms12_get_consumed_payload(), &adjust_ms);
+                if (is_bypass_dolbyms12(stream))
+                    aml_audio_hwsync_audio_process(aml_out->hwsync, aml_out->hwsync->payload_offset, &adjust_ms);
+                else
+                    aml_audio_hwsync_audio_process(aml_out->hwsync, dolby_ms12_get_consumed_payload(), &adjust_ms);
             } else {
                 ALOGW("%s,aml_out->hwsync->aout == NULL",__FUNCTION__);
             }
@@ -6866,6 +6896,7 @@ ssize_t hw_write (struct audio_stream_out *stream
                         //continuous_audio_mode = 0, when mixing-off and 7.1ch
                         //FIXME out_frames 4 or 16 when DD+ output???
                         aml_out->frame_write_sum += out_frames;
+
                     } else {
                         int sample_per_bytes = (output_format == AUDIO_FORMAT_E_AC3) ? 16 : 4;
 
@@ -6914,7 +6945,28 @@ ssize_t hw_write (struct audio_stream_out *stream
                     write_frames = aml_out->input_bytes_size / 24576 * 32 * 48;
                 }
             } else {
-                write_frames = aml_out->input_bytes_size / aml_out->ddp_frame_size * 32 * 48;
+                // write_frames = aml_out->input_bytes_size / aml_out->ddp_frame_size * 32 * 48;
+                if (is_bypass_dolbyms12(stream)) {
+                    //EAC3 IEC61937 size=4*6144bytes, same as PCM(6144bytes=1536*2ch*2bytes_per_sample)
+                    //every 24kbytes coulc cost 32ms to output.
+                    write_frames = aml_out->frame_write_sum;
+                }
+                else {
+                    size_t playload_used = dolby_ms12_get_consumed_payload();
+                    int ddp_size = 0;
+                    if (aml_out->last_playload_used > 0) {
+                        ddp_size = playload_used - aml_out->last_playload_used;
+                        /*santity check if current frame size matchs dd+ spec*/
+                        if (ddp_size > 0 && ddp_size < 4096) {
+                            if (aml_out->ddp_frame_size != ddp_size) {
+                                ALOGI("ddp frame changed from %d to %d",aml_out->ddp_frame_size,ddp_size);
+                                aml_out->ddp_frame_size = ddp_size;
+                            }
+                        }
+                    }
+                    aml_out->last_playload_used = playload_used;
+                    write_frames = aml_out->input_bytes_size/aml_out->ddp_frame_size*32*48;
+                }
             }
         }
     } else {
@@ -7576,7 +7628,7 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
                 if (cur_aformat != AUDIO_FORMAT_PCM_16_BIT && cur_aformat != AUDIO_FORMAT_PCM_32_BIT) {
                     aml_out->hal_format = AUDIO_FORMAT_IEC61937;
                 } else {
-                    aml_out->hal_format = cur_aformat ;
+                    aml_out->hal_format = cur_aformat;
                 }
                 aml_out->hal_internal_format = cur_aformat;
                 aml_out->hal_channel_mask = audio_parse_get_audio_channel_mask (patch->audio_parse_para);
@@ -7641,7 +7693,7 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         config_output (stream);
     }
 
-    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+    if ((eDolbyMS12Lib == adev->dolby_lib_type) && !is_bypass_dolbyms12(stream)) {
         // in NETFLIX moive selcet screen, switch between movies, adev->ms12_out will change.
         // so we need to update to latest staus just before use.zzz
         ms12_out = (struct aml_stream_out *)adev->ms12_out;
@@ -7842,11 +7894,7 @@ if (fp1) {
             __func__, __LINE__, aml_out->hal_format, output_format, adev->sink_format);
     }
 
-    if ( (adev->disable_pcm_mixing == true) && \
-        /*(aml_out->hal_channel_mask == AUDIO_CHANNEL_OUT_7POINT1) &&\ */
-        (adev->dual_decoder_support == false) && \
-        /*(adev->continuous_audio_mode == false) && \ */
-        (adev->sink_format == AUDIO_FORMAT_E_AC3) ) {
+    if (is_bypass_dolbyms12(stream)) {
         if (audio_hal_data_processing (stream, buffer, bytes, &output_buffer, &output_buffer_bytes, output_format) == 0)
             hw_write (stream, output_buffer, output_buffer_bytes, output_format);
     } else {
@@ -8126,33 +8174,41 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
             }
         }
         /*
-         *when disable_pcm_mixing is true and offload format is dolby
+         *when disable_pcm_mixing is true and offload format is ddp and output format is ddp
          *the system tone voice should not be mixed
          */
-        if (adev->disable_pcm_mixing && (dolby_stream_active(adev) || hwsync_lpcm_active(adev))) {
-            memset((void *)buffer, 0, bytes);
-            if (adev->debug_flag) {
-                ALOGI("%s mute the mixer voice(system/alexa)\n", __FUNCTION__);
+        if (is_bypass_dolbyms12(stream))
+            usleep(bytes * 1000000 /frame_size/out_get_sample_rate(&stream->common)*5/6);
+        else {
+            /*
+             *when disable_pcm_mixing is true and offload format is dolby
+             *the system tone voice should not be mixed
+             */
+            if (adev->disable_pcm_mixing && (dolby_stream_active(adev) || hwsync_lpcm_active(adev))) {
+                memset((void *)buffer, 0, bytes);
+                if (adev->debug_flag) {
+                    ALOGI("%s mute the mixer voice(system/alexa)\n", __FUNCTION__);
+                }
             }
-        }
 
-        aml_out->input_bytes_size += bytes;
-        int count = 0;
-        while (bytes_remaining && adev->ms12.dolby_ms12_enable && retry < 10) {
-            size_t used_size = 0;
-            ret = dolby_ms12_system_process(stream, (char *)buffer + bytes_written, bytes_remaining, &used_size);
-            if (!ret) {
-                bytes_remaining -= used_size;
-                bytes_written += used_size;
-                retry = 0;
-            }
-            retry++;
-            if (bytes_remaining) {
-                usleep(bytes_remaining * 1000000 / frame_size / out_get_sample_rate(&stream->common));
-            }
-            count++;
-            if ((count % 10) == 0) {
-                ALOGE("%s count %d", __func__, count);
+            aml_out->input_bytes_size += bytes;
+            int count = 0;
+            while (bytes_remaining && adev->ms12.dolby_ms12_enable && retry < 10) {
+                size_t used_size = 0;
+                ret = dolby_ms12_system_process(stream, (char *)buffer + bytes_written, bytes_remaining, &used_size);
+                if (!ret) {
+                    bytes_remaining -= used_size;
+                    bytes_written += used_size;
+                    retry = 0;
+                }
+                retry++;
+                if (bytes_remaining) {
+                    usleep(bytes_remaining * 1000000 / frame_size / out_get_sample_rate(&stream->common));
+                }
+                count++;
+                if ((count % 10) == 0) {
+                    ALOGE("%s count %d", __func__, count);
+                }
             }
         }
     } else {
