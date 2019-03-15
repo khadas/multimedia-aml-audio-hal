@@ -10051,7 +10051,7 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
 #endif
 
             {
-                float volume_in_dB = (float)(config->gain.values[0] / 100);
+                float volume_in_dB = ((float)config->gain.values[0]) / 100;
                 aml_dev->sink_gain[outport] = DbToAmpl(volume_in_dB);
 
                 ALOGI(" - set sink device[%#x](outport[%s]): volume_Mb[%d], gain[%f]",
@@ -10097,7 +10097,7 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
                         aml_dev->sink_gain[outport] = 1.0;
                         break;
                     case OUTPORT_SPEAKER:
-                        aml_dev->sink_gain[outport] = DbToAmpl((float)(config->gain.values[0] / 100));
+                        aml_dev->sink_gain[outport] = DbToAmpl(((float)config->gain.values[0]) / 100);
                         break;
                     default:
                         ALOGE("%s: invalid out device type %#x",
@@ -10119,19 +10119,19 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
                         break;
                     case AUDIO_DEVICE_OUT_AUX_LINE:
                         outport = OUTPORT_AUX_LINE;
-                        aml_dev->sink_gain[outport] = DbToAmpl((float)(config->gain.values[0] / 100));
+                        aml_dev->sink_gain[outport] = DbToAmpl(((float)config->gain.values[0]) / 100);
                         break;
                     case AUDIO_DEVICE_OUT_SPEAKER:
                         outport = OUTPORT_SPEAKER;
-                        aml_dev->sink_gain[outport] = DbToAmpl((float)(config->gain.values[0] / 100));
+                        aml_dev->sink_gain[outport] = DbToAmpl(((float)config->gain.values[0]) / 100);
                         break;
                     case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:
                         outport = OUTPORT_HEADPHONE;
-                        aml_dev->sink_gain[outport] = DbToAmpl((float)(config->gain.values[0] / 100));
+                        aml_dev->sink_gain[outport] = DbToAmpl(((float)config->gain.values[0]) / 100);
                         break;
                     case AUDIO_DEVICE_OUT_REMOTE_SUBMIX:
                         outport = OUTPORT_REMOTE_SUBMIX;
-                        aml_dev->sink_gain[outport] = DbToAmpl((float)(config->gain.values[0] / 100));
+                        aml_dev->sink_gain[outport] = DbToAmpl(((float)config->gain.values[0]) / 100);
                         break;
                 default:
                     ALOGE ("%s: invalid out device type %#x",
@@ -10161,7 +10161,7 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
                             patch->sinks->ext.device.type, output_ports[outport],
                             config->gain.values[0], aml_dev->sink_gain[outport]);
             } else if (patch->sinks[0].type == AUDIO_PORT_TYPE_MIX) {
-                aml_dev->src_gain[inport] = 1.0;
+                aml_dev->src_gain[inport] = DbToAmpl(((float)config->gain.values[0]) / 100);
                 ALOGI(" - set src device[%#x](inport[%s]): gain[%f]",
                             config->ext.device.type, input_ports[inport], aml_dev->src_gain[inport]);
             }
