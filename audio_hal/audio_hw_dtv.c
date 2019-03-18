@@ -1087,7 +1087,7 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                     patch->decoder_offset = 0;
                     patch->first_apts_lookup_over = 0;
                 } else {
-                    patch->aformat = AUDIO_FORMAT_PCM;
+                    patch->aformat = AUDIO_FORMAT_PCM_16_BIT;
                     patch->decoder_offset = 0;
                     patch->first_apts_lookup_over = 0;
                 }
