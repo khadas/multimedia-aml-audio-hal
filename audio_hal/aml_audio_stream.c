@@ -385,7 +385,7 @@ bool signal_status_check(audio_devices_t in_device, int *mute_time,
     }
     if ((in_device & AUDIO_DEVICE_IN_TV_TUNER) &&
             !is_atv_in_stable_hw (stream)) {
-        *mute_time = 2500;
+        *mute_time = 500;
         return false;
     }
     if ((in_device & AUDIO_DEVICE_IN_SPDIF) &&
