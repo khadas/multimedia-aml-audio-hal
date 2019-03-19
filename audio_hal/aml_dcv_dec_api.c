@@ -15,6 +15,7 @@
  */
 
 #define LOG_TAG "aml_audio_dcv_dec"
+// #define LOG_NDEBUG 0
 
 #include <unistd.h>
 #include <math.h>
@@ -828,6 +829,7 @@ int dcv_decoder_process_patch(struct dolby_ddp_dec *ddp_dec, unsigned char*buffe
                                              &outRAWLen,
                                              ddp_dec->nIsEc3,
                                              &ddp_dec->pcm_out_info);
+        ddp_dec->is_dolby_atmos = ddp_dec->pcm_out_info.is_dolby_atmos;
         used_size += current_size;
         ddp_dec->outlen_pcm += outPCMLen;
         ddp_dec->outlen_raw += outRAWLen;

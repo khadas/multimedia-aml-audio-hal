@@ -76,6 +76,8 @@ struct dolby_ms12_desc {
     // May change through playback.
     // here to caculate average frame size;
     int avgDdpFramesize;
+    // the input signal atmos info
+    int is_dolby_atmos;
 };
 
 /*

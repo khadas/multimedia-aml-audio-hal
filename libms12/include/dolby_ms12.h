@@ -217,6 +217,12 @@ void dolby_ms12_set_main_dummy(int type, int dummy);
 
 int dolby_ms12_get_gain(int idx);
 
+
+/*@@
+    @brief get dolby atmos info
+*/
+int dolby_ms12_get_input_atmos_info();
+
 #ifdef __cplusplus
 }
 #endif
