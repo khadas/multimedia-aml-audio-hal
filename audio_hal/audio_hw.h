@@ -592,6 +592,7 @@ struct aml_stream_in {
     struct timespec mute_start_ts;
     int mute_flag;
     int mute_log_cntr;
+    int mute_mdelay;
     bool first_buffer_discard;
     struct aml_audio_device *dev;
 

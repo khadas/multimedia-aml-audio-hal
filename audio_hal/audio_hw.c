@@ -3881,8 +3881,7 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
         /* when audio is unstable, need to mute the audio data for a while
          * the mute time is related to hdmi audio buffer size
          */
-        int mute_mdelay = 0;
-        bool stable = signal_status_check(adev->in_device, &mute_mdelay, stream);
+        bool stable = signal_status_check(adev->in_device, &in->mute_mdelay, stream);
 
         if (!stable) {
             if (in->mute_log_cntr == 0)
@@ -3893,7 +3892,7 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             in->mute_flag = 1;
         }
         if (in->mute_flag == 1) {
-            in_mute = Stop_watch(in->mute_start_ts, mute_mdelay);
+            in_mute = Stop_watch(in->mute_start_ts, in->mute_mdelay);
             if (!in_mute) {
                 ALOGI("%s: unmute audio since audio signal is stable", __func__);
                 in->mute_log_cntr = 0;
