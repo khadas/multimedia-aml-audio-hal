@@ -27,6 +27,8 @@ extern "C"{
 void nano_init(void);
 int  nano_input_open(struct audio_stream_in *stream_in, struct audio_config *config);
 void nano_close(struct audio_stream_in *stream);
+int  nano_is_connected(void);
+
 
 #ifdef __cplusplus
 }

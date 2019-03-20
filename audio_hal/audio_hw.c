@@ -5694,9 +5694,11 @@ exit:
     ALOGD("%s: exit", __func__);
 
 #if ENABLE_NANO_NEW_PATH
-    ret = nano_input_open(*stream_in, config);
-    if (ret < 0) {
-        ALOGD("%s: nano_input_open : %d",__func__,ret);
+	if (nano_is_connected() && (devices == AUDIO_DEVICE_IN_BUILTIN_MIC)) {
+        ret = nano_input_open(*stream_in, config);
+        if (ret < 0) {
+            ALOGD("%s: nano_input_open : %d",__func__,ret);
+        }
     }
 #endif
 
@@ -9306,7 +9308,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
     int ret = -1;
 
     ALOGI("++%s, src_config->ext.device.type(0x%x)", __FUNCTION__,src_config->ext.device.type);
-    if ((src_config->ext.device.type == AUDIO_DEVICE_IN_WIRED_HEADSET) || (remoteDeviceOnline() && (src_config->ext.device.type == AUDIO_DEVICE_IN_BUILTIN_MIC))) {
+    if ((src_config->ext.device.type == AUDIO_DEVICE_IN_WIRED_HEADSET) || ((remoteDeviceOnline()|| nano_is_connected())&& (src_config->ext.device.type == AUDIO_DEVICE_IN_BUILTIN_MIC))) {
         ALOGD("bluetooth voice search is in use, bypass adev_create_audio_patch()!!\n");
         goto err;
     }
