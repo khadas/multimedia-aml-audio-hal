@@ -393,6 +393,11 @@ bool signal_status_check(audio_devices_t in_device, int *mute_time,
         *mute_time = 1000;
         return false;
     }
+    if ((in_device & AUDIO_DEVICE_IN_LINE) &&
+            !is_av_in_stable_hw(stream)) {
+       *mute_time = 1000;
+       return false;
+    }
     return true;
 }
 
