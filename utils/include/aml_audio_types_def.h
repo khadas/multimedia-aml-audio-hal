@@ -69,6 +69,9 @@ struct pcm_info {
     int bytes_per_sample;
     int bitstream_type;
     int is_dolby_atmos;
+    int lorocmixlev;
+    int lorosurmixlev;
+    char padding[200];
 };
 
 

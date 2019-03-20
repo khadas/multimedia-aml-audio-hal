@@ -7916,39 +7916,10 @@ re_write:
 
                 while (get_buffer_read_space(&ddp_dec->output_ring_buf) > (int)bytes) {
                     ring_buffer_read(&ddp_dec->output_ring_buf, ddp_dec->outbuf, bytes);
-
+                    void *tmp_buffer = (void *) ddp_dec->outbuf;
 #if defined(IS_ATOM_PROJECT)
                     audio_format_t output_format = AUDIO_FORMAT_PCM_32_BIT;
-                    if (!adev->output_tmp_buf || adev->output_tmp_buf_size < 2 * bytes) {
-                        adev->output_tmp_buf = realloc(adev->output_tmp_buf, 2 * bytes);
-                        adev->output_tmp_buf_size = 2 * bytes;
-                    }
-                    uint16_t *p = (uint16_t *)ddp_dec->outbuf;
-                    int32_t *p1 = (int32_t *)adev->output_tmp_buf;
-                    void *tmp_buffer = (void *)adev->output_tmp_buf;
-                    for (unsigned i = 0; i < bytes / 2; i++) {
-                        p1[i] = ((int32_t)p[i]) << 16;
-                    }
-
-                    bytes *= 2;
-                    double lfe;
-                    if (ddp_dec->pcm_out_info.channel_num == 6) {
-                        int samplenum = bytes / (ddp_dec->pcm_out_info.channel_num * 4);
-                        //ALOGI("ddp_dec->pcm_out_info.channel_num:%d samplenum:%d bytes:%d",ddp_dec->pcm_out_info.channel_num,samplenum,bytes);
-                        //Lt = L + (C *  -3 dB)  - (Ls * -1.2 dB)  -  (Rs * -6.2 dB)
-                        //Rt = R + (C * -3 dB) + (Ls * -6.2 dB) + (Rs *  -1.2 dB)
-                        for (int i = 0; i < samplenum; i++ ) {
-                            lfe = (double)p1[6 * i + 3]*(1.678804f / 4);
-                            p1[6 * i] = p1[6 * i] + p1[6 * i + 2] * 0.707945 - p1[6 * i + 4] * 0.870963 - p1[6 * i + 5] * 0.489778;
-                            p1[6 * i + 1] = p1[6 * i + 1] + p1[6 * i + 2] * 0.707945 + p1[6 * i + 4] * 0.489778 + p1[6 * i + 5] * 0.870963;
-                            p1[2 * i ] = (p1[6 * i] >> 2) + (int32_t)lfe;
-                            p1[2 * i  + 1] = (p1[6 * i + 1] >> 2) + (int32_t)lfe;
-                        }
-                        bytes /= 3;
-                    }
-
 #else
-                    void *tmp_buffer = (void *) ddp_dec->outbuf;
                     audio_format_t output_format = AUDIO_FORMAT_PCM_16_BIT;
 #endif
                     aml_hw_mixer_mixing(&adev->hw_mixer, tmp_buffer, bytes, output_format);
