@@ -69,6 +69,11 @@ static audio_format_t get_sink_capability (struct audio_stream_out *stream)
     return sink_capability;
 }
 
+bool is_sink_support_dolby_passthrough(audio_format_t sink_capability)
+{
+    return sink_capability == AUDIO_FORMAT_E_AC3 || sink_capability == AUDIO_FORMAT_AC3;
+}
+
 /*
  *@brief get sink format by logic min(source format / digital format / sink capability)
  * For Speaker/Headphone output, sink format keep PCM-16bits
@@ -147,6 +152,9 @@ void get_sink_format (struct audio_stream_out *stream)
     /*when device is SPEAKER/HEADPHONE*/
     else {
         ALOGI("%s() SPEAKER/HEADPHONE case", __FUNCTION__);
+        if (!adev->is_STB && is_sink_support_dolby_passthrough(sink_capability))
+            ALOGE("!!!%s() SPEAKER/HEADPHONE case, should no arc caps!!!", __FUNCTION__);
+
         switch (adev->hdmi_format) {
         case PCM:
             sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;
@@ -186,15 +194,41 @@ void get_sink_format (struct audio_stream_out *stream)
     adev->optical_format = optical_audio_format;
 
     /* set the dual output format flag */
-    if (adev->sink_format != adev->optical_format) {
-        aml_out->dual_output_flag = true;
-    } else {
-        aml_out->dual_output_flag = false;
-    }
-
-    ALOGI("%s sink_format %#x optical_format %#x, dual_output %d\n",
-           __FUNCTION__, adev->sink_format, adev->optical_format, aml_out->dual_output_flag);
+    //if (adev->sink_format != adev->optical_format) {
+    //    aml_out->dual_output_flag = true;
+    //} else {
+    //    aml_out->dual_output_flag = false;
+    //}
+    ALOGI("%s sink_format %#x optical_format %#x, stream device %d\n",
+           __FUNCTION__, adev->sink_format, adev->optical_format, aml_out->device);
     return ;
+}
+
+int set_stream_dual_output(struct audio_stream_out *stream, bool en)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
+    aml_out->dual_output_flag = en;
+    return 0;
+}
+
+int update_stream_dual_output(struct audio_stream_out *stream)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
+    struct aml_audio_device *adev = aml_out->dev;
+
+    /* set the dual output format flag */
+    if (adev->sink_format != adev->optical_format) {
+        set_stream_dual_output(stream, true);
+    } else {
+        set_stream_dual_output(stream, false);
+    }
+    return 0;
+}
+
+bool is_dual_output_stream(struct audio_stream_out *stream)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
+    return aml_out->dual_output_flag;
 }
 
 bool is_hdmi_in_stable_hw (struct audio_stream_in *stream)

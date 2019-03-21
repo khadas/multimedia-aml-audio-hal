@@ -273,4 +273,9 @@ hdmiin_audio_packet_t get_hdmiin_audio_packet(struct aml_mixer_handle *mixer_han
 void  release_audio_stream(struct audio_stream_out *stream);
 /*@brief check the AV audio stability by HW register */
 bool is_av_in_stable_hw(struct audio_stream_in *stream);
+
+int set_stream_dual_output(struct audio_stream_out *stream, bool en);
+int update_stream_dual_output(struct audio_stream_out *stream);
+bool is_dual_output_stream(struct audio_stream_out *stream);
+
 #endif /* _AML_AUDIO_STREAM_H_ */

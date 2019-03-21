@@ -91,7 +91,7 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
             }
         }
     } else if (eDolbyDcvLib == adev->dolby_lib_type) {
-        if (aml_out->dual_output_flag && adev->optical_format != AUDIO_FORMAT_PCM_16_BIT) {
+        if (is_dual_output_stream(stream) && adev->optical_format != AUDIO_FORMAT_PCM_16_BIT) {
             device = I2S_DEVICE;
             config->rate = MM_FULL_POWER_SAMPLING_RATE;
         } else if (adev->sink_format != AUDIO_FORMAT_PCM_16_BIT &&
@@ -159,12 +159,13 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
 
 void aml_alsa_output_close(struct audio_stream_out *stream)
 {
-    ALOGI("\n+%s() stream %p\n", __func__, stream);
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
     unsigned int device = aml_out->device;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
 
+    ALOGI("\n+%s() stream %p , dual output: %d\n",
+            __func__, stream, is_dual_output_stream(stream));
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         if (aml_out->is_device_differ_with_ms12) {
             ALOGI("%s stream out device(%d) truely use device(%d)\n", __func__, aml_out->device, ms12->device);
@@ -172,7 +173,7 @@ void aml_alsa_output_close(struct audio_stream_out *stream)
             aml_out->is_device_differ_with_ms12 = false;
         }
     }  else if (eDolbyDcvLib == adev->dolby_lib_type) {
-        if (aml_out->dual_output_flag && adev->ddp.digital_raw == 1) {
+        if (is_dual_output_stream(stream) && adev->ddp.digital_raw == 1) {
             device = I2S_DEVICE;
             ALOGI("dual output,close i2s device");
         }
@@ -196,6 +197,17 @@ void aml_alsa_output_close(struct audio_stream_out *stream)
         adev->pcm_handle[device] = NULL;
     }
     aml_out->pcm = NULL;
+
+    /* dual output management */
+    /* TODO: only for Dcv, not for MS12 */
+    if (is_dual_output_stream(stream) && (eDolbyDcvLib == adev->dolby_lib_type)) {
+        device = DIGITAL_DEVICE;
+        pcm = adev->pcm_handle[device];
+        if (pcm) {
+            pcm_close(pcm);
+            adev->pcm_handle[device] = NULL;
+        }
+    }
     ALOGI("-%s()\n\n", __func__);
 }
 static int aml_alsa_add_zero(struct aml_stream_out *stream, int size)
@@ -393,7 +405,10 @@ write:
     if (adev->patch_src == SRC_DTV && adev->parental_control_av_mute) {
         memset(buffer,0x0,bytes);
     }
-
+    if (getprop_bool("media.audiohal.outdump")) {
+        aml_audio_dump_audio_bitstreams("/data/audio/pcm_write.raw",
+            buffer, bytes);
+    }
     ret = pcm_write(aml_out->pcm, buffer, bytes);
     if (ret < 0) {
         ALOGE("%s write failed,pcm handle %p err num %d", __func__, aml_out->pcm, ret);

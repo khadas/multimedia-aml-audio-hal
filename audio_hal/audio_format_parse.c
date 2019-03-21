@@ -257,19 +257,22 @@ static int audio_type_parse_init(audio_type_parse_t *status)
         return -1;
     }
 
-    in = pcm_open(audio_type_status->card, audio_type_status->device,
-                  PCM_IN, &audio_type_status->config_in);
-    if (!pcm_is_ready(in)) {
-        ALOGE("open device failed: %s\n", pcm_get_error(in));
-        pcm_close(in);
-        goto error;
+    /* Only txlx using software parser */
+    if (is_txlx_chip()) {
+        in = pcm_open(audio_type_status->card, audio_type_status->device,
+                      PCM_IN, &audio_type_status->config_in);
+        if (!pcm_is_ready(in)) {
+            ALOGE("open device failed: %s\n", pcm_get_error(in));
+            pcm_close(in);
+            goto error;
+        }
+        audio_type_status->in = in;
     }
-
-    audio_type_status->in = in;
     enable_HW_resample(mixer_handle, HW_RESAMPLE_ENABLE);
 
     ALOGD("init parser success: (%d), (%d), (%p)",
-          audio_type_status->card, audio_type_status->device, audio_type_status->in);
+          audio_type_status->card, audio_type_status->device,
+          audio_type_status->in);
     return 0;
 error:
     free(audio_type_status->parse_buffer);
@@ -280,7 +283,9 @@ static int audio_type_parse_release(audio_type_parse_t *status)
 {
     audio_type_parse_t *audio_type_status = status;
 
-    pcm_close(audio_type_status->in);
+    if (is_txlx_chip() && audio_type_status->in)
+        pcm_close(audio_type_status->in);
+
     audio_type_status->in = NULL;
     free(audio_type_status->parse_buffer);
 
@@ -341,7 +346,7 @@ void* audio_type_parse_threadloop(void *data)
     ALOGV("Start thread loop for android audio data parse! data = %p, bytes = %d, in = %p\n",
           data, bytes, audio_type_status->in);
 
-    while (audio_type_status->running_flag && audio_type_status->in != NULL) {
+    while (audio_type_status->running_flag) {
         cur_samplerate = get_hdmiin_samplerate(audio_type_status->mixer_handle);
         if (cur_samplerate == 7 /*192000*/) {
             period_mul = 4;
@@ -349,7 +354,7 @@ void* audio_type_parse_threadloop(void *data)
             period_mul = 1;
         }
         read_bytes = bytes * period_mul;
-        if (txlx_chip)
+        if (txlx_chip && audio_type_status->in)
             ret = pcm_read(audio_type_status->in, audio_type_status->parse_buffer + 3, read_bytes);
         else
             ret = -1;
