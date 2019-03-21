@@ -5255,6 +5255,15 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         return 0;
     }
 
+    ret = str_parms_get_str(parms, "TV-Mute", value, sizeof(value));
+    if (ret >= 0) {
+		unsigned int tv_mute = (unsigned int)atoi(value);
+        ALOGE ("Amlogic_HAL - %s: TV-Mute:%d.", __FUNCTION__,tv_mute);
+		adev->need_reset_ringbuffer = tv_mute;
+		adev->tv_mute = tv_mute;
+        return 0;
+    }
+
 exit:
     str_parms_destroy (parms);
 
@@ -8683,6 +8692,9 @@ void *audio_patch_input_threadloop(void *data)
 #endif
 
             bytes_avail = in_read(stream_in, patch->in_buf, read_bytes * period_mul);
+            if (aml_dev->tv_mute) {
+	            memset(patch->in_buf, 0, bytes_avail);
+            }
 
 #if 0
             clock_gettime(CLOCK_MONOTONIC, &after_read);

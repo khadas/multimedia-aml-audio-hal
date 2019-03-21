@@ -450,6 +450,8 @@ struct aml_audio_device {
     int tsync_fd;
     bool rawtopcm_flag;
     int dtv_aformat;
+    int need_reset_ringbuffer;
+    unsigned int tv_mute;
 };
 
 struct meta_data {

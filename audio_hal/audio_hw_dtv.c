@@ -505,6 +505,8 @@ static int dtv_patch_pcm_wirte(unsigned char *pcm_data, int size,
                                int symbolrate, int channel, void *args)
 {
     struct aml_audio_patch *patch = (struct aml_audio_patch *)args;
+    struct audio_hw_device *dev = patch->dev;
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *) dev;
     ring_buffer_t *ringbuffer = &(patch->aml_ringbuffer);
     int left, need_resample;
     int write_size, return_size;
@@ -592,6 +594,14 @@ static int dtv_patch_pcm_wirte(unsigned char *pcm_data, int size,
                                          (int16_t *)patch->resample_outbuf);
             write_size = out_frame << 2;
             write_buf = patch->resample_outbuf;
+        }
+    }
+
+    if (aml_dev->tv_mute) {
+        memset(write_buf, 0, write_size);
+        if (aml_dev->need_reset_ringbuffer) {
+            ring_buffer_reset(ringbuffer);
+            aml_dev->need_reset_ringbuffer = 0;
         }
     }
 
