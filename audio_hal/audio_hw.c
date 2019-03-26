@@ -7362,7 +7362,7 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         return -1;
     }
 
-    if (adev->useSubMix) {
+    if (eDolbyMS12Lib != adev->dolby_lib_type) {
         // For compatible by lianlian
         if (aml_out->standby) {
             ALOGI("%s(), standby to unstandby", __func__);
