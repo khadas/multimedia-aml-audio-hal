@@ -34,6 +34,7 @@
 #include "alsa_manager.h"
 #include "aml_audio_stream.h"
 #include "dolby_lib_api.h"
+#include "aml_audio_timer.h"
 
 #define DOLBY_MS12_OUTPUT_FORMAT_TEST
 
@@ -44,6 +45,7 @@
 
 #define MS12_OUTPUT_PCM_FILE "/data/audio_out/ms12_pcm.raw"
 #define MS12_OUTPUT_BITSTREAM_FILE "/data/audio_out/ms12_bitstream.raw"
+#define MS12_INPUT_SYS_PCM_FILE "/data/audio_out/ms12_input_sys.pcm"
 
 /*
  *@brief dump ms12 output data
@@ -450,6 +452,7 @@ MAIN_INPUT:
                         //FIXME, if ddp input, the size suppose as CONTINUOUS_OUTPUT_FRAME_SIZE
                         //if pcm input, suppose 2ch/16bits/48kHz
                         int need_sleep_us = 0;
+                        int input_ms = 0;
                         if ((aml_out->hal_format == AUDIO_FORMAT_AC3) || \
                             (aml_out->hal_format == AUDIO_FORMAT_E_AC3)) {
                             /*
@@ -467,14 +470,21 @@ MAIN_INPUT:
                             /*
                             for LPCM audio,we support it is 2 ch 48K audio.
                             */
+                            input_ms = (dolby_ms12_input_bytes * 1000 / 4 / ms12->config_sample_rate);
                             if (dolby_ms12_input_bytes > 0) {
-                                need_sleep_us = (dolby_ms12_input_bytes * 1000000 / 4 / (ms12->config_sample_rate) * 5 / 6);
+                                need_sleep_us =  input_ms * 1000 * 5 / 6;
+                            }
+                            ms12->input_total_ms += input_ms;
+                            /*if we are during the beging, we must acquire more data quickly to avoid underrun*/
+                            if ((ms12->input_total_ms <= 100) && (need_sleep_us > 5*1000)) {
+                                need_sleep_us = 5*1000;
                             }
                         }
+
                         if (need_sleep_us > 0) {
                             usleep(need_sleep_us);
                             if (adev->debug_flag >= 2) {
-                                ALOGI("%s sleep %d ms\n", __FUNCTION__, need_sleep_us / 1000);
+                                ALOGI("%s format=%#x sleep %d ms dolby_ms12_input_bytes=%d\n", __FUNCTION__, aml_out->hal_format, need_sleep_us / 1000,dolby_ms12_input_bytes);
                             }
                         }
                     }
@@ -542,6 +552,7 @@ int dolby_ms12_system_process(
             *use_size = dolby_ms12_input_bytes;
         }
     }
+    //dump_ms12_output_data((void*)buffer, dolby_ms12_input_bytes, MS12_INPUT_SYS_PCM_FILE);
     pthread_mutex_unlock(&ms12->lock);
     return 0;
 }
@@ -580,6 +591,8 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12)
     ms12->output_format = AUDIO_FORMAT_INVALID;
     ms12->dolby_ms12_enable = false;
     ms12->is_dolby_atmos = false;
+    ms12->input_total_ms = 0;
+    ms12->bitsteam_cnt = 0;
     ALOGI("--%s(), locked", __FUNCTION__);
     pthread_mutex_unlock(&ms12->main_lock);
     pthread_mutex_unlock(&ms12->lock);
@@ -654,17 +667,23 @@ int bitstream_output(void *buffer, void *priv_data, size_t size)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)priv_data;
     struct aml_audio_device *adev = aml_out->dev;
+    struct dolby_ms12_desc *ms12 = &(adev->ms12);
     void *output_buffer = NULL;
     size_t output_buffer_bytes = 0;
     audio_format_t output_format = AUDIO_FORMAT_AC3;
     int ret = 0;
+    uint64_t before_time;
+    uint64_t after_time;
+    ms12->bitsteam_cnt++;
 
     if (adev->debug_flag > 1) {
-        ALOGI("+%s() size %zu,dual_output = %d, optical_format = %d, sink_format = %d", __FUNCTION__, size, aml_out->dual_output_flag, adev->optical_format, adev->sink_format);
+        ALOGI("+%s() size %zu,dual_output = %d, optical_format = %d, sink_format = %d out total=%d main in=%d", __FUNCTION__, size, aml_out->dual_output_flag, adev->optical_format, adev->sink_format, ms12->bitsteam_cnt, ms12->input_total_ms);
     }
 
     /*dump ms12 bitstream output*/
     dump_ms12_output_data(buffer, size, MS12_OUTPUT_BITSTREAM_FILE);
+
+    before_time = aml_audio_get_systime();
 
     if (aml_out->dual_output_flag) {
         output_format = adev->optical_format;
@@ -674,6 +693,19 @@ int bitstream_output(void *buffer, void *priv_data, size_t size)
         output_format = adev->sink_format;
         if (audio_hal_data_processing((struct audio_stream_out *)aml_out, buffer, size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
             ret = hw_write((struct audio_stream_out *)aml_out, output_buffer, output_buffer_bytes, output_format);
+        }
+    }
+    after_time = aml_audio_get_systime();
+
+
+    if (adev->continuous_audio_mode == 1) {
+
+        /*if it is the beginning of continuous output, we need to slow down the output,
+         otherwise there is no input data, it will cause underrun, 
+         6 frame = 32*6 = 192 ms*/
+        if ((after_time - before_time) < 5*1000 && ms12->bitsteam_cnt <= 6) {
+            //ALOGI("%s cost time=%lld\n",__FUNCTION__,  after_time - before_time);
+            aml_audio_sleep(15*1000);
         }
     }
 

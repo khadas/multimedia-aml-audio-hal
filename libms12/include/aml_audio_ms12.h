@@ -78,6 +78,8 @@ struct dolby_ms12_desc {
     int avgDdpFramesize;
     // the input signal atmos info
     int is_dolby_atmos;
+    int input_total_ms;
+    int bitsteam_cnt;
 };
 
 /*
