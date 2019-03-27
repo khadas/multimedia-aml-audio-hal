@@ -138,6 +138,9 @@
 #define IEC61937_PACKET_SIZE_OF_EAC3    0x6000
 
 #define DISABLE_CONTINUOUS_OUTPUT "persist.vendor.audio.continuous.disable"
+
+#define INPUTSOURCE_MUTE_DELAY_MS	800
+
 const char *str_usecases[STREAM_USECASE_MAX] = {
     "STREAM_PCM_NORMAL",
     "STREAM_PCM_DIRECT",
@@ -5604,6 +5607,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
     in->requested_rate = config->sample_rate;
     in->hal_channel_mask = config->channel_mask;
     in->hal_format = config->format;
+    in->mute_mdelay = INPUTSOURCE_MUTE_DELAY_MS;
 
     if (in->device & AUDIO_DEVICE_IN_ALL_SCO)
         memcpy(&in->config, &pcm_config_bt, sizeof(pcm_config_bt));
