@@ -316,8 +316,11 @@ static void store_stream_presentation(struct aml_audio_device *adev)
                 write_frames = aml_out->input_bytes_size / aml_out->ddp_frame_size * 32 * 48;
             }
 
-            /* handle the case hal_rate != 48KHz */
-            if (aml_out->hal_rate != MM_FULL_POWER_SAMPLING_RATE) {
+            /*
+             *handle the case hal_rate(32kHz/44.1kHz) != 48KHz,
+             *if it is n(1 or 4)*48kHz, keep the write_frames as well.
+             */
+            if (aml_out->hal_rate % MM_FULL_POWER_SAMPLING_RATE) {
                 write_frames = (write_frames * MM_FULL_POWER_SAMPLING_RATE) / aml_out->hal_rate;
             }
 
