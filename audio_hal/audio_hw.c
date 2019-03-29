@@ -9599,7 +9599,11 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
             ALOGE("%s() output routing failed", __func__);
         }
 
-        aml_dev->out_device = sink_config->ext.device.type;
+        aml_dev->out_device = 0;
+        for (i = 0; i < num_sinks; i++) {
+            aml_dev->out_device |= sink_config[i].ext.device.type;
+        }
+
         ALOGI("%s: mix->device patch: outport(%d)", __func__, outport);
 #if defined(IS_ATOM_PROJECT)
 #ifdef DEBUG_VOLUME_CONTROL
