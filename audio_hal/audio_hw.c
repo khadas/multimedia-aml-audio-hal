@@ -7537,18 +7537,15 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
             //in_frames = outsize / frame_size;
             write_buf = hw_sync->hw_sync_body_buf;
 
-            // Tunnel Mode PCM is 16bits
+            // Tunnel Mode PCM is 16bits 2ch
             if ((eDolbyMS12Lib == adev->dolby_lib_type) && continous_mode(adev) &&
-                audio_is_linear_pcm(aml_out->hal_internal_format) && aml_out->config.channels == 2) {
+                audio_is_linear_pcm(aml_out->hal_internal_format)) {
                 short *sample = (short*) write_buf;
-                int l, r;
-                int out_frames = write_bytes / aml_out->config.channels / 2; // 2 bytes per sample
+                int out_frames = write_bytes / (2*2); // 2 bytes per sample
                 int kk;
                 for (kk = 0; kk <  out_frames; kk++) {
-                    l = aml_out->volume_l * sample[kk * 2];
-                    sample[kk * 2] = CLIP(l);
-                    r = aml_out->volume_r * sample[kk * 2 + 1];
-                    sample[kk * 2 + 1] = CLIP(r);
+                    sample[kk * 2] *= aml_out->volume_l;
+                    sample[kk * 2 + 1] *= aml_out->volume_r;
                 }
             }
 
