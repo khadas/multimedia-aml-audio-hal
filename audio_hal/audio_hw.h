@@ -391,11 +391,11 @@ struct aml_audio_device {
     int dtslib_bypass_enable;
     float dts_post_gain;
     bool spdif_encoder_init_flag;
-       /*atsc has video in program*/
+    /*atsc has video in program*/
     bool is_has_video;
     struct aml_stream_out *ms12_out;
     struct timespec mute_start_ts;
-	int spdif_fmt_hw;
+    int spdif_fmt_hw;
     bool ms12_ott_enable;
     bool ms12_main1_dolby_dummy;
     /*amlogic soft ware noise gate fot analog TV source*/
@@ -450,6 +450,9 @@ struct aml_audio_device {
     int tsync_fd;
     bool rawtopcm_flag;
     int dtv_aformat;
+    unsigned int dtv_i2s_clock;
+    unsigned int dtv_spidif_clock;
+    unsigned int dtv_droppcm_size;
     int need_reset_ringbuffer;
     unsigned int tv_mute;
 };
@@ -513,7 +516,7 @@ struct aml_stream_out {
     unsigned last_dsp_frame;
     audio_hwsync_t *hwsync;
     struct timespec timestamp;
-	struct timespec lasttimestamp;
+    struct timespec lasttimestamp;
     stream_usecase_t usecase;
     uint32_t dev_usecase_masks;
     /**
@@ -689,7 +692,7 @@ audio_format_t get_output_format(struct audio_stream_out *stream);
 void *audio_patch_output_threadloop(void *data);
 
 ssize_t aml_audio_spdif_output(struct audio_stream_out *stream,
-                void *buffer, size_t bytes);
+                               void *buffer, size_t bytes);
 
 /*
  *@brief audio_hal_data_processing
@@ -702,17 +705,17 @@ ssize_t aml_audio_spdif_output(struct audio_stream_out *stream,
  *    -1, fail
  */
 ssize_t audio_hal_data_processing(struct audio_stream_out *stream
-    , const void *input_buffer
-    , size_t input_buffer_bytes
-    , void **output_buffer
-    , size_t *output_buffer_bytes
-    , audio_format_t output_format);
+                                  , const void *input_buffer
+                                  , size_t input_buffer_bytes
+                                  , void **output_buffer
+                                  , size_t *output_buffer_bytes
+                                  , audio_format_t output_format);
 
 /*
  *@brief hw_write the api to write the data to audio hardware
  */
 ssize_t hw_write(struct audio_stream_out *stream
-    , const void *buffer
+                 , const void *buffer
                  , size_t bytes
                  , audio_format_t output_format);
 
@@ -725,6 +728,6 @@ int out_standby_new(struct audio_stream *stream);
 ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buffer,
                                size_t bytes);
 int dsp_process_output(struct aml_audio_device *adev, void *in_buffer,
-        size_t bytes);
+                       size_t bytes);
 
 #endif

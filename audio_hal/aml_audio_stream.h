@@ -38,10 +38,10 @@ enum digital_format {
 
 /**\brief Audio output mode*/
 typedef enum {
-   AM_AOUT_OUTPUT_STEREO,     /**< Stereo output*/
-   AM_AOUT_OUTPUT_DUAL_LEFT,  /**< Left audio output to dual channel*/
-   AM_AOUT_OUTPUT_DUAL_RIGHT, /**< Right audio output to dual channel*/
-   AM_AOUT_OUTPUT_SWAP        /**< Swap left and right channel*/
+    AM_AOUT_OUTPUT_STEREO,     /**< Stereo output*/
+    AM_AOUT_OUTPUT_DUAL_LEFT,  /**< Left audio output to dual channel*/
+    AM_AOUT_OUTPUT_DUAL_RIGHT, /**< Right audio output to dual channel*/
+    AM_AOUT_OUTPUT_SWAP        /**< Swap left and right channel*/
 } AM_AOUT_OutputMode_t;
 
 enum sample_bitwidth {
@@ -139,7 +139,7 @@ static inline alsa_device_t usecase_to_device(stream_usecase_t usecase)
         return DIGITAL_DEVICE;
     default:
         return I2S_DEVICE;
-   }
+    }
 }
 
 static inline alsa_device_t usecase_device_adapter_with_ms12(alsa_device_t usecase_device, audio_format_t output_format)
@@ -192,9 +192,9 @@ struct aml_audio_patch {
     audio_format_t out_format;
 #if 0
     struct ring_buffer
-    struct thread_read
-    struct thread_write
-    struct audio_mixer;
+        struct thread_read
+            struct thread_write
+                struct audio_mixer;
     void *output_process_buf;
     void *mixed_buf;
 #endif
@@ -224,15 +224,19 @@ struct aml_audio_patch {
     unsigned int first_apts_lookup_over;
     int dtv_symple_rate;
     int dtv_pcm_channel;
+    unsigned int dtv_output_clock;
+    unsigned int dtv_default_i2s_clock;
+    unsigned int dtv_default_spidif_clock;
+
     pthread_mutex_t dtv_output_mutex;
     pthread_mutex_t dtv_input_mutex;
     /*end dtv play*/
     // correspond to audio_patch:: audio_patch_handle_t id;
-	// patch unique ID
-	int patch_hdl;
-	struct resample_para dtv_resample;
-	unsigned char *resample_outbuf;
-	AM_AOUT_OutputMode_t   mode;
+    // patch unique ID
+    int patch_hdl;
+    struct resample_para dtv_resample;
+    unsigned char *resample_outbuf;
+    AM_AOUT_OutputMode_t   mode;
 };
 
 struct audio_stream_out;
