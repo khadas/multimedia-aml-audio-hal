@@ -4370,6 +4370,21 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out_standby_new(&stream->common);
     }
 
+    if (continous_mode(adev) && (eDolbyMS12Lib == adev->dolby_lib_type)) {
+        if (out->volume_l != 1.0) {
+            if (!audio_is_linear_pcm(out->hal_internal_format)) {
+                /*we change the volume in this stream, but it will be closed,
+                  we need to restore the ms12 to normal one
+                */
+                int iMS12DB = 0;//restore to full volume
+                ALOGI("restore the ms12 volume");
+                set_dolby_ms12_primary_input_db_gain(&(adev->ms12), iMS12DB , 10);
+                adev->ms12.curDBGain = iMS12DB;
+                aml_ms12_update_runtime_params(&(adev->ms12));
+            }
+        }
+    }
+
     pthread_mutex_lock(&out->lock);
     free(out->audioeffect_tmp_buffer);
     free(out->tmp_buffer_8ch);
@@ -6079,9 +6094,9 @@ int do_output_standby_l(struct audio_stream *stream)
                         dolby_ms12_set_main_dummy(0, true);
                         dolby_ms12_flush_main_input_buffer();
                         dolby_ms12_set_pause_flag(false);
-                        int iMS12DB = 0;//restore to full volume
-                        set_dolby_ms12_primary_input_db_gain(&(adev->ms12), iMS12DB , 10);
-                        adev->ms12.curDBGain = iMS12DB;
+                        //int iMS12DB = 0;//restore to full volume
+                        //set_dolby_ms12_primary_input_db_gain(&(adev->ms12), iMS12DB , 10);
+                        //adev->ms12.curDBGain = iMS12DB;
                         aml_ms12_update_runtime_params(&(adev->ms12));
                         adev->ms12.is_continuous_paused = false;
                         adev->ms12_main1_dolby_dummy = true;
