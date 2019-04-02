@@ -7995,11 +7995,13 @@ re_write:
                 } else {
                     config_output(stream);
                 }
-                if (ret < 0) {
+                if (ret < 0 ) {
                     if (adev->debug_flag)
                         ALOGE("%s(), %d decoder error, ret %d", __func__, __LINE__, ret);
-                    aml_out->frame_write_sum = aml_out->input_bytes_size  / audio_stream_out_frame_size(stream);
-                    aml_out->last_frames_postion = aml_out->frame_write_sum;
+                    if (aml_out->frame_write_sum > 0 ) {
+                        aml_out->frame_write_sum = (aml_out->input_bytes_size - ddp_dec->remain_size)  / audio_stream_out_frame_size(stream);
+                        aml_out->last_frames_postion = aml_out->frame_write_sum  - out_get_latency_frames (stream);
+                    }
                     return bytes;
                 }
                 /*wirte raw data*/
@@ -8044,8 +8046,8 @@ re_write:
                     }
                 }
 
-                aml_out->frame_write_sum = aml_out->input_bytes_size  / audio_stream_out_frame_size(stream);
-                aml_out->last_frames_postion = aml_out->frame_write_sum;
+                aml_out->frame_write_sum = (aml_out->input_bytes_size - ddp_dec->remain_size) / audio_stream_out_frame_size(stream);
+                aml_out->last_frames_postion = aml_out->frame_write_sum - out_get_latency_frames (stream);
                 return return_bytes;
             }
 
@@ -9402,7 +9404,6 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
     enum IN_PORT inport = INPORT_HDMIIN;
     unsigned int i = 0;
     int ret = -1;
-
     ALOGI("++%s, src_config->ext.device.type(0x%x)", __FUNCTION__,src_config->ext.device.type);
     if ((src_config->ext.device.type == AUDIO_DEVICE_IN_WIRED_HEADSET) || ((remoteDeviceOnline()|| nano_is_connected())&& (src_config->ext.device.type == AUDIO_DEVICE_IN_BUILTIN_MIC))) {
         ALOGD("bluetooth voice search is in use, bypass adev_create_audio_patch()!!\n");
