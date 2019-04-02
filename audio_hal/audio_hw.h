@@ -555,6 +555,7 @@ struct aml_stream_out {
     uint64_t us_used_last_write;
     bool offload_mute;
     bool need_convert;
+    size_t last_playload_used;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);
