@@ -76,6 +76,7 @@ include $(BUILD_PREBUILT)
         aml_resample_wrap.cpp \
         audio_simple_resample_api.c \
         aml_audio_resample_manager.c \
+        audio_dtv_ad.c \
         audio_android_resample_api.c
 
 
@@ -94,6 +95,7 @@ include $(BUILD_PREBUILT)
         $(LOCAL_PATH)/../../LibAudio/amadec/include \
         $(LOCAL_PATH)/../bt_voice/kehwin \
         frameworks/native/include \
+        vendor/amlogic/common/external/dvb/include/am_adp \
         frameworks/av/include
 
     LOCAL_LDFLAGS_arm += $(LOCAL_PATH)/lib_aml_ng.a
@@ -104,7 +106,7 @@ include $(BUILD_PREBUILT)
         liblog libcutils libtinyalsa \
         libaudioutils libdl libaudioroute libutils \
         libdroidaudiospdif libamaudioutils libamlaudiorc libamadec \
-        libnano
+        libnano libam_adp
 
 ifeq ($(BOARD_ENABLE_NANO), true)
     LOCAL_SHARED_LIBRARIES += libnano

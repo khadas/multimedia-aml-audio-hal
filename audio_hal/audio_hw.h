@@ -455,6 +455,8 @@ struct aml_audio_device {
     unsigned int dtv_droppcm_size;
     int need_reset_ringbuffer;
     unsigned int tv_mute;
+    int sub_apid;
+    int sub_afmt;
 };
 
 struct meta_data {

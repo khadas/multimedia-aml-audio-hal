@@ -5200,6 +5200,38 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+    ret = str_parms_get_str(parms, "subapid", value, sizeof(value));
+    if (ret > 0) {
+        int audio_sub_pid = (unsigned int)atoi(value);
+        ALOGI("%s() get the sub audio pid %d\n", __func__, audio_sub_pid);
+        if (adev->audio_patch != NULL) {
+            if (audio_sub_pid > 0) {
+                adev->sub_apid = audio_sub_pid;
+            } else {
+                adev->sub_apid = 0;
+            }
+        } else {
+            ALOGI("%s()the audio patch is NULL \n", __func__);
+        }
+        goto exit;
+    }
+
+    ret = str_parms_get_str(parms, "subafmt", value, sizeof(value));
+    if (ret > 0) {
+        int audio_sub_fmt = (unsigned int)atoi(value);
+        ALOGI("%s() get the sub audio fmt %d\n", __func__, audio_sub_fmt);
+        if (adev->audio_patch != NULL) {
+            if (audio_sub_fmt > 0) {
+                adev->sub_afmt = audio_sub_fmt;
+            } else {
+                adev->sub_afmt= 0;
+            }
+        } else {
+            ALOGI("%s()the audio patch is NULL \n", __func__);
+        }
+        goto exit;
+    }
+
     ret = str_parms_get_str(parms, "dtv_has_video", value, sizeof(value));
     if (ret > 0) {
         unsigned int has_video = (unsigned int)atoi(value);
@@ -8560,7 +8592,7 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
     }
 
     adev_close_output_stream(dev, stream);
-    adev->dual_decoder_support = false;
+    //adev->dual_decoder_support = false;
     ALOGD("%s: exit", __func__);
 }
 
