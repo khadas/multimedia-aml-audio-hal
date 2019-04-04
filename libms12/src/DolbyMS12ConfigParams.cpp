@@ -544,7 +544,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
         (*row_index)++;
     }
 
-    if (mDRCModesOfDownmixedOutput == 1) {
+    {
         sprintf(ConfigParams[*row_index], "%s", "-drc");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%d", mDRCModesOfDownmixedOutput);
@@ -787,7 +787,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitchesRuntime(char **ConfigParams, int
         (*row_index)++;
     }
 
-    if (mDRCModesOfDownmixedOutput == 1) {
+    {
         sprintf(ConfigParams[*row_index], "%s", "-drc");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%d", mDRCModesOfDownmixedOutput);
