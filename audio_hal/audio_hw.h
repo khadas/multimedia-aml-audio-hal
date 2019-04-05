@@ -317,6 +317,7 @@ struct aml_audio_device {
     bool usecase_changed;
     uint32_t usecase_masks;
     struct aml_stream_out *active_outputs[STREAM_USECASE_MAX];
+    pthread_mutex_t patch_lock;
     struct aml_audio_patch *audio_patch;
     /* indicates atv to mixer patch, no need HAL patching  */
     bool tuner2mix_patch;
