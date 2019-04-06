@@ -5527,6 +5527,11 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         ALOGD("temp_buf %s", temp_buf);
         return strdup(temp_buf);
     }
+    else if (strstr(keys, "HDMI ARC Switch")) {
+        sprintf(temp_buf, "HDMI ARC Switch=%d", adev->bHDMIARCon);
+        ALOGD("temp_buf %s", temp_buf);
+        return strdup(temp_buf);
+    }
 
 
     return strdup("");
