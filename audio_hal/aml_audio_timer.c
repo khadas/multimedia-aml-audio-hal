@@ -33,11 +33,22 @@ uint64_t aml_audio_get_systime(void)
 
     clock_gettime(CLOCK_MONOTONIC, &ts);
 
-    sys_time = ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+    sys_time = (uint64_t)ts.tv_sec * 1000000LL + (uint64_t)ts.tv_nsec / 1000LL;
 
     return sys_time;
 }
 
+uint64_t aml_audio_get_systime_ns(void)
+{
+    struct timespec ts;
+    uint64_t sys_time;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+
+    sys_time = (uint64_t)ts.tv_sec * 1000*1000*1000LL + (uint64_t)ts.tv_nsec;
+
+    return sys_time;
+}
 
 
 int aml_audio_sleep(uint64_t us)

@@ -28,7 +28,7 @@
 #include "alsa_device_parser.h"
 #include "dolby_lib_api.h"
 #include "aml_audio_stream.h"
-
+#include "audio_virtual_buf.h"
 #define AML_ZERO_ADD_MIN_SIZE 1024
 
 #define AUDIO_EAC3_FRAME_SIZE 16
@@ -38,6 +38,10 @@
 
 #define MAX_AVSYNC_GAP (10*90000)
 #define MAX_AVSYNC_WAIT_TIME (3*1000*1000)
+
+#define ALSA_OUT_BUF_NS (10000000000LL)   //10s
+#define ALSA_PREFILL_BUF_NS (10000000000LL)   //10s
+
 
 /*
 insert bytes of into audio effect buffer to clear intermediate data when exit
@@ -208,6 +212,9 @@ void aml_alsa_output_close(struct audio_stream_out *stream)
             adev->pcm_handle[device] = NULL;
         }
     }
+    if ((adev->continuous_audio_mode == 1) && (eDolbyMS12Lib == adev->dolby_lib_type)) {
+        audio_virtual_buf_close(&aml_out->alsa_vir_buf_handle);
+    }
     ALOGI("-%s()\n\n", __func__);
 }
 static int aml_alsa_add_zero(struct aml_stream_out *stream, int size)
@@ -267,6 +274,18 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
     int64_t pretime = 0;
     unsigned char*audio_data = (unsigned char*)buffer;
 
+    switch (adev->sink_format) {
+    case AUDIO_FORMAT_E_AC3:
+        frame_size = AUDIO_EAC3_FRAME_SIZE;
+        break;
+    case AUDIO_FORMAT_AC3:
+        frame_size = AUDIO_AC3_FRAME_SIZE;
+        break;
+    default:
+        frame_size = (aml_out->is_tv_platform == true) ? AUDIO_TV_PCM_FRAME_SIZE : AUDIO_DEFAULT_PCM_FRAME_SIZE;
+        break;
+    }
+
     // pre-check
     if (!has_video || !is_dtv) {
         goto write;
@@ -293,17 +312,7 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
         cur_vpts = first_vpts;
     }
 
-    switch (adev->sink_format) {
-    case AUDIO_FORMAT_E_AC3:
-        frame_size = AUDIO_EAC3_FRAME_SIZE;
-        break;
-    case AUDIO_FORMAT_AC3:
-        frame_size = AUDIO_AC3_FRAME_SIZE;
-        break;
-    default:
-        frame_size = (aml_out->is_tv_platform == true) ? AUDIO_TV_PCM_FRAME_SIZE : AUDIO_DEFAULT_PCM_FRAME_SIZE;
-        break;
-    }
+
 
     cur_apts = (unsigned int)((int64_t)first_apts + (int64_t)(((int64_t)aml_out->dropped_size * 90) / (48 * frame_size)));
     av_diff = (int)((int64_t)cur_apts - (int64_t)cur_vpts);
@@ -413,6 +422,34 @@ write:
     if (ret < 0) {
         ALOGE("%s write failed,pcm handle %p err num %d", __func__, aml_out->pcm, ret);
     }
+
+    if ((adev->continuous_audio_mode == 1) && (eDolbyMS12Lib == adev->dolby_lib_type) && (bytes != 0)) {
+        uint64_t input_ns = 0;
+        int mutex_lock_success = 0;
+        int sample_rate = 48000;
+        /*we will go to sleep, unlock mutex*/
+        if(pthread_mutex_unlock(&adev->alsa_pcm_lock) == 0) {
+            mutex_lock_success = 1;
+        }
+        if (adev->ms12_config.rate != 0) {
+            sample_rate = adev->ms12_config.rate;
+        }
+        input_ns = (uint64_t)(bytes) * 1000000000LL / frame_size / sample_rate;
+
+        if (aml_out->alsa_vir_buf_handle == NULL) {
+            /*set the buf to 10s, and then fill the buff, we will use this to make the data consuming to stable*/
+            audio_virtual_buf_open(&aml_out->alsa_vir_buf_handle, "alsa out", ALSA_OUT_BUF_NS, ALSA_OUT_BUF_NS, 0);
+            audio_virtual_buf_process(aml_out->alsa_vir_buf_handle, ALSA_OUT_BUF_NS - input_ns/2);
+        }
+
+
+        audio_virtual_buf_process(aml_out->alsa_vir_buf_handle, input_ns);
+        if(mutex_lock_success) {
+            pthread_mutex_lock(&adev->alsa_pcm_lock);
+        }
+    }
+
+    
     return ret;
 }
 

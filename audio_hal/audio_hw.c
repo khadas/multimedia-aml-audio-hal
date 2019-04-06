@@ -72,6 +72,7 @@
 #include "spdif_encoder_api.h"
 #include "aml_avsync_tuning.h"
 #include "aml_ng.h"
+#include "aml_audio_timer.h"
 
 // for invoke bluetooth rc hal
 #include "audio_hal_thunks.h"
@@ -4269,7 +4270,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->stream.get_next_write_timestamp = out_get_next_write_timestamp;
     out->stream.get_presentation_position = out_get_presentation_position;
 
-    if ((eDolbyMS12Lib == adev->dolby_lib_type) && (!adev->is_TV)) {
+    if (eDolbyMS12Lib == adev->dolby_lib_type) {
         // BOX with ms 12 need to use new method
         out->stream.pause = out_pause_new;
         out->stream.resume = out_resume_new;
@@ -8032,7 +8033,7 @@ re_write:
                     }
                     total_write += used_size;
                     write_bytes -= used_size;
-                    usleep(5000);
+                    aml_audio_sleep(1000);
                     if (adev->debug_flag >= 2) {
                         ALOGI("%s sleeep 5ms\n", __FUNCTION__);
                     }
@@ -8228,20 +8229,22 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
         ALOGD("%s:%d size:%d, dolby_lib_type:0x%x, frame_size:%d", __func__, __LINE__, bytes, adev->dolby_lib_type, frame_size);
     }
 
-    pthread_mutex_lock(&adev->alsa_pcm_lock);
+
     if ((aml_out->status == STREAM_HW_WRITING) && hw_mix) {
         ALOGI("%s(), aux do alsa close\n", __func__);
+        pthread_mutex_lock(&adev->alsa_pcm_lock);
 
         aml_alsa_output_close(stream);
 
         ALOGI("%s(), aux alsa close done\n", __func__);
         aml_out->status = STREAM_MIXING;
+        pthread_mutex_unlock(&adev->alsa_pcm_lock);
     }
 
     if (aml_out->status == STREAM_STANDBY) {
         aml_out->status = STREAM_MIXING;
     }
-    pthread_mutex_unlock(&adev->alsa_pcm_lock);
+
 
     if (adev->useSubMix) {
         // For compatible by lianlian
@@ -8320,7 +8323,8 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
                 }
                 retry++;
                 if (bytes_remaining) {
-                    usleep(bytes_remaining * 1000000 / frame_size / out_get_sample_rate(&stream->common));
+                    //usleep(bytes_remaining * 1000000 / frame_size / out_get_sample_rate(&stream->common));
+                    aml_audio_sleep(5000);
                 }
                 count++;
                 if ((count % 10) == 0) {
@@ -8614,7 +8618,9 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
         aml_out->stream.common.standby = out_standby_new;
     }
     aml_out->status = STREAM_STANDBY;
-    adev->spdif_encoder_init_flag = false;
+    if (adev->continuous_audio_mode == 0) {
+        adev->spdif_encoder_init_flag = false;
+    }
 
     pthread_mutex_lock(&adev->lock);
     adev->active_outputs[aml_out->usecase] = aml_out;

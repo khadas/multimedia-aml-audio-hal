@@ -80,6 +80,8 @@ struct dolby_ms12_desc {
     int is_dolby_atmos;
     int input_total_ms;
     int bitsteam_cnt;
+    void * main_virtual_buf_handle;
+    void * system_virtual_buf_handle;
 };
 
 /*

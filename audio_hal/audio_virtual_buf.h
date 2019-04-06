@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 
+#ifndef AUDIO_VIRTUAL_BUF_H
+#define AUDIO_VIRTUAL_BUF_H
 
-#ifndef AML_AUDIO_SLEEP_H
-#define AML_AUDIO_SLEEP_H
 
 #include <stdint.h>
 
-int aml_audio_sleep(uint64_t us);
+typedef struct audio_virtual_buf audio_virtual_buf_t;
 
-uint64_t aml_audio_get_systime(void);
 
-uint64_t aml_audio_get_systime_ns(void);
+int audio_virtual_buf_open(void ** pphandle, char * buf_name, uint64_t buf_ns_begin, uint64_t buf_ns_target, int ease_time_ms);
+
+int audio_virtual_buf_close(void **pphandle);
+
+int audio_virtual_buf_process(void *phandle, uint64_t frame_ns);
 
 #endif
-
