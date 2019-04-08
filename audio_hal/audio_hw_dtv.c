@@ -649,12 +649,21 @@ static int dtv_patch_pcm_wirte(unsigned char *pcm_data, int size,
     int write_size, return_size;
     unsigned char *write_buf;
     int16_t tmpbuf[OUTPUT_BUFFER_SIZE];
+    int valid_paramters = 1;
     write_buf = pcm_data;
     if (pcm_data == NULL || size == 0) {
         return 0;
     }
 
     patch->sample_rate = symbolrate;
+    // In the case of fast switching channels such as mpeg/dra/..., there may be an
+    // error "symbolrate" and "channel" paramters, so add the check to avoid it.
+    if (symbolrate > 96000 || symbolrate < 8000) {
+        valid_paramters = 0;
+    }
+    if (channel > 8 || channel < 1) {
+        valid_paramters = 0;
+    }
     patch->chanmask = channel;
     if (patch->sample_rate != 48000) {
         need_resample = 1;
@@ -697,7 +706,7 @@ static int dtv_patch_pcm_wirte(unsigned char *pcm_data, int size,
 
     if ((patch->aformat != AUDIO_FORMAT_E_AC3 &&
          patch->aformat != AUDIO_FORMAT_AC3 &&
-         patch->aformat != AUDIO_FORMAT_DTS)) {
+         patch->aformat != AUDIO_FORMAT_DTS) && valid_paramters) {
         if (patch->chanmask == 1) {
             int16_t *buf = (int16_t *)write_buf;
             int i = 0, samples_num;
