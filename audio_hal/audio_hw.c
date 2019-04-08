@@ -4823,6 +4823,9 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 if (ret == 0) {
                     adev->audio_patching = 1;
                 }
+            } else {
+                ALOGI("now reset the audio buffer now\n");
+                ring_buffer_reset(&(adev->audio_patch->aml_ringbuffer));
             }
             adev->patch_src = SRC_ATV;
         }
