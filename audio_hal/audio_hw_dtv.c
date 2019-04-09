@@ -107,6 +107,37 @@ struct cmd_list dtv_cmd_list = {
     .cmd_num = 0,
     .used = 1,
 };
+
+const unsigned int mute_dd_frame[] = {
+    0x5d9c770b, 0xf0432014, 0xf3010713, 0x2020dc62, 0x4842020, 0x57100404, 0xf97c3e1f, 0x9fcfe7f3, 0xf3f97c3e, 0x3e9fcfe7, 0xe7f3f97c, 0x7c3e9fcf, 0xcfe7f3f9, 0xfb7c3e9f, 0xf97c75fe, 0x9fcfe7f3,
+    0xf3f97c3e, 0x3e9fcfe7, 0xe7f3f97c, 0x7c3e9fcf, 0xcfe7f3f9, 0xfb7c3e9f, 0x3e5f9dff, 0xe7f3f97c, 0x7c3e9fcf, 0xcfe7f3f9, 0xf97c3e9f, 0x9fcfe7f3, 0xf3f97c3e, 0x3e9fcfe7, 0x48149ff2, 0x2091,
+    0x361e0000, 0x78bc6ddb, 0xbbbbe3f1, 0xb8, 0x0, 0x0, 0x0, 0x77770700, 0x361e8f77, 0x359f6fdb, 0xd65a6bad, 0x5a6badb5, 0x6badb5d6, 0xa0b5d65a, 0x1e000000, 0xbc6ddb36,
+    0xbbe3f178, 0xb8bb, 0x0, 0x0, 0x0, 0x77070000, 0x1e8f7777, 0x9f6fdb36, 0x5a6bad35, 0xa6b5d6, 0x0, 0xb66de301, 0x1e8fc7db, 0x80bbbb3b, 0x0, 0x0,
+    0x0, 0x0, 0x78777777, 0xb66de3f1, 0xd65af3f9, 0x5a6badb5, 0x6badb5d6, 0xadb5d65a, 0x5a6b, 0x6de30100, 0x8fc7dbb6, 0xbbbb3b1e, 0x80, 0x0, 0x0, 0x0,
+    0x77777700, 0x6de3f178, 0x5af3f9b6, 0x6badb5d6, 0x605a, 0x1e000000, 0xbc6ddb36, 0xbbe3f178, 0xb8bb, 0x0, 0x0, 0x0, 0x77070000, 0x1e8f7777, 0x9f6fdb36, 0x5a6bad35,
+    0x6badb5d6, 0xadb5d65a, 0xb5d65a6b, 0xa0, 0x6ddb361e, 0xe3f178bc, 0xb8bbbb, 0x0, 0x0, 0x0, 0x7000000, 0x8f777777, 0x6fdb361e, 0x6bad359f, 0xa6b5d65a, 0x0,
+    0x6de30100, 0x8fc7dbb6, 0xbbbb3b1e, 0x80, 0x0, 0x0, 0x0, 0x77777700, 0x6de3f178, 0x5af3f9b6, 0x6badb5d6, 0xadb5d65a, 0xb5d65a6b, 0x5a6bad, 0xe3010000, 0xc7dbb66d,
+    0xbb3b1e8f, 0x80bb, 0x0, 0x0, 0x0, 0x77770000, 0xe3f17877, 0xf3f9b66d, 0xadb5d65a, 0x605a6b, 0x0, 0x6ddb361e, 0xe3f178bc, 0xb8bbbb, 0x0, 0x0,
+    0x0, 0x7000000, 0x8f777777, 0x6fdb361e, 0x6bad359f, 0xadb5d65a, 0xb5d65a6b, 0xd65a6bad, 0xa0b5, 0xdb361e00, 0xf178bc6d, 0xb8bbbbe3, 0x0, 0x0, 0x0, 0x0,
+    0x77777707, 0xdb361e8f, 0xad359f6f, 0xb5d65a6b, 0x10200a6, 0x0, 0xdbb6f100, 0x8fc7e36d, 0xc0dddd1d, 0x0, 0x0, 0x0, 0x0, 0xbcbbbb3b, 0xdbb6f178, 0x6badf97c,
+    0xadb5d65a, 0xb5d65a6b, 0xd65a6bad, 0xadb5, 0xb6f10000, 0xc7e36ddb, 0xdddd1d8f, 0xc0, 0x0, 0x0, 0x0, 0xbbbb3b00, 0xb6f178bc, 0xadf97cdb, 0xb5d65a6b, 0x4deb00ad
+};
+
+const unsigned int mute_ddp_frame[] = {
+    0x7f01770b, 0x20e06734, 0x2004, 0x8084500, 0x404046c, 0x1010104, 0xe7630001, 0x7c3e9fcf, 0xcfe7f3f9, 0xf97c3e9f, 0x9fcfe7f3, 0xf3f97c3e, 0x3e9fcfe7, 0xe7f3f97c, 0xce7f9fcf, 0x7c3e9faf,
+    0xcfe7f3f9, 0xf97c3e9f, 0x9fcfe7f3, 0xf3f97c3e, 0x3e9fcfe7, 0xe7f3f97c, 0xf37f9fcf, 0x9fcfe7ab, 0xf3f97c3e, 0x3e9fcfe7, 0xe7f3f97c, 0x7c3e9fcf, 0xcfe7f3f9, 0xf97c3e9f, 0x53dee7f3, 0xf0e9,
+    0x6d3c0000, 0xf178dbb6, 0x7777c7e3, 0x70, 0x0, 0x0, 0x0, 0xeeee0e00, 0x6d3c1eef, 0x6b3edfb6, 0xadb5d65a, 0xb5d65a6b, 0xd65a6bad, 0x406badb5, 0x3c000000, 0x78dbb66d,
+    0x77c7e3f1, 0x7077, 0x0, 0x0, 0x0, 0xee0e0000, 0x3c1eefee, 0x3edfb66d, 0xb5d65a6b, 0x20606bad, 0x0, 0xdbb66d3c, 0xc7e3f178, 0x707777, 0x0, 0x0,
+    0x0, 0xe000000, 0x1eefeeee, 0xdfb66d3c, 0xd65a6b3e, 0x5a6badb5, 0x6badb5d6, 0xadb5d65a, 0x406b, 0xb66d3c00, 0xe3f178db, 0x707777c7, 0x0, 0x0, 0x0, 0x0,
+    0xefeeee0e, 0xb66d3c1e, 0x5a6b3edf, 0x6badb5d6, 0x2060, 0x6d3c0000, 0xf178dbb6, 0x7777c7e3, 0x70, 0x0, 0x0, 0x0, 0xeeee0e00, 0x6d3c1eef, 0x6b3edfb6, 0xadb5d65a,
+    0xb5d65a6b, 0xd65a6bad, 0x406badb5, 0x3c000000, 0x78dbb66d, 0x77c7e3f1, 0x7077, 0x0, 0x0, 0x0, 0xee0e0000, 0x3c1eefee, 0x3edfb66d, 0xb5d65a6b, 0x20606bad, 0x0,
+    0xdbb66d3c, 0xc7e3f178, 0x707777, 0x0, 0x0, 0x0, 0xe000000, 0x1eefeeee, 0xdfb66d3c, 0xd65a6b3e, 0x5a6badb5, 0x6badb5d6, 0xadb5d65a, 0x406b, 0xb66d3c00, 0xe3f178db,
+    0x707777c7, 0x0, 0x0, 0x0, 0x0, 0xefeeee0e, 0xb66d3c1e, 0x5a6b3edf, 0x6badb5d6, 0x2060, 0x6d3c0000, 0xf178dbb6, 0x7777c7e3, 0x70, 0x0, 0x0,
+    0x0, 0xeeee0e00, 0x6d3c1eef, 0x6b3edfb6, 0xadb5d65a, 0xb5d65a6b, 0xd65a6bad, 0x406badb5, 0x3c000000, 0x78dbb66d, 0x77c7e3f1, 0x7077, 0x0, 0x0, 0x0, 0xee0e0000,
+    0x3c1eefee, 0x3edfb66d, 0xb5d65a6b, 0x20606bad, 0x0, 0xdbb66d3c, 0xc7e3f178, 0x707777, 0x0, 0x0, 0x0, 0xe000000, 0x1eefeeee, 0xdfb66d3c, 0xd65a6b3e, 0x5a6badb5,
+    0x6badb5d6, 0xadb5d65a, 0x406b, 0xb66d3c00, 0xe3f178db, 0x707777c7, 0x0, 0x0, 0x0, 0x0, 0xefeeee0e, 0xb66d3c1e, 0x5a6b3edf, 0x6badb5d6, 0x40, 0x7f227c55,
+};
+
 static int create_dtv_output_stream_thread(struct aml_audio_patch *patch);
 static int release_dtv_output_stream_thread(struct aml_audio_patch *patch);
 
@@ -926,7 +957,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
                     /*&& aml_dev->associate_audio_mixing_enable*/)) {
                 unsigned char main_head[128];
                 unsigned char ad_head[128];
-                int main_frame_size = 0, main_head_offset = 0,main_head_left = 0;
+                int main_frame_size = 0, last_main_frame_size = 0, main_head_offset = 0,main_head_left = 0;
                 int ad_frame_size = 0, ad_head_offset = 0,ad_head_left = 0;
                 unsigned char mixbuffer[MAX_DECODER_FRAME_LENGTH*4];
                 unsigned char ad_buffer[MAX_DECODER_FRAME_LENGTH*4];
@@ -936,8 +967,11 @@ void *audio_dtv_patch_output_threadloop(void *data)
                 int dd_bsmod = 0,remain_size = 0;
                 int main_avail = get_buffer_read_space(ringbuffer);
                 int ad_avail = dtv_assoc_get_avail();
-                //ALOGI("AD main_avail=%d ad_avail=%d ", main_avail, ad_avail);
-                if (main_avail > 0 && ad_avail > 0) {
+                dtv_assoc_get_main_frame_size(&last_main_frame_size);
+                //ALOGI("AD main_avail=%d ad_avail=%d last_main_frame_size = %d",
+                        //main_avail, ad_avail, last_main_frame_size);
+                if ((last_main_frame_size == 0 && main_avail >= 6144)
+                        || (last_main_frame_size != 0 && main_avail >= last_main_frame_size)) {
                     if (!patch->first_apts_lookup_over) {
                         unsigned int first_checkinapts = 0xffffffff;
                         unsigned int demux_pcr = 0xffffffff;
@@ -971,7 +1005,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
                         }
                     }
 
-                    dtv_assoc_get_main_frame_size(&main_frame_size);
+                    //dtv_assoc_get_main_frame_size(&main_frame_size);
                     //main_frame_size = 0, get from data
                     while (main_frame_size == 0 && main_avail >= 32) {
                         memset(main_head, 0, 32);
@@ -984,25 +1018,11 @@ void *audio_dtv_patch_output_threadloop(void *data)
                             //ALOGI("AD main_frame_size=%d  ", main_frame_size);
                         }
                     }
+                    dtv_assoc_set_main_frame_size(main_frame_size);
 
-                    dtv_assoc_get_ad_frame_size(&ad_frame_size);
-                    //ad_frame_size = 0, get from data
-                    while (ad_frame_size == 0 && ad_avail >= 32) {
-                        memset(ad_head, 0, 32);
-                        ret = dtv_assoc_read(ad_head, 32);
-                        ad_frame_size = dcv_decoder_get_framesize(ad_head,
-                                ret, &ad_head_offset);
-                        ad_avail -= 32;
-                        if (ad_frame_size != 0) {
-                            ad_head_left = ret - ad_head_offset;
-                            //ALOGI("AD ad_frame_size=%d  ", ad_frame_size);
-                        }
-                    }
-
-                    if (main_frame_size > 0 && (main_avail >= main_frame_size - main_head_left) &&
-                            ad_frame_size > 0 && (ad_avail > ad_frame_size - ad_head_left)) {
-                        dtv_assoc_set_main_frame_size(main_frame_size);
-                        dtv_assoc_set_ad_frame_size(ad_frame_size);
+                    if (main_frame_size > 0 && (main_avail >= main_frame_size - main_head_left)) {
+                        //dtv_assoc_set_main_frame_size(main_frame_size);
+                        //dtv_assoc_set_ad_frame_size(ad_frame_size);
                         //read left of frame;
                         if (main_head_left > 0)
                             memcpy(patch->out_buf, main_head + main_head_offset, main_head_left);
@@ -1015,83 +1035,116 @@ void *audio_dtv_patch_output_threadloop(void *data)
                             continue;
                         }
                         main_size = ret + main_head_left;
+                    } else {
+                        /*ALOGE("%s(), ring_buffer has not enough data! %d in_avail()", __func__,
+                               avail);*/
+                        pthread_mutex_unlock(&(patch->dtv_output_mutex));
+                        usleep(1000);
+                        continue;
+                    }
 
-                        memset(ad_buffer,0,MAX_DECODER_FRAME_LENGTH*4);
+                    if (ad_avail > 0) {
+                        //dtv_assoc_get_ad_frame_size(&ad_frame_size);
+                        //ad_frame_size = 0, get from data
+                        while (ad_frame_size == 0 && ad_avail >= 32) {
+                            memset(ad_head, 0, 32);
+                            ret = dtv_assoc_read(ad_head, 32);
+                            ad_frame_size = dcv_decoder_get_framesize(ad_head,
+                                    ret, &ad_head_offset);
+                            ad_avail -= 32;
+                            if (ad_frame_size != 0) {
+                                ad_head_left = ret - ad_head_offset;
+                                //ALOGI("AD ad_frame_size=%d  ", ad_frame_size);
+                            }
+                        }
+                    }
+
+                    memset(ad_buffer,0,MAX_DECODER_FRAME_LENGTH*4);
+                    if (ad_frame_size > 0 && (ad_avail >= ad_frame_size - ad_head_left)) {
                         if (ad_head_left > 0)
                             memcpy(ad_buffer, ad_head + ad_head_offset, ad_head_left);
                         ret = dtv_assoc_read(ad_buffer + ad_head_left, ad_frame_size - ad_head_left);
-						if (ret == 0) {
-                            pthread_mutex_unlock(&(patch->dtv_output_mutex));
-                            /*ALOGE("%s(), ring_buffer read 0 data!", __func__);*/
-                            usleep(1000);
-                            continue;
-                        }
-                        ad_size = ret + ad_head_left;
-
-                        {
-                            unsigned long pts = 0;
-                            aml_out = (struct aml_stream_out *)stream_out;
-                            if (aml_out != NULL) {
-                                unsigned int lancty = out_get_latency(&(aml_out->stream));
-                                pts = dtv_hal_get_pts(patch, lancty);
-                                process_ac3_sync(patch, pts);
-                            }
-                        }
-                        {
-                            struct aml_stream_out *aml_out = (struct aml_stream_out *)stream_out;
-                            if (aml_out->hal_internal_format != patch->aformat) {
-                                aml_out->hal_format = aml_out->hal_internal_format = patch->aformat;
-                               get_sink_format(stream_out);
-                            }
-                        }
-
-                        //package iec61937
-                        memset(mixbuffer, 0, MAX_DECODER_FRAME_LENGTH*4);
-                        //papbpcpd
-                        p16_mixbuff = (uint16_t*)mixbuffer;
-                        p16_mixbuff[0] = 0xf872;
-                        p16_mixbuff[1] = 0x4e1f;
-                        if (patch->aformat == AUDIO_FORMAT_AC3) {
-                            dd_bsmod = 6;
-                            p16_mixbuff[2] = ((dd_bsmod & 7) << 8) | 3;
+                        if (ret == 0) {
+                            ad_size = 0;
                         } else {
-                            dd_bsmod = 12;
-                            p16_mixbuff[2] = ((dd_bsmod & 7) << 8) | 21;
+                            ad_size = ret + ad_head_left;
                         }
-                        p16_mixbuff[3] = main_size + ad_size + 8;
-                        mix_size +=8;
-                        //main
-                        p32_mixbuff = (uint32_t*)(mixbuffer + mix_size);
-                        p32_mixbuff[0] = main_size;
-                        mix_size += 4;
-                        memcpy(mixbuffer + mix_size, patch->out_buf, main_size);
-                        mix_size += main_size;
-                        //ad
-                        p32_mixbuff = (uint32_t*)(mixbuffer + mix_size);
-                        p32_mixbuff[0] = ad_size;
-                        mix_size += 4;
-                        memcpy(mixbuffer + mix_size, ad_buffer, ad_size);
-                        mix_size += ad_size;
-                        if (patch->aformat == AUDIO_FORMAT_AC3) {//ac3 iec61937 package size 6144
-                            ret = out_write_new(stream_out, mixbuffer, MAX_DECODER_FRAME_LENGTH);
-                        } else {//eac3 iec61937 package size 6144*4
-                            ret = out_write_new(stream_out, mixbuffer, MAX_DECODER_FRAME_LENGTH*4);
-                        }
-
-                        if (mixbuffer[12]!= 0xb || mixbuffer[13] != 0x77 || ad_buffer[0] != 0xb || ad_buffer[1] != 0x77) {
-                             ALOGI("AD mix main_size=%d ad_size=%d wirte_size=%d 0x%x 0x%x 0x%x 0x%x", main_size, ad_size, ret,
-                                     mixbuffer[12],mixbuffer[13],ad_buffer[0],ad_buffer[1]);
-                        }
-
-                        remain_size = aml_dev->ddp.remain_size;
-                        patch->outlen_after_last_validpts += aml_dev->ddp.outlen_pcm;
-                        patch->decoder_offset += remain_size + main_size - aml_dev->ddp.remain_size;
-                        patch->dtv_pcm_readed += main_size;
-                        pthread_mutex_unlock(&(patch->dtv_output_mutex));
                     } else {
-                        pthread_mutex_unlock(&(patch->dtv_output_mutex));
-                        usleep(1000);
+                        ad_size = 0;
                     }
+
+                    {
+                        unsigned long pts = 0;
+                        aml_out = (struct aml_stream_out *)stream_out;
+                        if (aml_out != NULL) {
+                            unsigned int lancty = out_get_latency(&(aml_out->stream));
+                            pts = dtv_hal_get_pts(patch, lancty);
+                            process_ac3_sync(patch, pts);
+                        }
+                    }
+                    {
+                        struct aml_stream_out *aml_out = (struct aml_stream_out *)stream_out;
+                        if (aml_out->hal_internal_format != patch->aformat) {
+                            aml_out->hal_format = aml_out->hal_internal_format = patch->aformat;
+                           get_sink_format(stream_out);
+                        }
+                    }
+
+                    //package iec61937
+                    memset(mixbuffer, 0, MAX_DECODER_FRAME_LENGTH*4);
+                    //papbpcpd
+                    p16_mixbuff = (uint16_t*)mixbuffer;
+                    p16_mixbuff[0] = 0xf872;
+                    p16_mixbuff[1] = 0x4e1f;
+                    if (patch->aformat == AUDIO_FORMAT_AC3) {
+                        dd_bsmod = 6;
+                        p16_mixbuff[2] = ((dd_bsmod & 7) << 8) | 1;
+                        if (ad_size == 0)
+                            p16_mixbuff[3] = (main_size + sizeof(mute_dd_frame))*8;
+                        else
+                            p16_mixbuff[3] = (main_size + ad_size)*8;
+                    } else {
+                        dd_bsmod = 12;
+                        p16_mixbuff[2] = ((dd_bsmod & 7) << 8) | 21;
+                        if (ad_size == 0)
+                            p16_mixbuff[3] = main_size + sizeof(mute_ddp_frame);
+                        else
+                            p16_mixbuff[3] = main_size + ad_size;
+                    }
+                    mix_size +=8;
+                    //main
+                    memcpy(mixbuffer + mix_size, patch->out_buf, main_size);
+                    mix_size += main_size;
+                    //ad
+                    if (ad_size == 0) {
+                        if (patch->aformat == AUDIO_FORMAT_AC3) {
+                            memcpy(mixbuffer + mix_size, mute_dd_frame, sizeof(mute_dd_frame));
+                        } else {
+                            memcpy(mixbuffer + mix_size, mute_ddp_frame, sizeof(mute_ddp_frame));
+                        }
+                    } else {
+                        memcpy(mixbuffer + mix_size, ad_buffer, ad_size);
+                    }
+
+                    if (patch->aformat == AUDIO_FORMAT_AC3) {//ac3 iec61937 package size 6144
+                        ret = out_write_new(stream_out, mixbuffer, MAX_DECODER_FRAME_LENGTH);
+                    } else {//eac3 iec61937 package size 6144*4
+                        ret = out_write_new(stream_out, mixbuffer, MAX_DECODER_FRAME_LENGTH*4);
+                    }
+
+                    if ((mixbuffer[8] != 0xb && mixbuffer[8] != 0x77)
+                            || (mixbuffer[9] != 0xb && mixbuffer[9] != 0x77)
+                            || (mixbuffer[mix_size] != 0xb && mixbuffer[mix_size] != 0x77)
+                            || (mixbuffer[mix_size+1] != 0xb && mixbuffer[mix_size+1] != 0x77)) {
+                         ALOGI("AD mix main_size=%d ad_size=%d wirte_size=%d 0x%x 0x%x 0x%x 0x%x", main_size, ad_size, ret,
+                                 mixbuffer[8],mixbuffer[9],mixbuffer[mix_size],mixbuffer[mix_size+1]);
+                    }
+
+                    remain_size = aml_dev->ddp.remain_size;
+                    patch->outlen_after_last_validpts += aml_dev->ddp.outlen_pcm;
+                    patch->decoder_offset += remain_size + main_size - aml_dev->ddp.remain_size;
+                    patch->dtv_pcm_readed += main_size;
+                    pthread_mutex_unlock(&(patch->dtv_output_mutex));
                 } else {
                     /*ALOGE("%s(), ring_buffer has not enough data! %d in_avail()", __func__,
                           avail);*/
