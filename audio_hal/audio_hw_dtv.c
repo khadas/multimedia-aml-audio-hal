@@ -686,6 +686,10 @@ static int dtv_patch_pcm_wirte(unsigned char *pcm_data, int size,
         return 0;
     }
 
+    if (patch->dtv_decoder_state == AUDIO_DTV_PATCH_DECODER_STATE_INIT) {
+        return 0;
+    }
+
     patch->sample_rate = symbolrate;
     // In the case of fast switching channels such as mpeg/dra/..., there may be an
     // error "symbolrate" and "channel" paramters, so add the check to avoid it.
@@ -1551,7 +1555,6 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                 ALOGI("++%s live now  stop  the audio decoder now \n",
                       __FUNCTION__);
                 dtv_adjust_output_clock(patch, DIRECT_NORMAL, 50);
-                release_dtv_output_stream_thread(patch);
                 dtv_patch_input_stop(adec_handle);
                 release_dtv_output_stream_thread(patch);
                 dtv_assoc_audio_stop(1);
