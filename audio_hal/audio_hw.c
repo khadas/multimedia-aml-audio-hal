@@ -206,6 +206,7 @@ static int create_patch_ext(struct audio_hw_device *dev,
                             audio_devices_t input,
                             audio_devices_t output,
                             audio_patch_handle_t handle);
+static int release_patch_l(struct aml_audio_device *aml_dev);
 static int release_patch (struct aml_audio_device *aml_dev);
 static int release_parser(struct aml_audio_device *aml_dev);
 static void aml_tinymix_set_spdif_format(audio_format_t output_format,  struct aml_stream_out *stream);
@@ -9038,7 +9039,7 @@ void *audio_patch_output_threadloop(void *data)
 }
 
 #define PATCH_PERIOD_COUNT  (4)
-static int create_patch(struct audio_hw_device *dev,
+static int create_patch_l(struct audio_hw_device *dev,
                         audio_devices_t input,
                         audio_devices_t output __unused)
 {
@@ -9050,6 +9051,13 @@ static int create_patch(struct audio_hw_device *dev,
     int ret = 0;
 
     ALOGD("%s: enter", __func__);
+    if (aml_dev->audio_patch) {
+        ALOGD("%s: patch exists, first release it", __func__);
+        ALOGD("%s: new input %#x, old input %#x",
+            __func__, input, aml_dev->audio_patch->input_src);
+        release_patch_l(aml_dev);
+    }
+
     patch = calloc(1, sizeof(*patch));
     if (!patch) {
         return -ENOMEM;
@@ -9135,10 +9143,12 @@ static int create_patch_ext(struct audio_hw_device *dev,
                             audio_devices_t output __unused,
                             audio_patch_handle_t handle)
 {
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *) dev;
     int ret = 0;
 
-    ret = create_patch(dev, input, output);
-    struct aml_audio_device *aml_dev = (struct aml_audio_device *) dev;
+    pthread_mutex_lock(&aml_dev->patch_lock);
+    ret = create_patch_l(dev, input, output);
+    pthread_mutex_unlock(&aml_dev->patch_lock);
 
     // successful
     if (!ret) {
@@ -9146,13 +9156,17 @@ static int create_patch_ext(struct audio_hw_device *dev,
     }
 
     return ret;
-
 }
-static int release_patch(struct aml_audio_device *aml_dev)
+
+static int release_patch_l(struct aml_audio_device *aml_dev)
 {
     struct aml_audio_patch *patch = aml_dev->audio_patch;
 
     ALOGD("%s: enter", __func__);
+    if (aml_dev->audio_patch == NULL) {
+        ALOGD("%s(), no patch to release", __func__);
+        goto exit;
+    }
     patch->output_thread_exit = 1;
     patch->input_thread_exit = 1;
     if (patch->input_src == AUDIO_DEVICE_IN_HDMI || patch->input_src == AUDIO_DEVICE_IN_SPDIF)
@@ -9175,9 +9189,32 @@ static int release_patch(struct aml_audio_device *aml_dev)
         switchNormalStream(aml_dev->active_outputs[STREAM_PCM_NORMAL], 1);
     }
 
+exit:
     return 0;
 }
 
+static int release_patch(struct aml_audio_device *aml_dev)
+{
+    pthread_mutex_lock(&aml_dev->patch_lock);
+    release_patch_l(aml_dev);
+    pthread_mutex_unlock(&aml_dev->patch_lock);
+
+    return 0;
+}
+
+static int create_patch(struct audio_hw_device *dev,
+                        audio_devices_t input,
+                        audio_devices_t output __unused)
+{
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *)dev;
+    int ret = 0;
+
+    pthread_mutex_lock(&aml_dev->patch_lock);
+    ret = create_patch_l(dev, input, output);
+    pthread_mutex_unlock(&aml_dev->patch_lock);
+
+    return ret;
+}
 static int create_parser (struct audio_hw_device *dev)
 {
     struct aml_audio_parser *parser;
@@ -10094,6 +10131,7 @@ static int adev_close(hw_device_t *device)
         deleteHalSubMixing(adev->sm);
     }
     aml_hwsync_close_tsync(adev->tsync_fd);
+    pthread_mutex_destroy(&adev->patch_lock);
 
     free(device);
     return 0;
@@ -10492,6 +10530,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         ALOGI("%s[%s] disable_continuous %d\n", DISABLE_CONTINUOUS_OUTPUT, buf, disable_continuous);
     }
     pthread_mutex_init(&adev->alsa_pcm_lock, NULL);
+    pthread_mutex_init(&adev->patch_lock, NULL);
     open_mixer_handle(&adev->alsa_mixer);
 
     // try to detect which dobly lib is readable
