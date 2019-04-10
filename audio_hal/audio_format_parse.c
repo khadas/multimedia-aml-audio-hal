@@ -131,7 +131,7 @@ static int hw_audio_format_detection(struct aml_mixer_handle *mixer_handle)
     else
         type = aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_SPDIFIN_AUDIO_TYPE);
 
-    if (type >= LPCM && type <= DTSHD) {
+    if (type >= LPCM && type <= PAUSE) {
         return type;
     } else {
         return LPCM;
