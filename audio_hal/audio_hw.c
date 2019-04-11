@@ -35,6 +35,8 @@
 #include <linux/ioctl.h>
 #include <hardware/hardware.h>
 #include <system/audio.h>
+#include "aml_DRC_param_gen.h"
+#include "aml_EQ_param_gen.h"
 
 #if ANDROID_PLATFORM_SDK_VERSION >= 25 //8.0
 #include <system/audio-base.h>
@@ -5132,6 +5134,35 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         adev->eq_data.p_gain.speaker, adev->eq_data.p_gain.spdif_arc,
         adev->eq_data.p_gain.headphone);
         goto exit;
+    }
+    ret = str_parms_get_str(parms,"EQ_PARAM",value,sizeof(value));
+    if (ret >= 0) {
+       sscanf(value, "%lf %lf %u %u %u",&adev->Eq_data.G,&adev->Eq_data.Q,&adev->Eq_data.fc,&adev->Eq_data.type,&adev->Eq_data.band_id);
+       setpar_eq(adev->Eq_data.G,adev->Eq_data.Q,adev->Eq_data.fc,adev->Eq_data.type,adev->Eq_data.band_id);
+       goto exit;
+    }
+    ret = str_parms_get_str(parms,"mb_drc",value,sizeof(value));
+    if (ret >= 0) {
+       sscanf(value, "%u %u %u %u %f %f",&adev->Drc_data.band_id,&adev->Drc_data.attrack_time,&adev->Drc_data.release_time,
+             &adev->Drc_data.estimate_time,&adev->Drc_data.K,&adev->Drc_data.threshold);
+       setmb_drc(adev->Drc_data.band_id,adev->Drc_data.attrack_time,adev->Drc_data.release_time,adev->Drc_data.estimate_time,
+                adev->Drc_data.K,adev->Drc_data.threshold);
+       goto exit;
+    }
+
+    ret = str_parms_get_str(parms,"fb_drc",value,sizeof(value));
+    if (ret >= 0) {
+       sscanf(value, "%u %u %u %u %f %f %u",&adev->Drc_data.band_id,&adev->Drc_data.attrack_time,&adev->Drc_data.release_time,
+             &adev->Drc_data.estimate_time,&adev->Drc_data.K,&adev->Drc_data.threshold,&adev->Drc_data.delays);
+       setfb_drc(adev->Drc_data.band_id,adev->Drc_data.attrack_time,adev->Drc_data.release_time,adev->Drc_data.estimate_time,
+               adev->Drc_data.K,adev->Drc_data.threshold,adev->Drc_data.delays);
+       goto exit;
+    }
+    ret = str_parms_get_str(parms,"csfilter_drc",value,sizeof(value));
+    if (ret >= 0) {
+       sscanf(value, "%u %u",&adev->Drc_data.band_id,&adev->Drc_data.fc);
+       setcsfilter_drc(adev->Drc_data.band_id,adev->Drc_data.fc);
+       goto exit;
     }
 
     ret = str_parms_get_str(parms, "DTS_POST_GAIN", value, sizeof(value));

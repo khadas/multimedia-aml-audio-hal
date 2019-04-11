@@ -99,6 +99,10 @@ include $(BUILD_PREBUILT)
         frameworks/av/include
 
     LOCAL_LDFLAGS_arm += $(LOCAL_PATH)/lib_aml_ng.a
+    LOCAL_LDFLAGS_arm += $(LOCAL_PATH)/Amlogic_EQ_Param_Generator.a
+    LOCAL_LDFLAGS_arm += $(LOCAL_PATH)/Amlogic_DRC_Param_Generator.a
+    LOCAL_LDFLAGS_arm64 += $(LOCAL_PATH)/Amlogic_EQ_Param_Generator64.a
+    LOCAL_LDFLAGS_arm64 += $(LOCAL_PATH)/Amlogic_DRC_Param_Generator64.a
     LOCAL_LDFLAGS_arm += $(LOCAL_PATH)/../bt_voice/kehwin/32/btmic.a
     LOCAL_LDFLAGS_arm64 += $(LOCAL_PATH)/../bt_voice/kehwin/64/btmic.a
 

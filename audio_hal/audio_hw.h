@@ -178,6 +178,25 @@ struct aml_arc_hdmi_desc {
     struct format_desc ddp_fmt;
 };
 
+struct drc_data {
+    uint32_t band_id;
+    uint32_t attrack_time;
+    uint32_t release_time;
+    float threshold;
+    unsigned int fc;
+    unsigned int estimate_time;
+    float K;
+    unsigned int delays;
+};
+
+struct eq_data {
+    double G;
+    double Q;
+    unsigned int fc;
+    unsigned int type;
+    unsigned int band_id;
+};
+
 enum patch_src_assortion {
     SRC_DTV,
     SRC_ATV,
@@ -375,6 +394,8 @@ struct aml_audio_device {
     ring_buffer_t spk_tuning_rbuf;
     bool mix_init_flag;
     struct eq_drc_data eq_data;
+    struct drc_data Drc_data;
+    struct eq_data  Eq_data;
     /*used for high pricision A/V from amlogic amadec decoder*/
     unsigned first_apts;
     /*
@@ -458,6 +479,7 @@ struct aml_audio_device {
     unsigned int tv_mute;
     int sub_apid;
     int sub_afmt;
+
 };
 
 struct meta_data {
