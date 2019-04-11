@@ -3106,6 +3106,9 @@ static int out_add_audio_effect (const struct audio_stream *stream, effect_handl
     }
 
     dev->native_postprocess.postprocessors[dev->native_postprocess.num_postprocessors++] = effect;
+    if (dev->native_postprocess.num_postprocessors >= dev->native_postprocess.total_postprocessors)
+        dev->native_postprocess.total_postprocessors = dev->native_postprocess.num_postprocessors;
+
 exit:
     pthread_mutex_unlock (&out->lock);
     pthread_mutex_unlock (&dev->lock);
@@ -6426,6 +6429,7 @@ int dsp_process_output(struct aml_audio_device *adev, void *in_buffer,
 }
 #endif
 
+#define EQ_GAIN_DEFAULT (0.16)
 ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                                 const void *buffer,
                                 size_t bytes,
@@ -6633,9 +6637,14 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             memcpy(hp_tmp_buf, tmp_buffer, bytes);
 
             /*aduio effect process for speaker*/
-            for (j = 0; j < adev->native_postprocess.num_postprocessors; j++) {
-                audio_post_process(adev->native_postprocess.postprocessors[j], effect_tmp_buf, out_frames);
+            if (adev->native_postprocess.num_postprocessors == adev->native_postprocess.total_postprocessors) {
+                for (j = 0; j < adev->native_postprocess.num_postprocessors; j++) {
+                    audio_post_process(adev->native_postprocess.postprocessors[j], effect_tmp_buf, out_frames);
+                }
+            } else {
+                gain_speaker *= EQ_GAIN_DEFAULT;
             }
+
             if (aml_getprop_bool("media.audiohal.outdump")) {
                 FILE *fp1 = fopen("/data/audio_spk.pcm", "a+");
                 if (fp1) {
