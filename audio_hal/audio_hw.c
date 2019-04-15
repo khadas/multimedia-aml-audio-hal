@@ -5025,7 +5025,24 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
        setcsfilter_drc(adev->Drc_data.band_id,adev->Drc_data.fc);
        goto exit;
     }
-
+    ret = str_parms_get_int(parms, "eq_enable", &val);
+    if (ret >= 0) {
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_AED_EQ_ENABLE, val);
+        ALOGI("audio AED EQ enable: %s\n", val?"enable":"disable");
+        goto exit;
+    }
+    ret = str_parms_get_int(parms, "multi_drc_enable", &val);
+    if (ret >= 0) {
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_AED_MULTI_DRC_ENABLE, val);
+        ALOGI("audio AED Multi-band DRC enable: %s\n", val?"enable":"disable");
+        goto exit;
+    }
+    ret = str_parms_get_int(parms, "fullband_drc_enable", &val);
+    if (ret >= 0) {
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_AED_FULL_DRC_ENABLE, val);
+        ALOGI("audio AED Full-band DRC enable: %s\n", val?"enable":"disable");
+        goto exit;
+    }
     ret = str_parms_get_str(parms, "DTS_POST_GAIN", value, sizeof(value));
     if (ret >= 0) {
         sscanf(value,"%f", &adev->dts_post_gain);
@@ -5393,7 +5410,24 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         ALOGD("temp_buf %s", temp_buf);
         return strdup(temp_buf);
     }
-
+    else if (strstr(keys, "eq_enable")) {
+        int cur_status = aml_mixer_ctrl_get_int(&adev->alsa_mixer,AML_MIXER_ID_AED_EQ_ENABLE);
+        sprintf(temp_buf, "%d", cur_status);
+        ALOGD("temp_buf %d", cur_status);
+        return strdup(temp_buf);
+    }
+    else if (strstr(keys, "multi_drc_enable")) {
+        int cur_status = aml_mixer_ctrl_get_int(&adev->alsa_mixer,AML_MIXER_ID_AED_MULTI_DRC_ENABLE);
+        sprintf(temp_buf, "%d", cur_status);
+        ALOGD("temp_buf %d", cur_status);
+        return strdup(temp_buf);
+    }
+    else if (strstr(keys, "fullband_drc_enable")) {
+        int cur_status = aml_mixer_ctrl_get_int(&adev->alsa_mixer,AML_MIXER_ID_AED_FULL_DRC_ENABLE);
+        sprintf(temp_buf, "%d", cur_status);
+        ALOGD("temp_buf %d", cur_status);
+        return strdup(temp_buf);
+    }
 
     return strdup("");
 }
