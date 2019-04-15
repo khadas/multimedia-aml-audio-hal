@@ -10234,6 +10234,10 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
                    patch->sinks[0].id == config->id) {
             ALOGI("patch found mix->dev id %d, patchset %p", patch->id, patch_set);
             break;
+        } else if (config->ext.device.type == AUDIO_DEVICE_IN_HDMI
+                && patch->sources[0].ext.device.type == AUDIO_DEVICE_IN_LINE) {
+            ALOGI("HDMIIN DVI case, using LINEIN patch");
+            break;
         } else {
             patch_set = NULL;
             patch = NULL;
