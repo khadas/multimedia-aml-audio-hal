@@ -7881,45 +7881,48 @@ if (fp1) {
             __func__, __LINE__, aml_out->hal_format, output_format, adev->sink_format);
     }
 
-    if (is_bypass_dolbyms12(stream)) {
-        if (audio_hal_data_processing (stream, buffer, bytes, &output_buffer, &output_buffer_bytes, output_format) == 0)
-            hw_write (stream, output_buffer, output_buffer_bytes, output_format);
-    } else {
+    {
         //#ifdef DOLBY_MS12_ENABLE
         if (eDolbyMS12Lib == adev->dolby_lib_type) {
-re_write:
-            if (adev->debug_flag) {
-                ALOGI("%s dolby_ms12_main_process before write_bytes %zu!\n", __func__, write_bytes);
+            if (is_bypass_dolbyms12(stream)) {
+                if (audio_hal_data_processing (stream, buffer, bytes, &output_buffer, &output_buffer_bytes, output_format) == 0)
+                    hw_write (stream, output_buffer, output_buffer_bytes, output_format);
             }
-
-            used_size = 0;
-            ret = dolby_ms12_main_process(stream, (char*)write_buf + total_write, write_bytes, &used_size);
-            if (ret == 0) {
+            else {
+re_write:
                 if (adev->debug_flag) {
-                    ALOGI("%s dolby_ms12_main_process return %d, return used_size %zu!\n", __FUNCTION__, ret, used_size);
+                    ALOGI("%s dolby_ms12_main_process before write_bytes %zu!\n", __func__, write_bytes);
                 }
-                if (used_size < write_bytes && write_retry < 400) {
+
+                used_size = 0;
+                ret = dolby_ms12_main_process(stream, (char*)write_buf + total_write, write_bytes, &used_size);
+                if (ret == 0) {
                     if (adev->debug_flag) {
-                        ALOGI("%s dolby_ms12_main_process used  %zu,write total %zu,left %zu\n", __FUNCTION__, used_size, write_bytes, write_bytes - used_size);
+                        ALOGI("%s dolby_ms12_main_process return %d, return used_size %zu!\n", __FUNCTION__, ret, used_size);
                     }
-                    total_write += used_size;
-                    write_bytes -= used_size;
-                    aml_audio_sleep(1000);
-                    if (adev->debug_flag >= 2) {
-                        ALOGI("%s sleeep 5ms\n", __FUNCTION__);
+                    if (used_size < write_bytes && write_retry < 400) {
+                        if (adev->debug_flag) {
+                            ALOGI("%s dolby_ms12_main_process used  %zu,write total %zu,left %zu\n", __FUNCTION__, used_size, write_bytes, write_bytes - used_size);
+                        }
+                        total_write += used_size;
+                        write_bytes -= used_size;
+                        aml_audio_sleep(1000);
+                        if (adev->debug_flag >= 2) {
+                            ALOGI("%s sleeep 5ms\n", __FUNCTION__);
+                        }
+                        write_retry++;
+                        if (adev->ms12.dolby_ms12_enable) {
+                            goto re_write;
+                        }
                     }
-                    write_retry++;
-                    if (adev->ms12.dolby_ms12_enable) {
-                        goto re_write;
+                    if (write_retry >= 400) {
+                        ALOGE("%s main write retry time output,left %zu", __func__, write_bytes);
+                        //bytes -= write_bytes;
                     }
+                    goto exit;
+                } else {
+                    ALOGE("%s dolby_ms12_main_process failed %d", __func__, ret);
                 }
-                if (write_retry >= 400) {
-                    ALOGE("%s main write retry time output,left %zu", __func__, write_bytes);
-                    //bytes -= write_bytes;
-                }
-                goto exit;
-            } else {
-                ALOGE("%s dolby_ms12_main_process failed %d", __func__, ret);
             }
         } else if (eDolbyDcvLib == adev->dolby_lib_type) {
             //#else
