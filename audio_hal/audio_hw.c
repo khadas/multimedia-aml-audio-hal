@@ -4773,15 +4773,9 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                     }
                 }
             } else if (strncmp(value, "atv", 3) == 0) {
-                int input_src;
-
-                if (alsa_device_is_auge())
-                    input_src = FRATV;
-                else
-                    input_src = ATV;
-
                 adev->patch_src = SRC_ATV;
-                set_audio_source(&adev->alsa_mixer, input_src);
+                set_audio_source(&adev->alsa_mixer,
+                        ATV, alsa_device_is_auge());
             }
             ALOGI("%s, tuner to mixer case, no need to create patch", __func__);
             goto exit;
@@ -4828,15 +4822,9 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             }
 #endif
             if (!adev->audio_patching) {
-                int input_src;
-
-                if (alsa_device_is_auge())
-                    input_src = FRATV;
-                else
-                    input_src = ATV;
-
                 ALOGI ("%s, create atv patching", __func__);
-                set_audio_source(&adev->alsa_mixer, input_src);
+                set_audio_source(&adev->alsa_mixer,
+                        ATV, alsa_device_is_auge());
                 ret = create_patch (dev, AUDIO_DEVICE_IN_TV_TUNER, AUDIO_DEVICE_OUT_SPEAKER);
                 // audio_patching ok, mark the patching status
                 if (ret == 0) {
@@ -4895,14 +4883,16 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                     ALOGI("%s, create hdmi-dvi patching dev->dev", __func__);
                     release_patch(adev);
                     adev->active_inport = INPORT_LINEIN;
-                    set_audio_source(&adev->alsa_mixer, LINEIN);
+                    set_audio_source(&adev->alsa_mixer,
+                            LINEIN, alsa_device_is_auge());
                     ret = create_patch_ext(dev, AUDIO_DEVICE_IN_LINE, pAudPatchTmp->sinks[0].ext.device.type, pAudPatchTmp->id);
                     pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_LINE;
                 } else if (is_hdmiin_audio && adev->audio_patch /* && (adev->patch_src == SRC_LINEIN) && pAudPatchTmp->id == adev->audio_patch->patch_hdl*/) {
                     ALOGI("%s, create dvi-hdmi patching dev->dev", __func__);
                     release_patch(adev);
                     adev->active_inport = INPORT_HDMIIN;
-                    set_audio_source(&adev->alsa_mixer, HDMIIN);
+                    set_audio_source(&adev->alsa_mixer,
+                            HDMIIN, alsa_device_is_auge());
                     ret = create_patch_ext(dev, AUDIO_DEVICE_IN_HDMI, pAudPatchTmp->sinks[0].ext.device.type, pAudPatchTmp->id);
                     pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_HDMI;
                 }
@@ -4921,7 +4911,8 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                     adev->patch_src == SRC_LINEIN;
                     pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_LINE;
 
-                    set_audio_source(&adev->alsa_mixer, LINEIN);
+                    set_audio_source(&adev->alsa_mixer,
+                            LINEIN, alsa_device_is_auge());
                 } else if (is_hdmiin_audio && adev->audio_patch /* && (adev->patch_src == SRC_LINEIN) && pAudPatchTmp->id == adev->audio_patch->patch_hdl*/) {
                     ALOGI("%s, !!create dvi-hdmi patching dev->mix", __func__);
                     release_parser(adev);
@@ -4930,7 +4921,8 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                     adev->patch_src == SRC_HDMIIN;
                     pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_HDMI;
 
-                    set_audio_source(&adev->alsa_mixer, HDMIIN);
+                    set_audio_source(&adev->alsa_mixer,
+                            HDMIIN, alsa_device_is_auge());
                 }
             }
 
@@ -5807,7 +5799,8 @@ exit:
                 in->hal_channel_mask = config->channel_mask;
                 in->hal_format = config->format;
             }
-            set_audio_source(&adev->alsa_mixer, LINEIN);
+            set_audio_source(&adev->alsa_mixer,
+                    LINEIN, alsa_device_is_auge());
             in->device |= (aux_mic_devce & AUDIO_DEVICE_IN_BUILTIN_MIC);
         } else {
             in->device |= (aux_mic_devce & AUDIO_DEVICE_IN_LINE);
@@ -9527,7 +9520,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
     struct audio_patch_set *patch_set;
     const struct audio_port_config *src_config = sources;
     const struct audio_port_config *sink_config = sinks;
-    int input_src = HDMIIN;
+    enum input_source input_src = HDMIIN;
     uint32_t sample_rate = 48000, channel_cnt = 2;
     enum OUT_PORT outport = OUTPORT_SPEAKER;
     enum IN_PORT inport = INPORT_HDMIIN;
@@ -9650,10 +9643,7 @@ else
 
         switch (src_config->ext.device.type) {
         case AUDIO_DEVICE_IN_HDMI:
-            if (alsa_device_is_auge())
-                input_src = FRHDMIRX;
-            else
-                input_src = HDMIIN;
+            input_src = HDMIIN;
             inport = INPORT_HDMIIN;
             aml_dev->patch_src = SRC_HDMIIN;
             break;
@@ -9668,25 +9658,22 @@ else
             aml_dev->patch_src = SRC_SPDIFIN;
             break;
         case AUDIO_DEVICE_IN_TV_TUNER:
-            if (alsa_device_is_auge())
-                input_src = FRATV;
-            else
-                input_src = ATV;
+            input_src = ATV;
             inport = INPORT_TUNER;
             aml_dev->tuner2mix_patch = true;
             break;
         case AUDIO_DEVICE_IN_REMOTE_SUBMIX:
-            input_src = REMOTE_SUBMIXIN;
+            input_src = SRC_NA;
             inport = INPORT_REMOTE_SUBMIXIN;
             aml_dev->patch_src = SRC_REMOTE_SUBMIXIN;
             break;
         case AUDIO_DEVICE_IN_WIRED_HEADSET:
-            input_src = WIRED_HEADSETIN;
+            input_src = SRC_NA;
             inport = INPORT_WIRED_HEADSETIN;
             aml_dev->patch_src = SRC_WIRED_HEADSETIN;
             break;
         case AUDIO_DEVICE_IN_BUILTIN_MIC:
-            input_src = BUILTIN_MIC;
+            input_src = SRC_NA;
             inport = INPORT_BUILTIN_MIC;
             aml_dev->patch_src = SRC_BUILTIN_MIC;
             break;
@@ -9697,7 +9684,9 @@ else
             goto err_patch;
         }
 
-        set_audio_source(&aml_dev->alsa_mixer, input_src);
+        if (input_src != SRC_NA)
+            set_audio_source(&aml_dev->alsa_mixer,
+                    input_src, alsa_device_is_auge());
 
         aml_dev->active_inport = inport;
         aml_dev->src_gain[inport] = 1.0;
@@ -9787,10 +9776,7 @@ else
 
         switch (src_config->ext.device.type) {
         case AUDIO_DEVICE_IN_HDMI:
-            if (alsa_device_is_auge())
-                input_src = FRHDMIRX;
-            else
-                input_src = HDMIIN;
+            input_src = HDMIIN;
             inport = INPORT_HDMIIN;
             aml_dev->patch_src = SRC_HDMIIN;
             break;
@@ -9800,10 +9786,7 @@ else
             aml_dev->patch_src = SRC_LINEIN;
             break;
         case AUDIO_DEVICE_IN_TV_TUNER:
-            if (alsa_device_is_auge())
-                input_src = FRATV;
-            else
-                input_src = ATV;
+            input_src = ATV;
             inport = INPORT_TUNER;
             break;
         case AUDIO_DEVICE_IN_SPDIF:
@@ -9812,12 +9795,12 @@ else
             aml_dev->patch_src = SRC_SPDIFIN;
             break;
         case AUDIO_DEVICE_IN_REMOTE_SUBMIX:
-            input_src = REMOTE_SUBMIXIN;
+            input_src = SRC_NA;
             inport = INPORT_REMOTE_SUBMIXIN;
             aml_dev->patch_src = SRC_REMOTE_SUBMIXIN;
             break;
         case AUDIO_DEVICE_IN_WIRED_HEADSET:
-            input_src = WIRED_HEADSETIN;
+            input_src = SRC_NA;
             inport = INPORT_WIRED_HEADSETIN;
             aml_dev->patch_src = SRC_WIRED_HEADSETIN;
             break;
@@ -9843,7 +9826,10 @@ else
         // One more case is ATV->ATV, should recreate audio patch.
         if ((inport != INPORT_TUNER)
                 || ((inport == INPORT_TUNER) && (aml_dev->patch_src == SRC_ATV))) {
-            set_audio_source(&aml_dev->alsa_mixer, input_src);
+            if (input_src != SRC_NA)
+                set_audio_source(&aml_dev->alsa_mixer,
+                        input_src, alsa_device_is_auge());
+
             ret = create_patch(dev,
                                src_config->ext.device.type, outport);
             if (ret) {

@@ -56,21 +56,6 @@ enum audio_type {
 /*min DTSHD Period 2048; max DTSHD Period 65536*/
 #define DTSHD_PERIOD_SIZE (2048)
 
-enum input_source {
-    LINEIN = 0,
-    ATV,
-    HDMIIN,
-    SPDIFIN,
-    REMOTE_SUBMIXIN,
-    WIRED_HEADSETIN,
-    BUILTIN_MIC,
-};
-
-enum auge_input_source {
-	FRATV    = 5,
-	FRHDMIRX = 8,
-};
-
 enum parser_state {
     IEC61937_UNSYNC,
     IEC61937_SYNCING,

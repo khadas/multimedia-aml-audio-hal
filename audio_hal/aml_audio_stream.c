@@ -341,9 +341,33 @@ bool is_spdif_in_stable_hw (struct audio_stream_in *stream)
     return true;
 }
 
-int set_audio_source(struct aml_mixer_handle *mixer_handle, int audio_source)
+int set_audio_source(struct aml_mixer_handle *mixer_handle,
+        enum input_source audio_source, bool is_auge)
 {
-    return aml_mixer_ctrl_set_int (mixer_handle, AML_MIXER_ID_AUDIO_IN_SRC, audio_source);
+    int src = audio_source;
+
+    if (is_auge) {
+        switch (audio_source) {
+        case LINEIN:
+            src = TDMIN_A;
+            break;
+        case ATV:
+            src = FRATV;
+            break;
+        case HDMIIN:
+            src = FRHDMIRX;
+            break;
+        case SPDIFIN:
+            src = SPDIFIN_AUGE;
+            break;
+        default:
+            ALOGW("%s(), src: %d not support", __func__, src);
+            src = FRHDMIRX;
+            break;
+        }
+    }
+
+    return aml_mixer_ctrl_set_int(mixer_handle, AML_MIXER_ID_AUDIO_IN_SRC, src);
 }
 
 int set_spdifin_pao(struct aml_mixer_handle *mixer_handle,int enable)
