@@ -187,6 +187,8 @@ static inline alsa_device_t usecase_device_adapter_with_ms12(alsa_device_t useca
     }
 }
 
+typedef void (*dtv_avsync_process_cb)(struct aml_audio_patch* patch,struct aml_stream_out* stream_out);
+
 struct aml_audio_patch {
     struct audio_hw_device *dev;
     ring_buffer_t aml_ringbuffer;
@@ -258,8 +260,9 @@ struct aml_audio_patch {
     int dtv_pcm_channel;
     unsigned int dtv_output_clock;
     unsigned int dtv_default_i2s_clock;
-    unsigned int dtv_default_spidif_clock;
-
+    unsigned int dtv_default_spdif_clock;
+    unsigned int spdif_format_set;
+    dtv_avsync_process_cb avsync_callback;
     pthread_mutex_t dtv_output_mutex;
     pthread_mutex_t dtv_input_mutex;
     pthread_mutex_t assoc_mutex;

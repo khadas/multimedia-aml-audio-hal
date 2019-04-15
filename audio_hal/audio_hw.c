@@ -6068,8 +6068,10 @@ static void aml_tinymix_set_spdif_format(audio_format_t output_format,struct aml
     int spdif_mute = 0;
     if (output_format == AUDIO_FORMAT_AC3) {
         aml_spdif_format = AML_DOLBY_DIGITAL;
+        audio_set_spdif_clock(aml_dev, AML_DOLBY_DIGITAL);
     } else if (output_format == AUDIO_FORMAT_E_AC3) {
         aml_spdif_format = AML_DOLBY_DIGITAL_PLUS;
+        audio_set_spdif_clock(aml_dev, AML_DOLBY_DIGITAL_PLUS);
         // for BOX with ms12 continous mode, need DDP output
         if ((eDolbyMS12Lib == aml_dev->dolby_lib_type) && aml_dev->continuous_audio_mode && !aml_dev->is_TV) {
             // do nothing
@@ -6078,8 +6080,10 @@ static void aml_tinymix_set_spdif_format(audio_format_t output_format,struct aml
         }
     } else if (output_format == AUDIO_FORMAT_DTS) {
         aml_spdif_format = AML_DTS;
+        audio_set_spdif_clock(aml_dev, AML_DTS);
     } else {
         aml_spdif_format = AML_STEREO_PCM;
+        audio_set_spdif_clock(aml_dev, AML_STEREO_PCM);
     }
     aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_FORMAT, aml_spdif_format);
     aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_MUTE, spdif_mute);
@@ -6761,6 +6765,7 @@ ssize_t hw_write (struct audio_stream_out *stream
     struct aml_audio_device *adev = aml_out->dev;
     const uint16_t *tmp_buffer = buffer;
     int16_t *effect_tmp_buf = NULL;
+    bool is_dtv = (adev->patch_src == SRC_DTV);
     int out_frames = bytes / 4;
     ssize_t ret = 0;
     int i;
@@ -6772,7 +6777,10 @@ ssize_t hw_write (struct audio_stream_out *stream
     if (adev->debug_flag) {
         ALOGI("+%s() buffer %p bytes %zu, format %#x", __func__, buffer, bytes, output_format);
     }
-
+    if (is_dtv) {
+        if (adev->audio_patch && adev->audio_patch->avsync_callback)
+            adev->audio_patch->avsync_callback(adev->audio_patch,aml_out);
+    }
     pthread_mutex_lock(&adev->alsa_pcm_lock);
     if (aml_out->status != STREAM_HW_WRITING) {
         ALOGI("%s, aml_out %p alsa open output_format %#x\n", __func__, aml_out, output_format);
