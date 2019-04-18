@@ -112,7 +112,13 @@ include $(BUILD_PREBUILT)
         liblog libcutils libtinyalsa \
         libaudioutils libdl libaudioroute libutils \
         libdroidaudiospdif libamaudioutils libamlaudiorc libamadec \
-        libnano libam_adp
+        libnano
+
+ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+    LOCAL_SHARED_LIBRARIES += libam_adp_vendor
+else
+    LOCAL_SHARED_LIBRARIES += libam_adp
+endif
 
 ifeq ($(BOARD_ENABLE_NANO), true)
     LOCAL_SHARED_LIBRARIES += libnano
