@@ -3022,7 +3022,7 @@ exit:
         usleep (bytes * 1000000 / audio_stream_out_frame_size (stream) /
                 out_get_sample_rate (&stream->common) );
     }
-    /* 
+    /*
     if the data is not  consumed totally,
     we need re-send data again
     */
@@ -3032,7 +3032,7 @@ exit:
     }
     else if (return_bytes < 0)
         return return_bytes;
-    else 
+    else
         return total_bytes;
 }
 
@@ -3986,6 +3986,13 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             }
             DoDumpData(buffer, bytes, CC_DUMP_SRC_TYPE_INPUT);
         }
+    }
+
+    /*noise gate is only used in Linein for 16bit audio data*/
+    if (adev->active_inport == INPORT_LINEIN && adev->aml_ng_enable == 1) {
+        int ng_status = noise_evaluation(adev->aml_ng_handle, buffer, bytes >> 1);
+        /*if (ng_status == NG_MUTE)
+            ALOGI("noise gate is working!");*/
     }
 
 #if !defined(IS_ATOM_PROJECT)
@@ -9865,13 +9872,6 @@ else
             ALOGI("%s, now end create dtv patch the audio_patching is %d ", __func__, aml_dev->audio_patching);
 #endif
         }
-        if (input_src == LINEIN && aml_dev->aml_ng_enable) {
-            aml_dev->aml_ng_handle = init_noise_gate(aml_dev->aml_ng_level,
-                                     aml_dev->aml_ng_attrack_time, aml_dev->aml_ng_release_time);
-            ALOGE("%s: init amlogic noise gate: level: %fdB, attrack_time = %dms, release_time = %dms",
-                  __func__, aml_dev->aml_ng_level,
-                  aml_dev->aml_ng_attrack_time, aml_dev->aml_ng_release_time);
-        }
     }
     return 0;
 
@@ -9930,12 +9930,6 @@ static int adev_release_audio_patch(struct audio_hw_device *dev,
                 && aml_dev->patch_src != SRC_INVAL
                 && aml_dev->audio_patching == 1) {
             release_patch(aml_dev);
-            if (aml_dev->patch_src == SRC_LINEIN && aml_dev->aml_ng_handle) {
-#ifdef ENABLE_DTV_PATCH
-                release_noise_gate(aml_dev->aml_ng_handle);
-                aml_dev->aml_ng_handle = NULL;
-#endif
-            }
         }
         aml_dev->audio_patching = 0;
         if (aml_dev->active_inport != INPORT_TUNER) {
@@ -10170,6 +10164,10 @@ static int adev_close(hw_device_t *device)
     }
     if (adev->hp_output_buf) {
         free(adev->hp_output_buf);
+    }
+    if (adev->aml_ng_handle) {
+        release_noise_gate(adev->aml_ng_handle);
+        adev->aml_ng_handle = NULL;
     }
     ring_buffer_release(&(adev->spk_tuning_rbuf));
     if (adev->ar) {
@@ -10663,6 +10661,14 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
             ALOGE("%s() open tsync failed", __func__);
         }
         adev->rawtopcm_flag = false;
+    }
+
+    if (adev && adev->aml_ng_enable) {
+        adev->aml_ng_handle = init_noise_gate(adev->aml_ng_level,
+                                 adev->aml_ng_attrack_time, adev->aml_ng_release_time);
+        ALOGI("%s: init amlogic noise gate: level: %fdB, attrack_time = %dms, release_time = %dms",
+              __func__, adev->aml_ng_level,
+              adev->aml_ng_attrack_time, adev->aml_ng_release_time);
     }
 
     // adev->debug_flag is set in hw_write()
