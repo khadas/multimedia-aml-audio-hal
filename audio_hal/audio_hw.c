@@ -209,7 +209,6 @@ static int create_patch_ext(struct audio_hw_device *dev,
                             audio_devices_t input,
                             audio_devices_t output,
                             audio_patch_handle_t handle);
-static int release_patch_l(struct aml_audio_device *aml_dev);
 static int release_patch (struct aml_audio_device *aml_dev);
 static int release_parser(struct aml_audio_device *aml_dev);
 static void aml_tinymix_set_spdif_format(audio_format_t output_format,  struct aml_stream_out *stream);
@@ -9106,7 +9105,10 @@ static int create_patch_l(struct audio_hw_device *dev,
         ALOGD("%s: patch exists, first release it", __func__);
         ALOGD("%s: new input %#x, old input %#x",
             __func__, input, aml_dev->audio_patch->input_src);
-        release_patch_l(aml_dev);
+        if (aml_dev->audio_patch->is_dtv_src)
+            release_dtv_patch_l(aml_dev);
+        else
+            release_patch_l(aml_dev);
     }
 
     patch = calloc(1, sizeof(*patch));
@@ -9116,13 +9118,13 @@ static int create_patch_l(struct audio_hw_device *dev,
     aml_dev->source_mute = 0;
     patch->dev = dev;
     patch->input_src = input;
+    patch->is_dtv_src = false;
     patch->aformat = AUDIO_FORMAT_PCM_16_BIT;
     patch->avsync_sample_max_cnt = AVSYNC_SAMPLE_MAX_CNT;
     aml_dev->audio_patch = patch;
     pthread_mutex_init(&patch->mutex, NULL);
     pthread_cond_init(&patch->cond, NULL);
 
-    patch->input_src = input;
     patch->in_sample_rate = 48000;
     patch->in_chanmask = AUDIO_CHANNEL_IN_STEREO;
     patch->output_src = AUDIO_DEVICE_OUT_SPEAKER;
@@ -9209,7 +9211,7 @@ static int create_patch_ext(struct audio_hw_device *dev,
     return ret;
 }
 
-static int release_patch_l(struct aml_audio_device *aml_dev)
+int release_patch_l(struct aml_audio_device *aml_dev)
 {
     struct aml_audio_patch *patch = aml_dev->audio_patch;
 

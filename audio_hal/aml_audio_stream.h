@@ -218,6 +218,7 @@ struct aml_audio_patch {
     audio_format_t in_format;
 
     audio_devices_t output_src;
+    bool is_dtv_src;
     audio_channel_mask_t out_chanmask;
     int out_sample_rate;
     audio_format_t out_format;

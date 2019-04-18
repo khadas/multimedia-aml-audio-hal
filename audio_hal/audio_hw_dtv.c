@@ -91,7 +91,7 @@
 #define DTV_DECODER_CHECKIN_FIRSTAPTS_PATH "/sys/class/tsync/checkin_firstapts"
 #define DTV_DECODER_TSYNC_MODE      "/sys/class/tsync/mode"
 
-pthread_mutex_t dtv_patch_mutex = PTHREAD_MUTEX_INITIALIZER;
+//pthread_mutex_t dtv_patch_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t dtv_cmd_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct cmd_list {
     struct cmd_list *next;
@@ -1754,7 +1754,7 @@ static int release_dtv_output_stream_thread(struct aml_audio_patch *patch)
     return 0;
 }
 
-int create_dtv_patch(struct audio_hw_device *dev, audio_devices_t input,
+int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
                      audio_devices_t output __unused)
 {
     struct aml_audio_patch *patch;
@@ -1765,7 +1765,14 @@ int create_dtv_patch(struct audio_hw_device *dev, audio_devices_t input,
 
     int ret = 0;
     // ALOGI("++%s live period_size %d\n", __func__, period_size);
-    pthread_mutex_lock(&dtv_patch_mutex);
+    //pthread_mutex_lock(&aml_dev->patch_lock);
+    if (aml_dev->audio_patch) {
+        ALOGD("%s: patch exists, first release it", __func__);
+        if (aml_dev->audio_patch->is_dtv_src)
+            release_dtv_patch_l(aml_dev);
+        else
+            release_patch_l(aml_dev);
+    }
     patch = calloc(1, sizeof(*patch));
     if (!patch) {
         ret = -1;
@@ -1782,6 +1789,7 @@ int create_dtv_patch(struct audio_hw_device *dev, audio_devices_t input,
     patch->input_src = input;
     patch->aformat = AUDIO_FORMAT_PCM_16_BIT;
     patch->avsync_sample_max_cnt = AVSYNC_SAMPLE_MAX_CNT;
+    patch->is_dtv_src = true;
 
     patch->output_thread_exit = 0;
     patch->input_thread_exit = 0;
@@ -1809,7 +1817,7 @@ int create_dtv_patch(struct audio_hw_device *dev, audio_devices_t input,
         goto err_in_thread;
     }
     create_dtv_output_stream_thread(patch);
-    pthread_mutex_unlock(&dtv_patch_mutex);
+    //pthread_mutex_unlock(&aml_dev->patch_lock);
     init_cmd_list();
     if (aml_dev->tuner2mix_patch) {
         ret = ring_buffer_init(&patch->dtvin_ringbuffer, 4 * 8192 * 2 *16);
@@ -1835,11 +1843,11 @@ err_in_thread:
 err_ring_buf:
     free(patch);
 err:
-    pthread_mutex_unlock(&dtv_patch_mutex);
+    //pthread_mutex_unlock(&aml_dev->patch_lock);
     return ret;
 }
 
-int release_dtv_patch(struct aml_audio_device *aml_dev)
+int release_dtv_patch_l(struct aml_audio_device *aml_dev)
 {
     if (aml_dev == NULL) {
         ALOGI("[%s]release the dtv patch failed  aml_dev == NULL\n", __FUNCTION__);
@@ -1848,10 +1856,10 @@ int release_dtv_patch(struct aml_audio_device *aml_dev)
     struct aml_audio_patch *patch = aml_dev->audio_patch;
 
     ALOGI("++%s live\n", __FUNCTION__);
-    pthread_mutex_lock(&dtv_patch_mutex);
+    //pthread_mutex_lock(&aml_dev->patch_lock);
     if (patch == NULL) {
         ALOGI("release the dtv patch failed  patch == NULL\n");
-        pthread_mutex_unlock(&dtv_patch_mutex);
+        //pthread_mutex_unlock(&aml_dev->patch_lock);
         return -1;
     }
     deinit_cmd_list();
@@ -1866,9 +1874,33 @@ int release_dtv_patch(struct aml_audio_device *aml_dev)
     free(patch);
     aml_dev->audio_patch = NULL;
     ALOGI("--%s", __FUNCTION__);
-    pthread_mutex_unlock(&dtv_patch_mutex);
+    //pthread_mutex_unlock(&aml_dev->patch_lock);
     if (aml_dev->useSubMix) {
         switchNormalStream(aml_dev->active_outputs[STREAM_PCM_NORMAL], 1);
     }
     return 0;
+}
+
+int create_dtv_patch(struct audio_hw_device *dev, audio_devices_t input,
+             audio_devices_t output)
+{
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *)dev;
+    int ret = 0;
+
+    pthread_mutex_lock(&aml_dev->patch_lock);
+    ret = create_dtv_patch_l(dev, input, output);
+    pthread_mutex_unlock(&aml_dev->patch_lock);
+
+    return ret;
+}
+
+int release_dtv_patch(struct aml_audio_device *aml_dev)
+{
+    int ret = 0;
+
+    pthread_mutex_lock(&aml_dev->patch_lock);
+    ret = release_dtv_patch_l(aml_dev);
+    pthread_mutex_unlock(&aml_dev->patch_lock);
+
+    return ret;
 }

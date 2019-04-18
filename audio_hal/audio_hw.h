@@ -755,5 +755,6 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
                                size_t bytes);
 int dsp_process_output(struct aml_audio_device *adev, void *in_buffer,
                        size_t bytes);
+int release_patch_l(struct aml_audio_device *adev);
 
 #endif
