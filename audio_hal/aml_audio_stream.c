@@ -394,12 +394,30 @@ int get_hdmiin_samplerate(struct aml_mixer_handle *mixer_handle)
 {
     int stable = 0;
 
-    stable = aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_HDMI_IN_AUDIO_STABLE);
+    stable = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_HDMI_IN_AUDIO_STABLE);
     if (!stable) {
         return -1;
     }
 
-    return aml_mixer_ctrl_get_int(mixer_handle,AML_MIXER_ID_HDMI_IN_SAMPLERATE);
+    return aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_HDMI_IN_SAMPLERATE);
+}
+
+int get_hdmiin_channel(struct aml_mixer_handle *mixer_handle)
+{
+    int stable = 0;
+    int channel_index = 0;
+
+    stable = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_HDMI_IN_AUDIO_STABLE);
+    if (!stable) {
+        return -1;
+    }
+
+    /*hmdirx audio support: N/A, 2, 3, 4, 5, 6, 7, 8*/
+    channel_index = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_HDMI_IN_CHANNELS);
+    if (channel_index != 7)
+        return 2;
+    else
+        return 8;
 }
 
 int get_HW_resample(struct aml_mixer_handle *mixer_handle)

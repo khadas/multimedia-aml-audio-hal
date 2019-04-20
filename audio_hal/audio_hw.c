@@ -3222,8 +3222,8 @@ static int start_input_stream(struct aml_stream_in *in)
     unsigned int port = PORT_I2S;
     struct aml_audio_device *adev = in->dev;
 
-    ALOGD("%s(need_echo_reference=%d, channels=%d, rate=%d, requested_rate=%d, mode= %d)",
-          __FUNCTION__, in->need_echo_reference, in->config.channels, in->config.rate, in->requested_rate, adev->mode);
+    ALOGD("%s(channels=%d, rate=%d, requested_rate=%d, mode= %d)",
+          __FUNCTION__, in->config.channels, in->config.rate, in->requested_rate, adev->mode);
 
     adev->active_input = in;
     if (adev->mode != AUDIO_MODE_IN_CALL) {
@@ -3237,8 +3237,7 @@ static int start_input_stream(struct aml_stream_in *in)
           __FUNCTION__, in->requested_rate, in->config.rate);
     if (adev->in_device & AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET) {
         port = PORT_PCM;
-    } else if (getprop_bool("sys.hdmiIn.Capture") ||
-               (adev->in_device & AUDIO_DEVICE_IN_HDMI) ||
+    } else if ((adev->in_device & AUDIO_DEVICE_IN_HDMI) ||
                (adev->in_device & AUDIO_DEVICE_IN_SPDIF)) {
         /* fix auge tv input, hdmirx, tunner */
         if (alsa_device_is_auge() &&
@@ -3255,21 +3254,11 @@ static int start_input_stream(struct aml_stream_in *in)
         else
             port = PORT_I2S;
     }
-     /* check to update port */
-
+    /* check to update port */
     port = alsa_device_update_pcm_index(port, CAPTURE);
     ALOGD("*%s, open card(%d) port(%d), in_device:0x%x\n",
         __FUNCTION__, card, port, adev->in_device);
 
-    //in->config.period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
-
-#if defined(IS_ATOM_PROJECT)
-    /*mic and linein share the same input device*/
-    if (in->device & (AUDIO_DEVICE_IN_BUILTIN_MIC | AUDIO_DEVICE_IN_LINE)) {
-        port = 2;
-    }
-#endif
-    ALOGI("%s: card(%d), port(%d)", __func__, card, port);
     /* this assumes routing is done previously */
     in->pcm = pcm_open(card, port, PCM_IN | PCM_NONEBLOCK, &in->config);
     if (!pcm_is_ready(in->pcm)) {
@@ -3278,7 +3267,6 @@ static int start_input_stream(struct aml_stream_in *in)
         adev->active_input = NULL;
         return -ENOMEM;
     }
-    ALOGD("pcm_open in: card(%d), port(%d)", card, port);
 
     /* if no supported sample rate is available, use the resampler */
     if (in->resampler) {
@@ -3651,6 +3639,37 @@ exit:
     return;
 }
 
+static void in_reset_channel_num(struct audio_stream_in *stream , unsigned int channel_count)
+{
+    int ret = 0;
+    struct aml_stream_in *in = (struct aml_stream_in *) stream;
+    struct aml_audio_device *adev = in->dev;
+    pthread_mutex_lock(&in->lock);
+
+    /*if input channel count is changed, it need to reconfig channel count*/
+    in->config.channels = channel_count;
+    ALOGD("Config channel nummer to %d\n", in->config.channels);
+    if (in->standby) {
+        ret = start_input_stream(in);
+        if (ret < 0) {
+            goto exit;
+        }
+    } else {
+        do_input_standby(in);
+        start_input_stream(in);
+        if (ret < 0) {
+            goto exit;
+        }
+    }
+    in->standby = 0;
+exit:
+    if (ret < 0) {
+        ALOGE("in_reset err!!!");
+    }
+
+    pthread_mutex_unlock(&in->lock);
+    return;
+}
 
 static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t bytes)
 {
@@ -3726,204 +3745,11 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             }
         } else
             memset (buffer, 0, bytes);
-    }
-#if defined(IS_ATOM_PROJECT)
-    else if (in->device & (AUDIO_DEVICE_IN_BUILTIN_MIC | AUDIO_DEVICE_IN_LINE)) {
-        if ((in->device & AUDIO_DEVICE_IN_BUILTIN_MIC) && !adev->mic_running) {
-            adev->mic_running = 1;
-            if(!adev->pstFir_mic)
-                Fir_initModule(&adev->pstFir_mic);
-        }
-
-        cur_in_bytes = in->requested_rate == 16000 ?
-            3 * FRAMESIZE_32BIT_STEREO * in_frames : FRAMESIZE_32BIT_STEREO * in_frames;
-        cur_in_frames = in->requested_rate == 16000 ? 3 * in_frames : in_frames;
-
-        if (!in->aux_buf || in->aux_buf_size < cur_in_bytes) {
-            ALOGI("%s: realloc aux_buf size from %zu to %zu", __func__, in->aux_buf_size, cur_in_bytes);
-            in->aux_buf = realloc(in->aux_buf, cur_in_bytes);
-            in->aux_buf_size = cur_in_bytes;
-        }
-        if (!in->mic_buf || in->mic_buf_size < cur_in_bytes) {
-            ALOGI("%s: realloc mic_buf size from %zu to %zu", __func__, in->mic_buf_size, cur_in_bytes);
-            in->mic_buf = realloc(in->mic_buf, cur_in_bytes);
-            in->mic_buf_size = cur_in_bytes;
-        }
-        if (!in->tmp_buffer_8ch || in->tmp_buffer_8ch_size < 4 * cur_in_bytes) {
-            ALOGI("%s: realloc tmp_buffer_8ch size from %zu to %zu", __func__, in->tmp_buffer_8ch_size, 4 * cur_in_bytes);
-            in->tmp_buffer_8ch = realloc(in->tmp_buffer_8ch, 4 * cur_in_bytes);
-            in->tmp_buffer_8ch_size = 4 * cur_in_bytes;
-        }
-
-        ret = aml_alsa_input_read(stream, in->tmp_buffer_8ch, 4 * cur_in_bytes);
-        if (ret < 0)
-            goto exit;
-
-        /*separate aux data in channel 0/1 and mic data in channel 6/7*/
-        int32_t *aux_buf = (int32_t *)in->aux_buf;
-        int32_t *mic_buf = (int32_t *)in->mic_buf;
-        int32_t *tmp_buffer_8ch = (int32_t *)in->tmp_buffer_8ch;
-        int16_t *tmp_buf_16 = (int16_t *)buffer;
-        int32_t *tmp_buf_32 = (int32_t *)buffer;
-        for (size_t i = 0; i < cur_in_frames; i++) {
-            if (in->device & AUDIO_DEVICE_IN_LINE) {
-                aux_buf[2 * i] = tmp_buffer_8ch[8 * i];
-                aux_buf[2 * i + 1] = tmp_buffer_8ch[8 * i + 1];
-            }
-            if (in->device & AUDIO_DEVICE_IN_BUILTIN_MIC) {
-                mic_buf[2 * i] = tmp_buffer_8ch[8 * i + 6];
-                mic_buf[2 * i + 1] = tmp_buffer_8ch[8 * i + 7];
-            }
-        }
-
-        /*Mic & AEC processing*/
-        if (in->device & AUDIO_DEVICE_IN_BUILTIN_MIC) {
-
-            aec_timestamp spk_timestamp;
-            aec_timestamp mic_timestamp = get_timestamp();
-
-            /* harman LPF FIR filter and simple downsample from 48K->16K for mic*/
-            if (adev->pstFir_mic) {
-                Fir_calcModule(adev->pstFir_mic, mic_buf, mic_buf, cur_in_frames);
-            }
-
-            if (adev->spk_buf_size < cur_in_bytes) {
-                ALOGI("%s: realloc spk_buf size from %zu to %zu", __func__, adev->spk_buf_size, cur_in_bytes);
-                adev->spk_buf = realloc(adev->spk_buf, cur_in_bytes);
-                adev->spk_buf_size = cur_in_bytes;
-            }
-
-            int int_get_buffer_read_space = get_buffer_read_space(&adev->spk_ring_buf);
-            int time_diff = 0;
-            bool aec_print_this = false;
-            if (int_get_buffer_read_space >= (int)(cur_in_bytes + TIMESTAMP_LEN)) {
-                /* get timestamp */
-                ring_buffer_read(&adev->spk_ring_buf, (unsigned char*) spk_timestamp.tsB, TIMESTAMP_LEN);
-
-                /*get audio data from speaker ringbuffer*/
-                ring_buffer_read(&adev->spk_ring_buf, (unsigned char*)adev->spk_buf, cur_in_bytes);
-
-                if (DEBUG_AEC) {
-                    ALOGI("%s: ---- TS[Spk] ---- ts(d): %llu, diff[spk_cadence]: %llu, diff[now - lastwr]: %llu",
-                        __func__, spk_timestamp.timeStamp,
-                        spk_timestamp.timeStamp - adev->debug_spk_buf_time_last,
-                        spk_timestamp.timeStamp - adev->spk_buf_last_write_time);
-                    if (adev->spk_buf_read_count++ > 10000000 ) {
-                        adev->spk_buf_read_count = 0;
-                    }
-                }
-                adev->debug_spk_buf_time_last = spk_timestamp.timeStamp;
-
-                int32_t *spk_buf_32 = (int32_t *)adev->spk_buf;
-                /* harman LPF FIR filter and simple downsample from 48K->16K for spk*/
-                if (adev->pstFir_spk) {
-                    Fir_calcModule(adev->pstFir_spk, spk_buf_32, spk_buf_32, cur_in_frames);
-                }
-
-                time_diff = (int) (mic_timestamp.timeStamp - spk_timestamp.timeStamp);
-                /*after mic and speaker ready to get timestampe, start AEC*/
-                if (adev->spk_running == 1 && time_diff < 200000) {
-                    pthread_mutex_lock(&adev->aec_spk_mic_lock);
-                    int cleaned_samples_per_channel = 0;
-                    int aec_frame_div = 2; //4;
-                    if (DEBUG_AEC) {
-                        if (getprop_bool("media.audio_hal.aec_frame_div4")) {
-                            aec_frame_div = 4;
-                        }
-                    }
-
-                    int aec_samples_per_channel = (int) cur_in_frames/(3 * aec_frame_div); //3072/6 -> 512
-                    int aec_data_bytes = aec_samples_per_channel * 8; // 2 samples, 4 bytes/sample; 512:4096
-                    //cur_in_bytes/(3 * aec_frame_div); // 8192 bytes per 64ms
-
-                    char* spk_buf_ptr = (char*) adev->spk_buf;
-                    char* mic_buf_ptr = (char*) mic_buf;
-
-                    for (int i = 0; i < aec_frame_div; i++) {
-                        cleaned_samples_per_channel = 0;
-                        aec_set_mic_buf_info(aec_samples_per_channel, mic_timestamp.timeStamp, true);
-                        aec_set_spk_buf_info(aec_samples_per_channel, spk_timestamp.timeStamp, true);
-                        mic_timestamp.timeStamp += 64000 / aec_frame_div; // 16ms per 256 samples/channel
-                        spk_timestamp.timeStamp += 64000 / aec_frame_div; // or 32 ms per 512 samples/channel
-
-                        //pthread_mutex_lock(&adev->aec_spk_buf_lock);
-                        int32_t *aec_proc_buf = aec_spk_mic_process((int32_t *)&spk_buf_ptr[aec_data_bytes * i],
-                            (int32_t *)&mic_buf_ptr[aec_data_bytes * i], &cleaned_samples_per_channel);
-                        //pthread_mutex_unlock(&adev->aec_spk_buf_lock);
-
-                        //When AEC is error or cleaned samples don't match input samples, ignore AEC output
-                        if (aec_proc_buf && (cleaned_samples_per_channel == aec_samples_per_channel)) {
-                            //AEC output int32 stereo
-                           if (getprop_bool("media.audio_hal.aec.outdump")) {
-                                FILE *fp1 = fopen("/data/tmp/audio_aec.raw", "a+");
-                                if (fp1) {
-                                    int flen = fwrite((char *)aec_proc_buf, 1, aec_data_bytes, fp1);
-                                    fclose(fp1);
-                                } else {
-                                    ALOGD("could not open files!");
-                                }
-                            }
-
-                            memcpy(&mic_buf_ptr[aec_data_bytes * i], (char*)aec_proc_buf, aec_data_bytes);
-                            if (DEBUG_AEC)
-                                ALOGD("i: %d, fr_div: %d, samples from AEC = %d, aec_data_bytes: %d",
-                                    i, aec_frame_div, cleaned_samples_per_channel, aec_data_bytes);
-                        } else {
-                            if (DEBUG_AEC)
-                                ALOGE("aec_proc_buf is null (or) cleaned_samples_per_channel: %d ",
-                                    cleaned_samples_per_channel);
-                        }
-                    }
-                    aec_print_this = true;
-                    pthread_mutex_unlock(&adev->aec_spk_mic_lock);
-                } else {
-                    if (DEBUG_AEC)
-                        ALOGE("%s: time_diff: %d", __func__, time_diff);
-                }
-            } else {
-                if (DEBUG_AEC_VERBOSE)
-                    ALOGE("%s: missed mic!", __func__);
-            }
-
-            /*harman HPF filter for mic data, fc:100Hz, sr:16KHZ*/
-            Aud_HPFFilter_Process(mic_buf, cur_in_frames/3);
-            Aud_Gain_Process(mic_buf, cur_in_frames/3);
-
-            if (DEBUG_AEC && aec_print_this)
-                ALOGI("%s: With AEC--buffer_read_space: %d, cur_in_bytes/3: %d, bytes: %d, in_frames: %d, cur_in_frames: %d, time_diff: %d, spk_buf[read]: %llu",
-                  __func__, int_get_buffer_read_space, cur_in_bytes/3, bytes, in_frames, cur_in_frames,
-                   time_diff, adev->spk_buf_read_count);
-
-            /*MIC output int32 stereo/mono???*/
-            if (channel_count == 1) {
-                for (size_t i = 0; i < cur_in_frames / 3; i++) {
-                    tmp_buf_32[i] = (mic_buf[2*i] + mic_buf[2*i + 1]);
-                }
-            } else {
-                memcpy(tmp_buf_32, mic_buf, cur_in_bytes / 3);
-            }
-
-            if (getprop_bool("media.audio_hal.aec.outdump")) {
-                FILE *fp1 = fopen("/data/tmp/audio_aechpf.raw", "a+");
-                if (fp1) {
-                    int flen = fwrite((char *)buffer, 1, bytes, fp1);
-                    fclose(fp1);
-                } else {
-                    ALOGD("could not open files!");
-                }
-            }
-        } else {/*Aux processing, directly copy aux data to audio patch*/
-            memcpy(tmp_buf_32, aux_buf, cur_in_frames * FRAMESIZE_32BIT_STEREO);
-        }
-    }
-#endif
-    else if (adev->patch_src == SRC_DTV && adev->tuner2mix_patch == 1)
-    {
+    } else if (adev->patch_src == SRC_DTV && adev->tuner2mix_patch == 1) {
         ret = dtv_in_read(stream, buffer, bytes);
         apply_volume(adev->src_gain[adev->active_inport], buffer, sizeof(uint16_t), bytes);
         goto exit;
-    }
-    else{
+    } else {
         /* when audio is unstable, need to mute the audio data for a while
          * the mute time is related to hdmi audio buffer size
          */
@@ -3964,8 +3790,40 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             if (in->resampler) {
                 ret = read_frames(in, buffer, in_frames);
             } else {
-                //ALOGI("%s, %d,byte:%d,pcm %p",__func__,__LINE__,bytes,in->pcm);
-                ret = aml_alsa_input_read(stream, buffer, bytes);
+                //if input channel count from hdmirx is 8, do audio downmix.
+                if (in->config.channels == 8) {
+                    if (in->input_tmp_buffer ||
+                        in->input_tmp_buffer_size < bytes) {
+                        in->input_tmp_buffer = realloc(in->input_tmp_buffer, bytes * 4);
+                        in->input_tmp_buffer_size = bytes * 4;
+                    }
+                    ret = aml_alsa_input_read(stream, in->input_tmp_buffer, bytes * 4);
+                    if (in->config.format == PCM_FORMAT_S16_LE) {
+                        int16_t *out_ptr = buffer;
+                        int16_t *in_ptr = in->input_tmp_buffer;
+                        for (unsigned i = 0; i < in_frames; i++) {
+                            int left = 0, right = 0;
+                            for (int k = 0; k < 4; k++) {
+                                left += *in_ptr++;
+                                right += *in_ptr++;
+                            }
+                            *out_ptr++ = (int16_t)(left >> 2);
+                            *out_ptr++ = (int16_t)(right >> 2);
+                        }
+                    } else if (in->config.format == PCM_FORMAT_S32_LE) {
+                        int32_t *out_ptr = buffer;
+                        int32_t *in_ptr = in->input_tmp_buffer;
+                        long long left = 0, right = 0;
+                        for (int k = 0; k < 4; k++) {
+                            left += *in_ptr++;
+                            right += *in_ptr++;
+                        }
+                        *out_ptr++ = (int32_t)(left >> 2);
+                        *out_ptr++ = (int32_t)(right >> 2);
+                    }
+                } else
+                    ret = aml_alsa_input_read(stream, buffer, bytes);
+
                 //ALOGI("%s, %d,ret:%d",__func__,__LINE__,ret);
                 if (getprop_bool("media.audiohal.indump")) {
                     aml_audio_dump_audio_bitstreams("/data/audio/alsa_read.raw",
@@ -3995,12 +3853,10 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             ALOGI("noise gate is working!");*/
     }
 
-#if !defined(IS_ATOM_PROJECT)
     if (!adev->audio_patching) {
         /* case dev->mix, set audio gain to src */
         apply_volume(adev->src_gain[adev->active_inport], buffer, sizeof(uint16_t), bytes);
     }
-#endif
 
 exit:
     if (ret < 0) {
@@ -4009,15 +3865,6 @@ exit:
                 in_get_sample_rate(&stream->common));
     }
     pthread_mutex_unlock(&in->lock);
-
-#if defined(IS_ATOM_PROJECT)
-    if ((in->device & AUDIO_DEVICE_IN_LINE) && in->ref_count == 2) {
-        in->aux_buf_write_bytes = cur_in_bytes;
-        if (parental_mute)
-            memset(in->aux_buf, 0, in->aux_buf_write_bytes);
-        pthread_cond_signal(&in->aux_mic_cond);
-    }
-#endif
 
     if (getprop_bool("media.audiohal.indump")) {
         aml_audio_dump_audio_bitstreams("/data/audio/in_read.raw",
@@ -5949,6 +5796,11 @@ static void adev_close_input_stream(struct audio_hw_device *dev,
         in->buffer = NULL;
     }
     pthread_mutex_unlock (&in->lock);
+
+    if (in->input_tmp_buffer) {
+        free(in->input_tmp_buffer);
+        in->input_tmp_buffer = NULL;
+    }
 
     if (in->proc_buf) {
         free(in->proc_buf);
@@ -8696,8 +8548,7 @@ void *audio_patch_input_threadloop(void *data)
     bool bSpdifin_PAO = false;
     hdmiin_audio_packet_t audio_packet = AUDIO_PACKET_NONE;
     int txl_chip = is_txl_chip();
-
-    ALOGI("++%s", __FUNCTION__);
+    int last_channel_count = 2;
 
     ALOGD("%s: enter", __func__);
     patch->chanmask = stream_config.channel_mask = patch->in_chanmask;
@@ -8846,7 +8697,13 @@ void *audio_patch_input_threadloop(void *data)
                         last_aformat = cur_aformat;
                         last_samplerate = cur_samplerate;
                     }
-
+                    int current_channel = get_hdmiin_channel(&aml_dev->alsa_mixer);
+                    if (current_channel != -1 && current_channel != last_channel_count) {
+                        ALOGI("%s(), channel count changed from %d to %d!",
+                            __func__, last_channel_count, current_channel);
+                        last_channel_count = current_channel;
+                        in_reset_channel_num(stream_in, current_channel);
+                    }
                 }
             }
 #if 0

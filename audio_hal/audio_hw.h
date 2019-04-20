@@ -627,6 +627,8 @@ struct aml_stream_in {
     int mute_mdelay;
     bool first_buffer_discard;
     struct aml_audio_device *dev;
+    void *input_tmp_buffer;
+    size_t input_tmp_buffer_size;
 
 #if defined(IS_ATOM_PROJECT)
     int ref_count;
