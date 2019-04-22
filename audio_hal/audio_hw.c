@@ -7375,10 +7375,16 @@ static void config_output(struct audio_stream_out *stream)
         pthread_mutex_unlock(&adev->lock);
     }
 
-    if (adev->sink_format == AUDIO_FORMAT_PCM_16_BIT || adev->sink_format == AUDIO_FORMAT_PCM_32_BIT) {
-        aml_out->device = PORT_I2S;
-    } else {
-        aml_out->device = PORT_SPDIF;
+    /*TV-4745: After switch from normal PCM playing to MS12, the device will
+     be changed to SPDIF, but when switch back to the normal PCM, the out device
+     is still SPDIF, then the sound is abnormal.
+    */
+    if (!(continous_mode(adev) && (eDolbyMS12Lib == adev->dolby_lib_type))) {
+        if (adev->sink_format == AUDIO_FORMAT_PCM_16_BIT || adev->sink_format == AUDIO_FORMAT_PCM_32_BIT) {
+            aml_out->device = PORT_I2S;
+        } else {
+            aml_out->device = PORT_SPDIF;
+        }
     }
     ALOGI("%s(), device: %d", __func__, aml_out->device);
     return ;
