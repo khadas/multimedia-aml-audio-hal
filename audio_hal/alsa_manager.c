@@ -420,7 +420,7 @@ write:
     }
     ret = pcm_write(aml_out->pcm, buffer, bytes);
     if (ret < 0) {
-        ALOGE("%s write failed,pcm handle %p err num %d", __func__, aml_out->pcm, ret);
+        ALOGE("%s write failed,pcm handle:%p, ret:%#x, err info:%s", __func__, aml_out->pcm, ret, strerror(errno));
     }
 
     if ((adev->continuous_audio_mode == 1) && (eDolbyMS12Lib == adev->dolby_lib_type) && (bytes != 0)) {
@@ -449,7 +449,6 @@ write:
         }
     }
 
-    
     return ret;
 }
 
@@ -539,6 +538,7 @@ size_t aml_alsa_input_read(struct audio_stream_in *stream,
         if (ret >= 0) {
             ALOGV("ret:%d read_bytes:%d, bytes:%d ",ret,read_bytes,bytes);
         } else if (ret != -EAGAIN ) {
+            ALOGE("%s:%d, pcm_read fail, ret:%#x, error info:%s", __func__, __LINE__, ret, strerror(errno));
             return ret;
         } else {
              usleep( (bytes - read_bytes) * 1000000 / audio_stream_in_frame_size(stream) /

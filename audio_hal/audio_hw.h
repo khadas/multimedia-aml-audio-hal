@@ -199,38 +199,38 @@ struct eq_data {
 };
 
 enum patch_src_assortion {
-    SRC_DTV,
-    SRC_ATV,
-    SRC_LINEIN,
-    SRC_HDMIIN,
-    SRC_SPDIFIN,
-    SRC_REMOTE_SUBMIXIN,
-    SRC_WIRED_HEADSETIN,
-    SRC_BUILTIN_MIC,
-    SRC_OTHER,
-    SRC_INVAL
+    SRC_DTV                     = 0,
+    SRC_ATV                     = 1,
+    SRC_LINEIN                  = 2,
+    SRC_HDMIIN                  = 3,
+    SRC_SPDIFIN                 = 4,
+    SRC_REMOTE_SUBMIXIN         = 5,
+    SRC_WIRED_HEADSETIN         = 6,
+    SRC_BUILTIN_MIC             = 7,
+    SRC_OTHER                   = 8,
+    SRC_INVAL                   = 9,
 };
 
 enum OUT_PORT {
-    OUTPORT_SPEAKER = 0,
-    OUTPORT_HDMI_ARC,
-    OUTPORT_HDMI,
-    OUTPORT_SPDIF,
-    OUTPORT_AUX_LINE,
-    OUTPORT_HEADPHONE,
-    OUTPORT_REMOTE_SUBMIX,
-    OUTPORT_MAX
+    OUTPORT_SPEAKER             = 0,
+    OUTPORT_HDMI_ARC            = 1,
+    OUTPORT_HDMI                = 2,
+    OUTPORT_SPDIF               = 3,
+    OUTPORT_AUX_LINE            = 4,
+    OUTPORT_HEADPHONE           = 5,
+    OUTPORT_REMOTE_SUBMIX       = 6,
+    OUTPORT_MAX                 = 7,
 };
 
 enum IN_PORT {
-    INPORT_TUNER = 0,
-    INPORT_HDMIIN,
-    INPORT_SPDIF,
-    INPORT_LINEIN,
-    INPORT_REMOTE_SUBMIXIN,
-    INPORT_WIRED_HEADSETIN,
-    INPORT_BUILTIN_MIC,
-    INPORT_MAX
+    INPORT_TUNER                = 0,
+    INPORT_HDMIIN               = 1,
+    INPORT_SPDIF                = 2,
+    INPORT_LINEIN               = 3,
+    INPORT_REMOTE_SUBMIXIN      = 4,
+    INPORT_WIRED_HEADSETIN      = 5,
+    INPORT_BUILTIN_MIC          = 6,
+    INPORT_MAX                  = 7,
 };
 
 struct audio_patch_set {

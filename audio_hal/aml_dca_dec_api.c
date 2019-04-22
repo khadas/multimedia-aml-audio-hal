@@ -15,6 +15,7 @@
  */
 
 #define LOG_TAG "aml_audio_dca_dec"
+//#define LOG_NDEBUG 0
 
 #include <unistd.h>
 #include <math.h>
@@ -36,8 +37,6 @@
 #include "audio_hw_utils.h"
 #include "aml_dca_dec_api.h"
 #include "aml_audio_resample_manager.h"
-
-
 
 enum {
     EXITING_STATUS = -1001,
@@ -160,6 +159,7 @@ static int dca_decode_process(unsigned char*input, int input_size, unsigned char
 
 int dca_decoder_init_patch(struct dca_dts_dec *dts_dec)
 {
+    ALOGD("%s:%d enter", __func__, __LINE__);
     dts_dec->status = dca_decoder_init(dts_dec->digital_raw);
     if (dts_dec->status < 0) {
         return -1;
@@ -174,24 +174,23 @@ int dca_decoder_init_patch(struct dca_dts_dec *dts_dec)
     dts_dec->outbuf_raw = NULL;
     dts_dec->inbuf = (unsigned char*) malloc(MAX_DECODER_FRAME_LENGTH * 4 * 2);
     if (!dts_dec->inbuf) {
-        ALOGE("malloc buffer failed\n");
+        ALOGE("%s:%d malloc input buffer failed", __func__, __LINE__);
         return -1;
     }
     dts_dec->outbuf = (unsigned char*) malloc(MAX_DECODER_FRAME_LENGTH * 3 + MAX_DECODER_FRAME_LENGTH + 8);
     if (!dts_dec->outbuf) {
-        ALOGE("malloc buffer failed\n");
+        ALOGE("%s:%d malloc output buffer failed", __func__, __LINE__);
         return -1;
     }
     dts_dec->outbuf_raw = dts_dec->outbuf + MAX_DECODER_FRAME_LENGTH * 3;
     dts_dec->decoder_process = dca_decode_process;
     ring_buffer_init(&dts_dec->output_ring_buf, 6 * MAX_DECODER_FRAME_LENGTH);
-    //dts_dec->get_parameters = Get_Parameters;
     return 1;
 }
 
 int dca_decoder_release_patch(struct dca_dts_dec *dts_dec)
 {
-    ALOGI("+++%s", __func__);
+    ALOGD("%s:%d enter", __func__, __LINE__);
     if (dts_decoder_cleanup != NULL) {
         (*dts_decoder_cleanup)();
     }
@@ -200,13 +199,11 @@ int dca_decoder_release_patch(struct dca_dts_dec *dts_dec)
         dts_dec->remain_size = 0;
         dts_dec->outlen_pcm = 0;
         dts_dec->outlen_raw = 0;
-        //dts_dec->nIsEc3 = 0;
         free(dts_dec->inbuf);
         free(dts_dec->outbuf);
         dts_dec->inbuf = NULL;
         dts_dec->outbuf = NULL;
         dts_dec->outbuf_raw = NULL;
-        //dts_dec->get_parameters = NULL;
         dts_dec->decoder_process = NULL;
         memset(&dts_dec->pcm_out_info, 0, sizeof(struct pcm_info));
         if (dts_dec->resample_handle) {
@@ -214,15 +211,12 @@ int dca_decoder_release_patch(struct dca_dts_dec *dts_dec)
             dts_dec->resample_handle = NULL;
         }
         ring_buffer_release(&dts_dec->output_ring_buf);
-
     }
-    ALOGI("---%s", __func__);
     return 1;
 }
 
 int dca_decoder_process_patch(struct dca_dts_dec *dts_dec, unsigned char*buffer, int bytes)
 {
-
     int mFrame_size = 0;
     unsigned char *read_pointer = NULL;
     int dts_type = 0;
@@ -494,30 +488,36 @@ static void *decode_threadloop(void *data)
     int outlen_pcm = 0;
     int remain_size = 0;
     bool get_frame_size_ok = 0;
-    bool  little_end = false;
+    bool little_end = false;
     bool SyncFlag = false;
     int used_size = 0;
-    int read_size = READ_PERIOD_LENGTH;
-    int ret = 0;
+    unsigned int u32AlsaFrameSize = 0;
+    int s32AlsaReadFrames = 0;
     int mSample_rate = 0;
-    int mFrame_size = 0;
+    int s32DtsFramesize = 0;
     int mChNum = 0;
     unsigned char temp;
     int i, j;
     int digital_raw = 0;
     struct pcm_info  pcm_out_info;
 
-    ALOGI("++ %s, in_sr = %d, out_sr = %d\n", __func__, parser->in_sample_rate, parser->out_sample_rate);
-    outbuf = (unsigned char*) malloc(MAX_DECODER_FRAME_LENGTH * 4 + MAX_DECODER_FRAME_LENGTH + 8);
-    if (!outbuf) {
-        ALOGE("malloc buffer failed\n");
+    if (NULL == parser) {
+        ALOGE("%s:%d parser == NULL", __func__, __LINE__);
         return NULL;
     }
+
+    ALOGI("++ %s:%d in_sr = %d, out_sr = %d\n", __func__, __LINE__, parser->in_sample_rate, parser->out_sample_rate);
+    outbuf = (unsigned char*) malloc(MAX_DECODER_FRAME_LENGTH * 4 + MAX_DECODER_FRAME_LENGTH + 8);
+    if (!outbuf) {
+        ALOGE("%s:%d malloc output buffer failed", __func__, __LINE__);
+        return NULL;
+    }
+
     outbuf_raw = outbuf + MAX_DECODER_FRAME_LENGTH;
     inbuf = (unsigned char*) malloc(MAX_DECODER_FRAME_LENGTH * 4 * 2);
 
     if (!inbuf) {
-        ALOGE("malloc inbuf failed\n");
+        ALOGE("%s:%d malloc input buffer failed", __func__, __LINE__);
         free(outbuf);
         return NULL;
     }
@@ -525,9 +525,8 @@ static void *decode_threadloop(void *data)
     if (dts_decoder_init != NULL) {
         unload_dts_decoder_lib();
     }
-    ret = dca_decoder_init(1);
-    if (ret) {
-        ALOGW("dec init failed, maybe no lisensed dts decoder.\n");
+    if (dca_decoder_init(1)) {
+        ALOGW("%s:%d dts decoder init failed, maybe no lisensed dts decoder", __func__, __LINE__);
         valid_lib = 0;
     }
     //parser->decode_enabled = 1;
@@ -539,41 +538,40 @@ static void *decode_threadloop(void *data)
         resampler_init(&parser->aml_resample);
     }
 
+    struct aml_stream_in *in = (struct aml_stream_in *)parser->stream;
+    u32AlsaFrameSize = in->config.channels * pcm_format_to_bits(in->config.format) / 8;
     prctl(PR_SET_NAME, (unsigned long)"audio_dca_dec");
     while (parser->decode_ThreadExitFlag == 0) {
         outlen = 0;
         outlen_raw = 0;
         outlen_pcm = 0;
         SyncFlag = 0;
-        mFrame_size = 0;
+        s32DtsFramesize = 0;
         if (parser->decode_ThreadExitFlag == 1) {
-            ALOGI("%s, exit threadloop! \n", __func__);
+            ALOGI("%s:%d exit threadloop!", __func__, __LINE__);
             break;
         }
 
         //here we call decode api to decode audio frame here
         if (remain_size + READ_PERIOD_LENGTH <= (MAX_DECODER_FRAME_LENGTH * 4 * 2)) { //input buffer size
-            ret = pcm_read(parser->aml_pcm, inbuf + remain_size, read_size);
-            //ret = pcm_read(parser->aml_pcm, inbuf, read_size);
-
-            //pthread_mutex_unlock(parser->decode_dev_op_mutex);
-            if (ret < 0) {
-                usleep(1000);  //1ms
+            // read raw DTS data for alsa
+            s32AlsaReadFrames = pcm_read(parser->aml_pcm, inbuf + remain_size, READ_PERIOD_LENGTH);
+            if (s32AlsaReadFrames < 0) {
+                usleep(1000);
                 continue;
             } else {
 #if 0
                 FILE *dump_origin = NULL;
                 dump_origin = fopen("/data/tmp/pcm_read.raw", "a+");
                 if (dump_origin != NULL) {
-                    //fwrite(inbuf + remain_size, read_size, 1, dump_origin);
-                    fwrite(inbuf + remain_size, read_size, 1, dump_origin);
+                    fwrite(inbuf + remain_size, READ_PERIOD_LENGTH, 1, dump_origin);
                     fclose(dump_origin);
                 } else {
                     ALOGW("[Error] Can't write to /data/tmp/pcm_read.raw");
                 }
 #endif
             }
-            remain_size += read_size;
+            remain_size += s32AlsaReadFrames * u32AlsaFrameSize;
         }
 
 #ifdef DTS_DECODER_ENABLE
@@ -589,9 +587,9 @@ static void *decode_threadloop(void *data)
                 && read_pointer[2] == 0x1f && read_pointer[3] == 0x4e) {
                 SyncFlag = true;
                 little_end = false;
-                mFrame_size = (read_pointer[6] | read_pointer[7] << 8) / 8;
-                if (mFrame_size == 2013) {
-                    mFrame_size = 2012;
+                s32DtsFramesize = (read_pointer[6] | read_pointer[7] << 8) / 8;
+                if (s32DtsFramesize == 2013) {
+                    s32DtsFramesize = 2012;
                 }
                 //ALOGI("mFrame_size:%d dts_dec->remain_size:%d little_end:%d", mFrame_size, remain_size, little_end);
                 break;
@@ -600,41 +598,31 @@ static void *decode_threadloop(void *data)
             remain_size--;
         }
 
-        if (remain_size < (mFrame_size + 8) || SyncFlag == 0) {
-            ALOGI("remain %d,frame size %d, read more\n", remain_size, mFrame_size);
+        if (remain_size < (s32DtsFramesize + 8) || SyncFlag == 0) {
+            ALOGV("%s:%d remain:%d, DtsFramesize:%d, SyncFlag:%d, read more...", __func__, __LINE__,
+                remain_size, s32DtsFramesize, SyncFlag);
             memcpy(inbuf, read_pointer, remain_size);
             continue;
         }
-
         read_pointer += 8;   //pa pb pc pd
-#if 0
-        FILE *dump_fp = NULL;
-        dump_fp = fopen("/data/tmp/decoder.raw", "a+");
-        if (dump_fp != NULL) {
-            fwrite(read_pointer, mFrame_size, 1, dump_fp);
-            fclose(dump_fp);
-        } else {
-            ALOGW("[Error] Can't write to /data/tmp/decoder.raw");
-        }
-#endif
-
 #ifdef DTS_DECODER_ENABLE
-        used_size = dca_decode_process(read_pointer, mFrame_size, outbuf,
+        used_size = dca_decode_process(read_pointer, s32DtsFramesize, outbuf,
                                        &outlen_pcm, (char *) outbuf_raw, &outlen_raw,&pcm_out_info);
 #else
-        used_size = mFrame_size;
+        used_size = s32DtsFramesize;
 #endif
         if (used_size > 0) {
             remain_size -= 8;    //pa pb pc pd
             remain_size -= used_size;
-            //ALOGI("%s, %d used size %d, remain_size %d\n", __func__, __LINE__, used_size, remain_size);
+            ALOGV("%s:%d decode success used_size:%d, outlen_pcm:%d", __func__, __LINE__, used_size, outlen_pcm);
             memcpy(inbuf, read_pointer + used_size, remain_size);
+        } else {
+            ALOGW("%s:%d decode failed, used_size:%d", __func__, __LINE__, used_size);
         }
 
 #ifdef DTS_DECODER_ENABLE
         //only need pcm data
         if (outlen_pcm > 0) {
-            //ALOGI("outlen_pcm: %d,outlen_raw: %d\n", outlen_pcm, outlen_raw);
             // here only downresample, so no need to malloc more buffer
             if (parser->in_sample_rate != parser->out_sample_rate) {
                 int out_frame = outlen_pcm >> 2;
@@ -646,7 +634,6 @@ static void *decode_threadloop(void *data)
         }
 #endif
     }
-
     parser->decode_enabled = 0;
     if (inbuf) {
         free(inbuf);
@@ -657,7 +644,7 @@ static void *decode_threadloop(void *data)
 #ifdef DTS_DECODER_ENABLE
     unload_dts_decoder_lib();
 #endif
-    ALOGI("-- %s\n", __func__);
+    ALOGI("-- %s:%d", __func__, __LINE__);
     return NULL;
 }
 
@@ -666,25 +653,24 @@ static int start_decode_thread(struct aml_audio_parser *parser)
 {
     int ret = 0;
 
-    ALOGI("++ %s\n", __func__);
+    ALOGI("%s:%d enter", __func__, __LINE__);
     parser->decode_enabled = 1;
     parser->decode_ThreadExitFlag = 0;
     ret = pthread_create(&parser->decode_ThreadID, NULL, &decode_threadloop, parser);
     if (ret != 0) {
-        ALOGE("%s, Create thread fail!\n", __FUNCTION__);
+        ALOGE("%s:%d, Create thread fail!", __FUNCTION__, __LINE__);
         return -1;
     }
-    ALOGI("-- %s\n", __func__);
     return 0;
 }
 
 static int stop_decode_thread(struct aml_audio_parser *parser)
 {
-    ALOGI("++ %s \n", __func__);
+    ALOGI("++%s:%d enter", __func__, __LINE__);
     parser->decode_ThreadExitFlag = 1;
     pthread_join(parser->decode_ThreadID, NULL);
     parser->decode_ThreadID = 0;
-    ALOGI("-- %s \n", __func__);
+    ALOGI("--%s:%d exit", __func__, __LINE__);
     return 0;
 }
 

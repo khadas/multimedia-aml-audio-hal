@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "aml_audio_dcv_dec"
-// #define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 
 #include <unistd.h>
 #include <math.h>
@@ -511,40 +511,42 @@ void *decode_threadloop(void *data)
     int outlen_pcm = 0;
     int remain_size = 0;
     int used_size = 0;
-    int read_size = READ_PERIOD_LENGTH;
+    unsigned int u32AlsaFrameSize = 0;
+    int s32AlsaReadFrames = 0;
     int ret = 0;
     int mSample_rate = 0;
-    int mFrame_size = 0;
+    int s32DolbyFrameSize = 0;
     int is_eac3 = 0;
     int mChNum = 0;
     int in_sync = 0;
     unsigned char temp;
     int i;
     int digital_raw = 0;
+    if (NULL == parser) {
+        ALOGE("%s:%d parser == NULL", __func__, __LINE__);
+        return NULL;
+    }
 
-    ALOGI ("++ %s, in_sr = %d, out_sr = %d\n", __func__, parser->in_sample_rate, parser->out_sample_rate);
+    ALOGI("++ %s:%d in_sr = %d, out_sr = %d\n", __func__, __LINE__, parser->in_sample_rate, parser->out_sample_rate);
     outbuf = (unsigned char*) malloc (MAX_DDP_BUFFER_SIZE);
-
     if (!outbuf) {
-        ALOGE("malloc buffer failed\n");
+        ALOGE("%s:%d malloc output buffer failed", __func__, __LINE__);
         return NULL;
     }
     outbuf_raw = outbuf + MAX_DECODER_FRAME_LENGTH;
-
-    inbuf = (unsigned char *) malloc(MAX_DDP_FRAME_LENGTH + read_size);
+    inbuf = (unsigned char *) malloc(MAX_DDP_FRAME_LENGTH + READ_PERIOD_LENGTH);
     if (!inbuf) {
-        ALOGE("malloc inbuf failed\n");
+        ALOGE("%s:%d malloc input buffer failed", __func__, __LINE__);
         free(outbuf);
         return NULL;
     }
        /*TODO: always decode*/
     ret = (*ddp_decoder_init)(1, digital_raw,&handle);
     if (ret) {
-        ALOGW("dec init failed, maybe no lisensed ddp decoder.\n");
+        ALOGW("%s:%d ddp decoder init failed, maybe no lisensed ddp decoder", __func__, __LINE__);
         valid_lib = 0;
     }
     //parser->decode_enabled = 1;
-
     if (parser->in_sample_rate != parser->out_sample_rate) {
         parser->aml_resample.input_sr = parser->in_sample_rate;
         parser->aml_resample.output_sr = parser->out_sample_rate;
@@ -552,6 +554,8 @@ void *decode_threadloop(void *data)
         resampler_init(&parser->aml_resample);
     }
 
+    struct aml_stream_in *in = (struct aml_stream_in *)parser->stream;
+    u32AlsaFrameSize = in->config.channels * pcm_format_to_bits(in->config.format) / 8;
     prctl(PR_SET_NAME, (unsigned long)"audio_dcv_dec");
     while (parser->decode_ThreadExitFlag == 0) {
         outlen = 0;
@@ -560,26 +564,18 @@ void *decode_threadloop(void *data)
         in_sync = 0;
 
         if (parser->decode_ThreadExitFlag == 1) {
-            ALOGI("%s, exit threadloop! \n", __func__);
+            ALOGI("%s:%d exit threadloop!", __func__, __LINE__);
             break;
         }
-
-        if (parser->aformat == AUDIO_FORMAT_E_AC3) {
-            nIsEc3 = 1;
-        } else {
-            nIsEc3 = 0;
-        }
-
+        nIsEc3 = (AUDIO_FORMAT_E_AC3 == parser->aformat)? 1 : 0;
         //here we call decode api to decode audio frame here
         if (remain_size < MAX_DDP_FRAME_LENGTH) {
-            //pthread_mutex_lock(parser->decode_dev_op_mutex);
-            ret = pcm_read(parser->aml_pcm, inbuf + remain_size, read_size);
-            //pthread_mutex_unlock(parser->decode_dev_op_mutex);
-            if (ret < 0) {
-                usleep(1000);  //1ms
+            s32AlsaReadFrames = pcm_read(parser->aml_pcm, inbuf + remain_size, READ_PERIOD_LENGTH);
+            if (s32AlsaReadFrames < 0) {
+                usleep(1000);
                 continue;
             }
-            remain_size += read_size;
+            remain_size += s32AlsaReadFrames * u32AlsaFrameSize;
         }
 
         if (valid_lib == 0) {
@@ -591,10 +587,11 @@ void *decode_threadloop(void *data)
         while (parser->decode_ThreadExitFlag == 0 && remain_size > 16) {
             if ((read_pointer[0] == 0x0b && read_pointer[1] == 0x77) || \
                 (read_pointer[0] == 0x77 && read_pointer[1] == 0x0b)) {
-                Get_Parameters(read_pointer, &mSample_rate, &mFrame_size, &mChNum, &is_eac3);
-                if ((mFrame_size == 0) || (mFrame_size < PTR_HEAD_SIZE) || \
+                Get_Parameters(read_pointer, &mSample_rate, &s32DolbyFrameSize, &mChNum, &is_eac3);
+                if ((s32DolbyFrameSize == 0) || (s32DolbyFrameSize < PTR_HEAD_SIZE) || \
                     (mChNum == 0) || (mSample_rate == 0)) {
-                    ALOGI("error dolby frame !!!");
+                    ALOGW("%s:%d error dolby frame, DolbyFrameSize:%d, mChNum:%d, mSample_rate:%d", __func__, __LINE__,
+                        s32DolbyFrameSize, mChNum, mSample_rate);
                 } else {
                     in_sync = 1;
                     break;
@@ -603,34 +600,31 @@ void *decode_threadloop(void *data)
             remain_size--;
             read_pointer++;
         }
-        //ALOGI("remain %d, frame size %d\n", remain_size, mFrame_size);
-
-        if (remain_size < mFrame_size || in_sync == 0) {
+        if (remain_size < s32DolbyFrameSize || in_sync == 0) {
             //if (in_sync == 1)
             //    ALOGI("remain %d,frame size %d, read more\n",remain_size,mFrame_size);
             memcpy(inbuf, read_pointer, remain_size);
             continue;
         }
 
-        //ALOGI("frame size %d,remain %d\n",mFrame_size,remain_size);
+        ALOGV("DolbyFrameSize %d, remain_size:%d", s32DolbyFrameSize,remain_size);
         //do the endian conversion
         if (read_pointer[0] == 0x77 && read_pointer[1] == 0x0b) {
-            for (i = 0; i < mFrame_size / 2; i++) {
+            for (i = 0; i < s32DolbyFrameSize / 2; i++) {
                 temp = read_pointer[2 * i + 1];
                 read_pointer[2 * i + 1] = read_pointer[2 * i];
                 read_pointer[2 * i] = temp;
             }
         }
 
-        used_size = dcv_decode_process(read_pointer, mFrame_size, outbuf,
+        used_size = dcv_decode_process(read_pointer, s32DolbyFrameSize, outbuf,
                                        &outlen_pcm, (char *) outbuf_raw, &outlen_raw, nIsEc3, &parser->pcm_out_info);
         if (used_size > 0) {
             remain_size -= used_size;
             memcpy(inbuf, read_pointer + used_size, remain_size);
         }
-
-        //ALOGI("outlen_pcm: %d,outlen_raw: %d\n", outlen_pcm, outlen_raw);
-
+        ALOGV("%s:%d outlen_pcm:%d, outlen_raw:%d, used_size:%d, remain_size:%d", __func__, __LINE__,
+            outlen_pcm, outlen_raw, used_size, remain_size);
         //only need pcm data
         if (outlen_pcm > 0) {
             // here only downresample, so no need to malloc more buffer

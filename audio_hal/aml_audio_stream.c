@@ -179,8 +179,8 @@ void get_sink_format (struct audio_stream_out *stream)
                 sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;
                 optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_DTS;
             }
-            ALOGI("%s() source_format %d sink_audio_format %d "
-                  "optical_audio_format %d  \n",
+            ALOGI("%s() source_format %#x sink_audio_format %#x "
+                  "optical_audio_format %#x",
                   __FUNCTION__, source_format, sink_audio_format,
                   optical_audio_format);
             break;
