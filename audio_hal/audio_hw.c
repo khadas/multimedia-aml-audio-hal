@@ -1082,7 +1082,8 @@ static int do_output_standby (struct aml_stream_out *out)
 static int do_output_standby_direct (struct aml_stream_out *out)
 {
     int status = 0;
-
+    struct aml_audio_device *adev = out->dev;
+    unsigned int device = out->device;
     ALOGI ("%s,out %p", __FUNCTION__,  out);
 
     if (!out->standby) {
@@ -1101,6 +1102,7 @@ static int do_output_standby_direct (struct aml_stream_out *out)
             pcm_close(out->pcm);
         }
         out->pcm = NULL;
+        adev->pcm_handle[device] = NULL;
     }
     out->pause_status = false;
     set_codec_type (TYPE_PCM);
