@@ -4567,6 +4567,8 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
            * while in config_output(), it detects this change, then re-route output config.
            */
         adev->arc_hdmi_updated = 1;
+        if (adev->patch_src == SRC_DTV)
+            adev->reset_dtv_audio = 1;
 
         goto exit;
     }

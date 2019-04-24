@@ -73,6 +73,7 @@
 #define TSYNC_LASTCHECKIN_APTS "/sys/class/tsync/last_checkin_apts"
 #define TSYNC_LASTCHECKIN_VPTS "/sys/class/tsync/checkin_firstvpts"
 #define TSYNC_PCR_LANTCY        "/sys/class/tsync/pts_latency"
+#define AMSTREAM_AUDIO_PORT_RESET   "/sys/class/amstream/reset_audio_port"
 
 #define PATCH_PERIOD_COUNT 4
 #define DTV_PTS_CORRECTION_THRESHOLD (90000 * 30 / 1000)
@@ -643,6 +644,39 @@ static int dtv_calc_abuf_level(struct aml_audio_patch *patch, struct aml_stream_
         return 1;
     }
     return 0;
+}
+
+static void dtv_check_audio_reset(struct aml_audio_device *aml_dev)
+{
+    unsigned int first_checkinapts = 0xffffffff;
+    unsigned int demux_pcr = 0xffffffff;
+    int ret, audio_reset;
+    char buff[32];
+    memset(buff, 0, 32);
+    ret = aml_sysfs_get_str(TSYNC_FIRSTCHECKIN_APTS, buff, sizeof(buff));
+    if (ret > 0) {
+        ret = sscanf(buff, "0x%x\n", &first_checkinapts);
+    } else {
+        return;
+    }
+    ret = aml_sysfs_get_str(TSYNC_DEMUX_PCR, buff, sizeof(buff));
+    if (ret > 0) {
+        ret = sscanf(buff, "0x%x\n", &demux_pcr);
+    } else {
+        return;
+    }
+    if (first_checkinapts == 0xffffffff) {
+        return;
+    }
+    //ALOGI("demux_pcr %x first_checkinapts %x,reset %d", demux_pcr, first_checkinapts,aml_dev->reset_dtv_audio);
+    if (demux_pcr > first_checkinapts &&
+        (demux_pcr - first_checkinapts) > AUDIO_PTS_DISCONTINUE_THRESHOLD / 5) {
+        if (aml_dev->reset_dtv_audio) {
+            ALOGI("dtv_audio_reset %d", aml_dev->reset_dtv_audio);
+            aml_sysfs_set_str(AMSTREAM_AUDIO_PORT_RESET, "1");
+            aml_dev->reset_dtv_audio = 0;
+        }
+    }
 }
 
 static void dtv_set_pcr_latency(struct aml_audio_patch *patch, int mode)
@@ -2025,6 +2059,9 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     int ret = 0;
     // ALOGI("++%s live period_size %d\n", __func__, period_size);
     //pthread_mutex_lock(&aml_dev->patch_lock);
+    if (aml_dev->reset_dtv_audio) {
+        aml_dev->reset_dtv_audio = 0;
+    }
     if (aml_dev->audio_patch) {
         ALOGD("%s: patch exists, first release it", __func__);
         if (aml_dev->audio_patch->is_dtv_src) {
@@ -2135,6 +2172,7 @@ int release_dtv_patch_l(struct aml_audio_device *aml_dev)
     ring_buffer_release(&(patch->aml_ringbuffer));
     free(patch);
     aml_dev->audio_patch = NULL;
+    dtv_check_audio_reset(aml_dev);
     ALOGI("--%s", __FUNCTION__);
     //pthread_mutex_unlock(&aml_dev->patch_lock);
     if (aml_dev->useSubMix) {

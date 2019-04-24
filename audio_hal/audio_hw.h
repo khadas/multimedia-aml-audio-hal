@@ -480,7 +480,7 @@ struct aml_audio_device {
     unsigned int tv_mute;
     int sub_apid;
     int sub_afmt;
-
+    int reset_dtv_audio;
 };
 
 struct meta_data {
