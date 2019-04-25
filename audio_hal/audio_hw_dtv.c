@@ -73,7 +73,8 @@
 #define PATCH_PERIOD_COUNT 4
 #define DTV_PTS_CORRECTION_THRESHOLD (90000 * 30 / 1000)
 #define AUDIO_PTS_DISCONTINUE_THRESHOLD (90000 * 5)
-#define MAX_DECODER_FRAME_LENGTH 6144
+#define AC3_IEC61937_FRAME_SIZE 6144
+#define EAC3_IEC61937_FRAME_SIZE 24576
 #define DECODER_PTS_DEFAULT_LATENCY (200 * 90)
 #define DECODER_PTS_MAX_LATENCY (320 * 90)
 //{ RAW_OUTPUT_FORMAT
@@ -1157,16 +1158,19 @@ void *audio_dtv_patch_output_threadloop(void *data)
             if ((eDolbyMS12Lib == aml_dev->dolby_lib_type && aml_dev->dual_decoder_support
                     && VALID_PID(aml_dev->sub_apid)
                     /*&& aml_dev->associate_audio_mixing_enable*/)) {
-                unsigned char main_head[128];
-                unsigned char ad_head[128];
+                unsigned char main_head[32];
+                unsigned char ad_head[32];
                 int main_frame_size = 0, last_main_frame_size = 0, main_head_offset = 0,main_head_left = 0;
                 int ad_frame_size = 0, ad_head_offset = 0,ad_head_left = 0;
-                unsigned char mixbuffer[MAX_DECODER_FRAME_LENGTH*4];
-                unsigned char ad_buffer[MAX_DECODER_FRAME_LENGTH*4];
+                unsigned char mixbuffer[EAC3_IEC61937_FRAME_SIZE];
+                unsigned char ad_buffer[EAC3_IEC61937_FRAME_SIZE];
                 uint16_t *p16_mixbuff = NULL;
                 uint32_t *p32_mixbuff = NULL;
                 int main_size = 0, ad_size = 0, mix_size = 0;
                 int dd_bsmod = 0,remain_size = 0;
+                unsigned long long all_pcm_len1 = 0;
+                unsigned long long all_pcm_len2 = 0;
+                unsigned long long all_zero_len = 0;
                 int main_avail = get_buffer_read_space(ringbuffer);
                 int ad_avail = dtv_assoc_get_avail();
                 dtv_assoc_get_main_frame_size(&last_main_frame_size);
@@ -1190,6 +1194,11 @@ void *audio_dtv_patch_output_threadloop(void *data)
                         if (ret > 0) {
                             ret = sscanf(buff, "0x%x\n", &demux_pcr);
                         }
+                        if (demux_pcr > 100 * 90) {
+                            demux_pcr = demux_pcr - 100 * 90;
+                        } else {
+                            demux_pcr = 0;
+                        }
 
                         ALOGI("demux_pcr %x first_checkinapts %x\n", demux_pcr, first_checkinapts);
                         if ((first_checkinapts != 0xffffffff) || (demux_pcr != 0xffffffff)) {
@@ -1211,12 +1220,12 @@ void *audio_dtv_patch_output_threadloop(void *data)
 
                     //dtv_assoc_get_main_frame_size(&main_frame_size);
                     //main_frame_size = 0, get from data
-                    while (main_frame_size == 0 && main_avail >= 32) {
-                        memset(main_head, 0, 32);
-                        ret = ring_buffer_read(ringbuffer, main_head, 32);
+                    while (main_frame_size == 0 && main_avail >= (int)sizeof(main_head)) {
+                        memset(main_head, 0, sizeof(main_head));
+                        ret = ring_buffer_read(ringbuffer, main_head, sizeof(main_head));
                         main_frame_size = dcv_decoder_get_framesize(main_head,
                                 ret, &main_head_offset);
-                        main_avail -= 32;
+                        main_avail -= ret;
                         if (main_frame_size != 0) {
                             main_head_left = ret-main_head_offset;
                             //ALOGI("AD main_frame_size=%d  ", main_frame_size);
@@ -1238,6 +1247,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
                             usleep(1000);
                             continue;
                         }
+                        dtv_assoc_audio_cache(1);
                         main_size = ret + main_head_left;
                     } else {
                         /*ALOGE("%s(), ring_buffer has not enough data! %d in_avail()", __func__,
@@ -1250,12 +1260,12 @@ void *audio_dtv_patch_output_threadloop(void *data)
                     if (ad_avail > 0) {
                         //dtv_assoc_get_ad_frame_size(&ad_frame_size);
                         //ad_frame_size = 0, get from data
-                        while (ad_frame_size == 0 && ad_avail >= 32) {
-                            memset(ad_head, 0, 32);
-                            ret = dtv_assoc_read(ad_head, 32);
+                        while (ad_frame_size == 0 && ad_avail >= (int)sizeof(ad_head)) {
+                            memset(ad_head, 0, sizeof(ad_head));
+                            ret = dtv_assoc_read(ad_head, sizeof(ad_head));
                             ad_frame_size = dcv_decoder_get_framesize(ad_head,
                                     ret, &ad_head_offset);
-                            ad_avail -= 32;
+                            ad_avail -= ret;
                             if (ad_frame_size != 0) {
                                 ad_head_left = ret - ad_head_offset;
                                 //ALOGI("AD ad_frame_size=%d  ", ad_frame_size);
@@ -1263,7 +1273,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
                         }
                     }
 
-                    memset(ad_buffer,0,MAX_DECODER_FRAME_LENGTH*4);
+                    memset(ad_buffer,0,sizeof(ad_buffer));
                     if (ad_frame_size > 0 && (ad_avail >= ad_frame_size - ad_head_left)) {
                         if (ad_head_left > 0)
                             memcpy(ad_buffer, ad_head + ad_head_offset, ad_head_left);
@@ -1276,6 +1286,9 @@ void *audio_dtv_patch_output_threadloop(void *data)
                     } else {
                         ad_size = 0;
                     }
+                    if (aml_dev->associate_audio_mixing_enable == 0) {
+                        ad_size = 0;
+                    }
 
                     {
                         struct aml_stream_out *aml_out = (struct aml_stream_out *)stream_out;
@@ -1284,9 +1297,11 @@ void *audio_dtv_patch_output_threadloop(void *data)
                            get_sink_format(stream_out);
                         }
                     }
+                    remain_size = dolby_ms12_get_main_buffer_avail(NULL);
+                    dolby_ms12_get_pcm_output_size(&all_pcm_len1, &all_zero_len);
 
                     //package iec61937
-                    memset(mixbuffer, 0, MAX_DECODER_FRAME_LENGTH*4);
+                    memset(mixbuffer, 0, sizeof(mixbuffer));
                     //papbpcpd
                     p16_mixbuff = (uint16_t*)mixbuffer;
                     p16_mixbuff[0] = 0xf872;
@@ -1322,23 +1337,27 @@ void *audio_dtv_patch_output_threadloop(void *data)
                     }
 
                     if (patch->aformat == AUDIO_FORMAT_AC3) {//ac3 iec61937 package size 6144
-                        ret = out_write_new(stream_out, mixbuffer, MAX_DECODER_FRAME_LENGTH);
+                        ret = out_write_new(stream_out, mixbuffer, AC3_IEC61937_FRAME_SIZE);
                     } else {//eac3 iec61937 package size 6144*4
-                        ret = out_write_new(stream_out, mixbuffer, MAX_DECODER_FRAME_LENGTH*4);
+                        ret = out_write_new(stream_out, mixbuffer, EAC3_IEC61937_FRAME_SIZE);
                     }
 
                     if ((mixbuffer[8] != 0xb && mixbuffer[8] != 0x77)
                             || (mixbuffer[9] != 0xb && mixbuffer[9] != 0x77)
                             || (mixbuffer[mix_size] != 0xb && mixbuffer[mix_size] != 0x77)
                             || (mixbuffer[mix_size+1] != 0xb && mixbuffer[mix_size+1] != 0x77)) {
-                         ALOGI("AD mix main_size=%d ad_size=%d wirte_size=%d 0x%x 0x%x 0x%x 0x%x", main_size, ad_size, ret,
+                         ALOGD("AD mix main_size=%d ad_size=%d wirte_size=%d 0x%x 0x%x 0x%x 0x%x", main_size, ad_size, ret,
                                  mixbuffer[8],mixbuffer[9],mixbuffer[mix_size],mixbuffer[mix_size+1]);
                     }
-
-                    remain_size = aml_dev->ddp.remain_size;
-                    patch->outlen_after_last_validpts += aml_dev->ddp.outlen_pcm;
-                    patch->decoder_offset += remain_size + main_size - aml_dev->ddp.remain_size;
-                    patch->dtv_pcm_readed += main_size;
+                    {
+                        unsigned long long all_pcm_len = 0, all_zero_len = 0;
+                        int size = dolby_ms12_get_main_buffer_avail(NULL);
+                        dolby_ms12_get_pcm_output_size(&all_pcm_len2, &all_zero_len);
+                        patch->decoder_offset += remain_size + main_size - size;
+                        patch->outlen_after_last_validpts += (unsigned int)(all_pcm_len2 - all_pcm_len1);
+                        //ALOGD("remain_size %d,size %d,main_size %d,validpts %d",remain_size,size,main_size,patch->outlen_after_last_validpts);
+                        patch->dtv_pcm_readed += main_size;
+                    }
                     pthread_mutex_unlock(&(patch->dtv_output_mutex));
                 } else {
                     /*ALOGE("%s(), ring_buffer has not enough data! %d in_avail()", __func__,

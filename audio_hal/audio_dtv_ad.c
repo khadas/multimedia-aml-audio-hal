@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 #include <dlfcn.h>
 #include <cutils/log.h>
 #include "am_ad.h"
@@ -30,7 +31,8 @@
 #include "aml_audio_stream.h"
 
 #define AD_DEMUX_ID 0
-#define DEFAULT_ASSOC_AUDIO_BUFFER_SIZE 512 * 6 * 2 * 8
+#define CACHE_TIME 200
+#define DEFAULT_ASSOC_AUDIO_BUFFER_SIZE 512 * 6 * 8 * 8
 
 static pthread_mutex_t assoc_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -38,6 +40,8 @@ typedef struct _dtv_assoc_audio {
     int assoc_enable;
     int sub_apid;
     int sub_afmt;
+    int cache;
+    int cache_start_time;
     int main_frame_size;
     int ad_frame_size;
     ring_buffer_t sub_abuf;
@@ -53,6 +57,7 @@ static dtv_assoc_audio assoc_bst = {
     .assoc_enable = 0,
     .sub_apid = 0,
     .sub_afmt = 0,
+    .cache = 0,
     .main_frame_size = 0,
     .ad_frame_size = 0,
     //sub_abuf ,
@@ -69,6 +74,13 @@ enum {
     DTV_ASSOC_STAT_ENABLE,
 };
 
+static int64_t get_time(void)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return ((int64_t)tv.tv_sec * 1000000 + tv.tv_usec)/1000;//ms
+}
+
 static dtv_assoc_audio *get_assoc_audio(void)
 {
     return &assoc_bst;
@@ -83,7 +95,7 @@ static void audio_adcallback(const unsigned char * data, int len, void * handle)
 
     ring_buffer_t *ringbuffer = &(param->sub_abuf);
     int left;
-    if (param->assoc_enable == DTV_ASSOC_STAT_ENABLE && param->bufinited == 1) {
+    if (param->assoc_enable == DTV_ASSOC_STAT_ENABLE && param->bufinited == 1 && param->cache > 0) {
         unsigned short head1 = data[0] << 8 | data[1];
         left = get_buffer_write_space(ringbuffer);
         if (left < len) {
@@ -149,6 +161,7 @@ int dtv_assoc_init(void)
     param->bufinited = 1;
     param->sub_apid = 0;
     param->sub_afmt = 0;
+    param->cache= 0;
     param->main_frame_size= 0;
     param->ad_frame_size= 0;
     ret = ring_buffer_init(&(param->sub_abuf),
@@ -177,6 +190,7 @@ int dtv_assoc_deinit(void)
     }
     param->sub_apid = 0;
     param->sub_afmt = 0;
+    param->cache= 0;
     param->main_frame_size= 0;
     param->ad_frame_size= 0;
 	ALOGI("[%s %d] dtv_assoc_deinit success! \n", __FUNCTION__, __LINE__);
@@ -190,9 +204,14 @@ int dtv_assoc_get_avail(void)
     //ALOGI(" dtv_assoc_read enter,size=%d", size);
     dtv_assoc_audio *param = get_assoc_audio();
     ring_buffer_t *ringbuffer = &(param->sub_abuf);
-    int avail = get_buffer_read_space(ringbuffer);
+    int avail = 0;
+    int cache_time = get_time() - param->cache_start_time;
 
-	return avail;
+    if (cache_time >= CACHE_TIME) {
+        avail = get_buffer_read_space(ringbuffer);
+    }
+
+    return avail;
 }
 
 //To get the associate data if assoc is able
@@ -250,6 +269,21 @@ void dtv_assoc_get_ad_frame_size(int* ad_frame_size)
     *ad_frame_size = param->ad_frame_size;
 }
 
+void dtv_assoc_audio_cache(int value)
+{
+    dtv_assoc_audio *param = get_assoc_audio();
+
+    if (value < 0) {
+        param->cache = -1000;
+        ring_buffer_reset(&param->sub_abuf);
+    } else {
+        param->cache += value;
+        if (param->cache == 1) {
+            param->cache_start_time = get_time();
+        }
+    }
+}
+
 void dtv_assoc_audio_start(unsigned int handle, int pid, int fmt)
 {
     int ret = -1;
@@ -262,6 +296,7 @@ void dtv_assoc_audio_start(unsigned int handle, int pid, int fmt)
         ALOGI("%s, pid %d, fmt %d,return", __FUNCTION__, pid, fmt);
         param->sub_apid = pid;
         param->sub_afmt = fmt;
+        param->cache = 0;
         param->main_frame_size= 0;
         param->ad_frame_size= 0;
         ret = audio_ad_set_source(DTV_ASSOC_STAT_ENABLE, param->sub_apid, param->sub_afmt, NULL);
@@ -274,6 +309,7 @@ void dtv_assoc_audio_start(unsigned int handle, int pid, int fmt)
         ALOGI("%s, assoc is enable, disable it", __FUNCTION__);
         param->sub_apid = 0;
         param->sub_afmt = 0;
+        param->cache= 0;
         param->main_frame_size= 0;
         param->ad_frame_size= 0;
         param->assoc_enable = DTV_ASSOC_STAT_DISABLE;
@@ -298,6 +334,7 @@ void dtv_assoc_audio_stop(unsigned int handle)
         param->assoc_enable = DTV_ASSOC_STAT_DISABLE;
         param->sub_apid = 0;
         param->sub_afmt = 0;
+        param->cache= 0;
         param->main_frame_size= 0;
         param->ad_frame_size= 0;
         audio_ad_set_source(DTV_ASSOC_STAT_DISABLE, param->sub_apid, param->sub_afmt, NULL);

@@ -73,6 +73,7 @@
 #include "aml_avsync_tuning.h"
 #include "aml_ng.h"
 #include "aml_audio_timer.h"
+#include "audio_dtv_ad.h"
 
 // for invoke bluetooth rc hal
 #include "audio_hal_thunks.h"
@@ -4868,6 +4869,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         if (ret >= 0) {
             pthread_mutex_lock(&adev->lock);
             pthread_mutex_lock(&ms12->lock);
+            dtv_assoc_audio_cache(-1);
             adev->associate_audio_mixing_enable = val;
             ALOGI("associate_audio_mixing_enable set to %d\n", adev->associate_audio_mixing_enable);
             dolby_ms12_set_asscociated_audio_mixing(adev->associate_audio_mixing_enable);
