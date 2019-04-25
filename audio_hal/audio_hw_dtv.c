@@ -591,8 +591,10 @@ static void dtv_adjust_output_clock(struct aml_audio_patch * patch, int direct, 
     }
     if (!aml_dev->bHDMIARCon) {
         dtv_adjust_i2s_output_clock(patch, direct, step);
+        dtv_adjust_spdif_output_clock(patch, direct, step / 2);
+    } else {
+        dtv_adjust_spdif_output_clock(patch, direct, step / 10);
     }
-    dtv_adjust_spdif_output_clock(patch, direct, step / 2);
 }
 
 static unsigned int dtv_calc_pcrpts_latency(struct aml_audio_patch *patch, unsigned int pcrpts)
