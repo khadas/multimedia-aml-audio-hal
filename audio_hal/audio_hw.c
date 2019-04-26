@@ -1094,7 +1094,7 @@ static int do_output_standby_direct (struct aml_stream_out *out)
 
         out->standby = 1;
         /* cleanup the audio hw fifo */
-        if (out->pause_status == true) {
+        if (out->pause_status == true && out->pcm) {
             pcm_stop(out->pcm);
         }
 
@@ -1199,7 +1199,7 @@ static int out_flush (struct audio_stream_out *stream)
     }
     pthread_mutex_lock (&adev->lock);
     pthread_mutex_lock (&out->lock);
-    if (out->pause_status == true) {
+    if (out->pause_status == true && out->pcm) {
         // when pause status, set status prepare to avoid static pop sound
         ret = pcm_ioctl (out->pcm, SNDRV_PCM_IOCTL_PREPARE);
         if (ret < 0) {
@@ -3078,6 +3078,8 @@ static int out_get_render_position (const struct audio_stream_out *stream,
         frame_latency = arc_latency_ms * 48;
         *dsp_frames += frame_latency;
     }
+    if (*dsp_frames < 0)
+        *dsp_frames = 0;
     if (adev->debug_flag) {
         ALOGI("out_get_render_position %d \n", *dsp_frames);
     }
@@ -3206,6 +3208,8 @@ static int out_get_presentation_position (const struct audio_stream_out *stream,
         frame_latency = arc_latency_ms * 48;
         *frames += frame_latency;
     }
+    if (*frames < 0)
+        *frames = 0;
     if (adev->debug_flag) {
         ALOGI("out_get_presentation_position out %p %"PRIu64", sec = %ld, nanosec = %ld\n", out, *frames, timestamp->tv_sec, timestamp->tv_nsec);
     }
@@ -7808,31 +7812,23 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
 #endif
 
         if (ret < 0) {
+            aml_out->frame_write_sum = (aml_out->input_bytes_size  - dts_dec->remain_size ) / audio_stream_out_frame_size(stream);
+            aml_out->last_frames_postion = aml_out->frame_write_sum - out_get_latency_frames (stream);
+            if (aml_out->pcm == NULL) {
+                clock_gettime (CLOCK_MONOTONIC, &aml_out->timestamp);
+                aml_out->lasttimestamp.tv_sec = aml_out->timestamp.tv_sec;
+                aml_out->lasttimestamp.tv_nsec = aml_out->timestamp.tv_nsec;
+            }
             return bytes;
         }
-
         /* if one frame size is too big, such as 4096 frames = 85ms, but the alsa buffer only 42ms
            it will block the whole pipeline, we must increase the alsa buffer
         */
         if (dts_dec->outlen_pcm >= 4096*2*2) {
             aml_out->config.period_size = DEFAULT_PLAYBACK_PERIOD_SIZE*4;
         } else {
-
             aml_out->config.period_size = DEFAULT_PLAYBACK_PERIOD_SIZE;
-
         }
-        if (ret < 0) {
-            return bytes;
-        }
-
-
-        //add by lianlian.zhu ,for dts cerfication becase dts cd hdmi in pcm output distortion
-
-        //if (dts_dec->is_dtscd == 1) {
-            //memset(dts_dec->outbuf, 0, dts_dec->outlen_pcm);
-        //}
-
-
         //write pcm data
         int read_bytes =  PLAYBACK_PERIOD_COUNT * DEFAULT_PLAYBACK_PERIOD_SIZE ;
         bytes  = read_bytes;
@@ -7891,8 +7887,8 @@ if (fp1) {
             }
         }
 
-        aml_out->frame_write_sum = aml_out->input_bytes_size  / audio_stream_out_frame_size(stream);
-        aml_out->last_frames_postion = aml_out->frame_write_sum;
+        aml_out->frame_write_sum = (aml_out->input_bytes_size  - dts_dec->remain_size )  / audio_stream_out_frame_size(stream);
+        aml_out->last_frames_postion = aml_out->frame_write_sum - out_get_latency_frames (stream);
         return return_bytes;
     }
 
