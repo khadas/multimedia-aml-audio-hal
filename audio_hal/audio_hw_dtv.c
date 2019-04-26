@@ -90,10 +90,6 @@
 #define DEFAULT_SPDIF_PLL_PCM_CLOCK    (256*24000)
 #define DEFAULT_SPDIF_PLL_DDP_CLOCK    (256*48000*2)
 #define DEFAULT_SPDIF_ADJUST_TIMES    (10)
-#define AIU_AIFIFO_CTRL                            0x1580
-#define AIU_MEM_AIFIFO_LEVEL                       0x158b
-volatile unsigned* reg_base = 0;
-#define READ_MPEG_REG(reg) reg_base[reg-AIU_AIFIFO_CTRL]
 #define DTV_DECODER_PTS_LOOKUP_PATH "/sys/class/tsync/apts_lookup"
 #define DTV_DECODER_CHECKIN_FIRSTAPTS_PATH "/sys/class/tsync/checkin_firstapts"
 #define DTV_DECODER_TSYNC_MODE      "/sys/class/tsync/mode"
@@ -633,11 +629,8 @@ static int dtv_calc_abuf_level(struct aml_audio_patch *patch, struct aml_stream_
     struct aml_audio_device *aml_dev = (struct aml_audio_device *)dev;
     ring_buffer_t *ringbuffer = &(patch->aml_ringbuffer);
     int main_avail = 0;
-    int alevel = 0;
-    alevel = READ_MPEG_REG(AIU_MEM_AIFIFO_LEVEL);
     main_avail = get_buffer_read_space(ringbuffer);
-    //ALOGI("alevel %d,main_avail %d,frame_size %d", alevel,main_avail,stream_out->ddp_frame_size);
-    if ((main_avail + alevel) > 2 * stream_out->ddp_frame_size && main_avail > stream_out->ddp_frame_size) {
+    if (main_avail > stream_out->ddp_frame_size) {
         return 1;
     }
     return 0;
@@ -693,6 +686,9 @@ void process_ac3_sync(struct aml_audio_patch *patch, unsigned long pts, struct a
     } else {
         cur_out_pts = pts;
         get_sysfs_uint(TSYNC_PCRSCR, &pcrpts);
+        if (!patch || !patch->dev || !stream_out) {
+            return;
+        }
         pcrpts = dtv_calc_pcrpts_latency(patch, pcrpts);
         if (pcrpts > cur_out_pts) {
             pts_diff = pcrpts - cur_out_pts;
