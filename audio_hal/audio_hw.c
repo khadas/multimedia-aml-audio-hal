@@ -4332,6 +4332,9 @@ static int set_arc_format (struct audio_hw_device *dev, char *value, size_t len)
             } else if (val == _DTS) {
                 fmt_desc = &hdmi_desc->dts_fmt;
                 fmt_desc->fmt = val;
+            } else if (val == _DTSHD) {
+                fmt_desc = &hdmi_desc->dtshd_fmt;
+                fmt_desc->fmt = val;
             } else {
                 ALOGE ("unsupport fmt %d", val);
                 return -EINVAL;
@@ -7323,16 +7326,23 @@ static void config_output(struct audio_stream_out *stream)
             break;
         case AUTO:
             if (adev->active_outport == OUTPORT_HDMI_ARC) {
-                if (adev->hdmi_descs.dts_fmt.is_support) {
-                    dts_dec->digital_raw = 1;
-                    if (dts_dec->is_dtscd == 1) {
-                        adev->dtslib_bypass_enable = 0;
-                        dtscd_flag = true;
-                    } else {
-                        adev->dtslib_bypass_enable = 1;
+                if (adev->hdmi_descs.dtshd_fmt.is_support) {
+                    adev->dtslib_bypass_enable = 1;
+                    dts_dec->digital_raw = 2;
+                } else if (adev->hdmi_descs.dts_fmt.is_support) {
+                    if (aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD) {
+                       adev->dtslib_bypass_enable = 0;
+                } else if (aml_out->hal_internal_format == AUDIO_FORMAT_DTS) {
+                        dts_dec->digital_raw = 1;
+                        if (dts_dec->is_dtscd == 1) {
+                            adev->dtslib_bypass_enable = 0;
+                            dtscd_flag = true;
+                        } else {
+                            adev->dtslib_bypass_enable = 1;
+                        }
                     }
                 } else {
-                    dts_dec->digital_raw = 1;
+                    dts_dec->digital_raw = 0;
                     adev->dtslib_bypass_enable = 0;
                 }
             } else if (adev->active_outport == OUTPORT_SPEAKER) {
@@ -7767,7 +7777,7 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         audio_format_t output_format;
         if (adev->dtslib_bypass_enable) {
             if (aml_out->hal_format == AUDIO_FORMAT_IEC61937) {
-                output_format = AUDIO_FORMAT_DTS;
+                output_format = aml_out->hal_internal_format;
                 if (audio_hal_data_processing(stream, (void *)buffer, bytes, &output_buffer, &output_buffer_bytes, output_format) == 0) {
                     hw_write(stream, output_buffer, output_buffer_bytes, output_format);
                 }
@@ -7788,28 +7798,36 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
             /* all the HDMI in we goes through into decoder, because sometimes it is 44.1 khz, we don't know
                 such info if we doesn't decoded it.
             */
-            if (patch && (patch->input_src == AUDIO_DEVICE_IN_HDMI || patch->input_src == AUDIO_DEVICE_IN_SPDIF)) {
-                if (ret == 0) {
-                    // we only support 44.1 Khz & 48 Khz raw output
-                    if (dts_dec->pcm_out_info.sample_rate == 44100 ) {
+            if (ret == 0) {
+                // we only support 44.1 Khz & 48 Khz raw output
+                 if (dts_dec->pcm_out_info.sample_rate == 44100 ) {
                         aml_out->config.rate = dts_dec->pcm_out_info.sample_rate;
-                    }else {
+                 } else {
                         aml_out->config.rate = 48000;
-                    }
-                    if (adev->debug_flag) {
+                 }
+            }
+            if (aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD) {
+                if (adev->debug_flag) {
                         ALOGD("%s:%d SPDIF/HDMIIN, rate:%d set:%d DTS output size:%d", __func__, __LINE__,
                             aml_out->config.rate,dts_dec->pcm_out_info.sample_rate,dts_dec->outlen_raw);
-                    }
-                    if (dts_dec->outlen_raw) {
-                        aml_audio_spdif_output(stream, (void *)dts_dec->outbuf_raw, dts_dec->outlen_raw);
-                    }
-                }
-            } else {
+                 }
+                 if (ret == 0 && dts_dec->outlen_raw) {
+                    aml_audio_spdif_output(stream, (void *)dts_dec->outbuf_raw, dts_dec->outlen_raw);
+                 }
+            } else if (aml_out->hal_internal_format == AUDIO_FORMAT_DTS){
                 if (adev->debug_flag) {
                     ALOGD("%s:%d non SPDIF/HDMIIN, DTS output bytes:%d", __func__, __LINE__, bytes);
                 }
                 aml_audio_spdif_output(stream, (void *)buffer, bytes);
             }
+        } else if (adev->active_outport == OUTPORT_HDMI_ARC) {
+            output_format = AUDIO_FORMAT_DTS;
+            if (ret == 0 && dts_dec->outlen_raw) {
+                if (audio_hal_data_processing(stream, (void *)dts_dec->outbuf_raw, dts_dec->outlen_raw, &output_buffer, &output_buffer_bytes, output_format) == 0) {
+                    hw_write(stream, output_buffer, output_buffer_bytes, output_format);
+                }
+            }
+            return return_bytes;
         }
 #endif
 

@@ -174,6 +174,7 @@ struct aml_arc_hdmi_desc {
     unsigned int avr_port;
     struct format_desc pcm_fmt;
     struct format_desc dts_fmt;
+    struct format_desc dtshd_fmt;
     struct format_desc dd_fmt;
     struct format_desc ddp_fmt;
 };
