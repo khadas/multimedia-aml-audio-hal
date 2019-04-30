@@ -583,6 +583,9 @@ static void dtv_adjust_output_clock(struct aml_audio_patch * patch, int direct, 
     struct audio_hw_device *adev = patch->dev;
     struct aml_audio_device *aml_dev = (struct aml_audio_device *) adev;
     //ALOGI("dtv_adjust_output_clock not set,%x,%x",patch->decoder_offset,patch->dtv_pcm_readed);
+    if (!aml_dev) {
+        return;
+    }
     if (patch->decoder_offset < 512 * 2 * 10) {
         return;
     }
@@ -1930,14 +1933,16 @@ int dtv_in_read(struct audio_stream_in *stream, void* buffer, size_t bytes)
 
 int audio_set_spdif_clock(struct aml_audio_device*dev, int type)
 {
-    if (!dev->audio_patch) {
+    if (!dev || !dev->audio_patch) {
         return 0;
     }
-    if (dev->patch_src != SRC_DTV) {
+    if (dev->patch_src != SRC_DTV || !dev->audio_patch->is_dtv_src) {
+        return 0;
+    }
+    if (!(dev->usecase_masks > 1)) {
         return 0;
     }
     ALOGI("[%s] type=%d\n", __FUNCTION__, type);
-    dtv_adjust_output_clock(dev->audio_patch, DIRECT_NORMAL, DEFAULT_DTV_ADJUST_CLOCK);
     if (type == AML_DOLBY_DIGITAL) {
         dev->audio_patch->dtv_default_spdif_clock = DEFAULT_SPDIF_PLL_PCM_CLOCK;
         dev->audio_patch->spdif_format_set = 1;

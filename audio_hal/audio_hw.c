@@ -6815,7 +6815,7 @@ ssize_t hw_write (struct audio_stream_out *stream
     if (adev->debug_flag) {
         ALOGI("+%s() buffer %p bytes %zu, format %#x", __func__, buffer, bytes, output_format);
     }
-    if (is_dtv) {
+    if (is_dtv && need_hw_mix(adev->usecase_masks)) {
         if (adev->audio_patch && adev->audio_patch->avsync_callback)
             adev->audio_patch->avsync_callback(adev->audio_patch,aml_out);
     }
