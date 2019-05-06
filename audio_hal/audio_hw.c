@@ -8641,11 +8641,10 @@ void *audio_patch_input_threadloop(void *data)
     int ret = 0, retry = 0;
     audio_format_t cur_aformat  = AUDIO_FORMAT_INVALID;
     audio_format_t last_aformat = AUDIO_FORMAT_INVALID;
-    int cur_samplerate = 0;
-    int last_samplerate = 0;
     int ring_buffer_size = 0;
     bool bSpdifin_PAO = false;
-    hdmiin_audio_packet_t audio_packet = AUDIO_PACKET_NONE;
+    hdmiin_audio_packet_t cur_audio_packet = AUDIO_PACKET_AUDS;
+    hdmiin_audio_packet_t last_audio_packet = AUDIO_PACKET_AUDS;
     int txl_chip = is_txl_chip();
     int last_channel_count = 2;
 
@@ -8661,19 +8660,8 @@ void *audio_patch_input_threadloop(void *data)
     }
 
     in = (struct aml_stream_in *)stream_in;
-#if defined(IS_ATOM_PROJECT)
-    if (in->device & AUDIO_DEVICE_IN_LINE) {
-        pthread_mutex_init(&in->aux_mic_mutex, NULL);
-        pthread_cond_init(&in->aux_mic_cond, NULL);
-        if (patch->in_format == AUDIO_FORMAT_PCM_16_BIT)
-            patch->in_buf_size = read_bytes = in->config.period_size * 2 * 2;
-        else
-            patch->in_buf_size = read_bytes = in->config.period_size * 2 * 4;
-    } else
-#endif
-    {
-        patch->in_buf_size = read_bytes = in->config.period_size * audio_stream_in_frame_size(&in->stream);
-    }
+
+    patch->in_buf_size = read_bytes = in->config.period_size * audio_stream_in_frame_size(&in->stream);
     patch->in_buf = calloc(1, patch->in_buf_size);
     if (!patch->in_buf) {
         adev_close_input_stream(patch->dev, &in->stream);
@@ -8686,194 +8674,141 @@ void *audio_patch_input_threadloop(void *data)
         ring_buffer_size = ringbuffer->size;
     }
     while (!patch->input_thread_exit) {
-#if defined(IS_ATOM_PROJECT)
-        if ((in->device & AUDIO_DEVICE_IN_LINE) && in->ref_count == 2) {
-            pthread_mutex_lock(&in->aux_mic_mutex);
-            ts_wait_time(&ts, 300000);
-            ret = pthread_cond_timedwait(&in->aux_mic_cond, &in->aux_mic_mutex, &ts);
-            pthread_mutex_unlock(&in->aux_mic_mutex);
-            if (ret != 0 || in->aux_buf_write_bytes == 0)
-                continue;
-            if (patch->in_buf_size < in->aux_buf_write_bytes) {
-                ALOGI("%s: aux: realloc in buf size from %zu to %zu", __func__, patch->in_buf_size, in->aux_buf_write_bytes);
-                patch->in_buf = realloc(patch->in_buf, in->aux_buf_write_bytes);
-                patch->in_buf_size = in->aux_buf_write_bytes;
+        int bytes_avail = 0;
+        int period_mul = 1;
+        int read_threshold = 0;
+        switch (patch->aformat) {
+        case AUDIO_FORMAT_E_AC3:
+            period_mul = EAC3_MULTIPLIER;
+            break;
+        case AUDIO_FORMAT_DTS_HD:
+            // 192Khz
+            period_mul = 4 * 4;
+            break;
+        default:
+            period_mul = 1;
+        }
+        if (patch->input_src == AUDIO_DEVICE_IN_LINE) {
+            read_threshold = 4 * read_bytes * period_mul;
+        }
+        ALOGV("++%s start to in read, periodmul %d, threshold %d",
+              __func__, period_mul, read_threshold);
+
+        // buffer size diff from allocation size, need to resize.
+        if (patch->in_buf_size < (size_t)read_bytes * period_mul) {
+            ALOGI("%s: !!realloc in buf size from %zu to %zu", __func__, patch->in_buf_size, read_bytes * period_mul);
+            patch->in_buf = realloc(patch->in_buf, read_bytes * period_mul);
+            patch->in_buf_size = read_bytes * period_mul;
+        }
+
+        if (patch->input_src == AUDIO_DEVICE_IN_HDMI) {
+            cur_audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
+            //reconfig period size when HBR and non HBR audio switching
+            if ((last_audio_packet == AUDIO_PACKET_HBR ||
+                    cur_audio_packet == AUDIO_PACKET_HBR) &&
+                    last_audio_packet != cur_audio_packet) {
+                int period_size = 0;
+                int buf_size = 0;
+
+                cur_aformat = audio_parse_get_audio_type(patch->audio_parse_para);
+                ALOGD("HDMI Format Switch from 0x%x to 0x%x last_type=%d cur_type=%d\n",
+                    last_aformat, cur_aformat, last_audio_packet, cur_audio_packet);
+
+                if (cur_audio_packet == AUDIO_PACKET_HBR ||
+                    (patch->aformat == AUDIO_FORMAT_DTS_HD)) {
+                    // if it is high bitrate bitstream, use PAO and increase the buffer size
+                    bSpdifin_PAO = true;
+                    period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
+                    // increase the buffer size
+                    buf_size = ring_buffer_size * 8;
+                } else {
+                    bSpdifin_PAO = false;
+                    period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
+                    // reset to original one
+                    buf_size = ring_buffer_size;
+                }
+
+                if (!alsa_device_is_auge())
+                    set_spdifin_pao(&aml_dev->alsa_mixer, bSpdifin_PAO);
+                ring_buffer_reset_size(ringbuffer, buf_size);
+                in_reset_preroid_size(stream_in, period_size);
+                last_aformat = cur_aformat;
+                last_audio_packet = cur_audio_packet;
             }
-            memcpy(patch->in_buf, in->aux_buf, in->aux_buf_write_bytes);
-            if (aml_dev->parental_control_av_mute)
-                memset(patch->in_buf, 0, in->aux_buf_write_bytes);
-            aux_read_bytes = in->aux_buf_write_bytes;
-            if (get_buffer_write_space(ringbuffer) < aux_read_bytes) {
-                ALOGE("%s: aux: ring_buffer overrun", __func__);
-            } else {
-                ret = ring_buffer_write(ringbuffer, (unsigned char*)patch->in_buf, aux_read_bytes, UNCOVER_WRITE);
-                if (ret != aux_read_bytes)
-                    ALOGE("%s: aux: ring_buffer_write() failed", __func__);
+
+            // hdmi in audio channels recofig.
+            int current_channel = get_hdmiin_channel(&aml_dev->alsa_mixer);
+            if (current_channel != -1 && current_channel != last_channel_count) {
+                ALOGI("%s(), channel count changed from %d to %d!",
+                    __func__, last_channel_count, current_channel);
+                last_channel_count = current_channel;
+                in_reset_channel_num(stream_in, current_channel);
+            }
+        }
+#if 0
+        struct timespec before_read;
+        struct timespec after_read;
+        int us = 0;
+        clock_gettime(CLOCK_MONOTONIC, &before_read);
+#endif
+
+        bytes_avail = in_read(stream_in, patch->in_buf, read_bytes * period_mul);
+        if (aml_dev->tv_mute) {
+            memset(patch->in_buf, 0, bytes_avail);
+        }
+
+#if 0
+        clock_gettime(CLOCK_MONOTONIC, &after_read);
+        us = calc_time_interval_us(&before_read, &after_read);
+        ALOGD("function gap =%d \n", us);
+#endif
+
+        ALOGV("++%s in read over read_bytes = %d, in_read returns = %d",
+              __FUNCTION__, read_bytes * period_mul, bytes_avail);
+        if (bytes_avail > 0) {
+            //DoDumpData(patch->in_buf, bytes_avail, CC_DUMP_SRC_TYPE_INPUT);
+
+            /*if it is txl & 88.2k~192K, we will use software detect*/
+            if (txl_chip && (cur_audio_packet == AUDIO_PACKET_HBR) && (patch->input_src == AUDIO_DEVICE_IN_HDMI)) {
+                feeddata_audio_type_parse(&patch->audio_parse_para, patch->in_buf, bytes_avail);
+            }
+
+            do {
+                if (get_buffer_write_space(ringbuffer) >= bytes_avail) {
+                    retry = 0;
+                    ret = ring_buffer_write(ringbuffer,
+                                            (unsigned char*)patch->in_buf,
+                                            bytes_avail, UNCOVER_WRITE);
+                    if (ret != bytes_avail) {
+                        ALOGE("%s(), write buffer fails!", __func__);
+                    }
+
+                    if (!first_start || get_buffer_read_space(ringbuffer) >= read_threshold) {
+                        pthread_cond_signal(&patch->cond);
+                        if (first_start) {
+                            first_start = 0;
+                        }
+                    }
+                    //usleep(1000);
+                } else {
+                    retry = 1;
+                    pthread_cond_signal(&patch->cond);
+                    //Fixme: if ringbuffer is full enough but no output, reset ringbuffer
+                    ring_buffer_reset(ringbuffer);
+                    usleep(3000);
+                    ALOGE("%s(), no space to input, in read audio discontinue!", __func__);
+                }
+            } while (retry && !patch->input_thread_exit);
+        } else {
+            ALOGV("%s(), read alsa pcm fails, to _read(%d), bytes_avail(%d)!",
+                  __func__, read_bytes * period_mul, bytes_avail);
+            if (get_buffer_read_space(ringbuffer) >= bytes_avail) {
                 pthread_cond_signal(&patch->cond);
             }
-        } else
-#endif
-        {
-            int bytes_avail = 0;
-            int period_mul = 1;
-            int read_threshold = 0;
-            switch (patch->aformat) {
-            case AUDIO_FORMAT_E_AC3:
-                period_mul = EAC3_MULTIPLIER;
-                break;
-            case AUDIO_FORMAT_DTS_HD:
-                // 192Khz
-                period_mul = 4 * 4;
-                break;
-            default:
-                period_mul = 1;
-            }
-            if (patch->input_src == AUDIO_DEVICE_IN_LINE) {
-                read_threshold = 4 * read_bytes * period_mul;
-            }
-            ALOGV("++%s start to in read, periodmul %d, threshold %d",
-                  __func__, period_mul, read_threshold);
-
-            // buffer size diff from allocation size, need to resize.
-            if (patch->in_buf_size < (size_t)read_bytes * period_mul) {
-                ALOGI("%s: !!realloc in buf size from %zu to %zu", __func__, patch->in_buf_size, read_bytes * period_mul);
-                patch->in_buf = realloc(patch->in_buf, read_bytes * period_mul);
-                patch->in_buf_size = read_bytes * period_mul;
-            }
-
-            if (patch) {
-                if (patch->input_src == AUDIO_DEVICE_IN_HDMI) {
-                    cur_aformat = audio_parse_get_audio_type(patch->audio_parse_para);
-                    cur_samplerate = get_hdmiin_samplerate(&aml_dev->alsa_mixer);
-                    audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
-                    if (cur_samplerate != -1 && cur_samplerate != 0) {
-                        int period_size = 0;
-
-                        int buf_size = 0;;
-                        // HDMI in samplerate is stable
-                        if (last_samplerate != cur_samplerate) {
-                            ALOGD("HDMI Format Switch from 0x%x to 0x%x rate=%d packet type=%d\n", last_aformat, cur_aformat, cur_samplerate,audio_packet);
-
-                            if (audio_packet == AUDIO_PACKET_HBR ||
-                                (patch->aformat == AUDIO_FORMAT_DTS_HD)) {
-                            // if it is high bitrate bitstream, use PAO and increase the buffer size
-                                bSpdifin_PAO = true;
-                                period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
-                                // increase the buffer size
-                                buf_size = ring_buffer_size * 8;
-                            } else {
-                                bSpdifin_PAO = false;
-                                period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
-                                // reset to original one
-                                buf_size = ring_buffer_size;
-
-                            }
-
-                            if (alsa_device_is_auge()) {
-                                ring_buffer_reset_size(ringbuffer, buf_size);
-                                /* for tl1, pcm using PAO too. */
-                                set_spdifin_pao(&aml_dev->alsa_mixer,true);
-                                in_reset_preroid_size(stream_in, period_size);
-                            } else {
-                                ring_buffer_reset_size(ringbuffer, buf_size);
-                                set_spdifin_pao(&aml_dev->alsa_mixer,bSpdifin_PAO);
-                                in_reset_preroid_size(stream_in, period_size);
-                            }
-
-                        }
-
-                        if (((audio_packet == AUDIO_PACKET_HBR) && bSpdifin_PAO == false) ||
-                            ((patch->aformat == AUDIO_FORMAT_DTS_HD) && bSpdifin_PAO == false)) {
-                            bSpdifin_PAO = true;
-                            period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
-                            // increase the buffer size
-                            buf_size = ring_buffer_size * 8;
-                            ring_buffer_reset_size(ringbuffer, buf_size);
-                            set_spdifin_pao(&aml_dev->alsa_mixer,bSpdifin_PAO);
-                            in_reset_preroid_size(stream_in, period_size);
-
-                        }
-                        last_aformat = cur_aformat;
-                        last_samplerate = cur_samplerate;
-                    }
-                    int current_channel = get_hdmiin_channel(&aml_dev->alsa_mixer);
-                    if (current_channel != -1 && current_channel != last_channel_count) {
-                        ALOGI("%s(), channel count changed from %d to %d!",
-                            __func__, last_channel_count, current_channel);
-                        last_channel_count = current_channel;
-                        in_reset_channel_num(stream_in, current_channel);
-                    }
-                }
-            }
-#if 0
-            struct timespec before_read;
-            struct timespec after_read;
-            int us = 0;
-            clock_gettime(CLOCK_MONOTONIC, &before_read);
-#endif
-
-            bytes_avail = in_read(stream_in, patch->in_buf, read_bytes * period_mul);
-            if (aml_dev->tv_mute) {
-	            memset(patch->in_buf, 0, bytes_avail);
-            }
-
-#if 0
-            clock_gettime(CLOCK_MONOTONIC, &after_read);
-            us = calc_time_interval_us(&before_read, &after_read);
-            ALOGD("function gap =%d \n", us);
-#endif
-
-            ALOGV("++%s in read over read_bytes = %d, in_read returns = %d",
-                  __FUNCTION__, read_bytes * period_mul, bytes_avail);
-            if (bytes_avail > 0) {
-                //DoDumpData(patch->in_buf, bytes_avail, CC_DUMP_SRC_TYPE_INPUT);
-
-                /*if it is txl & 88.2k~192K, we will use software detect*/
-                if (txl_chip && (audio_packet == AUDIO_PACKET_HBR) && (patch->input_src == AUDIO_DEVICE_IN_HDMI)) {
-                    feeddata_audio_type_parse(&patch->audio_parse_para, patch->in_buf, bytes_avail);
-                }
-
-                do {
-                    if (get_buffer_write_space(ringbuffer) >= bytes_avail) {
-                        retry = 0;
-                        ret = ring_buffer_write(ringbuffer,
-                                                (unsigned char*)patch->in_buf,
-                                                bytes_avail, UNCOVER_WRITE);
-                        if (ret != bytes_avail) {
-                            ALOGE("%s(), write buffer fails!", __func__);
-                        }
-
-                        if (!first_start || get_buffer_read_space(ringbuffer) >= read_threshold) {
-                            pthread_cond_signal(&patch->cond);
-                            if (first_start) {
-                                first_start = 0;
-                            }
-                        }
-                        //usleep(1000);
-                    } else {
-                        retry = 1;
-                        pthread_cond_signal(&patch->cond);
-                        //Fixme: if ringbuffer is full enough but no output, reset ringbuffer
-                        ring_buffer_reset(ringbuffer);
-                        usleep(3000);
-                        ALOGE("%s(), no space to input, in read audio discontinue!", __func__);
-                    }
-                } while (retry && !patch->input_thread_exit);
-            } else {
-                ALOGV("%s(), read alsa pcm fails, to _read(%d), bytes_avail(%d)!",
-                      __func__, read_bytes * period_mul, bytes_avail);
-                if (get_buffer_read_space(ringbuffer) >= bytes_avail) {
-                    pthread_cond_signal(&patch->cond);
-                }
-                usleep(3000);
-            }
+            usleep(3000);
         }
     }
 
-#if defined(IS_ATOM_PROJECT)
-    if (in->device & AUDIO_DEVICE_IN_LINE)
-        in->device &= ~AUDIO_DEVICE_IN_LINE;
-#endif
     adev_close_input_stream(patch->dev, &in->stream);
     if (patch->in_buf) {
         free(patch->in_buf);
