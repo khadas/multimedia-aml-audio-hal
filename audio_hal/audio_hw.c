@@ -6685,13 +6685,13 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                 }
             }
 
-            if (adev->patch_src == SRC_DTV)
+            if (adev->patch_src == SRC_DTV && adev->audio_patching)
                 source_gain = adev->eq_data.s_gain.dtv;
             else if (adev->patch_src == SRC_HDMIIN)
                 source_gain = adev->eq_data.s_gain.hdmi;
             else if (adev->patch_src == SRC_LINEIN)
                 source_gain = adev->eq_data.s_gain.av;
-            else if (adev->patch_src == SRC_ATV)
+            else if (adev->patch_src == SRC_ATV && adev->audio_patching)
                 source_gain = adev->eq_data.s_gain.atv;
             else
                 source_gain = 1.0;
