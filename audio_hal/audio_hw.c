@@ -10318,7 +10318,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         goto err_adev;
     }
     memset(adev->effect_buf, 0, buffer_size);
-    adev->spk_output_buf = malloc(buffer_size);
+    adev->spk_output_buf = malloc(buffer_size * 2);
     if (adev->spk_output_buf == NULL) {
         ALOGE("no memory for headphone output buffer");
         ret = -ENOMEM;
