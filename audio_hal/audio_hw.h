@@ -437,6 +437,9 @@ struct aml_audio_device {
     int tsync_fd;
     bool rawtopcm_flag;
     int dtv_aformat;
+    int delay_max;
+    int delay_time;
+    void * delay_handle;
     unsigned int dtv_i2s_clock;
     unsigned int dtv_spidif_clock;
     unsigned int dtv_droppcm_size;

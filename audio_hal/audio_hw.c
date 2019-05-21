@@ -114,7 +114,9 @@
 #endif
 
 #include "sub_mixing_factory.h"
-
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+#include "aml_audio_delay.h"
+#endif
 #define CARD_AMLOGIC_BOARD 0
 
 #undef PLAYBACK_PERIOD_COUNT
@@ -4289,6 +4291,13 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
             goto err;
         }
         memset(out->audioeffect_tmp_buffer, 0, out->config.period_size * 6);
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+        ret = aml_audiodelay_init(&adev->hw_device);
+        if (ret < 0) {
+            ALOGE("aml_audiodelay_init faild\n");
+            goto err;
+        }
+#endif
     }
 
     out->hwsync =  calloc(1, sizeof(audio_hwsync_t));
@@ -4363,7 +4372,10 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         aml_audio_hwsync_release(out->hwsync);
         free(out->hwsync);
     }
-    pthread_mutex_unlock (&out->lock);
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+    aml_audiodelay_close(&adev->hw_device);
+#endif
+    pthread_mutex_unlock(&out->lock);
     free(stream);
     ALOGD("%s: exit", __func__);
 }
@@ -5136,7 +5148,15 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         adev->eq_data.p_gain.headphone);
         goto exit;
     }
-    ret = str_parms_get_str(parms,"EQ_PARAM",value,sizeof(value));
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+    ret = str_parms_get_int(parms, "delay_time", &val);
+    if (ret >= 0) {
+        adev->delay_time = val;
+        ALOGI("delay time  set to %d\n", adev->delay_time);
+        goto exit;
+    }
+#endif
+    ret = str_parms_get_str(parms, "EQ_PARAM", value, sizeof(value));
     if (ret >= 0) {
        sscanf(value, "%lf %lf %u %u %u",&adev->Eq_data.G,&adev->Eq_data.Q,&adev->Eq_data.fc,&adev->Eq_data.type,&adev->Eq_data.band_id);
        setpar_eq(adev->Eq_data.G,adev->Eq_data.Q,adev->Eq_data.fc,adev->Eq_data.type,adev->Eq_data.band_id);
@@ -6873,6 +6893,13 @@ ssize_t hw_write (struct audio_stream_out *stream
         }
     }
     if (aml_out->pcm) {
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+        ret = aml_audiodelay_process(&adev->hw_device, (void *) tmp_buffer, bytes, output_format);
+        if (ret < 0) {
+            ALOGE("aml_audiodelay_process skip\n");
+            return ret;
+        }
+#endif
         if (adjust_ms) {
             int adjust_bytes = 0;
             memset((void*)buffer, 0, bytes);
@@ -10536,6 +10563,10 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     // however, sometimes function didn't goto hw_write() before encounting error.
     // set debug_flag here to see more debug log when debugging.
     adev->debug_flag = aml_audio_get_debug_flag();
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+    adev->delay_time    = 0;
+    adev->delay_max    = 2000;
+#endif
     ALOGD("%s: exit", __func__);
     return 0;
 
