@@ -6763,8 +6763,9 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
     } else if (adev->patch_src == SRC_DTV && adev->tuner2mix_patch == 1){
         dtv_in_write(stream,buffer, bytes);
     }
-    output_mute(stream,output_buffer_bytes);
-
+    if (adev->audio_patching) {
+        output_mute(stream,output_buffer_bytes);
+    }
     return 0;
 }
 
