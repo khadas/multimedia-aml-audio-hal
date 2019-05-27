@@ -340,6 +340,7 @@ static void store_stream_presentation(struct aml_audio_device *adev)
     struct aml_stream_out *aml_out = NULL;
     uint64_t write_frames = 0;
     int i = 0;
+    bool is_ddp_61937 = false;
     for (i = 0; i < STREAM_USECASE_MAX; i++) {
         aml_out = adev->active_outputs[i];
         if (aml_out && (aml_out->flags & AUDIO_OUTPUT_FLAG_DIRECT)) {
@@ -349,6 +350,7 @@ static void store_stream_presentation(struct aml_audio_device *adev)
                 }
                 if (aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3) {
                     write_frames = aml_out->input_bytes_size / 24576 * 32 * 48;
+                    is_ddp_61937 = true;
                 }
             } else if ((aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3) || (aml_out->hal_internal_format == AUDIO_FORMAT_AC3)) {
                 write_frames = aml_out->input_bytes_size / aml_out->ddp_frame_size * 32 * 48;
@@ -359,9 +361,11 @@ static void store_stream_presentation(struct aml_audio_device *adev)
              *if it is n(1 or 4)*48kHz, keep the write_frames as well.
              */
             if (aml_out->hal_rate % MM_FULL_POWER_SAMPLING_RATE) {
-                write_frames = (write_frames * MM_FULL_POWER_SAMPLING_RATE) / aml_out->hal_rate;
+                int multiple = 1;
+                if (is_ddp_61937 == true && (aml_out->hal_rate == 128000 || aml_out->hal_rate == 44100*4))
+                    multiple = 4;
+                write_frames = (write_frames * MM_FULL_POWER_SAMPLING_RATE*multiple) / aml_out->hal_rate;
             }
-
             aml_out->last_frames_postion = write_frames;
             aml_out->frame_write_sum = write_frames;
             aml_out->last_playload_used = 0;
@@ -699,7 +703,7 @@ static int start_output_stream_direct (struct aml_stream_out *out)
         out->hal_format == AUDIO_FORMAT_E_AC3) {
         out->need_convert = true;
         out->hal_internal_format = AUDIO_FORMAT_AC3;
-        if (out->hal_rate == 192000)
+        if (out->hal_rate == 192000 || out->hal_rate == 176400)
             out->hal_rate = out->hal_rate / 4;
         ALOGI("spdif out DD+ need covert to DD ");
     }
