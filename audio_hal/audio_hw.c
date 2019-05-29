@@ -3150,7 +3150,8 @@ static int out_add_audio_effect (const struct audio_stream *stream, effect_handl
     struct aml_audio_device *dev = out->dev;
     int i;
     int status = 0;
-
+    char *name = "VirtualX";
+    effect_handle_t tmp;
     pthread_mutex_lock (&dev->lock);
     pthread_mutex_lock (&out->lock);
     if (dev->native_postprocess.num_postprocessors >= MAX_POSTPROCESSORS) {
@@ -3166,6 +3167,20 @@ static int out_add_audio_effect (const struct audio_stream *stream, effect_handl
     }
 
     dev->native_postprocess.postprocessors[dev->native_postprocess.num_postprocessors++] = effect;
+    /*add for virtualx. specify effect order
+     according to dts profile2 block diagram: Trusurround:X->Truvolume->TBHDX->customer modules->MC Dynamics
+     virtualx will be called twice,first implementation for process Trusurround:X->Truvolume->TBHDX
+     final implementation for process MC Dynamics
+    */
+    effect_descriptor_t tmpdesc;
+    for ( i = 0; i < dev->native_postprocess.num_postprocessors; i++) {
+        (*effect)->get_descriptor(dev->native_postprocess.postprocessors[i], &tmpdesc);
+        if (0 == strcmp(tmpdesc.name,name)) {
+            tmp = dev->native_postprocess.postprocessors[i];
+            dev->native_postprocess.postprocessors[i] = dev->native_postprocess.postprocessors[0];
+            dev->native_postprocess.postprocessors[0] = tmp;
+        }
+    }
     if (dev->native_postprocess.num_postprocessors >= dev->native_postprocess.total_postprocessors)
         dev->native_postprocess.total_postprocessors = dev->native_postprocess.num_postprocessors;
 
@@ -6846,6 +6861,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             size_t out_frames = bytes / (2 * 2);
 
             int16_t *effect_tmp_buf;
+            effect_descriptor_t tmpdesc;
             int32_t *spk_tmp_buf;
             float source_gain;
             float gain_speaker = adev->eq_data.p_gain.speaker;
@@ -6896,6 +6912,17 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             if (adev->native_postprocess.num_postprocessors == adev->native_postprocess.total_postprocessors) {
                 for (j = 0; j < adev->native_postprocess.num_postprocessors; j++) {
                     audio_post_process(adev->native_postprocess.postprocessors[j], effect_tmp_buf, out_frames);
+                }
+                /*
+                according to dts profile2 block diagram: Trusurround:X->Truvolume->TBHDX->customer modules->MC Dynamics
+                virtualx will be called twice,first implementation for process Trusurround:X->Truvolume->TBHDX
+                final implementation for process MC Dynamics
+                */
+                if (adev->native_postprocess.postprocessors[0] != NULL) {
+                    (*(adev->native_postprocess.postprocessors[0]))->get_descriptor(adev->native_postprocess.postprocessors[0], &tmpdesc);
+                    if (0 == strcmp(tmpdesc.name,"VirtualX")) {
+                        audio_post_process(adev->native_postprocess.postprocessors[0], effect_tmp_buf, out_frames);
+                    }
                 }
             } else {
                 gain_speaker *= EQ_GAIN_DEFAULT;
