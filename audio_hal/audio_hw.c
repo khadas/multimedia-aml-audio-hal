@@ -4034,8 +4034,19 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
     if (in->device & AUDIO_DEVICE_IN_BUILTIN_MIC) {
         inread_proc_aec(stream, buffer, bytes);
     } else if (!adev->audio_patching) {
-        /* case dev->mix, set audio gain to src */
-        apply_volume(adev->src_gain[adev->active_inport], buffer, sizeof(uint16_t), bytes);
+        /* case dev->mix, set audio gain to src and TV source gain */
+        float source_gain;
+        if (adev->patch_src == SRC_HDMIIN)
+            source_gain = adev->eq_data.s_gain.hdmi;
+        else if (adev->patch_src == SRC_LINEIN)
+            source_gain = adev->eq_data.s_gain.av;
+        else if (adev->patch_src == SRC_ATV)
+            source_gain = adev->eq_data.s_gain.atv;
+        else
+            source_gain = 1.0;
+
+        source_gain *= adev->src_gain[adev->active_inport];
+        apply_volume(source_gain, buffer, sizeof(int16_t), bytes);
     }
 
 exit:
@@ -6676,6 +6687,21 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             memcpy(effect_tmp_buf, tmp_buffer, bytes);
 #endif
 
+            /*apply dtv source gain for speaker*/
+            if (adev->patch_src == SRC_DTV && adev->audio_patching)
+                source_gain = adev->eq_data.s_gain.dtv;
+            else if (adev->patch_src == SRC_HDMIIN && adev->audio_patching)
+                source_gain = adev->eq_data.s_gain.hdmi;
+            else if (adev->patch_src == SRC_LINEIN && adev->audio_patching)
+                source_gain = adev->eq_data.s_gain.av;
+            else if (adev->patch_src == SRC_ATV && adev->audio_patching)
+                source_gain = adev->eq_data.s_gain.atv;
+            else
+                source_gain = 1.0;
+
+            if (source_gain != 1.0)
+                apply_volume(source_gain, effect_tmp_buf, sizeof(int16_t), bytes);
+
             /*aduio effect process for speaker*/
             if (adev->native_postprocess.num_postprocessors == adev->native_postprocess.total_postprocessors) {
                 for (j = 0; j < adev->native_postprocess.num_postprocessors; j++) {
@@ -6694,23 +6720,12 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                 }
             }
 
-            if (adev->patch_src == SRC_DTV && adev->audio_patching)
-                source_gain = adev->eq_data.s_gain.dtv;
-            else if (adev->patch_src == SRC_HDMIIN)
-                source_gain = adev->eq_data.s_gain.hdmi;
-            else if (adev->patch_src == SRC_LINEIN)
-                source_gain = adev->eq_data.s_gain.av;
-            else if (adev->patch_src == SRC_ATV && adev->audio_patching)
-                source_gain = adev->eq_data.s_gain.atv;
-            else
-                source_gain = 1.0;
-
             if (adev->patch_src == SRC_DTV && adev->audio_patch != NULL) {
                 aml_audio_switch_output_mode((int16_t *)effect_tmp_buf, bytes, adev->audio_patch->mode);
             }
 
             /* apply volume for spk/hp, SPDIF/HDMI keep the max volume */
-            gain_speaker *= (adev->sink_gain[OUTPORT_SPEAKER] * source_gain);
+            gain_speaker *= (adev->sink_gain[OUTPORT_SPEAKER]);
             apply_volume_16to32(gain_speaker, effect_tmp_buf, spk_tmp_buf, bytes);
 
             /* 2 ch 16 bit --> 8 ch 32 bit mapping, need 8X size of input buffer size */
