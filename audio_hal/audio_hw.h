@@ -52,7 +52,7 @@
  * test case test4_1MeasurePeakRms(android.media.cts.VisualizerTest)
  */
 #define DEFAULT_PLAYBACK_PERIOD_SIZE 512//1024
-#define DEFAULT_CAPTURE_PERIOD_SIZE  512//1024
+#define DEFAULT_CAPTURE_PERIOD_SIZE  1024
 #define DEFAULT_PLAYBACK_PERIOD_CNT 6
 
 //#define DEFAULT_PERIOD_SIZE 512
