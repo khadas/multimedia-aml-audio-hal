@@ -7491,6 +7491,7 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
     int total_write = 0;
     size_t used_size = 0;
     int write_retry = 0;
+    static int pre_hdmi_out_format = 0;
     audio_hwsync_t *hw_sync = aml_out->hwsync;
     if (adev->debug_flag) {
         ALOGI("%s:%d out:%p write in %zu,format:0x%x,ms12_ott:%d,conti:%d,hw_sync:%d", __FUNCTION__, __LINE__,
@@ -7570,6 +7571,11 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         ALOGI ("%s(), arc format updated, need reconfig output", __func__);
         need_reconfig_output = true;
         adev->arc_hdmi_updated = 0;
+    }
+    /* here to check if the hdmi audio output format dynamic changed. */
+    if (pre_hdmi_out_format != adev->hdmi_format) {
+        pre_hdmi_out_format = adev->hdmi_format;
+        need_reconfig_output = true;
     }
 
     /* here to check if the audio output routing changed. */
