@@ -7573,7 +7573,9 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         adev->arc_hdmi_updated = 0;
     }
     /* here to check if the hdmi audio output format dynamic changed. */
-    if (pre_hdmi_out_format != adev->hdmi_format) {
+    if (pre_hdmi_out_format != adev->hdmi_format &&
+        aml_out->hal_internal_format != AUDIO_FORMAT_PCM_16_BIT &&
+        aml_out->hal_internal_format != AUDIO_FORMAT_PCM_32_BIT) {
         pre_hdmi_out_format = adev->hdmi_format;
         need_reconfig_output = true;
     }
