@@ -17,6 +17,8 @@
 #define LOG_TAG "audio_hw_primary"
 //#define LOG_NDEBUG 0
 
+#define ADD_AUDIO_DELAY_INTERFACE
+
 #include <errno.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -5176,8 +5178,13 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
 #ifdef ADD_AUDIO_DELAY_INTERFACE
     ret = str_parms_get_int(parms, "delay_time", &val);
     if (ret >= 0) {
-        adev->delay_time = val;
-        ALOGI("delay time  set to %d\n", adev->delay_time);
+        if (val < OUTPUT_DELAY_MIN_MS || val > OUTPUT_DELAY_MAX_MS) {
+            ALOGW("%s() unsupport delay time:%dms, min:%dms, max:%dms, set delay failed!",
+                __func__, val, OUTPUT_DELAY_MIN_MS, OUTPUT_DELAY_MAX_MS);
+        } else {
+            adev->delay_time = val;
+            ALOGI("delay time set to %dms", adev->delay_time);
+        }
         goto exit;
     }
 #endif
@@ -6925,8 +6932,7 @@ ssize_t hw_write (struct audio_stream_out *stream
 #ifdef ADD_AUDIO_DELAY_INTERFACE
         ret = aml_audiodelay_process(&adev->hw_device, (void *) tmp_buffer, bytes, output_format);
         if (ret < 0) {
-            ALOGE("aml_audiodelay_process skip\n");
-            return ret;
+            ALOGW("aml_audiodelay_process skip, ret:%#x", ret);
         }
 #endif
         if (adjust_ms) {

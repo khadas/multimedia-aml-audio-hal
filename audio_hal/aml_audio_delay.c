@@ -15,11 +15,10 @@
  */
 
 #define LOG_TAG "aml_channel_delay"
+//#define LOG_NDEBUG 0
 
 #include "aml_audio_delay.h"
-
-
-
+#include <aml_ringbuffer.h>
 
 
 #define ONE_FRAME_MAX_MS   100
@@ -36,7 +35,7 @@ typedef struct delay_buf {
 typedef struct delay_handle {
     int delay_time;
     int delay_max;
-    delay_buf_t delay_buffer;
+    struct ring_buffer stDelayRbuffer;
 } delay_handle_t;
 
 
@@ -65,19 +64,12 @@ int aml_audiodelay_init(struct audio_hw_device *dev)
         ALOGE("malloc delay buffer failed for size: 0x%x\n", buf_size);
         return -1;
     }
-    delay_handle->delay_buffer.buf_start = buf_start;
-    delay_handle->delay_buffer.buf_size  = buf_size;
-    delay_handle->delay_buffer.delay_rp  = 0;
-    delay_handle->delay_buffer.wp        = 0;
-    delay_handle->delay_buffer.rp        = 0;
+    ring_buffer_init(&delay_handle->stDelayRbuffer, buf_size);
 
     delay_handle->delay_max              = delay_max;
     delay_handle->delay_time             = 0;
 
-
     adev->delay_handle = (void *)delay_handle;
-
-
     return 0;
 }
 int aml_audiodelay_close(struct audio_hw_device *dev)
@@ -88,10 +80,7 @@ int aml_audiodelay_close(struct audio_hw_device *dev)
     delay_handle = adev->delay_handle;
 
     if (delay_handle) {
-        if (delay_handle->delay_buffer.buf_start != NULL) {
-            free(delay_handle->delay_buffer.buf_start);
-        }
-
+        ring_buffer_release(&delay_handle->stDelayRbuffer);
         free(delay_handle);
 
     }
@@ -101,112 +90,72 @@ int aml_audiodelay_close(struct audio_hw_device *dev)
     return 0;
 }
 
-
-int aml_audiodelay_process(struct audio_hw_device *dev, void * in_data, int size, audio_format_t  format)
+int aml_audiodelay_process(struct audio_hw_device *pAudioDev, void * in_data, int size, audio_format_t format)
 {
-    delay_handle_t * delay_handle = NULL;
-    int delay_time = 0;
-    int delay_size = 0;
-    int sample_rate = 0;
-    int ch = 0;
-    int bitwidth = 0;
-    int one_sec_size = 0;
-    int delay_buf_size = 0;
-    int avail_buf_size = 0;
-    int avail_data_size = 0;
-    int left = 0;
-    const unsigned char *tmp_buffer = in_data;
-    unsigned char * buf_start = NULL;
-    int wp = 0;
-    int delay_rp = 0;
-    struct aml_audio_device *adev = (struct aml_audio_device *) dev;
+    delay_handle_t* phDelayHandle = NULL;
+    unsigned int    u32OneMsSize = 0;
+    int             s32CurNeedDelaySize = 0;
+    int             s32AvailDataSize = 0;
 
-    delay_handle = adev->delay_handle;
-    if (delay_handle == NULL) {
+    phDelayHandle = ((struct aml_audio_device *)pAudioDev)->delay_handle;
+    if (phDelayHandle == NULL) {
+        ALOGW("%s:%d delay_handle is null, pAudioDev:%#x", __func__, __LINE__, (unsigned int)pAudioDev);
         return -1;
     }
+
     if (format == AUDIO_FORMAT_E_AC3) {
-        one_sec_size = 192 * 1000 * 4;// * abs(adev->delay_ms);
+        u32OneMsSize = 192 * 4;// * abs(adev->delay_ms);
     } else if (format == AUDIO_FORMAT_AC3) {
-        one_sec_size = 48 * 1000 * 4;// * abs(adev->delay_ms);
+        u32OneMsSize = 48 * 4;// * abs(adev->delay_ms);
     } else {
-        one_sec_size = 48 * 1000 * 32;// * abs(adev->delay_ms);
-    }
-    if (one_sec_size == 0) {
-        return -1;
+        u32OneMsSize = 48 * 32;// * abs(adev->delay_ms);
     }
 
+    // calculate need delay total size
+    s32CurNeedDelaySize = ALIGN(((struct aml_audio_device *)pAudioDev)->delay_time * u32OneMsSize, 16);
+    // get current ring buffer delay data size
+    s32AvailDataSize = ALIGN((get_buffer_read_space(&phDelayHandle->stDelayRbuffer) / u32OneMsSize) * u32OneMsSize, 16);
 
+    ring_buffer_write(&phDelayHandle->stDelayRbuffer, (unsigned char *)in_data, size, UNCOVER_WRITE);
+    ALOGV("%s:%d AvailDataSize:%d", __func__, __LINE__, s32AvailDataSize);
 
-    delay_time = delay_handle->delay_time;
-    buf_start  = delay_handle->delay_buffer.buf_start;
-    delay_buf_size = delay_handle->delay_buffer.buf_size;
-
-    if (adev->delay_time > adev->delay_max) {
-        adev->delay_time = adev->delay_max;
-    }
-
-    /*delay changed*/
-    if (adev->delay_time < 0) {
-        if (size > delay_size) {
-            tmp_buffer = &tmp_buffer[delay_size];
-            size = size - delay_size;
-            adev->delay_time = 0;
+    // accumulate this delay data
+    if (s32CurNeedDelaySize > s32AvailDataSize) {
+        int s32NeedAddDelaySize = s32CurNeedDelaySize - s32AvailDataSize;
+        if (s32NeedAddDelaySize >= size) {
+            memset(in_data, 0, size);
+            ALOGD("%s:%d accumulate all in_data, CurNeedDelaySize:%d, AddDelaySize:%d, size:%d", __func__, __LINE__,
+                s32CurNeedDelaySize, s32NeedAddDelaySize, size);
         } else {
-            if (format == AUDIO_FORMAT_E_AC3) {
-                adev->delay_time = size / (192 * 4) - abs(adev->delay_time);
-            } else if (format == AUDIO_FORMAT_AC3) {
-                adev->delay_time = size / (48 * 4) - abs(adev->delay_time);
-            } else {
-                adev->delay_time = size / (48 * 32) - abs(adev->delay_time);
-            }
-            return -1;
+            // splicing this in_data data
+            memset(in_data, 0, s32NeedAddDelaySize);
+            ring_buffer_read(&phDelayHandle->stDelayRbuffer, (unsigned char *)in_data+s32NeedAddDelaySize, size-s32NeedAddDelaySize);
+            ALOGD("%s:%d accumulate part in_data CurNeedDelaySize:%d, AddDelaySize:%d, size:%d", __func__, __LINE__,
+                s32CurNeedDelaySize, s32NeedAddDelaySize, size);
         }
-    } else if (delay_time != adev->delay_time) {
-        memset(buf_start, 0, delay_buf_size);
-        delay_time  = adev->delay_time;
-        delay_handle->delay_time  = delay_time;
-        delay_size = (one_sec_size * delay_time) / 1000;
-        /*align to frame size*/
-        delay_size = ALIGN(delay_size, 16);//ch * bitwidth
-
-        delay_handle->delay_buffer.rp        = 0;
-        delay_handle->delay_buffer.wp        = 0;
-        delay_handle->delay_buffer.delay_rp  = (delay_buf_size - delay_size) % delay_buf_size;
-    }
-    /*we don't need to delay, just send the data back*/
-    if (delay_time == 0) {
-        return 0;
-    }
-
-    /*write data to delay buffer*/
-    wp = delay_handle->delay_buffer.wp;
-    avail_buf_size = delay_buf_size - wp;
-    if (avail_buf_size >= size) {
-        memcpy(buf_start + wp, in_data, size);
-        wp += size;
+    // decrease this delay data
+    } else if (s32CurNeedDelaySize < s32AvailDataSize) {
+        unsigned int u32NeedDecreaseDelaySize = s32AvailDataSize - s32CurNeedDelaySize;
+        // drop this delay data
+        unsigned int    u32ClearedSize = 0;
+        for (;u32ClearedSize < u32NeedDecreaseDelaySize; ) {
+            unsigned int u32ResidualClearSize = u32NeedDecreaseDelaySize - u32ClearedSize;
+            if (u32ResidualClearSize > (unsigned int)size) {
+                ring_buffer_read(&phDelayHandle->stDelayRbuffer, (unsigned char *)in_data, size);
+                u32ClearedSize += size;
+            } else {
+                ring_buffer_read(&phDelayHandle->stDelayRbuffer, (unsigned char *)in_data, u32ResidualClearSize);
+                break;
+            }
+        }
+        ring_buffer_read(&phDelayHandle->stDelayRbuffer, (unsigned char *)in_data, size);
+        ALOGD("%s:%d drop delay data, CurNeedDelaySize:%d, NeedDecreaseDelaySize:%d, size:%d", __func__, __LINE__,
+            s32CurNeedDelaySize, u32NeedDecreaseDelaySize, size);
     } else {
-        left = size - avail_buf_size;
-        memcpy(buf_start + wp, in_data, avail_buf_size);
-        memcpy(buf_start, (char *)in_data + avail_buf_size, left);
-        wp = left;
+        ring_buffer_read(&phDelayHandle->stDelayRbuffer, (unsigned char *)in_data, size);
+        ALOGV("%s:%d do nothing, CurNeedDelaySize:%d, size:%d", __func__, __LINE__, s32CurNeedDelaySize, size);
     }
 
-    delay_handle->delay_buffer.wp = wp % delay_buf_size;
-
-    /*get the delayed data*/
-    delay_rp = delay_handle->delay_buffer.delay_rp;
-    avail_data_size = delay_buf_size - delay_rp;
-    if (avail_data_size >= size) {
-        memcpy(in_data, buf_start + delay_rp, size);
-        delay_rp += size;
-    } else {
-        left = size - avail_data_size;
-        memcpy(in_data, buf_start + delay_rp, avail_data_size);
-        memcpy((char *)in_data + avail_data_size, buf_start, left);
-        delay_rp = left;
-    }
-    delay_handle->delay_buffer.delay_rp = delay_rp % delay_buf_size;
     return 0;
 }
 
