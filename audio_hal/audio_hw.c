@@ -149,6 +149,8 @@
 
 #define INPUTSOURCE_MUTE_DELAY_MS	800
 
+#define DROP_AUDIO_SIZE             (32 * 1024)
+
 const char *str_usecases[STREAM_USECASE_MAX] = {
     "STREAM_PCM_NORMAL",
     "STREAM_PCM_DIRECT",
@@ -9089,6 +9091,25 @@ void *audio_patch_input_threadloop(void *data)
     return (void *)0;
 }
 
+static unsigned int calc_drop_size(unsigned int dropms, struct audio_config* stream_config)
+{
+    unsigned int size = 0;
+    unsigned int byte_width = 0;
+    unsigned int channum;
+    channum = audio_channel_count_from_out_mask(stream_config->channel_mask);
+    if (AUDIO_FORMAT_PCM_16_BIT == stream_config->format) {
+        byte_width = 2;
+    } else if (AUDIO_FORMAT_PCM_32_BIT == stream_config->format) {
+        byte_width = 4;
+    } else if (AUDIO_FORMAT_PCM_8_BIT == stream_config->format) {
+        byte_width = 1;
+    } else {
+        byte_width = 0;
+    }
+    size = dropms * byte_width * channum * stream_config->sample_rate / 1000;
+    return size;
+}
+
 #define AVSYNC_SAMPLE_INTERVAL (50)
 #define AVSYNC_SAMPLE_MAX_CNT (10)
 void *audio_patch_output_threadloop(void *data)
@@ -9222,6 +9243,23 @@ void *audio_patch_output_threadloop(void *data)
 #endif
             if (patch->avsync_sample_interval >= AVSYNC_SAMPLE_INTERVAL * period_mul) {
                 aml_dev_try_avsync(patch);
+                if (patch->avsync_adelay > 0) {
+                    usleep(1000 * patch->avsync_adelay);
+                    ALOGI("now delay the audio output by %d\n", patch->avsync_adelay);
+                }
+                if (patch->avsync_drop > 0) {
+                    unsigned int drop_byte = calc_drop_size(patch->avsync_drop,
+                        &stream_config);
+                    ALOGI("avsync the dropp size is %d\n", drop_byte);
+                    if (drop_byte > DROP_AUDIO_SIZE) {
+                        ring_buffer_read(ringbuffer,
+                            (unsigned char*)patch->drop_buf, DROP_AUDIO_SIZE);
+                        drop_byte = drop_byte - DROP_AUDIO_SIZE;
+                    } else {
+                        ring_buffer_read(ringbuffer,
+                            (unsigned char*)patch->drop_buf, drop_byte);
+                    }
+                }
                 patch->avsync_sample_interval = 0;
             } else {
                 patch->avsync_sample_interval++;
@@ -9290,6 +9328,9 @@ static int create_patch_l(struct audio_hw_device *dev,
     patch->in_format = AUDIO_FORMAT_PCM_16_BIT;
     patch->out_format = AUDIO_FORMAT_PCM_16_BIT;
 #endif
+    patch->avsync_drop = 0;
+    patch->avsync_adelay = 0;
+    patch->drop_buf = calloc(1, sizeof(unsigned char) * DROP_AUDIO_SIZE);
 
     if (aml_dev->useSubMix) {
         // switch normal stream to old tv mode writing
@@ -9297,9 +9338,9 @@ static int create_patch_l(struct audio_hw_device *dev,
     }
 
     if (patch->out_format == AUDIO_FORMAT_PCM_16_BIT)
-        ret = ring_buffer_init(&patch->aml_ringbuffer, 2 * 2 * play_buffer_size * PATCH_PERIOD_COUNT);
+        ret = ring_buffer_init(&patch->aml_ringbuffer, 8 * 2 * 2 * play_buffer_size * PATCH_PERIOD_COUNT);
     else
-        ret = ring_buffer_init(&patch->aml_ringbuffer, 2 * 4 * play_buffer_size * PATCH_PERIOD_COUNT);
+        ret = ring_buffer_init(&patch->aml_ringbuffer, 8 * 2 * 4 * play_buffer_size * PATCH_PERIOD_COUNT);
     if (ret < 0) {
         ALOGE("%s: init audio ringbuffer failed", __func__);
         goto err_ring_buf;
@@ -9383,6 +9424,7 @@ int release_patch_l(struct aml_audio_device *aml_dev)
     patch->output_thread_exit = 1;
     pthread_join(patch->audio_output_threadID, NULL);
     ring_buffer_release(&patch->aml_ringbuffer);
+    free(patch->drop_buf);
     free(patch);
     aml_dev->audio_patch = NULL;
     ALOGD("%s: exit", __func__);

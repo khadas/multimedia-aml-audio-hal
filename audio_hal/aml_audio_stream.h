@@ -284,6 +284,10 @@ struct aml_audio_patch {
     struct resample_para dtv_resample;
     unsigned char *resample_outbuf;
     AM_AOUT_OutputMode_t   mode;
+    unsigned char avsync_adelay;
+    unsigned char avsync_tuned;
+    unsigned char avsync_drop;
+    void *drop_buf;
 };
 
 struct audio_stream_out;
