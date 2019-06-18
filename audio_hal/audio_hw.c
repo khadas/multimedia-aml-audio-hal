@@ -5284,12 +5284,9 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     }
     ret = str_parms_get_str(parms, "SOURCE_MUTE", value, sizeof(value));
     if (ret >= 0) {
-        sscanf(value,"%d", &adev->eq_data.s_mute.mute);
-        ALOGI("%s() set audio mute: mute:%d",__func__,adev->eq_data.s_mute.mute);
-        if (adev->eq_data.s_mute.mute == 1)
-            adev->source_mute = 1;
-        else if (adev->eq_data.s_mute.mute == 0)
-            adev->source_mute = 0;
+        sscanf(value,"%d", &adev->source_mute);
+        ALOGI("%s() set audio source mute: %s",__func__,
+            adev->source_mute?"mute":"unmute");
         goto exit;
     }
     ret = str_parms_get_str(parms, "POST_GAIN", value, sizeof(value));
@@ -5675,7 +5672,7 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         sprintf(temp_buf, "dolby_ms12_enable=%d", ms12_enable);
         return  strdup(temp_buf);
     } else if (!strcmp(keys, "SOURCE_MUTE")) {
-        sprintf(temp_buf, "source_mute = %d", adev->eq_data.s_mute.mute);
+        sprintf(temp_buf, "source_mute = %d", adev->source_mute);
         return strdup(temp_buf);
     }
 
@@ -10652,12 +10649,12 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         ALOGI("%s() audio device gain: speaker:%f, spdif_arc:%f, headphone:%f", __func__,
            adev->eq_data.p_gain.speaker, adev->eq_data.p_gain.spdif_arc,
               adev->eq_data.p_gain.headphone);
-        adev->aml_ng_enable = adev->eq_data.p_attr->aml_ng_enable;
-        adev->aml_ng_level = adev->eq_data.p_attr->aml_ng_level;
-        adev->aml_ng_attrack_time = adev->eq_data.p_attr->aml_ng_attrack_time;
-        adev->aml_ng_release_time = adev->eq_data.p_attr->aml_ng_release_time;
-        ALOGI("%s() audio noise gate level: %fdB, attrack_time = %dms, release_time = %dms", __func__,
-              adev->aml_ng_level, adev->aml_ng_attrack_time, adev->aml_ng_release_time);
+        adev->aml_ng_enable = adev->eq_data.noise_gate.aml_ng_enable;
+        adev->aml_ng_level = adev->eq_data.noise_gate.aml_ng_level;
+        adev->aml_ng_attack_time = adev->eq_data.noise_gate.aml_ng_attack_time;
+        adev->aml_ng_release_time = adev->eq_data.noise_gate.aml_ng_release_time;
+        ALOGI("%s() audio noise gate level: %fdB, attack_time = %dms, release_time = %dms", __func__,
+              adev->aml_ng_level, adev->aml_ng_attack_time, adev->aml_ng_release_time);
     }
 
     ret = aml_audio_output_routing(&adev->hw_device, OUTPORT_SPEAKER, false);
@@ -10797,10 +10794,10 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 
     if (adev && adev->aml_ng_enable) {
         adev->aml_ng_handle = init_noise_gate(adev->aml_ng_level,
-                                 adev->aml_ng_attrack_time, adev->aml_ng_release_time);
+                                 adev->aml_ng_attack_time, adev->aml_ng_release_time);
         ALOGI("%s: init amlogic noise gate: level: %fdB, attrack_time = %dms, release_time = %dms",
               __func__, adev->aml_ng_level,
-              adev->aml_ng_attrack_time, adev->aml_ng_release_time);
+              adev->aml_ng_attack_time, adev->aml_ng_release_time);
     }
 
     if (aml_audio_ease_init(&adev->audio_ease) < 0) {

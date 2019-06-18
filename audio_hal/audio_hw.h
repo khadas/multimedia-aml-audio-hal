@@ -34,7 +34,7 @@
 #include "audio_hwsync.h"
 #include "audio_post_process.h"
 #include "aml_hw_mixer.h"
-#include "audio_eq_drc_compensation.h"
+#include "../amlogic_AQ_tools/audio_eq_drc_compensation.h"
 #include "aml_dcv_dec_api.h"
 #include "aml_dca_dec_api.h"
 #include "aml_audio_types_def.h"
@@ -441,7 +441,7 @@ struct aml_audio_device {
     int aml_ng_enable;
     float aml_ng_level;
     int source_mute;
-    int aml_ng_attrack_time;
+    int aml_ng_attack_time;
     int aml_ng_release_time;
     int system_app_mixing_status;
     int audio_type;
