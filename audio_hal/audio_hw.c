@@ -193,7 +193,7 @@ static const struct pcm_config pcm_config_in = {
 static const struct pcm_config pcm_config_bt = {
     .channels = 1,
     .rate = VX_NB_SAMPLING_RATE,
-    .period_size = 256,
+    .period_size = DEFAULT_PLAYBACK_PERIOD_SIZE,
     .period_count = PLAYBACK_PERIOD_COUNT,
     .format = PCM_FORMAT_S16_LE,
 };
@@ -829,16 +829,6 @@ static int start_output_stream_direct (struct aml_stream_out *out)
     return 0;
 }
 
-static int is_config_supported_for_bt(uint32_t sample_rate, audio_format_t format, int channel_count)
-{
-    if ((sample_rate == 8000 || sample_rate == 16000) &&
-            channel_count == 1 &&
-            format == AUDIO_FORMAT_PCM_16_BIT)
-        return true;
-
-    return false;
-}
-
 static int check_input_parameters(uint32_t sample_rate, audio_format_t format, int channel_count, audio_devices_t devices)
 {
     ALOGD("%s(sample_rate=%d, format=%d, channel_count=%d, devices = %x)", __FUNCTION__, sample_rate, format, channel_count, devices);
@@ -880,17 +870,6 @@ static int check_input_parameters(uint32_t sample_rate, audio_format_t format, i
             return 0;
         } else {
             ALOGD("%s: unspported audio patch input device %x", __FUNCTION__, devices);
-            return -EINVAL;
-        }
-    }
-
-    if (devices & AUDIO_DEVICE_IN_ALL_SCO) {
-        bool support = is_config_supported_for_bt(sample_rate, format, channel_count);
-        if (support) {
-            ALOGD("%s(): OK for input device %#x", __func__, devices);
-            return 0;
-        } else {
-            ALOGD("%s: unspported audio params for input device %x", __func__, devices);
             return -EINVAL;
         }
     }
@@ -3275,8 +3254,14 @@ static int out_get_presentation_position (const struct audio_stream_out *stream,
     }
     return 0;
 }
+static int get_next_buffer (struct resampler_buffer_provider *buffer_provider,
+                            struct resampler_buffer* buffer);
+static void release_buffer (struct resampler_buffer_provider *buffer_provider,
+                            struct resampler_buffer* buffer);
+
 
 /** audio_stream_in implementation **/
+
 static unsigned int select_port_by_device(audio_devices_t in_device)
 {
     unsigned int inport = PORT_I2S;
@@ -3324,9 +3309,6 @@ static void update_alsa_config(struct aml_stream_in *in) {
 #endif
 }
 
-static int choose_stream_pcm_config(struct aml_stream_in *in);
-static int add_in_stream_resampler(struct aml_stream_in *in);
-
 /* must be called with hw device and input stream mutexes locked */
 static int start_input_stream(struct aml_stream_in *in)
 {
@@ -3335,16 +3317,6 @@ static int start_input_stream(struct aml_stream_in *in)
     unsigned int port = PORT_I2S;
     unsigned int alsa_device = 0;
     int ret = 0;
-
-    ret = choose_stream_pcm_config(in);
-    if (ret < 0)
-        return -EINVAL;
-
-    if (in->requested_rate != in->config.rate) {
-        ret = add_in_stream_resampler(in);
-        if (ret < 0)
-            return -EINVAL;
-    }
 
     ALOGD("%s: device(%x) channels=%d rate=%d requested_rate=%d mode= %d",
         __func__, in->device, in->config.channels,
@@ -3362,7 +3334,6 @@ static int start_input_stream(struct aml_stream_in *in)
     alsa_device = alsa_device_update_pcm_index(port, CAPTURE);
     ALOGD("*%s, open alsa_card(%d) alsa_device(%d), in_device:0x%x\n",
         __func__, card, alsa_device, adev->in_device);
-
     /* this assumes routing is done previously */
     in->pcm = pcm_open(card, alsa_device, PCM_IN | PCM_NONEBLOCK, &in->config);
     if (!pcm_is_ready(in->pcm)) {
@@ -3456,15 +3427,6 @@ static int do_input_standby (struct aml_stream_in *in)
     if (!in->standby) {
         pcm_close (in->pcm);
         in->pcm = NULL;
-
-        if (in->resampler) {
-            release_resampler(in->resampler);
-            in->resampler = NULL;
-        }
-        if (in->buffer) {
-            free(in->buffer);
-            in->buffer = NULL;
-        }
 
         adev->active_input = NULL;
         if (adev->mode != AUDIO_MODE_IN_CALL) {
@@ -3879,7 +3841,6 @@ static void inread_proc_aec(struct audio_stream_in *stream,
     (void)bytes;
 }
 #endif
-
 static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t bytes)
 {
     int ret = 0;
@@ -3897,20 +3858,6 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
      * mutex
      */
     pthread_mutex_lock(&in->lock);
-
-    /* For voice communication BT & MIC switches */
-    if (adev->active_inport == INPORT_BT_SCO_HEADSET_MIC) {
-        int ret = 0;
-        if (!in->bt_sco_active) {
-            do_input_standby(in);
-            in->bt_sco_active = true;
-            in->device = AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET & ~AUDIO_DEVICE_BIT_IN;
-        }
-    } else if (in->bt_sco_active) {
-        do_input_standby(in);
-        in->bt_sco_active = false;
-        in->device = inport_to_device(adev->active_inport) & ~AUDIO_DEVICE_BIT_IN;
-    }
 
     if (in->standby) {
         ret = start_input_stream(in);
@@ -4622,9 +4569,7 @@ const char* outport2String(enum OUT_PORT enOutPort)
         "[0x4]AUX_LINE",
         "[0x5]HEADPHONE",
         "[0x6]REMOTE_SUBMIX",
-        "[0x7]BT_SCO",
-        "[0x8]BT_SCO_HEADSET",
-        "[0x9]MAX"
+        "[0x7]MAX"
     };
     return apcOutPort[enOutPort];
 }
@@ -4642,8 +4587,7 @@ const char* inport2String(enum IN_PORT enInPort)
         "[0x4]REMOTE_SUBMIXIN",
         "[0x5]WIRED_HEADSETIN",
         "[0x6]BUILTIN_MIC",
-        "[0x7]BT_SCO_HEADSET_MIC",
-        "[0x8]MAX"
+        "[0x7]MAX"
     };
     return apcInPort[enInPort];
 }
@@ -4669,11 +4613,8 @@ static int aml_audio_output_routing(struct audio_hw_device *dev,
         case OUTPORT_HEADPHONE:
             audio_route_apply_path(aml_dev->ar, "headphone_off");
             break;
-        case OUTPORT_BT_SCO:
-        case OUTPORT_BT_SCO_HEADSET:
-            break;
         default:
-            ALOGE("%s: active_outport = %s unsupport", __func__, outport2String(aml_dev->active_outport));
+            ALOGE("%s: active_outport = %d unsupport", __func__, aml_dev->active_outport);
             break;
         }
 
@@ -4694,11 +4635,8 @@ static int aml_audio_output_routing(struct audio_hw_device *dev,
             audio_route_apply_path(aml_dev->ar, "headphone");
             audio_route_apply_path(aml_dev->ar, "spdif");
             break;
-        case OUTPORT_BT_SCO:
-        case OUTPORT_BT_SCO_HEADSET:
-            break;
         default:
-            ALOGE("%s: outport = %s unsupport", __func__, outport2String(outport));
+            ALOGE("%s: outport = %d unsupport", __func__, outport);
             break;
         }
 
@@ -4718,33 +4656,9 @@ static int aml_audio_output_routing(struct audio_hw_device *dev,
     return 0;
 }
 
-static int aml_audio_input_routing(struct audio_hw_device *dev,
-                                    enum IN_PORT inport)
+static int aml_audio_input_routing(struct audio_hw_device *dev __unused,
+                                    enum IN_PORT inport __unused)
 {
-    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
-
-    if (adev->active_inport != inport) {
-        ALOGI("%s: switch from %s to %s", __func__,
-            inport2String(adev->active_inport), inport2String(inport));
-        /* switch on the new input */
-        switch (inport) {
-        case INPORT_BUILTIN_MIC:
-        case INPORT_BT_SCO_HEADSET_MIC:
-        case INPORT_TUNER:
-        case INPORT_HDMIIN:
-        case INPORT_LINEIN:
-        case INPORT_WIRED_HEADSETIN:
-            break;
-        default:
-            ALOGE("%s: inport = %s unsupport", __func__, inport2String(inport));
-            inport = INPORT_MAX;
-            break;
-        }
-        adev->active_inport = inport;
-    } else {
-        ALOGI("%s: inport %s already exists, do nothing", __func__, inport2String(inport));
-    }
-
     return 0;
 }
 
@@ -5035,7 +4949,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                     // Anything change in the adev_create_audio_patch() . Must also change code here..
                     ALOGI("%s, create hdmi-dvi patching dev->dev", __func__);
                     release_patch(adev);
-                    aml_audio_input_routing(dev, INPORT_LINEIN);
+                    adev->active_inport = INPORT_LINEIN;
                     set_audio_source(&adev->alsa_mixer,
                             LINEIN, alsa_device_is_auge());
                     ret = create_patch_ext(dev, AUDIO_DEVICE_IN_LINE, pAudPatchTmp->sinks[0].ext.device.type, pAudPatchTmp->id);
@@ -5043,7 +4957,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 } else if (is_hdmiin_audio && adev->audio_patch /* && (adev->patch_src == SRC_LINEIN) && pAudPatchTmp->id == adev->audio_patch->patch_hdl*/) {
                     ALOGI("%s, create dvi-hdmi patching dev->dev", __func__);
                     release_patch(adev);
-                    aml_audio_input_routing(dev, INPORT_HDMIIN);
+                    adev->active_inport = INPORT_HDMIIN;
                     set_audio_source(&adev->alsa_mixer,
                             HDMIIN, alsa_device_is_auge());
                     ret = create_patch_ext(dev, AUDIO_DEVICE_IN_HDMI, pAudPatchTmp->sinks[0].ext.device.type, pAudPatchTmp->id);
@@ -5058,7 +4972,9 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                     ALOGI("%s, !!create hdmi-dvi patching dev->mix", __func__);
                     release_parser(adev);
 
-                    aml_audio_input_routing(dev, INPORT_LINEIN);
+                    //adev->in_device &= ~AUDIO_DEVICE_IN_ALL;
+                    //adev->in_device = AUDIO_DEVICE_IN_LINE;
+                    adev->active_inport = INPORT_LINEIN;
                     adev->patch_src == SRC_LINEIN;
                     pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_LINE;
 
@@ -5068,7 +4984,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                     ALOGI("%s, !!create dvi-hdmi patching dev->mix", __func__);
                     release_parser(adev);
 
-                    aml_audio_input_routing(dev, INPORT_HDMIIN);
+                    adev->active_inport = INPORT_HDMIIN;
                     adev->patch_src == SRC_HDMIIN;
                     pAudPatchTmp->sources[0].ext.device.type = AUDIO_DEVICE_IN_HDMI;
 
@@ -5827,66 +5743,6 @@ static size_t adev_get_input_buffer_size(const struct audio_hw_device *dev __unu
     return size;
 }
 
-static int choose_stream_pcm_config(struct aml_stream_in *in)
-{
-    int channel_count = audio_channel_count_from_in_mask(in->hal_channel_mask);
-    int ret = 0;
-
-    if (in->device & AUDIO_DEVICE_IN_ALL_SCO)
-        memcpy(&in->config, &pcm_config_bt, sizeof(pcm_config_bt));
-    else
-        memcpy(&in->config, &pcm_config_in, sizeof(pcm_config_in));
-
-    in->config.channels = channel_count;
-    switch (in->hal_format) {
-        case AUDIO_FORMAT_PCM_16_BIT:
-            in->config.format = PCM_FORMAT_S16_LE;
-            break;
-        case AUDIO_FORMAT_PCM_32_BIT:
-            in->config.format = PCM_FORMAT_S32_LE;
-            break;
-        default:
-            ALOGE("%s(), fmt not supported %#x", __func__, in->hal_format);
-            break;
-    }
-    /* TODO: modify alsa config by params */
-    update_alsa_config(in);
-
-    return 0;
-}
-
-int add_in_stream_resampler(struct aml_stream_in *in)
-{
-    int ret = 0;
-
-    if (in->requested_rate == in->config.rate)
-        return 0;
-
-    in->buffer = calloc(1, in->config.period_size * audio_stream_in_frame_size(&in->stream));
-    if (!in->buffer) {
-        ret = -ENOMEM;
-        goto err;
-    }
-
-    ALOGD("%s: in->requested_rate = %d, in->config.rate = %d",
-            __func__, in->requested_rate, in->config.rate);
-    in->buf_provider.get_next_buffer = get_next_buffer;
-    in->buf_provider.release_buffer = release_buffer;
-    ret = create_resampler(in->config.rate, in->requested_rate, in->config.channels,
-                        RESAMPLER_QUALITY_DEFAULT, &in->buf_provider, &in->resampler);
-    if (ret != 0) {
-        ALOGE("%s: create resampler failed (%dHz --> %dHz)", __func__, in->config.rate, in->requested_rate);
-        ret = -EINVAL;
-        goto err_resampler;
-    }
-
-    return 0;
-err_resampler:
-    free(in->buffer);
-err:
-    return ret;
-}
-
 static int adev_open_input_stream(struct audio_hw_device *dev,
                                 audio_io_handle_t handle __unused,
                                 audio_devices_t devices,
@@ -5905,15 +5761,9 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         devices, config->channel_mask, config->sample_rate, config->format, source);
 
     if (check_input_parameters(config->sample_rate, config->format, channel_count, devices) != 0) {
-        if (devices & AUDIO_DEVICE_IN_ALL_SCO) {
-            config->sample_rate = VX_NB_SAMPLING_RATE;
-            config->channel_mask = AUDIO_CHANNEL_IN_MONO;
-            config->format = AUDIO_FORMAT_PCM_16_BIT;
-        } else {
-            config->sample_rate = 48000;
-            config->format = AUDIO_FORMAT_PCM_16_BIT;
-            config->channel_mask = AUDIO_CHANNEL_IN_STEREO;
-        }
+        config->sample_rate = 48000;
+        config->format = AUDIO_FORMAT_PCM_16_BIT;
+        config->channel_mask = AUDIO_CHANNEL_IN_STEREO;
         return -EINVAL;
     }
 
@@ -5946,7 +5796,10 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         in->stream.read = kehwin_in_read;
         in->stream.get_input_frames_lost = kehwin_in_get_input_frames_lost;
         in->stream.get_capture_position =  kehwin_in_get_capture_position;
-    } else {
+
+    }
+
+    else {
         in->stream.common.get_sample_rate = in_get_sample_rate;
         in->stream.common.set_sample_rate = in_set_sample_rate;
         in->stream.common.get_buffer_size = in_get_buffer_size;
@@ -5972,15 +5825,53 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
     in->hal_format = config->format;
     in->mute_mdelay = INPUTSOURCE_MUTE_DELAY_MS;
 
-    if (in->device & AUDIO_DEVICE_IN_WIRED_HEADSET) {
-        // bluetooth rc voice
+    if (in->device & AUDIO_DEVICE_IN_ALL_SCO)
+        memcpy(&in->config, &pcm_config_bt, sizeof(pcm_config_bt));
+    else if (in->device & AUDIO_DEVICE_IN_WIRED_HEADSET) {
+        //bluetooth rc voice
         // usecase for bluetooth rc audio hal
         ALOGI("%s: use RC audio HAL", __func__);
         ret = rc_open_input_stream(&in, config);
         if (ret != 0)
-            return ret;
+            goto err;
         config->sample_rate = in->config.rate;
         config->channel_mask = AUDIO_CHANNEL_IN_MONO;
+    } else
+        memcpy(&in->config, &pcm_config_in, sizeof(pcm_config_in));
+    in->config.channels = channel_count;
+    /* TODO: modify alsa config by params */
+    update_alsa_config(in);
+
+    switch (config->format) {
+        case AUDIO_FORMAT_PCM_16_BIT:
+            in->config.format = PCM_FORMAT_S16_LE;
+            break;
+        case AUDIO_FORMAT_PCM_32_BIT:
+            in->config.format = PCM_FORMAT_S32_LE;
+            break;
+        default:
+            break;
+    }
+
+    in->buffer = malloc(in->config.period_size * audio_stream_in_frame_size(&in->stream));
+    if (!in->buffer) {
+        ret = -ENOMEM;
+        goto err;
+    }
+    memset(in->buffer, 0, in->config.period_size * audio_stream_in_frame_size(&in->stream));
+
+    if (!(in->device & AUDIO_DEVICE_IN_WIRED_HEADSET) && in->requested_rate != in->config.rate) {
+        ALOGD("%s: in->requested_rate = %d, in->config.rate = %d",
+            __func__, in->requested_rate, in->config.rate);
+        in->buf_provider.get_next_buffer = get_next_buffer;
+        in->buf_provider.release_buffer = release_buffer;
+        ret = create_resampler(in->config.rate, in->requested_rate, in->config.channels,
+                            RESAMPLER_QUALITY_DEFAULT, &in->buf_provider, &in->resampler);
+        if (ret != 0) {
+            ALOGE("%s: create resampler failed (%dHz --> %dHz)", __func__, in->config.rate, in->requested_rate);
+            ret = -EINVAL;
+            goto err;
+        }
     }
 
 #ifdef ENABLE_AEC_FUNC
@@ -6074,6 +5965,17 @@ static void adev_close_input_stream(struct audio_hw_device *dev,
         aec_spk_mic_release();
     }
 #endif
+    if (in->resampler) {
+        release_resampler(in->resampler);
+        in->resampler = NULL;
+    }
+
+    pthread_mutex_lock (&in->lock);
+    if (in->buffer) {
+        free(in->buffer);
+        in->buffer = NULL;
+    }
+    pthread_mutex_unlock (&in->lock);
 
     if (in->input_tmp_buffer) {
         free(in->input_tmp_buffer);
@@ -9608,16 +9510,6 @@ static struct audio_patch_set *register_audio_patch(struct audio_hw_device *dev,
     return patch_set_new;
 }
 
-bool bypass_primary_patch(const struct audio_port_config *sources)
-{
-    if ((sources->ext.device.type == AUDIO_DEVICE_IN_WIRED_HEADSET) ||
-            ((remoteDeviceOnline()|| nano_is_connected()) &&
-            (sources->ext.device.type == AUDIO_DEVICE_IN_BUILTIN_MIC)))
-        return true;
-
-    return false;
-}
-
 static int adev_create_audio_patch(struct audio_hw_device *dev,
                                 unsigned int num_sources,
                                 const struct audio_port_config *sources,
@@ -9636,7 +9528,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
     unsigned int i = 0;
     int ret = -1;
     ALOGI("++%s, src_config->ext.device.type(0x%x)", __FUNCTION__,src_config->ext.device.type);
-    if (bypass_primary_patch(src_config)) {
+    if ((src_config->ext.device.type == AUDIO_DEVICE_IN_WIRED_HEADSET) || ((remoteDeviceOnline()|| nano_is_connected())&& (src_config->ext.device.type == AUDIO_DEVICE_IN_BUILTIN_MIC))) {
         ALOGD("bluetooth voice search is in use, bypass adev_create_audio_patch()!!\n");
         goto err;
     }
@@ -9691,12 +9583,6 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
         case AUDIO_DEVICE_OUT_REMOTE_SUBMIX:
             outport = OUTPORT_REMOTE_SUBMIX;
             break;
-        case AUDIO_DEVICE_OUT_BLUETOOTH_SCO:
-            outport = OUTPORT_BT_SCO;
-            break;
-        case AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET:
-            outport = OUTPORT_BT_SCO_HEADSET;
-            break;
         default:
             ALOGE("d-m %s: invalid sink device type %#x",
                   __func__, sink_config->ext.device.type);
@@ -9733,7 +9619,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
             aml_dev->out_device |= sink_config[i].ext.device.type;
         }
 
-        ALOGI("%s: mix->device patch: outport(%s)", __func__, outport2String(outport));
+        ALOGI("%s: mix->device patch: outport(%d)", __func__, outport);
         return 0;
     }
 
@@ -9781,11 +9667,6 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
             inport = INPORT_BUILTIN_MIC;
             aml_dev->patch_src = SRC_BUILTIN_MIC;
             break;
-        case AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET:
-            input_src = SRC_NA;
-            inport = INPORT_BT_SCO_HEADSET_MIC;
-            aml_dev->patch_src = SRC_BT_SCO_HEADSET_MIC;
-            break;
         default:
             ALOGE("%s: invalid src device type %#x",
                   __func__, src_config->ext.device.type);
@@ -9797,7 +9678,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
             set_audio_source(&aml_dev->alsa_mixer,
                     input_src, alsa_device_is_auge());
 
-        aml_audio_input_routing(dev, inport);
+        aml_dev->active_inport = inport;
         aml_dev->src_gain[inport] = 1.0;
 
         if (inport == INPORT_HDMIIN || inport == INPORT_SPDIF) {
@@ -9844,12 +9725,6 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
             break;
         case AUDIO_DEVICE_OUT_REMOTE_SUBMIX:
             outport = OUTPORT_REMOTE_SUBMIX;
-            break;
-        case AUDIO_DEVICE_OUT_BLUETOOTH_SCO:
-            outport = OUTPORT_BT_SCO;
-            break;
-        case AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET:
-            outport = OUTPORT_BT_SCO_HEADSET;
             break;
         default:
             ALOGE("d-d %s: invalid sink device type %#x",
@@ -9919,19 +9794,13 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
             inport = INPORT_WIRED_HEADSETIN;
             aml_dev->patch_src = SRC_WIRED_HEADSETIN;
             break;
-        case AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET:
-            input_src = SRC_NA;
-            inport = INPORT_BT_SCO_HEADSET_MIC;
-            aml_dev->patch_src = SRC_BT_SCO_HEADSET_MIC;
-            break;
         default:
             ALOGE("%s: invalid src device type %#x",
                   __func__, src_config->ext.device.type);
             ret = -EINVAL;
             goto err_patch;
         }
-
-        aml_audio_input_routing(dev, inport);
+        aml_dev->active_inport = inport;
         aml_dev->src_gain[inport] = 1.0;
         //aml_dev->sink_gain[outport] = 1.0;
         ALOGI("%s: dev->dev patch: inport(%s), outport(%s)",
@@ -10394,12 +10263,6 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
             case AUDIO_DEVICE_OUT_REMOTE_SUBMIX:
                 outport = OUTPORT_REMOTE_SUBMIX;
                 break;
-            case AUDIO_DEVICE_OUT_BLUETOOTH_SCO:
-                outport = OUTPORT_BT_SCO;
-                break;
-            case AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET:
-                outport = OUTPORT_BT_SCO_HEADSET;
-                break;
             default:
                 ALOGE ("%s: invalid out device type %#x",
                           __func__, config->ext.device.type);
@@ -10451,9 +10314,6 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
             case AUDIO_DEVICE_IN_BUILTIN_MIC:
                 inport = INPORT_BUILTIN_MIC;
                 break;
-            case AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET:
-                inport = INPORT_BT_SCO_HEADSET_MIC;
-                break;
             }
 
             aml_dev->src_gain[inport] = 1.0;
@@ -10499,12 +10359,6 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
                     case AUDIO_DEVICE_OUT_REMOTE_SUBMIX:
                         outport = OUTPORT_REMOTE_SUBMIX;
                         aml_dev->sink_gain[outport] = DbToAmpl(((float)config->gain.values[0]) / 100);
-                        break;
-                    case AUDIO_DEVICE_OUT_BLUETOOTH_SCO:
-                        outport = OUTPORT_BT_SCO;
-                        break;
-                    case AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET:
-                        outport = OUTPORT_BT_SCO_HEADSET;
                         break;
                 default:
                     ALOGE ("%s: invalid out device type %#x",

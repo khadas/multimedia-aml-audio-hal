@@ -204,9 +204,8 @@ enum patch_src_assortion {
     SRC_REMOTE_SUBMIXIN         = 5,
     SRC_WIRED_HEADSETIN         = 6,
     SRC_BUILTIN_MIC             = 7,
-    SRC_BT_SCO_HEADSET_MIC      = 8,
-    SRC_OTHER                   = 9,
-    SRC_INVAL                   = 10,
+    SRC_OTHER                   = 8,
+    SRC_INVAL                   = 9,
 };
 
 enum OUT_PORT {
@@ -217,9 +216,7 @@ enum OUT_PORT {
     OUTPORT_AUX_LINE            = 4,
     OUTPORT_HEADPHONE           = 5,
     OUTPORT_REMOTE_SUBMIX       = 6,
-    OUTPORT_BT_SCO              = 7,
-    OUTPORT_BT_SCO_HEADSET      = 8,
-    OUTPORT_MAX                 = 9,
+    OUTPORT_MAX                 = 7,
 };
 
 enum IN_PORT {
@@ -230,8 +227,7 @@ enum IN_PORT {
     INPORT_REMOTE_SUBMIXIN      = 4,
     INPORT_WIRED_HEADSETIN      = 5,
     INPORT_BUILTIN_MIC          = 6,
-    INPORT_BT_SCO_HEADSET_MIC   = 7,
-    INPORT_MAX                  = 8,
+    INPORT_MAX                  = 7,
 };
 
 struct audio_patch_set {
@@ -280,20 +276,7 @@ typedef union {
 
 struct aml_audio_mixer;
 const char *usecase_to_str(stream_usecase_t usecase);
-const char* outport2String(enum OUT_PORT enOutPort);
-const char* inport2String(enum IN_PORT enInPort);
 
-struct aml_bt_output {
-    bool active;
-    struct pcm *pcm_bt;
-    char *bt_out_buffer;
-    size_t bt_out_frames;
-    struct resampler_itfe *resampler;
-    struct resampler_buffer_provider buf_provider;
-    int16_t *resampler_buffer;
-    size_t resampler_buffer_size_in_frames;
-    size_t resampler_in_frames;
-};
 #define MAX_STREAM_NUM   5
 #define HDMI_ARC_MAX_FORMAT  20
 struct aml_audio_device {
@@ -323,7 +306,6 @@ struct aml_audio_device {
     struct aml_stream_out *hwsync_output;
     struct aml_hal_mixer hal_mixer;
     struct pcm *pcm;
-    struct aml_bt_output bt_output;
     bool pcm_paused;
     unsigned hdmi_arc_ad[HDMI_ARC_MAX_FORMAT];
     bool hi_pcm_mode;
@@ -623,7 +605,6 @@ struct aml_stream_in {
     void *delay_buffer;
     size_t delay_buffer_size;
     void *tmp_delay_buffer;
-    bool bt_sco_active;
 };
 typedef  int (*do_standby_func)(struct aml_stream_out *out);
 typedef  int (*do_startup_func)(struct aml_stream_out *out);
