@@ -3791,10 +3791,13 @@ static void inread_proc_aec(struct audio_stream_in *stream,
     size_t in_frames = bytes / audio_stream_in_frame_size(stream);
     int channel_count = audio_channel_count_from_in_mask(in->hal_channel_mask);
     char *read_buf = in->tmp_buffer_8ch;
-    aec_timestamp a_timestamp = get_timestamp();
-
-    aec_set_mic_buf_info(in_frames, a_timestamp.timeStamp, true);
-    aec_set_spk_buf_info(in_frames, a_timestamp.timeStamp, true);
+    aec_timestamp a_timestamp;
+    int aec_frame_div = in_frames/512;
+    if (in_frames % 512) {
+        ALOGE("AEC should 512 frames align,now %d\n",in_frames);
+        return ;
+    }
+    ALOGV("%s,in %d\n",__func__,in_frames);
     //split the mic data with the speaker data.
     short *mic_data, *speaker_data;
     short *read_buf_16 = (short *)read_buf;
@@ -3828,24 +3831,31 @@ static void inread_proc_aec(struct audio_stream_in *stream,
             aml_audio_dump_audio_bitstreams("/data/tmp/audio_speaker.raw",
                 speaker_data, in_frames*2*2);
     }
-
-    aec_out_buf = aec_spk_mic_process_int16(speaker_data,
-            mic_data, &cleaned_samples_per_channel);
-    if (!aec_out_buf || cleaned_samples_per_channel == 0
-            || cleaned_samples_per_channel > (int)in_frames) {
-        ALOGV("aec process fail %s,in %d clean sample %d",
-                __func__,in_frames,cleaned_samples_per_channel);
-        adjust_channels(mic_data, 2, buffer, channel_count,
-                bytes_per_sample, in_frames*2*2);
-    } else {
-        if (enable_dump) {
-            aml_audio_dump_audio_bitstreams("/data/tmp/audio_aec.raw",
-                aec_out_buf, cleaned_samples_per_channel*2*2);
+    for (int i = 0; i < aec_frame_div; i++) {
+        cleaned_samples_per_channel = 512;
+        short *cur_mic_data = mic_data + i*512*channel_count;
+        short *cur_spk_data = speaker_data + i*512*channel_count;
+        a_timestamp = get_timestamp();
+        aec_set_mic_buf_info(512, a_timestamp.timeStamp, true);
+        aec_set_spk_buf_info(512, a_timestamp.timeStamp, true);
+        aec_out_buf = aec_spk_mic_process_int16(cur_spk_data,
+                cur_mic_data, &cleaned_samples_per_channel);
+        if (!aec_out_buf || cleaned_samples_per_channel == 0
+                || cleaned_samples_per_channel > (int)512) {
+            ALOGV("aec process fail %s,in %d clean sample %d,div %d,in frame %d,ch %d",
+                    __func__,512,cleaned_samples_per_channel,aec_frame_div,in_frames,channel_count);
+            adjust_channels(cur_mic_data, 2, (char *) buffer + channel_count*512*2*i, channel_count,
+                    bytes_per_sample, 512*2*2);
+        } else {
+            if (enable_dump) {
+                aml_audio_dump_audio_bitstreams("/data/tmp/audio_aec.raw",
+                    aec_out_buf, cleaned_samples_per_channel*2*2);
+            }
+            ALOGV("%p,clean sample %d, in frame %d",
+                aec_out_buf, cleaned_samples_per_channel, 512);
+            adjust_channels(aec_out_buf, 2, (char *)buffer + channel_count*512*2*i, channel_count,
+                    bytes_per_sample, 512*2*2);
         }
-        ALOGV("%p,clean sample %d, in frame %d",
-            aec_out_buf, cleaned_samples_per_channel, in_frames);
-        adjust_channels(aec_out_buf, 2, buffer, channel_count,
-                bytes_per_sample, in_frames*2*2);
     }
     //apply volume here
     short *vol_buf = (short *)buffer;
@@ -3908,7 +3918,6 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             goto exit;
         in->standby = 0;
     }
-
     /* if audio patch type is hdmi to mixer, check audio format from hdmi*/
     if (adev->patch_src == SRC_HDMIIN && parser != NULL) {
         if (in->delay_buffer == NULL ||
@@ -5562,7 +5571,6 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
 		adev->tv_mute = tv_mute;
         return 0;
     }
-
 exit:
     str_parms_destroy (parms);
 
