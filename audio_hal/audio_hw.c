@@ -3963,6 +3963,7 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             if (in->mute_log_cntr++ >= 100)
                 in->mute_log_cntr = 0;
             clock_gettime(CLOCK_MONOTONIC, &in->mute_start_ts);
+            clock_gettime(CLOCK_MONOTONIC, &adev->mute_start_ts);
             in->mute_flag = 1;
         }
         if (in->mute_flag == 1) {
