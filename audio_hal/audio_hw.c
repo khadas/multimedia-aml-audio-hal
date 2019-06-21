@@ -7077,10 +7077,12 @@ ssize_t hw_write (struct audio_stream_out *stream
     }
     if (aml_out->pcm) {
 #ifdef ADD_AUDIO_DELAY_INTERFACE
+    if (adev->delay_time > OUTPUT_DELAY_MIN_MS && adev->delay_handle != NULL) {
         ret = aml_audiodelay_process(&adev->hw_device, (void *) tmp_buffer, bytes, output_format);
         if (ret < 0) {
             ALOGW("aml_audiodelay_process skip, ret:%#x", ret);
         }
+    }
 #endif
         if (adjust_ms) {
             int adjust_bytes = 0;

@@ -99,7 +99,6 @@ int aml_audiodelay_process(struct audio_hw_device *pAudioDev, void * in_data, in
 
     phDelayHandle = ((struct aml_audio_device *)pAudioDev)->delay_handle;
     if (phDelayHandle == NULL) {
-        ALOGW("%s:%d delay_handle is null, pAudioDev:%#x", __func__, __LINE__, (unsigned int)pAudioDev);
         return -1;
     }
 
