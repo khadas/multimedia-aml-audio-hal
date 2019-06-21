@@ -7338,7 +7338,6 @@ static void config_output(struct audio_stream_out *stream)
             pthread_mutex_lock(&adev->alsa_pcm_lock);
             struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
 
-            update_stream_dual_output(stream);
             if (is_dual_output_stream(stream) && pcm) {
                 ALOGI("%s close pcm handle %p", __func__, pcm);
                 pcm_close(pcm);
@@ -7346,6 +7345,7 @@ static void config_output(struct audio_stream_out *stream)
                 ALOGI("------%s close pcm handle %p", __func__, pcm);
                 aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
             }
+            update_stream_dual_output(stream);
             if (adev->dual_spdifenc_inited) {
                 adev->dual_spdifenc_inited = 0;
             }
