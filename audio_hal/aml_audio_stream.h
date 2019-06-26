@@ -247,6 +247,8 @@ struct aml_audio_patch {
     int dtv_decoder_state;
     int dtv_decoder_cmd;
     int dtv_first_apts_flag;
+    unsigned char dtv_NchOriginal;
+    unsigned char dtv_lfepresent;
     unsigned int dtv_first_apts;
     unsigned int dtv_pcm_writed;
     unsigned int dtv_pcm_readed;

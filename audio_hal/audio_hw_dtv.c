@@ -350,6 +350,15 @@ static int dtv_patch_buffer_space(void *args)
     return left;
 }
 
+static int dtv_patch_audio_info(void *args,unsigned char ori_channum,unsigned char lfepresent)
+{
+    struct aml_audio_patch *patch = (struct aml_audio_patch *)args;
+    patch->dtv_NchOriginal = ori_channum;
+    patch->dtv_lfepresent = lfepresent;
+    return 1;
+}
+
+
 unsigned long dtv_hal_get_pts(struct aml_audio_patch *patch,
                               unsigned int lantcy)
 {
@@ -1808,7 +1817,8 @@ static void *audio_dtv_patch_process_threadloop(void *data)
         case AUDIO_DTV_PATCH_DECODER_STATE_INIT: {
             ALOGI("++%s live now  open the audio decoder now !\n", __FUNCTION__);
             dtv_patch_input_open(&adec_handle, dtv_patch_pcm_wirte,
-                                 dtv_patch_buffer_space, patch);
+                                 dtv_patch_buffer_space,
+                                 dtv_patch_audio_info,patch);
             patch->dtv_decoder_state = AUDIO_DTV_PATCH_DECODER_STATE_START;
         }
         break;

@@ -5742,7 +5742,19 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         ALOGD("temp_buf %d", cur_status);
         return strdup(temp_buf);
     }
-
+    else if (strstr (keys, "stream_dra_channel") ) {
+       if (adev->audio_patch != NULL && adev->patch_src == SRC_DTV) {
+          if (adev->audio_patch->dtv_NchOriginal > 8 || adev->audio_patch->dtv_NchOriginal < 1) {
+              sprintf (temp_buf, "0.0");
+            } else {
+              sprintf(temp_buf, "channel_num=%d.%d", adev->audio_patch->dtv_NchOriginal,adev->audio_patch->dtv_lfepresent);
+              ALOGD ("temp_buf=%s\n", temp_buf);
+            }
+       } else {
+          sprintf (temp_buf, "0.0");
+       }
+        return strdup(temp_buf);
+    }
     return strdup("");
 }
 
