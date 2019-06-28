@@ -8052,8 +8052,8 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
                 if (audio_hal_data_processing(stream, (void *)dts_dec->outbuf_raw, dts_dec->outlen_raw, &output_buffer, &output_buffer_bytes, output_format) == 0) {
                     hw_write(stream, output_buffer, output_buffer_bytes, output_format);
                 }
+                return return_bytes;
             }
-            return return_bytes;
         }
 #endif
 
