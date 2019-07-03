@@ -196,7 +196,6 @@ static int parse_audio_drc_status(dictionary *pIniParser, struct audio_eq_drc_in
     p_attr->mdrc.enable = iniparser_getboolean(pIniParser, "drc_param:mdrc_enable", 0);
     if (!p_attr->mdrc.enable) {
         ITEM_LOGD("%s, multiband drc is disable!\n", __FUNCTION__);
-        return 0;
     } else {
         str = iniparser_getstring(pIniParser, "drc_param:mdrc_enable_name", NULL);
         strcpy(p_attr->mdrc.mdrc_enable_name, str);
@@ -212,6 +211,18 @@ static int parse_audio_drc_status(dictionary *pIniParser, struct audio_eq_drc_in
 
         if (p_attr->mdrc.drc_byte_mode == 0)
             p_attr->mdrc.drc_byte_mode = 4;
+    }
+
+    p_attr->clip.enable = iniparser_getboolean(pIniParser, "hw_clip:clip_enable", 0);
+    if (!p_attr->clip.enable) {
+        ITEM_LOGD("%s, hw clip is disable!\n", __FUNCTION__);
+    } else {
+        p_attr->clip.clip_threshold = iniparser_getdouble(pIniParser, "hw_clip:clip_threshold", 0.0f);
+        ITEM_LOGD("%s, hw clip threshold is (%f)\n", __FUNCTION__, p_attr->clip.clip_threshold);
+
+        str = iniparser_getstring(pIniParser, "hw_clip:clip_threshold_name", NULL);
+        strcpy(p_attr->clip.clip_threshold_name, str);
+        ITEM_LOGD("%s, hw clip threshold name is (%s)\n", __FUNCTION__, p_attr->clip.clip_threshold_name);
     }
 
     return 0;

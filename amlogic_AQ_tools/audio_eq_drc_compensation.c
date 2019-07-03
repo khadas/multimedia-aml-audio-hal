@@ -229,6 +229,34 @@ exit:
     return ret;
 }
 
+static int clip_threshold_set(struct audio_eq_drc_info_s *p_attr, int card)
+{
+    int ret = 0;
+    int value = 0;
+    float clip_threshold = 0;
+
+    if (!p_attr->clip.enable)
+        goto exit;
+
+    if (p_attr->clip.clip_threshold > 0) {
+        ALOGE("%s: Clip threshold is invalid!", __FUNCTION__);
+        goto exit;
+    }
+
+    clip_threshold = DbToAmpl(p_attr->clip.clip_threshold);
+    value = (int)(round(clip_threshold * (1 << 23)));
+
+    ret = eq_drc_ctl_value_set(card, value,
+            p_attr->clip.clip_threshold_name);
+    if (ret < 0) {
+        ALOGE("%s: set Clip threshold failed!", __FUNCTION__);
+    }
+
+exit:
+    return ret;
+}
+
+
 static int aml_table_set(struct audio_data_s *table, int card, char *name)
 {
     struct mixer_ctl *ctl;
@@ -383,6 +411,7 @@ int eq_drc_init(struct eq_drc_data *pdata)
         drc_status_set(pdata->aml_attr, pdata->card);
         aml_eq_mode_set(pdata, 0);
         aml_drc_set(pdata);
+        clip_threshold_set(pdata->aml_attr, pdata->card);
     }
 
     return 0;

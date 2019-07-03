@@ -82,7 +82,6 @@ struct audio_eq_s {
     bool enable;
     char eq_name[MAX_NAME_SIZE];
     char eq_enable_name[MAX_NAME_SIZE];
-    /*bytes of register*/
     int eq_byte_mode;
     char eq_table_name[MAX_NAME_SIZE];
     int eq_table_num;
@@ -94,17 +93,22 @@ struct audio_fdrc_s {
     bool enable;
     char fdrc_name[MAX_NAME_SIZE];
     char fdrc_enable_name[MAX_NAME_SIZE];
-    /*bytes of register*/
     int drc_byte_mode;
     char fdrc_table_name[MAX_NAME_SIZE];
     struct audio_data_s *fdrc_table;
+};
+
+/*clip threshold*/
+struct audio_clip_s {
+    bool enable;
+    float clip_threshold;
+    char clip_threshold_name[MAX_NAME_SIZE];
 };
 
 /*hw multiband drc*/
 struct audio_mdrc_s {
     bool enable;
     char mdrc_enable_name[MAX_NAME_SIZE];
-    /*bytes of register*/
     int drc_byte_mode;
     char crossover_table_name[MAX_NAME_SIZE];
     struct audio_data_s *crossover_table;
@@ -117,6 +121,7 @@ struct audio_eq_drc_info_s {
     struct audio_eq_s eq;
     struct audio_fdrc_s fdrc;
     struct audio_mdrc_s mdrc;
+    struct audio_clip_s clip;
 };
 
 struct eq_drc_data {
