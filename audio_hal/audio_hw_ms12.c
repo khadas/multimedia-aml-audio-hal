@@ -62,6 +62,7 @@
 #define MS12_INPUT_SYS_PCM_FILE "/data/audio_out/ms12_input_sys.pcm"
 #define MS12_INPUT_SYS_MAIN_FILE "/data/audio_out/ms12_input_main.raw"
 
+
 /*
  *@brief dump ms12 output data
  */
@@ -289,8 +290,7 @@ static bool is_iec61937_format(struct audio_stream_out *stream)
      *but the dd/ddp of HDMI-IN, has same format as IEC61937 but size do not match.
      *Fixme: in Kodi APK, audio passthrough choose AUDIO_FORMAT_IEC61937.
     */
-    return ((adev->patch_src == SRC_DTV) && \
-            ((aml_out->flags & AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO) || (aml_out->hal_format == AUDIO_FORMAT_IEC61937)));
+    return (aml_out->hal_format == AUDIO_FORMAT_IEC61937);
 }
 /*
  *@brief dolby ms12 main process
