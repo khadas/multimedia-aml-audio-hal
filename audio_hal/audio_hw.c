@@ -3960,9 +3960,11 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             } else if (cur_aformat == AUDIO_FORMAT_PCM_16_BIT && //from dd/dd+ -> pcm
                        (parser->aformat == AUDIO_FORMAT_AC3 || parser->aformat == AUDIO_FORMAT_E_AC3)) {
                 dcv_decode_release(parser);
+                ring_buffer_reset(&(parser->aml_ringbuffer));
             } else if (cur_aformat == AUDIO_FORMAT_PCM_16_BIT && //from dts -> pcm
                        (parser->aformat == AUDIO_FORMAT_DTS || parser->aformat == AUDIO_FORMAT_DTS_HD)) {
                 dca_decode_release(parser);
+                ring_buffer_reset(&(parser->aml_ringbuffer));
             } else {
                 ALOGI("This format unsupport or no need to reset decoder!\n");
             }

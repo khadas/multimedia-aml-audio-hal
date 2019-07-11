@@ -499,6 +499,7 @@ static void *decode_threadloop(void *data)
     unsigned char temp;
     int i, j;
     int digital_raw = 0;
+    int mute_count = 5;
     struct pcm_info  pcm_out_info;
 
     if (NULL == parser) {
@@ -525,7 +526,8 @@ static void *decode_threadloop(void *data)
     if (dts_decoder_init != NULL) {
         unload_dts_decoder_lib();
     }
-    if (dca_decoder_init(1)) {
+    //use and bt output need only pcm output,need not raw output
+    if (dca_decoder_init(0)) {
         ALOGW("%s:%d dts decoder init failed, maybe no lisensed dts decoder", __func__, __LINE__);
         valid_lib = 0;
     }
@@ -581,7 +583,7 @@ static void *decode_threadloop(void *data)
 #endif
         //find header and get paramters
         read_pointer = inbuf;
-        while (parser->decode_ThreadExitFlag == 0 && remain_size > 8) {
+        while (parser->decode_ThreadExitFlag == 0 && remain_size > MAX_DECODER_FRAME_LENGTH) {
             //DTS_SYNCWORD_IEC61937 : 0xF8724E1F
             if (read_pointer[0] == 0x72 && read_pointer[ 1] == 0xf8
                 && read_pointer[2] == 0x1f && read_pointer[3] == 0x4e) {
@@ -608,6 +610,19 @@ static void *decode_threadloop(void *data)
 #ifdef DTS_DECODER_ENABLE
         used_size = dca_decode_process(read_pointer, s32DtsFramesize, outbuf,
                                        &outlen_pcm, (char *) outbuf_raw, &outlen_raw,&pcm_out_info);
+#if 1
+    if (getprop_bool("media.audiohal.dtsdump")) {
+        FILE *dump_fp = NULL;
+        dump_fp = fopen("/data/audio_hal/audio2dca.dts", "a+");
+        if (dump_fp != NULL) {
+            fwrite(read_pointer, s32DtsFramesize, 1, dump_fp);
+            fclose(dump_fp);
+        } else {
+            ALOGW("[Error] Can't write to /data/audio_hal/audio2dca.raw");
+        }
+    }
+#endif
+
 #else
         used_size = s32DtsFramesize;
 #endif
@@ -623,6 +638,7 @@ static void *decode_threadloop(void *data)
 #ifdef DTS_DECODER_ENABLE
         //only need pcm data
         if (outlen_pcm > 0) {
+
             // here only downresample, so no need to malloc more buffer
             if (parser->in_sample_rate != parser->out_sample_rate) {
                 int out_frame = outlen_pcm >> 2;
@@ -630,6 +646,25 @@ static void *decode_threadloop(void *data)
                 outlen_pcm = out_frame << 2;
             }
             parser->data_ready = 1;
+            //here when pcm -> dts,some error frames maybe received by deocder
+            //and I tried to use referrence tools to decoding the frames and the output also has noise frames.
+            //so here we try to mute count outbuf frame to wrok arount the issuse
+            if (mute_count > 0) {
+                memset(outbuf, 0, outlen_pcm);
+                mute_count--;
+            }
+#if 1
+            if (getprop_bool("media.audiohal.dtsdump")) {
+                FILE *dump_fp = NULL;
+                dump_fp = fopen("/data/audio_hal/dtsout.pcm", "a+");
+                if (dump_fp != NULL) {
+                    fwrite(outbuf, outlen_pcm, 1, dump_fp);
+                    fclose(dump_fp);
+                } else {
+                    ALOGW("[Error] Can't write to /data/audio_hal/dtsout.pcm");
+                }
+            }
+#endif
             Write_buffer(parser, outbuf, outlen_pcm);
         }
 #endif
