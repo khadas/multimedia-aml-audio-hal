@@ -10291,6 +10291,9 @@ static int adev_close(hw_device_t *device)
 
     ALOGD("%s: enter", __func__);
     unload_ddp_decoder_lib();
+    if (eDolbyMS12Lib == adev->dolby_lib_type_last) {
+        aml_ms12_lib_release();
+    }
 #if defined(IS_ATOM_PROJECT)
     if (adev->aec_buf)
         free(adev->aec_buf);
@@ -10748,6 +10751,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         adev->hw_device.open_output_stream = adev_open_output_stream_new;
         adev->hw_device.close_output_stream = adev_close_output_stream_new;
         ALOGI("%s,in ms12 case, use new method no matter if current platform is TV or BOX", __FUNCTION__);
+        aml_ms12_lib_preload();
     }
     adev->atoms_lock_flag = false;
 
