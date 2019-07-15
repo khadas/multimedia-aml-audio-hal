@@ -31,6 +31,8 @@
 #define PORT_MM 1
 #endif
 
+#define ADD_AUDIO_DELAY_INTERFACE
+
 #include "audio_hwsync.h"
 #include "audio_post_process.h"
 #include "aml_hw_mixer.h"
@@ -46,6 +48,9 @@
 #include "audio_port.h"
 #include "aml_audio_ease.h"
 
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+#include "aml_audio_delay.h"
+#endif
 /* number of frames per period */
 /*
  * change DEFAULT_PERIOD_SIZE from 1024 to 512 for passing CTS
@@ -458,9 +463,9 @@ struct aml_audio_device {
     int tsync_fd;
     bool rawtopcm_flag;
     int dtv_aformat;
-    int delay_max;
-    int delay_time;
-    void * delay_handle;
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+    aml_audio_delay_st *delay_handle;
+#endif
     unsigned int dtv_i2s_clock;
     unsigned int dtv_spidif_clock;
     unsigned int dtv_droppcm_size;

@@ -17,16 +17,25 @@
 
 #ifndef AML_AUDIO_DELAY_H
 #define AML_AUDIO_DELAY_H
-#include <cutils/log.h>
-#include "aml_audio_stream.h"
-#include "audio_hw.h"
+#include <system/audio-base.h>
+#include <aml_ringbuffer.h>
 
-#define OUTPUT_DELAY_MAX_MS     1000
-#define OUTPUT_DELAY_MIN_MS     0
 
-int aml_audiodelay_init(struct audio_hw_device *dev);
-int aml_audiodelay_close(struct audio_hw_device *dev);
-int aml_audiodelay_process(struct audio_hw_device *dev, void * in_data, int size, audio_format_t format);
+#define OUTPUT_DELAY_MAX_MS     (1000)
+#define OUTPUT_DELAY_MIN_MS     (0)
+#define ONE_FRAME_MAX_MS        (100)
+
+typedef struct AML_AUDIO_DELAY {
+    int delay_time;
+    int delay_max;
+    struct ring_buffer stDelayRbuffer;
+} aml_audio_delay_st;
+
+
+int aml_audio_delay_init(aml_audio_delay_st **ppstAudioOutputDelayHandle);
+int aml_audio_delay_close(aml_audio_delay_st **ppstAudioOutputDelayHandle);
+int aml_audio_delay_set_time(aml_audio_delay_st **ppstAudioOutputDelayHandle, int s32DelayTimeMs);
+int aml_audio_delay_process(aml_audio_delay_st *pstAudioDelayHandle, void * in_data, int size, audio_format_t format);
 
 
 #endif

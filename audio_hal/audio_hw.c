@@ -17,8 +17,6 @@
 #define LOG_TAG "audio_hw_primary"
 //#define LOG_NDEBUG 0
 
-#define ADD_AUDIO_DELAY_INTERFACE
-
 #include <errno.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -116,9 +114,6 @@
 #endif
 
 #include "sub_mixing_factory.h"
-#ifdef ADD_AUDIO_DELAY_INTERFACE
-#include "aml_audio_delay.h"
-#endif
 #define CARD_AMLOGIC_BOARD 0
 
 /*Google Voice Assistant channel_mask */
@@ -4435,13 +4430,6 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
             goto err;
         }
         memset(out->audioeffect_tmp_buffer, 0, out->config.period_size * 6);
-#ifdef ADD_AUDIO_DELAY_INTERFACE
-        ret = aml_audiodelay_init(&adev->hw_device);
-        if (ret < 0) {
-            ALOGE("aml_audiodelay_init faild\n");
-            goto err;
-        }
-#endif
     }
 
     out->hwsync =  calloc(1, sizeof(audio_hwsync_t));
@@ -4516,9 +4504,6 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         aml_audio_hwsync_release(out->hwsync);
         free(out->hwsync);
     }
-#ifdef ADD_AUDIO_DELAY_INTERFACE
-    aml_audiodelay_close(&adev->hw_device);
-#endif
     pthread_mutex_unlock(&out->lock);
     free(stream);
     ALOGD("%s: exit", __func__);
@@ -5324,13 +5309,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
 #ifdef ADD_AUDIO_DELAY_INTERFACE
     ret = str_parms_get_int(parms, "delay_time", &val);
     if (ret >= 0) {
-        if (val < OUTPUT_DELAY_MIN_MS || val > OUTPUT_DELAY_MAX_MS) {
-            ALOGW("%s() unsupport delay time:%dms, min:%dms, max:%dms, set delay failed!",
-                __func__, val, OUTPUT_DELAY_MIN_MS, OUTPUT_DELAY_MAX_MS);
-        } else {
-            adev->delay_time = val;
-            ALOGI("delay time set to %dms", adev->delay_time);
-        }
+        aml_audio_delay_set_time(&adev->delay_handle, val);
         goto exit;
     }
 #endif
@@ -7120,10 +7099,10 @@ ssize_t hw_write (struct audio_stream_out *stream
     }
     if (aml_out->pcm) {
 #ifdef ADD_AUDIO_DELAY_INTERFACE
-    if (adev->delay_time > OUTPUT_DELAY_MIN_MS && adev->delay_handle != NULL) {
-        ret = aml_audiodelay_process(&adev->hw_device, (void *) tmp_buffer, bytes, output_format);
+    if (adev->delay_handle != NULL && adev->delay_handle->delay_time > OUTPUT_DELAY_MIN_MS) {
+        ret = aml_audio_delay_process(adev->delay_handle, (void *) tmp_buffer, bytes, output_format);
         if (ret < 0) {
-            ALOGW("aml_audiodelay_process skip, ret:%#x", ret);
+            ALOGW("aml_audio_delay_process skip, ret:%#x", ret);
         }
     }
 #endif
@@ -10352,6 +10331,12 @@ static int adev_close(hw_device_t *device)
     aml_hwsync_close_tsync(adev->tsync_fd);
     pthread_mutex_destroy(&adev->patch_lock);
 
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+    if (adev->is_TV) {
+        aml_audio_delay_close(&adev->delay_handle);
+    }
+#endif
+
     free(device);
     return 0;
 }
@@ -10814,6 +10799,13 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 #if defined(TV_AUDIO_OUTPUT)
     adev->is_TV = true;
     ALOGI("%s(), TV platform", __func__);
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+        ret = aml_audio_delay_init(&adev->delay_handle);
+        if (ret < 0) {
+            ALOGE("aml_audio_delay_init faild\n");
+            goto err;
+        }
+#endif
 #else
     adev->is_STB = property_get_bool("ro.vendor.platform.is.stb", false);
     adev->sink_gain[OUTPORT_SPEAKER] = 1.0;
@@ -10860,10 +10852,6 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     // however, sometimes function didn't goto hw_write() before encounting error.
     // set debug_flag here to see more debug log when debugging.
     adev->debug_flag = aml_audio_get_debug_flag();
-#ifdef ADD_AUDIO_DELAY_INTERFACE
-    adev->delay_time    = 0;
-    adev->delay_max    = 2000;
-#endif
     ALOGD("%s: exit", __func__);
     return 0;
 
