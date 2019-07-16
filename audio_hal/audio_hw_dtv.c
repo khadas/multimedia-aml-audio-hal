@@ -250,6 +250,17 @@ static unsigned int decoder_get_latency(void)
     return (unsigned int)latency;
 }
 
+static void decoder_set_pcrsrc(unsigned int pcrsrc)
+{
+    char tempbuf[128];
+    memset(tempbuf, 0, 128);
+    sprintf(tempbuf, "%x", pcrsrc);
+    if (aml_sysfs_set_str(TSYNC_PCRSCR, tempbuf) == -1) {
+        ALOGE("set pcr lantcy failed %s\n", tempbuf);
+    }
+    return;
+}
+
 static int get_dtv_audio_mode(void)
 {
     int ret, mode = 0;
@@ -899,6 +910,48 @@ static void dtv_set_pcr_latency(struct aml_audio_patch *patch, int mode)
     }
 }
 
+static bool dtv_firstapts_lookup_over(struct aml_audio_patch *patch, struct aml_audio_device *aml_dev, bool a_discontinue)
+{
+    char buff[32];
+    int ret;
+    unsigned int first_checkinapts = 0xffffffff;
+    unsigned int demux_pcr = 0xffffffff;
+    if (!patch || !aml_dev) {
+        return true;
+    }
+    if (a_discontinue) {
+        ret = aml_sysfs_get_str(TSYNC_LAST_CHECKIN_APTS, buff, sizeof(buff));
+        if (ret > 0) {
+            ret = sscanf(buff, "0x%x\n", &first_checkinapts);
+        }
+    } else {
+        ret = aml_sysfs_get_str(TSYNC_FIRSTCHECKIN_APTS, buff, sizeof(buff));
+        if (ret > 0) {
+            ret = sscanf(buff, "0x%x\n", &first_checkinapts);
+        }
+    }
+    ret = aml_sysfs_get_str(TSYNC_PCRSCR, buff, sizeof(buff));
+    if (ret > 0) {
+        ret = sscanf(buff, "0x%x\n", &demux_pcr);
+    }
+    if (get_tsync_pcr_debug()) {
+        ALOGI("demux_pcr %x first_apts %x, discontinue %d", demux_pcr, first_checkinapts, a_discontinue);
+    }
+    if ((first_checkinapts != 0xffffffff) || (demux_pcr != 0xffffffff)) {
+        if (first_checkinapts > demux_pcr) {
+            unsigned diff = first_checkinapts - demux_pcr;
+            if (diff  < AUDIO_PTS_DISCONTINUE_THRESHOLD) {
+                return false;
+            }
+        } else {
+            unsigned diff = demux_pcr - first_checkinapts;
+            aml_dev->dtv_droppcm_size = diff * 48 * 2 * 2 / 90;
+            ALOGI("now must drop size %d\n", aml_dev->dtv_droppcm_size);
+        }
+    }
+    return true;
+}
+
 static int dtv_set_audio_latency(int apts_diff)
 {
     int ret, diff = 0;
@@ -1158,7 +1211,16 @@ static int dtv_audio_tune_check(struct aml_audio_patch *patch, int cur_pts_diff,
                 }
                 decoder_set_latency(pts_latency);
             } else {
-                ALOGI("dtv_audio_tune audio_latency vsync pts_diff %d", pts_diff / 90);
+                uint pcrpts = 0;
+                get_sysfs_uint(TSYNC_PCRSCR, &pcrpts);
+                ALOGI("dtv_audio_tune audio_latency pts_diff %d, pcrsrc %x", pts_diff / 90, pcrpts);
+                if (pts_diff > 1000 * 90) {
+                    pts_diff = 1000 * 90;
+                } else if (pts_diff < -1000 * 90) {
+                    pts_diff = -1000 * 90;
+                }
+                pcrpts -= pts_diff;
+                decoder_set_pcrsrc(pcrpts);
             }
             patch->dtv_audio_tune = AUDIO_RUNNING;
         }
@@ -2000,60 +2062,25 @@ void *audio_dtv_patch_output_threadloop(void *data)
                     }
 
                     if (!patch->first_apts_lookup_over) {
-                        unsigned int first_checkinapts = 0xffffffff;
-                        unsigned int demux_pcr = 0xffffffff;
                         apts_diff = dtv_set_audio_latency(0);
-                        ret = aml_sysfs_get_str(TSYNC_FIRSTCHECKIN_APTS, buff, sizeof(buff));
-                        if (ret > 0) {
-                            ret = sscanf(buff, "0x%x\n", &first_checkinapts);
-                        }
-                        ret = aml_sysfs_get_str(TSYNC_PCRSCR, buff, sizeof(buff));
-                        if (ret > 0) {
-                            ret = sscanf(buff, "0x%x\n", &demux_pcr);
-                        }
-                        //ALOGI("demux_pcr %x first_checkinapts %x\n", demux_pcr, first_checkinapts);
-                        if ((first_checkinapts != 0xffffffff) || (demux_pcr != 0xffffffff)) {
-                            if (first_checkinapts > demux_pcr) {
-                                unsigned diff = first_checkinapts - demux_pcr;
-                                if (diff  < AUDIO_PTS_DISCONTINUE_THRESHOLD) {
-                                    //ALOGI("hold the aduio for cache data\n");
-                                    pthread_mutex_unlock(&(patch->dtv_output_mutex));
-                                    usleep(5000);
-                                    continue;
-                                }
-                            } else {
-                                unsigned diff = demux_pcr - first_checkinapts;
-                                aml_dev->dtv_droppcm_size = diff * 48 * 2 * 2 / 90;
-                                ALOGI("now must drop size %d\n", aml_dev->dtv_droppcm_size);
-                            }
+                        if (!dtv_firstapts_lookup_over(patch, aml_dev, false) || avail < 512 * 2) {
+                            ALOGI("hold the aduio for cache data, avail %d", avail);
+                            pthread_mutex_unlock(&(patch->dtv_output_mutex));
+                            usleep(5000);
+                            continue;
                         }
                         patch->first_apts_lookup_over = 1;
                         patch->dtv_audio_tune = AUDIO_LOOKUP;
                         clean_dtv_patch_pts(patch);
                         //ALOGI("dtv_audio_tune audio_lookup\n");
                     } else if (patch->dtv_audio_tune == AUDIO_BREAK) {
-                        unsigned int first_checkinapts = 0xffffffff;
-                        unsigned int demux_pcr = 0xffffffff;
                         int a_discontinue = get_audio_discontinue();
                         dtv_set_audio_latency(apts_diff);
-                        ret = aml_sysfs_get_str(TSYNC_LAST_CHECKIN_APTS, buff, sizeof(buff));
-                        if (ret > 0) {
-                            ret = sscanf(buff, "0x%x\n", &first_checkinapts);
-                        }
-                        ret = aml_sysfs_get_str(TSYNC_PCRSCR, buff, sizeof(buff));
-                        if (ret > 0) {
-                            ret = sscanf(buff, "0x%x\n", &demux_pcr);
-                        }
-                        //ALOGI("demux_pcr %x checkinapts %x,a_discontinue %d,apts_diff %d\n", demux_pcr, first_checkinapts, a_discontinue, apts_diff / 90);
-                        if ((first_checkinapts != 0xffffffff) || (demux_pcr != 0xffffffff)) {
-                            if (a_discontinue == 0) {
-                                ALOGI("a_discontinue is resumed\n");
-                            } else if (first_checkinapts == 0 || first_checkinapts > demux_pcr) {
-                                //ALOGI("hold the aduio for cache data\n");
-                                pthread_mutex_unlock(&(patch->dtv_output_mutex));
-                                usleep(5000);
-                                continue;
-                            }
+                        if (!dtv_firstapts_lookup_over(patch, aml_dev, true) && !a_discontinue) {
+                            ALOGI("hold the aduio for cache data, avail %d", avail);
+                            pthread_mutex_unlock(&(patch->dtv_output_mutex));
+                            usleep(5000);
+                            continue;
                         }
                         patch->dtv_audio_tune = AUDIO_LOOKUP;
                         clean_dtv_patch_pts(patch);
@@ -2196,33 +2223,12 @@ void *audio_dtv_patch_output_threadloop(void *data)
                     write_len = avail;
                 }
                 if (!patch->first_apts_lookup_over) {
-                    unsigned int first_checkinapts = 0xffffffff;
-                    unsigned int demux_pcr = 0xffffffff;
                     apts_diff = dtv_set_audio_latency(0);
-                    ret = aml_sysfs_get_str(TSYNC_FIRSTCHECKIN_APTS, buff, sizeof(buff));
-                    if (ret > 0) {
-                        ret = sscanf(buff, "0x%x\n", &first_checkinapts);
-                    }
-                    ret = aml_sysfs_get_str(TSYNC_PCRSCR, buff, sizeof(buff));
-                    if (ret > 0) {
-                        ret = sscanf(buff, "0x%x\n", &demux_pcr);
-                    }
-                    if ((first_checkinapts != 0xffffffff) || (demux_pcr != 0xffffffff)) {
-                        //ALOGI("demux_pcr %x first_checkinapts %x,adiff %d\n", demux_pcr, first_checkinapts, apts_diff / 90);
-                        if (first_checkinapts > demux_pcr) {
-                            //ALOGI("hold the aduio for cache data\n");
-                            pthread_mutex_unlock(&(patch->dtv_output_mutex));
-                            usleep(5000);
-                            continue;
-                        } else {
-                            unsigned diff = demux_pcr - first_checkinapts;
-                            if (diff > AUDIO_PTS_DISCONTINUE_THRESHOLD) {
-                                aml_dev->dtv_droppcm_size = 0;
-                            } else {
-                                aml_dev->dtv_droppcm_size = diff * 48 * 2 * 2 / 90;
-                                ALOGI("now must drop size %d\n", aml_dev->dtv_droppcm_size);
-                            }
-                        }
+                    if (!dtv_firstapts_lookup_over(patch, aml_dev, false) || avail < 48 * 4 * 50) {
+                        ALOGI("hold the aduio for cache data, avail %d", avail);
+                        pthread_mutex_unlock(&(patch->dtv_output_mutex));
+                        usleep(5000);
+                        continue;
                     }
                     patch->first_apts_lookup_over = 1;
                     patch->dtv_audio_tune = AUDIO_LOOKUP;
@@ -2230,28 +2236,13 @@ void *audio_dtv_patch_output_threadloop(void *data)
                     clean_dtv_patch_pts(patch);
                     patch->out_buf_size = out->config.period_size * audio_stream_out_frame_size(&out->stream);
                 } else if (patch->dtv_audio_tune == AUDIO_BREAK) {
-                    unsigned int first_checkinapts = 0xffffffff;
-                    unsigned int demux_pcr = 0xffffffff;
                     int a_discontinue = get_audio_discontinue();
                     dtv_set_audio_latency(apts_diff);
-                    ret = aml_sysfs_get_str(TSYNC_LAST_CHECKIN_APTS, buff, sizeof(buff));
-                    if (ret > 0) {
-                        ret = sscanf(buff, "0x%x\n", &first_checkinapts);
-                    }
-                    ret = aml_sysfs_get_str(TSYNC_PCRSCR, buff, sizeof(buff));
-                    if (ret > 0) {
-                        ret = sscanf(buff, "0x%x\n", &demux_pcr);
-                    }
-                    //ALOGI("demux_pcr %x checkinapts %x,a_discontinue %d,apts_diff %d\n", demux_pcr, first_checkinapts, a_discontinue, apts_diff / 90);
-                    if ((first_checkinapts != 0xffffffff) || (demux_pcr != 0xffffffff)) {
-                        if (a_discontinue == 0) {
-                            ALOGI("a_discontinue is resumed\n");
-                        } else if (first_checkinapts == 0 || first_checkinapts > demux_pcr) {
-                            //ALOGI("hold the aduio for cache data\n");
-                            pthread_mutex_unlock(&(patch->dtv_output_mutex));
-                            usleep(5000);
-                            continue;
-                        }
+                    if (!dtv_firstapts_lookup_over(patch, aml_dev, true) && !a_discontinue) {
+                        ALOGI("hold the aduio for cache data, avail %d", avail);
+                        pthread_mutex_unlock(&(patch->dtv_output_mutex));
+                        usleep(5000);
+                        continue;
                     }
                     patch->dtv_audio_tune = AUDIO_LOOKUP;
                     //ALOGI("dtv_audio_tune audio_lookup\n");
