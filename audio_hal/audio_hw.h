@@ -477,6 +477,7 @@ struct aml_audio_device {
     int patch_start;
     int mute_start;
     aml_audio_ease_t  *audio_ease;
+    int sound_track_mode;
 };
 
 struct meta_data {
