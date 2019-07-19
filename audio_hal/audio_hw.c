@@ -3352,7 +3352,6 @@ static int start_input_stream(struct aml_stream_in *in)
     ret = choose_stream_pcm_config(in);
     if (ret < 0)
         return -EINVAL;
-
     if (in->requested_rate != in->config.rate) {
         ret = add_in_stream_resampler(in);
         if (ret < 0)
@@ -4044,6 +4043,9 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
 #endif
     else if (adev->patch_src == SRC_DTV && adev->tuner2mix_patch == 1)
     {
+        if (adev->debug_flag) {
+            ALOGD("%s:%d dtv_in_read data size:%d, src_gain:%f",__func__,__LINE__, bytes, adev->src_gain[adev->active_inport]);
+        }
         ret = dtv_in_read(stream, buffer, bytes);
         apply_volume(adev->src_gain[adev->active_inport], buffer, sizeof(uint16_t), bytes);
         goto exit;
@@ -4087,10 +4089,13 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             uint64_t frame_duration = bytes * 1000000 / audio_stream_in_frame_size(stream) /
                     in_get_sample_rate(&stream->common);
 
-            if (frame_duration > estimated_sched_time_us)
+            if (frame_duration > estimated_sched_time_us) {
                 usleep(frame_duration - estimated_sched_time_us);
-            ret = 0;
+            }
         } else {
+            if (adev->debug_flag) {
+                ALOGD("%s:%d pcm_read data size:%d, channels:%d, pResampler:%p",__func__,__LINE__, bytes, in->config.channels, in->resampler);
+            }
             if (in->resampler) {
                 ret = read_frames(in, buffer, in_frames);
             } else {
@@ -4128,8 +4133,6 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
                 } else {
                     ret = aml_alsa_input_read(stream, buffer, bytes);
                 }
-
-                //ALOGI("%s, %d,ret:%d",__func__,__LINE__,ret);
                 if (getprop_bool("media.audiohal.indump")) {
                     aml_audio_dump_audio_bitstreams("/data/audio/alsa_read.raw",
                         buffer, bytes);
@@ -4335,8 +4338,9 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
             }
             if (adev->audio_type != DTS) {
                 adev->dolby_lib_type = adev->dolby_lib_type_last;
-                if (eDolbyMS12Lib == adev->dolby_lib_type)
+                if (eDolbyMS12Lib == adev->dolby_lib_type) {
                     adev->ms12.dolby_ms12_enable = true;
+                }
             } else {
                 adev->ms12.dolby_ms12_enable = false;
             }
@@ -5864,11 +5868,6 @@ static int choose_stream_pcm_config(struct aml_stream_in *in)
     int channel_count = audio_channel_count_from_in_mask(in->hal_channel_mask);
     int ret = 0;
 
-    if (in->device & AUDIO_DEVICE_IN_ALL_SCO)
-        memcpy(&in->config, &pcm_config_bt, sizeof(pcm_config_bt));
-    else
-        memcpy(&in->config, &pcm_config_in, sizeof(pcm_config_in));
-
     in->config.channels = channel_count;
     switch (in->hal_format) {
         case AUDIO_FORMAT_PCM_16_BIT:
@@ -6010,6 +6009,12 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
     }
     in->pBtUsbTempDelayBuf = NULL;
     in->delay_buffer_size = 0;
+
+    if (in->device & AUDIO_DEVICE_IN_ALL_SCO) {
+        memcpy(&in->config, &pcm_config_bt, sizeof(pcm_config_bt));
+    } else {
+        memcpy(&in->config, &pcm_config_in, sizeof(pcm_config_in));
+    }
 
     if (in->device & AUDIO_DEVICE_IN_WIRED_HEADSET) {
         // bluetooth rc voice
@@ -7980,7 +7985,9 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         }
     }
 
-    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+    if (eDolbyMS12Lib == adev->dolby_lib_type &&
+        aml_out->hal_internal_format != AUDIO_FORMAT_DTS &&
+        aml_out->hal_internal_format != AUDIO_FORMAT_DTS_HD) {
         if (adev->need_reset_for_dual_decoder == true) {
             need_reconfig_output = true;
             adev->need_reset_for_dual_decoder = false;
@@ -8056,6 +8063,9 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         if (adev->dtslib_bypass_enable) {
             if (aml_out->hal_format == AUDIO_FORMAT_IEC61937) {
                 output_format = aml_out->hal_internal_format;
+                if (adev->debug_flag) {
+                    ALOGD("%s:%d DTS write passthrough data", __func__, __LINE__);
+                }
                 if (audio_hal_data_processing(stream, (void *)buffer, bytes, &output_buffer, &output_buffer_bytes, output_format) == 0) {
                     hw_write(stream, output_buffer, output_buffer_bytes, output_format);
                 }
@@ -8065,6 +8075,9 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         int ret = -1;
         struct dca_dts_dec *dts_dec = &(adev->dts_hd);
         if (dts_dec->status == 1) {
+            if (adev->debug_flag) {
+                ALOGD("%s:%d DTS decoder start", __func__, __LINE__);
+            }
             ret = dca_decoder_process_patch(dts_dec, (unsigned char *)buffer, bytes);
         } else {
             config_output(stream);
@@ -8957,51 +8970,6 @@ void *audio_patch_input_threadloop(void *data)
             patch->in_buf = realloc(patch->in_buf, read_bytes * period_mul);
             patch->in_buf_size = read_bytes * period_mul;
         }
-
-        if (patch->input_src == AUDIO_DEVICE_IN_HDMI) {
-            cur_audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
-            //reconfig period size when HBR and non HBR audio switching
-            if ((last_audio_packet == AUDIO_PACKET_HBR ||
-                    cur_audio_packet == AUDIO_PACKET_HBR) &&
-                    last_audio_packet != cur_audio_packet) {
-                int period_size = 0;
-                int buf_size = 0;
-
-                cur_aformat = audio_parse_get_audio_type(patch->audio_parse_para);
-                ALOGD("HDMI Format Switch from 0x%x to 0x%x last_type=%d cur_type=%d\n",
-                    last_aformat, cur_aformat, last_audio_packet, cur_audio_packet);
-
-                if (cur_audio_packet == AUDIO_PACKET_HBR ||
-                    (patch->aformat == AUDIO_FORMAT_DTS_HD)) {
-                    // if it is high bitrate bitstream, use PAO and increase the buffer size
-                    bSpdifin_PAO = true;
-                    period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
-                    // increase the buffer size
-                    buf_size = ring_buffer_size * 8;
-                } else {
-                    bSpdifin_PAO = false;
-                    period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
-                    // reset to original one
-                    buf_size = ring_buffer_size;
-                }
-
-                if (!alsa_device_is_auge())
-                    set_spdifin_pao(&aml_dev->alsa_mixer, bSpdifin_PAO);
-                ring_buffer_reset_size(ringbuffer, buf_size);
-                in_reset_preroid_size(stream_in, period_size);
-                last_aformat = cur_aformat;
-                last_audio_packet = cur_audio_packet;
-            }
-
-            // hdmi in audio channels recofig.
-            int current_channel = get_hdmiin_channel(&aml_dev->alsa_mixer);
-            if (current_channel != -1 && current_channel != last_channel_count) {
-                ALOGI("%s(), channel count changed from %d to %d!",
-                    __func__, last_channel_count, current_channel);
-                last_channel_count = current_channel;
-                in_reset_channel_num(stream_in, current_channel);
-            }
-        }
 #if 0
         struct timespec before_read;
         struct timespec after_read;
@@ -9030,6 +8998,54 @@ void *audio_patch_input_threadloop(void *data)
             }
 
             do {
+
+                if (patch->input_src == AUDIO_DEVICE_IN_HDMI) {
+                    // hdmi in audio channels recofig.
+                    int current_channel = get_hdmiin_channel(&aml_dev->alsa_mixer);
+                    if (current_channel != -1 && current_channel != last_channel_count) {
+                        ALOGI("%s(), channel count changed from %d to %d!",
+                            __func__, last_channel_count, current_channel);
+                        last_channel_count = current_channel;
+                        in_reset_channel_num(stream_in, current_channel);
+                    }
+
+                    cur_audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
+                    //reconfig period size when HBR and non HBR audio switching
+                    if ((last_audio_packet == AUDIO_PACKET_HBR ||
+                            cur_audio_packet == AUDIO_PACKET_HBR) &&
+                            last_audio_packet != cur_audio_packet) {
+                        int period_size = 0;
+                        int buf_size = 0;
+
+                        cur_aformat = audio_parse_get_audio_type(patch->audio_parse_para);
+                        ALOGD("HDMI Format Switch from 0x%x to 0x%x last_type=%d cur_type=%d\n",
+                            last_aformat, cur_aformat, last_audio_packet, cur_audio_packet);
+
+                        if (cur_audio_packet == AUDIO_PACKET_HBR ||
+                            (patch->aformat == AUDIO_FORMAT_DTS_HD)) {
+                            // if it is high bitrate bitstream, use PAO and increase the buffer size
+                            bSpdifin_PAO = true;
+                            period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
+                            // increase the buffer size
+                            buf_size = ring_buffer_size * 8;
+                        } else {
+                            bSpdifin_PAO = false;
+                            period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
+                            // reset to original one
+                            buf_size = ring_buffer_size;
+                        }
+
+                        if (!alsa_device_is_auge())
+                            set_spdifin_pao(&aml_dev->alsa_mixer, bSpdifin_PAO);
+                        ring_buffer_reset_size(ringbuffer, buf_size);
+                        in_reset_preroid_size(stream_in, period_size);
+                        last_aformat = cur_aformat;
+                        last_audio_packet = cur_audio_packet;
+                        break;
+                    }
+
+
+                }
                 if (get_buffer_write_space(ringbuffer) >= bytes_avail) {
                     retry = 0;
                     ret = ring_buffer_write(ringbuffer,
@@ -9050,9 +9066,10 @@ void *audio_patch_input_threadloop(void *data)
                     retry = 1;
                     pthread_cond_signal(&patch->cond);
                     //Fixme: if ringbuffer is full enough but no output, reset ringbuffer
+                    ALOGW("%s(), ring buffer no space to write, buffer free size:%d, need write size:%d", __func__,
+                        get_buffer_write_space(ringbuffer), bytes_avail);
                     ring_buffer_reset(ringbuffer);
                     usleep(3000);
-                    ALOGE("%s(), no space to input, in read audio discontinue!", __func__);
                 }
             } while (retry && !patch->input_thread_exit);
         } else {
@@ -9162,8 +9179,6 @@ void *audio_patch_output_threadloop(void *data)
         default:
             period_mul = 1;
         }
-
-
         // buffer size diff from allocation size, need to resize.
         if (patch->out_buf_size < (size_t)write_bytes * period_mul) {
             ALOGI("%s: !!realloc out buf size from %zu to %zu", __func__, patch->out_buf_size, write_bytes * period_mul);
@@ -9213,7 +9228,8 @@ void *audio_patch_output_threadloop(void *data)
                 patch->avsync_sample_interval++;
             }
         } else {
-            ALOGE("%s(), no data in buffer, audio discontinue output!", __func__);
+            ALOGW("%s(), no enough data in ring buffer, available data size:%d, need data size:%d", __func__,
+                get_buffer_read_space(ringbuffer), (write_bytes * period_mul));
         }
     }
 
@@ -10787,7 +10803,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->dolby_lib_type = detect_dolby_lib_type();
     adev->dolby_lib_type_last = adev->dolby_lib_type;
     if (eDolbyMS12Lib != adev->dolby_lib_type) {
-        adev->ms12.dolby_ms12_enable == false;
+        adev->ms12.dolby_ms12_enable = false;
     } else {
         // in ms12 case, use new method for TV or BOX .zzz
         adev->hw_device.open_output_stream = adev_open_output_stream_new;
