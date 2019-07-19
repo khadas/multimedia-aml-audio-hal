@@ -1133,7 +1133,7 @@ static void dtv_do_drop_ac3(int avail, struct aml_audio_patch *patch,
     struct aml_stream_out *out = (struct aml_stream_out *)stream_out;
     int fm_size;
     int drop_size, t1, t2;
-    if (!patch || !patch->dev || !stream_out) {
+    if (!patch || !patch->dev || !stream_out || aml_dev->tuner2mix_patch == 1) {
         return;
     }
     fm_size = out->ddp_frame_size;
@@ -1170,6 +1170,12 @@ static void dtv_do_drop_ac3(int avail, struct aml_audio_patch *patch,
 static int dtv_audio_tune_check(struct aml_audio_patch *patch, int cur_pts_diff, int last_pts_diff, unsigned int apts)
 {
     char tempbuf[128];
+    struct audio_hw_device *adev = patch->dev;
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *) adev;
+    if (!patch || !patch->dev || aml_dev->tuner2mix_patch == 1) {
+        patch->dtv_audio_tune = AUDIO_RUNNING;
+        return 1;
+    }
     if (get_audio_discontinue() || patch->dtv_has_video == 0 ||
         patch->dtv_audio_mode == 1) {
         dtv_adjust_output_clock(patch, DIRECT_NORMAL, DEFAULT_DTV_ADJUST_CLOCK);
