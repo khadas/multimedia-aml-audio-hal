@@ -6714,6 +6714,7 @@ static void output_mute(struct audio_stream_out *stream, size_t *output_buffer_b
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
+    size_t target_len = MIN(aml_out->tmp_buffer_8ch_size, *output_buffer_bytes);
 
     /* when aux/spdif/arcin/hdmiin switching, mute 1000ms, then start fade in. */
     if (adev->patch_src == SRC_LINEIN || adev->patch_src == SRC_SPDIFIN
@@ -6731,7 +6732,8 @@ static void output_mute(struct audio_stream_out *stream, size_t *output_buffer_b
 
                 ALOGI ("%s() AUX/SPDIF/ARC unmute, start fade in", __func__);
             } else {
-                memset(aml_out->tmp_buffer_8ch, 0, (*output_buffer_bytes));
+                ALOGD("%s line %d target memset len 0x%x\n", __func__, __LINE__, target_len);
+                memset(aml_out->tmp_buffer_8ch, 0, target_len);
             }
         }
     } else if (adev->patch_src == SRC_DTV || adev->patch_src == SRC_ATV) {
@@ -6748,7 +6750,8 @@ static void output_mute(struct audio_stream_out *stream, size_t *output_buffer_b
             start_ease_in(adev);
             ALOGI ("%s() tv source unmute, start fade in", __func__);
             } else {
-                memset(aml_out->tmp_buffer_8ch, 0, (*output_buffer_bytes));
+                ALOGD("%s line %d target memset len 0x%x\n", __func__, __LINE__, target_len);
+                memset(aml_out->tmp_buffer_8ch, 0, target_len);
             }
         }
 #else
@@ -6756,7 +6759,7 @@ static void output_mute(struct audio_stream_out *stream, size_t *output_buffer_b
 #endif
     }
     /*ease in or ease out*/
-    aml_audio_ease_process(adev->audio_ease, aml_out->tmp_buffer_8ch, *output_buffer_bytes);
+    aml_audio_ease_process(adev->audio_ease, aml_out->tmp_buffer_8ch, target_len);
     return;
 }
 #define EQ_GAIN_DEFAULT (0.16)
@@ -7005,7 +7008,9 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
         }
         //mute output audio for 500ms, when input audio change format.
         if (aml_out->tmp_buffer_8ch != NULL && Stop_watch(adev->mute_start_ts, 500)) {
-            memset(aml_out->tmp_buffer_8ch, 0, (*output_buffer_bytes));
+            size_t target_len = MIN(aml_out->tmp_buffer_8ch_size, *output_buffer_bytes);
+            ALOGD("%s line %d target memset len 0x%x\n", __func__, __LINE__, target_len);
+            memset(aml_out->tmp_buffer_8ch, 0, target_len);
         }
     } else if (adev->patch_src == SRC_DTV && adev->tuner2mix_patch == 1){
         dtv_in_write(stream,buffer, bytes);

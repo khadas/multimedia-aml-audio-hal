@@ -102,6 +102,9 @@ static unsigned int DEFAULT_OUT_SAMPLING_RATE = 48000;
 
 #define DDP_FRAME_SIZE      768
 #define EAC3_MULTIPLIER 4
+#define MAX(a,b) (((a) > (b)) ? (a) : (b))
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
+
 enum {
     TYPE_PCM = 0,
     TYPE_AC3 = 2,

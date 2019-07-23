@@ -37,7 +37,7 @@
 #include "aml_audio_timer.h"
 #include "audio_virtual_buf.h"
 
-#define DOLBY_MS12_OUTPUT_FORMAT_TEST
+//#define DOLBY_MS12_OUTPUT_FORMAT_TEST
 
 #define DOLBY_DRC_LINE_MODE 0
 #define DOLBY_DRC_RF_MODE   1
