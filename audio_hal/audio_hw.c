@@ -3728,73 +3728,40 @@ static ssize_t read_frames (struct aml_stream_in *in, void *buffer, ssize_t fram
 
 static uint32_t mic_buf_print_count = 0;
 
-
-static void in_reset_preroid_size(struct audio_stream_in *stream , unsigned int period_size)
+static int in_reset_config_param(struct audio_stream_in *stream, AML_INPUT_STREAM_CONFIG_TYPE_E enType, const void *pValue)
 {
-    int ret = 0;
-    struct aml_stream_in *in = (struct aml_stream_in *) stream;
+    int                     s32Ret = 0;
+    struct aml_stream_in    *in = (struct aml_stream_in *) stream;
     struct aml_audio_device *adev = in->dev;
     pthread_mutex_lock(&in->lock);
 
-    /*in buffer is allocated in adev_open_input_stream according to the
-    period_size, is it safe to change the size?*/
-    in->config.period_size = period_size;
-    ALOGD("Config Period size to %d\n", in->config.period_size);
-    if (in->standby) {
-        ret = start_input_stream(in);
-        if (ret < 0) {
-            goto exit;
-        }
-    } else {
+    switch (enType) {
+        case AML_INPUT_STREAM_CONFIG_TYPE_CHANNELS:
+            in->config.channels = *(unsigned int *)pValue;
+            ALOGD("%s:%d Config channel nummer to %d", __func__, __LINE__, in->config.channels);
+            break;
+
+        case AML_INPUT_STREAM_CONFIG_TYPE_PERIODS:
+            in->config.period_size = *(unsigned int *)pValue;
+            ALOGD("%s:%d Config Period size to %d", __func__, __LINE__, in->config.period_size);
+            break;
+        default:
+            ALOGW("%s:%d not support input stream type:%#x", __func__, __LINE__, enType);
+            return -1;
+    }
+
+    if (0 == in->standby) {
         do_input_standby(in);
-        start_input_stream(in);
-        if (ret < 0) {
-            goto exit;
-        }
-
     }
-
+    s32Ret = start_input_stream(in);
     in->standby = 0;
-exit:
-    if (ret < 0) {
-        ALOGE("in_reset err!!!");
-    }
-
     pthread_mutex_unlock(&in->lock);
-    return;
+    if (s32Ret < 0) {
+        ALOGW("start input stream failed! ret:%#x", s32Ret);
+    }
+    return s32Ret;
 }
 
-static void in_reset_channel_num(struct audio_stream_in *stream , unsigned int channel_count)
-{
-    int ret = 0;
-    struct aml_stream_in *in = (struct aml_stream_in *) stream;
-    struct aml_audio_device *adev = in->dev;
-    pthread_mutex_lock(&in->lock);
-
-    /*if input channel count is changed, it need to reconfig channel count*/
-    in->config.channels = channel_count;
-    ALOGD("Config channel nummer to %d\n", in->config.channels);
-    if (in->standby) {
-        ret = start_input_stream(in);
-        if (ret < 0) {
-            goto exit;
-        }
-    } else {
-        do_input_standby(in);
-        start_input_stream(in);
-        if (ret < 0) {
-            goto exit;
-        }
-    }
-    in->standby = 0;
-exit:
-    if (ret < 0) {
-        ALOGE("in_reset err!!!");
-    }
-
-    pthread_mutex_unlock(&in->lock);
-    return;
-}
 #ifdef ENABLE_AEC_FUNC
 static void inread_proc_aec(struct audio_stream_in *stream,
         void *buffer, size_t bytes)
@@ -5867,6 +5834,13 @@ static int choose_stream_pcm_config(struct aml_stream_in *in)
 {
     int channel_count = audio_channel_count_from_in_mask(in->hal_channel_mask);
     int ret = 0;
+    if (in->device & AUDIO_DEVICE_IN_ALL_SCO) {
+        memcpy(&in->config, &pcm_config_bt, sizeof(pcm_config_bt));
+    } else {
+        if (!(in->device & AUDIO_DEVICE_IN_HDMI)) {
+            memcpy(&in->config, &pcm_config_in, sizeof(pcm_config_in));
+        }
+    }
 
     in->config.channels = channel_count;
     switch (in->hal_format) {
@@ -9006,7 +8980,7 @@ void *audio_patch_input_threadloop(void *data)
                         ALOGI("%s(), channel count changed from %d to %d!",
                             __func__, last_channel_count, current_channel);
                         last_channel_count = current_channel;
-                        in_reset_channel_num(stream_in, current_channel);
+                        in_reset_config_param(stream_in, AML_INPUT_STREAM_CONFIG_TYPE_CHANNELS, &current_channel);
                     }
 
                     cur_audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
@@ -9035,10 +9009,11 @@ void *audio_patch_input_threadloop(void *data)
                             buf_size = ring_buffer_size;
                         }
 
-                        if (!alsa_device_is_auge())
+                        if (!alsa_device_is_auge()) {
                             set_spdifin_pao(&aml_dev->alsa_mixer, bSpdifin_PAO);
+                        }
                         ring_buffer_reset_size(ringbuffer, buf_size);
-                        in_reset_preroid_size(stream_in, period_size);
+                        in_reset_config_param(stream_in, AML_INPUT_STREAM_CONFIG_TYPE_PERIODS, &period_size);
                         last_aformat = cur_aformat;
                         last_audio_packet = cur_audio_packet;
                         break;
