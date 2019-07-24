@@ -281,6 +281,13 @@ typedef enum atom_stream_type {
 } atom_stream_type_t;
 #endif
 
+typedef enum AML_INPUT_STREAM_CONFIG_TYPE {
+    AML_INPUT_STREAM_CONFIG_TYPE_CHANNELS   = 0,
+    AML_INPUT_STREAM_CONFIG_TYPE_PERIODS    = 1,
+
+    AML_INPUT_STREAM_CONFIG_TYPE_BUTT       = -1,
+} AML_INPUT_STREAM_CONFIG_TYPE_E;
+
 typedef union {
     unsigned long long timeStamp;
     unsigned char tsB[8];
