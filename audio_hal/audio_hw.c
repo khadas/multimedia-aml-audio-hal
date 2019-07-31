@@ -4030,7 +4030,8 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             if (in->mute_log_cntr++ >= 100)
                 in->mute_log_cntr = 0;
             clock_gettime(CLOCK_MONOTONIC, &in->mute_start_ts);
-            clock_gettime(CLOCK_MONOTONIC, &adev->mute_start_ts);
+            //clock_gettime(CLOCK_MONOTONIC, &adev->mute_start_ts);
+            adev->patch_start = false;
             in->mute_flag = 1;
         }
         if (in->mute_flag == 1) {
@@ -4102,10 +4103,6 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
                 } else {
                     ret = aml_alsa_input_read(stream, buffer, bytes);
                 }
-                if (getprop_bool("media.audiohal.indump")) {
-                    aml_audio_dump_audio_bitstreams("/data/audio/alsa_read.raw",
-                        buffer, bytes);
-                }
             }
 
             if (ret < 0) {
@@ -4165,8 +4162,8 @@ exit:
             processBtAndUsbCardData(in, parser, buffer, bytes);
     }
 
-    if (getprop_bool("media.audiohal.indump")) {
-        aml_audio_dump_audio_bitstreams("/data/audio/in_read.raw",
+    if (ret >= 0 && getprop_bool("media.audiohal.indump")) {
+        aml_audio_dump_audio_bitstreams("/data/audio/alsa_read.raw",
             buffer, bytes);
     }
 
@@ -5014,9 +5011,10 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             }
 
             if (pAudPatchTmp == NULL) {
-                ALOGE("%s,There is no audio patch using HDMI as input", __func__);
+                //ALOGE("%s, There is no audio patch using HDMI as input", __func__);
                 goto exit;
             }
+
             if (is_linein_audio && pAudPatchTmp->sources[0].ext.device.type != AUDIO_DEVICE_IN_HDMI) {
                 ALOGE("%s, pAudPatchTmp->sources[0].ext.device.type != AUDIO_DEVICE_IN_HDMI", __func__);
                 goto exit;
@@ -5485,32 +5483,6 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         }
         ALOGI("is_has_video set to %d\n", adev->is_has_video);
     }
-#if defined(IS_ATOM_PROJECT)
-    ret = str_parms_get_int(parms, "DSP_EQ_MODE", &val);
-    if (ret >= 0 && adev->has_dsp_lib == true) {
-        if (set_EQ_mode(val) < 0)
-            ALOGE("%s: set eq mode failed", __FUNCTION__);
-        goto exit;
-    }
-    ret = str_parms_get_int(parms, "DSP_SUBWOFFER_VOLUME", &val);
-    if (ret >= 0 && adev->has_dsp_lib == true) {
-        if (set_subwoofer_volume(val) < 0)
-            ALOGE("%s: subwoofer failed", __FUNCTION__);
-        goto exit;
-    }
-    ret = str_parms_get_int(parms, "DSP_SUB_CONNECT", &val);
-    if (ret >= 0 && adev->has_dsp_lib == true) {
-        if (set_subwoofer_connect(val) < 0)
-            ALOGE("%s: set subwoofer connect failed", __FUNCTION__);
-        goto exit;
-    }
-    ret = str_parms_get_int(parms, "DSP_XFADE_DUR", &val);
-    if (ret >= 0 && adev->has_dsp_lib == true) {
-        if (set_xfade_dur(val) < 0)
-            ALOGE("%s: set xfade dur failed", __FUNCTION__);
-        goto exit;
-    }
-#endif
 
     ret = str_parms_get_str(parms, "hfp_set_sampling_rate", value, sizeof(value));
     if (ret >= 0) {
@@ -5585,7 +5557,7 @@ exit:
         return 0;
     }
     if (ret > 0 || (strlen (kvpairs) == 0) ) {
-        ALOGI ("Amlogic_HAL - %s: return 0 instead of length of data be copied.", __FUNCTION__);
+        //ALOGI ("Amlogic_HAL - %s: return 0 instead of length of data be copied.", __FUNCTION__);
         ret = 0;
     } else if (ret < 0) {
         ALOGI ("Amlogic_HAL - %s: return Result::NOT_SUPPORTED (4) instead of other error code.", __FUNCTION__);
@@ -6715,49 +6687,50 @@ static void output_mute(struct audio_stream_out *stream, size_t *output_buffer_b
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
     size_t target_len = MIN(aml_out->tmp_buffer_8ch_size, *output_buffer_bytes);
+    int timer_in_ms = 0;
 
-    /* when aux/spdif/arcin/hdmiin switching, mute 1000ms, then start fade in. */
     if (adev->patch_src == SRC_LINEIN || adev->patch_src == SRC_SPDIFIN
             || adev->patch_src == SRC_HDMIIN) {
+        /* when aux/spdif/arcin/hdmiin switching or format change,
+           mute 1000ms, then start fade in. */
         if (adev->active_input != NULL && (!adev->patch_start)) {
             clock_gettime(CLOCK_MONOTONIC, &adev->mute_start_ts);
-            adev->patch_start = 1;
+            adev->patch_start = true;
             adev->mute_start = true;
-            ALOGI ("%s() detect AUX/SPDIF start mute 1000ms", __func__);
+            timer_in_ms = 1000;
+            //ALOGI ("%s() detect AUX/SPDIF start mute!", __func__);
         }
-        if (aml_out->tmp_buffer_8ch != NULL && adev->mute_start) {
-            if (!Stop_watch(adev->mute_start_ts, 1000)) {
-                adev->mute_start = false;
-                start_ease_in(adev);
 
-                ALOGI ("%s() AUX/SPDIF/ARC unmute, start fade in", __func__);
-            } else {
-                ALOGD("%s line %d target memset len 0x%x\n", __func__, __LINE__, target_len);
-                memset(aml_out->tmp_buffer_8ch, 0, target_len);
-            }
+        if (adev->active_input != NULL &&
+                adev->spdif_fmt_hw != adev->active_input->spdif_fmt_hw) {
+            clock_gettime(CLOCK_MONOTONIC, &adev->mute_start_ts);
+            adev->spdif_fmt_hw = adev->active_input->spdif_fmt_hw;
+            adev->mute_start = true;
+            timer_in_ms = 500;
+            ALOGI ("%s() detect AUX/SPDIF format change, start mute!", __func__);
         }
     } else if (adev->patch_src == SRC_DTV || adev->patch_src == SRC_ATV) {
-#if 1
+        /*dtv start patching, mute 200ms, then start fade in.*/
         if (adev->audio_patch != NULL && (!adev->patch_start)) {
             clock_gettime(CLOCK_MONOTONIC, &adev->mute_start_ts);
             adev->patch_start = 1;
             adev->mute_start = true;
+            timer_in_ms = 200;
             ALOGI ("%s() detect tv source start mute 200ms", __func__);
         }
-        if (aml_out->tmp_buffer_8ch != NULL && adev->mute_start) {
-            if (!Stop_watch(adev->mute_start_ts, 200)) {
+    }
+
+    if (aml_out->tmp_buffer_8ch != NULL && adev->mute_start) {
+        if (!Stop_watch(adev->mute_start_ts, timer_in_ms)) {
             adev->mute_start = false;
             start_ease_in(adev);
             ALOGI ("%s() tv source unmute, start fade in", __func__);
-            } else {
-                ALOGD("%s line %d target memset len 0x%x\n", __func__, __LINE__, target_len);
-                memset(aml_out->tmp_buffer_8ch, 0, target_len);
-            }
+        } else {
+            ALOGD("%s line %d target memset len 0x%x\n", __func__, __LINE__, target_len);
+            memset(aml_out->tmp_buffer_8ch, 0, target_len);
         }
-#else
-        return;
-#endif
     }
+
     /*ease in or ease out*/
     aml_audio_ease_process(adev->audio_ease, aml_out->tmp_buffer_8ch, target_len);
     return;
@@ -7000,23 +6973,12 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
         }
     }
 
-    if (adev->patch_src == SRC_HDMIIN || adev->patch_src == SRC_SPDIFIN) {
-        if (adev->active_input != NULL &&
-                adev->spdif_fmt_hw != adev->active_input->spdif_fmt_hw) {
-            clock_gettime(CLOCK_MONOTONIC, &adev->mute_start_ts);
-            adev->spdif_fmt_hw = adev->active_input->spdif_fmt_hw;
-        }
-        //mute output audio for 500ms, when input audio change format.
-        if (aml_out->tmp_buffer_8ch != NULL && Stop_watch(adev->mute_start_ts, 500)) {
-            size_t target_len = MIN(aml_out->tmp_buffer_8ch_size, *output_buffer_bytes);
-            ALOGD("%s line %d target memset len 0x%x\n", __func__, __LINE__, target_len);
-            memset(aml_out->tmp_buffer_8ch, 0, target_len);
-        }
-    } else if (adev->patch_src == SRC_DTV && adev->tuner2mix_patch == 1){
+    if (adev->patch_src == SRC_DTV && adev->tuner2mix_patch == 1) {
         dtv_in_write(stream,buffer, bytes);
     }
+
     if (adev->audio_patching) {
-        output_mute(stream,output_buffer_bytes);
+        output_mute(stream, output_buffer_bytes);
     }
     return 0;
 }
@@ -9109,12 +9071,45 @@ static unsigned int calc_drop_size(unsigned int dropms, struct audio_config* str
 
 #define AVSYNC_SAMPLE_INTERVAL (50)
 #define AVSYNC_SAMPLE_MAX_CNT (10)
+
+static int do_avsync(struct aml_audio_patch *patch, int period_mul, struct audio_config *stream_config)
+{
+    ring_buffer_t *ringbuffer = &(patch->aml_ringbuffer);
+
+    if (patch->avsync_sample_interval >= AVSYNC_SAMPLE_INTERVAL * period_mul) {
+        aml_dev_try_avsync(patch);
+        if (patch->avsync_adelay > 0) {
+            ALOGI("now delay the audio output by %d\n", patch->avsync_adelay);
+        }
+
+        if (patch->avsync_drop > 0) {
+            unsigned int drop_byte = calc_drop_size(patch->avsync_drop,
+                stream_config);
+
+            ALOGI("avsync the dropp size is %d\n", drop_byte);
+            if (drop_byte > DROP_AUDIO_SIZE) {
+                ring_buffer_read(ringbuffer,
+                    (unsigned char*)patch->drop_buf, DROP_AUDIO_SIZE);
+                drop_byte = drop_byte - DROP_AUDIO_SIZE;
+            } else {
+                ring_buffer_read(ringbuffer,
+                    (unsigned char*)patch->drop_buf, drop_byte);
+            }
+        }
+        patch->avsync_sample_interval = 0;
+    } else {
+        patch->avsync_sample_interval++;
+    }
+
+    return 0;
+}
+
 void *audio_patch_output_threadloop(void *data)
 {
     struct aml_audio_patch *patch = (struct aml_audio_patch *)data;
     struct audio_hw_device *dev = patch->dev;
     struct aml_audio_device *aml_dev = (struct aml_audio_device *) dev;
-    ring_buffer_t *ringbuffer = & (patch->aml_ringbuffer);
+    ring_buffer_t *ringbuffer = &(patch->aml_ringbuffer);
     struct audio_stream_out *stream_out = NULL;
     struct aml_stream_out *aml_out = NULL,*out;
     struct audio_config stream_config;
@@ -9236,32 +9231,14 @@ void *audio_patch_output_threadloop(void *data)
             us = calc_time_interval_us(&before_read, &after_read);
             ALOGD("function gap =%d \n", us);
 #endif
-            if (patch->avsync_sample_interval >= AVSYNC_SAMPLE_INTERVAL * period_mul) {
-                aml_dev_try_avsync(patch);
-                if (patch->avsync_adelay > 0) {
-                    usleep(1000 * patch->avsync_adelay);
-                    ALOGI("now delay the audio output by %d\n", patch->avsync_adelay);
-                }
-                if (patch->avsync_drop > 0) {
-                    unsigned int drop_byte = calc_drop_size(patch->avsync_drop,
-                        &stream_config);
-                    ALOGI("avsync the dropp size is %d\n", drop_byte);
-                    if (drop_byte > DROP_AUDIO_SIZE) {
-                        ring_buffer_read(ringbuffer,
-                            (unsigned char*)patch->drop_buf, DROP_AUDIO_SIZE);
-                        drop_byte = drop_byte - DROP_AUDIO_SIZE;
-                    } else {
-                        ring_buffer_read(ringbuffer,
-                            (unsigned char*)patch->drop_buf, drop_byte);
-                    }
-                }
-                patch->avsync_sample_interval = 0;
-            } else {
-                patch->avsync_sample_interval++;
-            }
+            //do_avsync(patch, period_mul, &stream_config);
         } else {
             ALOGW("%s(), no enough data in ring buffer, available data size:%d, need data size:%d", __func__,
                 get_buffer_read_space(ringbuffer), (write_bytes * period_mul));
+            //repeat last period data, when no data in ringbuffer
+            ret = out_write_new(stream_out, patch->out_buf, DEFAULT_PLAYBACK_PERIOD_SIZE);
+            usleep( (DEFAULT_PLAYBACK_PERIOD_SIZE) * 1000000 / 4 /
+                stream_config.sample_rate);
         }
     }
 

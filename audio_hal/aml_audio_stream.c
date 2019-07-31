@@ -448,7 +448,7 @@ bool signal_status_check(audio_devices_t in_device, int *mute_time,
     if ((in_device & AUDIO_DEVICE_IN_HDMI) &&
             (!is_hdmi_in_stable_hw(stream) ||
             !is_hdmi_in_stable_sw(stream))) {
-        *mute_time = 600;
+        *mute_time = 100;
         return false;
     }
     if ((in_device & AUDIO_DEVICE_IN_TV_TUNER) &&
