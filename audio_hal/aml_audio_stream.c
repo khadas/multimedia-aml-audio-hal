@@ -17,6 +17,7 @@
 #define LOG_TAG "audio_hw_primary"
 //#define LOG_NDEBUG 0
 #include <cutils/log.h>
+#include <string.h>
 #include <tinyalsa/asoundlib.h>
 
 #include "aml_alsa_mixer.h"

@@ -49,7 +49,7 @@ uint32_t out_get_latency_frames(const struct audio_stream_out *stream);
 int aml_audio_get_spdif_tuning_latency(void);
 int aml_audio_get_arc_tuning_latency(audio_format_t arc_afmt);
 int aml_audio_get_src_tune_latency(enum patch_src_assortion patch_src);
-int sysfs_get_sysfs_str(const char *path, const char *val, int len);
+int sysfs_get_sysfs_str(const char *path, char *val, int len);
 void audio_fade_func(void *buf,int fade_size,int is_fadein);
 void ts_wait_time_us(struct timespec *ts, uint32_t time_us);
 int cpy_16bit_data_with_gain(int16_t *dst, int16_t *src, int size_in_bytes, float vol);

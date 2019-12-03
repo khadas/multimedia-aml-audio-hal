@@ -19,6 +19,8 @@
 
 #define MAX_RESAMPLE_CHANNEL 8
 
+#include <stdint.h>
+
 struct resample_para {
     unsigned int FractionStep;
     unsigned int SampleFraction;

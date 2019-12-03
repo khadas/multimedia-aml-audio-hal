@@ -19,7 +19,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AudioSPDIF-wrap"
 #include <stdint.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <system/audio.h>
 #include <audio_utils/spdif/SPDIFEncoder.h>
 #include <tinyalsa/asoundlib.h>

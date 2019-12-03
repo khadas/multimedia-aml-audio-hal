@@ -16,12 +16,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "audio_eq_drc_parser.h"
 #include "iniparser.h"

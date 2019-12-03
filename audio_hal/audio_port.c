@@ -19,7 +19,9 @@
 
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 #include <cutils/log.h>
+#include <cutils/list.h>
 #include <linux/ioctl.h>
 #include <sound/asound.h>
 #include <tinyalsa/asoundlib.h>
@@ -28,6 +30,13 @@
 #include "aml_ringbuffer.h"
 #include "audio_hw_utils.h"
 #include "audio_hwsync.h"
+
+#ifndef list_for_each_safe
+#define list_for_each_safe(node, n, list) \
+    for (node = (list)->next, n = node->next; \
+         node != (list); \
+         node = n, n = node->next)
+#endif
 
 #define BUFF_CNT 4
 #define SYS_BUFF_CNT 4
@@ -41,8 +50,8 @@ static ssize_t input_port_write(struct input_port *port, const void *buffer, int
     if (getprop_bool("media.audiohal.inport")) {
         if (port->port_index == MIXER_INPUT_PORT_PCM_SYSTEM)
             aml_audio_dump_audio_bitstreams("/data/audio/inportSys.raw", buffer, written);
-        //else if (port->port_index == MIXER_INPUT_PORT_PCM_DIRECT)
-            //aml_audio_dump_audio_bitstreams("/data/audio/inportDirect.raw", buffer, written);
+        else if (port->port_index == MIXER_INPUT_PORT_PCM_DIRECT)
+            aml_audio_dump_audio_bitstreams("/data/audio/inportDirect.raw", buffer, written);
     }
 
     ALOGV("%s() written %d", __func__, written);
@@ -113,6 +122,7 @@ enum MIXER_INPUT_PORT get_input_port_index(struct audio_config *config,
             }
         case AUDIO_FORMAT_AC3:
         case AUDIO_FORMAT_E_AC3:
+        case AUDIO_FORMAT_MAT:
             //port_index = MIXER_INPUT_PORT_BITSTREAM_RAW;
             //break;
         default:
@@ -167,7 +177,7 @@ struct port_message *get_inport_message(struct input_port *port)
     if (!list_empty(&port->msg_list)) {
         item = list_head(&port->msg_list);
         p_msg = node_to_item(item, struct port_message, list);
-        ALOGI("%s(), msg: %s", __func__, port_msg_to_str(p_msg->msg_what));
+        ALOGD("%s(), msg: %s", __func__, port_msg_to_str(p_msg->msg_what));
     }
     pthread_mutex_unlock(&port->msg_lock);
     return p_msg;
@@ -486,11 +496,16 @@ static ssize_t output_port_start(struct output_port *port)
         ALOGE("%s(), unsupport", __func__);
         pcm_cfg.format = PCM_FORMAT_S16_LE;
     }
-    ALOGI("%s(), open ALSA hw:%d,%d", __func__, card, device);
+    ALOGI("%s(), port:%p open ALSA hw:%d,%d", __func__, port, card, device);
     pcm = pcm_open(card, device, PCM_OUT | PCM_MONOTONIC, &pcm_cfg);
     if ((pcm == NULL) || !pcm_is_ready(pcm)) {
         ALOGE("cannot open pcm_out driver: %s", pcm_get_error(pcm));
         pcm_close(pcm);
+        return -EINVAL;
+    }
+    if (!pcm_is_ready (pcm) ) {
+        ALOGE ("cannot open pcm_out driver: %s", pcm_get_error (pcm) );
+        pcm_close (pcm);
         return -EINVAL;
     }
     port->pcm_handle = pcm;
@@ -501,14 +516,14 @@ static ssize_t output_port_start(struct output_port *port)
 
 static int output_port_standby(struct output_port *port)
 {
-    struct pcm *pcm = port->pcm_handle;
-    if (pcm) {
+    if (port && port->pcm_handle) {
         ALOGI("%s()", __func__);
-        pcm_close(pcm);
-        pcm = NULL;
+        pcm_close(port->pcm_handle);
+        port->pcm_handle = NULL;
         port->port_status = STOPPED;
+        return 0;
     }
-    return 0;
+    return -EINVAL;
 }
 
 int outport_stop_pcm(struct output_port *port)
@@ -552,8 +567,10 @@ static ssize_t output_port_write_alsa(struct output_port *port, void *buffer, in
         if (ret == 0) {
            written += bytes;
         } else {
-           ALOGE("pcm_write failed ret = %d, pcm_get_error(out->pcm):%s",
-                ret, pcm_get_error(port->pcm_handle));
+           ALOGE("pcm_write port:%p failed ret = %d, pcm_get_error(out->pcm):%s",
+                port, ret, pcm_get_error(port->pcm_handle));
+           if (errno == EBADF)
+               return 0;
            pcm_stop(port->pcm_handle);
            usleep(1000);
         }
@@ -651,6 +668,10 @@ int free_output_port(struct output_port *port)
         return -EINVAL;
     }
 
+    ALOGI("%s(), %d port:%p", __func__, __LINE__, port);
+    if (port->port_status != STOPPED &&
+            port->port_status != IDLE)
+        pcm_close(port->pcm_handle);
     ring_buffer_release(port->r_buf);
     free(port->r_buf);
     free(port->data_buf);

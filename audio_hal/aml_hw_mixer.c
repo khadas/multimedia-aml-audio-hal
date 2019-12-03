@@ -22,6 +22,7 @@
 #include <cutils/log.h>
 
 #include "aml_hw_mixer.h"
+#include "audio_hw_utils.h"
 
 //code here for audio hw mixer when hwsync with af mixer output stream output
 //at the same,need do a software mixer in audio hw c.
@@ -163,6 +164,9 @@ int aml_hw_mixer_mixing(struct aml_hw_mixer *mixer, void *buffer, int bytes, aud
     int32_t i, tail;
     int32_t cached_bytes, read_bytes = bytes;
 
+    if (getprop_bool("media.audiohal.mixer"))
+        aml_audio_dump_audio_bitstreams("/data/audio/beforemix.raw", buffer, bytes);
+
     pthread_mutex_lock(&mixer->lock);
     cached_bytes = aml_hw_mixer_get_content_l(mixer);
     if (cached_bytes < bytes) {
@@ -225,6 +229,9 @@ int aml_hw_mixer_mixing(struct aml_hw_mixer *mixer, void *buffer, int bytes, aud
         ALOGE("%s(), format %#x not supporte!", __func__, format);
     }
     pthread_mutex_unlock(&mixer->lock);
+
+    if (getprop_bool("media.audiohal.mixer"))
+        aml_audio_dump_audio_bitstreams("/data/audio/mixed.raw", buffer, bytes);
 
     return 0;
 }

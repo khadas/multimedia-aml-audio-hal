@@ -95,6 +95,24 @@ int sysfs_set_sysfs_str(const char *path, const char *val)
     return -1;
 }
 
+int  sysfs_get_sysfs_str(const char *path, char *valstr, int size)
+{
+    int fd;
+    fd = open(path, O_RDONLY);
+    if (fd >= 0) {
+        memset(valstr,0,size);
+        read(fd, valstr, size - 1);
+        valstr[strlen(valstr)] = '\0';
+        close(fd);
+    } else {
+        ALOGE("unable to open file %s,err: %s", path, strerror(errno));
+        sprintf(valstr, "%s", "fail");
+        return -1;
+    };
+    //LOGI("get_sysfs_str=%s\n", valstr);
+    return 0;
+}
+
 int get_sysfs_int(const char *path)
 {
     int val = 0;
@@ -168,6 +186,7 @@ int get_codec_type(int format)
     case AUDIO_FORMAT_DTS_HD:
         return TYPE_DTS_HD_MA;
     case AUDIO_FORMAT_DOLBY_TRUEHD:
+    case AUDIO_FORMAT_MAT:
         return TYPE_TRUE_HD;
     case AUDIO_FORMAT_PCM:
         return TYPE_PCM;
@@ -493,11 +512,16 @@ uint32_t out_get_outport_latency(const struct audio_stream_out *stream)
     return latency_ms;
 }
 
-static bool is_4x_rate_fmt(int codec_type)
+static int get_fmt_rate(int codec_type)
 {
-    return (codec_type == TYPE_EAC3) ||
+    int rate = 1;
+    if ((codec_type == TYPE_EAC3) ||
         (codec_type == TYPE_DTS_HD_MA) ||
-        (codec_type == TYPE_DTS_HD);
+        (codec_type == TYPE_DTS_HD))
+        rate = 4;
+    else if (codec_type == TYPE_TRUE_HD)
+        rate = 16;
+    return rate;
 }
 
 uint32_t out_get_latency_frames(const struct audio_stream_out *stream)
@@ -506,13 +530,15 @@ uint32_t out_get_latency_frames(const struct audio_stream_out *stream)
     snd_pcm_sframes_t frames = 0;
     uint32_t whole_latency_frames;
     int ret = 0;
+    //TODO: hal_internal_format may not be the final format to ALSA side (with MS12)
+    //should we use sink and optical format?
     int codec_type = get_codec_type(out->hal_internal_format);
     int mul = 1;
     if (out->dual_output_flag) {
         if (out->hal_internal_format == AUDIO_FORMAT_E_AC3)
             mul = 1;
-    } else if (is_4x_rate_fmt(codec_type))
-        mul = 4;
+    } else
+        mul = get_fmt_rate(codec_type);
 
     whole_latency_frames = out->config.period_size * out->config.period_count;
     if (!out->pcm || !pcm_is_ready(out->pcm)) {
@@ -556,6 +582,9 @@ int aml_audio_get_arc_tuning_latency(audio_format_t arc_fmt)
         break;
     case AUDIO_FORMAT_E_AC3:
         prop_name = "persist.audio.arc_ltcy.ddp";
+        break;
+    case AUDIO_FORMAT_MAT:
+        prop_name = "persist.audio.arc_ltcy.mat";
         break;
     default:
         ALOGE("%s(), unsupported audio arc_fmt: %#x", __func__, arc_fmt);

@@ -285,8 +285,12 @@ ssize_t header_extractor_write(struct hw_avsync_header_extractor *header_extract
             size_t bytes_to_copy = min(bytes_remaining,
                     hwsync_header_get_frame_size(sync_header) - header_extractor->sync_frame_written);
             ALOGV("%s() writing body_bytes= %d,data_size_bytes= %d",
-		    __func__, bytes_to_copy, header_extractor->data_size_bytes);
+                    __func__, bytes_to_copy, header_extractor->data_size_bytes);
 
+            if (header_extractor->data_size_bytes + bytes_to_copy > HW_AVSYNC_FRAME_SIZE) {
+                ALOGE("%s() buffer overflow", __func__);
+                return bytes;
+            }
             memcpy(header_extractor->data + header_extractor->data_size_bytes, data, bytes_to_copy);
             header_extractor->data_size_bytes += bytes_to_copy;
             bytes_remaining -= bytes_to_copy;

@@ -11,6 +11,7 @@ Description:
 #define LOG_TAG "audio_hw_hwsync_cbks"
 //#define LOG_NDEBUG 0
 
+#include <string.h>
 #include <errno.h>
 #include <cutils/log.h>
 #include "hw_avsync_callbacks.h"
@@ -95,13 +96,15 @@ int on_meta_data_cbk(void *cookie,
         ALOGV("%s(), frame_size %d, pts %lldms",
                     __func__, header->frame_size, header->pts/1000000);
     }
+#if 0 //For HW sync the frame size is not necessariy constant, do not need this check
     if (offset != mdata_list->mdata.payload_offset) {
         ALOGV("%s(), offset %lld not equal payload offset %lld, try next time",
                     __func__, offset, mdata_list->mdata.payload_offset);
         ret = -EAGAIN;
         goto err_lock;
     }
-    pts32 = (uint32_t)(header->pts / 1000000 * 90);
+#endif
+    pts32 = (uint32_t)(header->pts *9 / 100000);
     list_remove(&mdata_list->list);
     pthread_mutex_unlock(&out->mdata_lock);
     free(mdata_list);
@@ -112,7 +115,7 @@ int on_meta_data_cbk(void *cookie,
         int delay_count = 0;
         hwsync_header_construct(header);
         pts32 -= latency*90;
-        ALOGD("%s(), set tsync start pts %d, latency %d, last position %lld",
+        ALOGI("%s(), set tsync start pts %d, latency %d, last position %lld",
             __func__, pts32, latency, out->last_frames_postion);
         while (delay_count < 10) {
             vframe_ready_cnt = get_sysfs_int("/sys/class/video/vframe_ready_cnt");

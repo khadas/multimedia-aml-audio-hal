@@ -17,7 +17,7 @@
 #define LOG_TAG "audio_hw_primary"
 //#define LOG_NDEBUG 0
 
-#include <cutils/atomic.h>
+//#include <cutils/atomic.h>
 #include <cutils/log.h>
 #include <cutils/properties.h>
 #include <cutils/str_parms.h>
@@ -30,6 +30,7 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/time.h>

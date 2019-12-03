@@ -17,6 +17,7 @@
 #ifndef _AML_AUDIO_STREAM_H_
 #define _AML_AUDIO_STREAM_H_
 
+#include <compiler.h>
 #include <system/audio.h>
 #include <pthread.h>
 #include "aml_ringbuffer.h"
@@ -101,6 +102,7 @@ static inline bool is_digital_raw_format(audio_format_t format)
     switch (format) {
     case AUDIO_FORMAT_AC3:
     case AUDIO_FORMAT_E_AC3:
+    case AUDIO_FORMAT_MAT:
     case AUDIO_FORMAT_DTS:
     case AUDIO_FORMAT_DTS_HD:
     case AUDIO_FORMAT_DOLBY_TRUEHD:
@@ -178,7 +180,7 @@ static inline alsa_device_t usecase_device_adapter_with_ms12(alsa_device_t useca
     switch (usecase_device) {
     case DIGITAL_DEVICE:
     case I2S_DEVICE:
-        if ((output_format == AUDIO_FORMAT_AC3) || (output_format == AUDIO_FORMAT_E_AC3)) {
+        if ((output_format == AUDIO_FORMAT_AC3) || (output_format == AUDIO_FORMAT_E_AC3) || (output_format == AUDIO_FORMAT_MAT) ) {
             return DIGITAL_DEVICE;
         } else {
             return I2S_DEVICE;

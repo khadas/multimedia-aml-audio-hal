@@ -86,6 +86,8 @@ int aml_audio_delay_process(aml_audio_delay_st *pstAudioDelayHandle, void * in_d
         u32OneMsSize = 192 * 4;// * abs(adev->delay_ms);
     } else if (enFormat == AUDIO_FORMAT_AC3) {
         u32OneMsSize = 48 * 4;// * abs(adev->delay_ms);
+    } else if (enFormat == AUDIO_FORMAT_MAT) {
+        u32OneMsSize = 192 * 4 * 4;// * abs(adev->delay_ms);
     } else {
         u32OneMsSize = 48 * 32;// * abs(adev->delay_ms);
     }

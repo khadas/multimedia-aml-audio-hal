@@ -17,6 +17,8 @@
 #ifndef _AML_ALSA_MIXER_H_
 #define _AML_ALSA_MIXER_H_
 
+#include <pthread.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -27,11 +27,11 @@
 #include <math.h>
 #include <audio_utils/primitives.h>
 #include <audio_utils/sndfile.h>
-#include <utils/Vector.h>
+//#include <utils/Vector.h>
 #include <media/AudioBufferProvider.h>
 #include <media/AudioResampler.h>
-#include <aml_resample_wrap.h>
-#include <utils/Log.h>
+#include "aml_resample_wrap.h"
+#include <cutils/log.h>
 #undef LOG_TAG
 #define LOG_TAG "audio_resample_wrap"
 

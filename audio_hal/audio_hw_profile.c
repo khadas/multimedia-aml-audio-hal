@@ -105,7 +105,11 @@ char*  get_hdmi_sink_cap(const char *keys,audio_format_t format,struct aml_arc_h
         if (strstr(keys, AUDIO_PARAMETER_STREAM_SUP_FORMATS)) {
             ALOGD("query hdmi format...\n");
             size += sprintf(aud_cap, "sup_formats=%s", "AUDIO_FORMAT_PCM_16_BIT");
-            if (mystrstr(infobuf, "Dobly_Digital+")) {
+            if (mystrstr(infobuf, "Dobly_Digital+/ATMOS")) {
+                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_E_AC3");
+                p_hdmi_descs->ddp_fmt.is_support = 1;
+                p_hdmi_descs->ddp_fmt.atmos_supported = 1;
+            } else if (mystrstr(infobuf, "Dobly_Digital+")) {
                 size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_E_AC3");
                 p_hdmi_descs->ddp_fmt.is_support = 1;
             }
@@ -119,8 +123,13 @@ char*  get_hdmi_sink_cap(const char *keys,audio_format_t format,struct aml_arc_h
                 size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DTS");
                 p_hdmi_descs->dts_fmt.is_support = 1;
             }
-            if (mystrstr(infobuf, "MAT")) {
+            if (mystrstr(infobuf, "MAT/ATMOS")) {
+                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_MAT");
+                p_hdmi_descs->mat_fmt.is_support = 1;
+                p_hdmi_descs->mat_fmt.atmos_supported = 1;
+            } else if (mystrstr(infobuf, "MAT")) {
                 size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DOLBY_TRUEHD");
+                p_hdmi_descs->mat_fmt.is_support = 1;
             }
         }
         /*check the channel cap */
@@ -131,7 +140,7 @@ char*  get_hdmi_sink_cap(const char *keys,audio_format_t format,struct aml_arc_h
             if (/*(!alsa_device_is_auge() && mystrstr(infobuf, "PCM, 8 ch")) ||*/
                 (mystrstr(infobuf, "Dobly_Digital+") && format == AUDIO_FORMAT_E_AC3) ||
                 (mystrstr(infobuf, "DTS-HD") && format == AUDIO_FORMAT_DTS_HD) ||
-                (mystrstr(infobuf, "MAT") && format == AUDIO_FORMAT_DOLBY_TRUEHD) ||
+                (mystrstr(infobuf, "MAT") && (format == AUDIO_FORMAT_DOLBY_TRUEHD || format == AUDIO_FORMAT_MAT)) ||
                 format == AUDIO_FORMAT_IEC61937) {
                 size += sprintf(aud_cap + size, "|%s", "AUDIO_CHANNEL_OUT_5POINT1|AUDIO_CHANNEL_OUT_7POINT1");
             } else if (/*(!alsa_device_is_auge() && mystrstr(infobuf, "PCM, 6 ch")) ||*/
@@ -185,6 +194,7 @@ fail:
     }
     return NULL;
 }
+
 char*  get_hdmi_arc_cap(unsigned *ad, int maxsize, const char *keys)
 {
     int i = 0;

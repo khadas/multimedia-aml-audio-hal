@@ -13,6 +13,7 @@ Description:
 #define __USE_GNU
 
 #include <errno.h>
+#include <sched.h>
 #include <cutils/log.h>
 #include <system/audio.h>
 #include <inttypes.h>
@@ -23,7 +24,7 @@ Description:
 #include "audio_hw.h"
 #include "audio_hw_utils.h"
 #include "hw_avsync_callbacks.h"
-#include "../libms12/include/aml_audio_ms12.h"
+#include "../libms12v2/include/aml_audio_ms12.h"
 #include "dolby_lib_api.h"
 #include "alsa_device_parser.h"
 
@@ -183,7 +184,7 @@ static int consume_meta_data(void *cookie,
                 __func__, frame_size, pts/1000000, offset);
     }
     if (get_mixer_hwsync_frame_size(audio_mixer) != frame_size) {
-        ALOGI("%s(), resize frame_size %d", __func__, frame_size);
+        ALOGV("%s(), resize frame_size %d", __func__, frame_size);
         set_mixer_hwsync_frame_size(audio_mixer, frame_size);
     }
     pthread_mutex_lock(&out->mdata_lock);
@@ -206,6 +207,9 @@ static int consume_output_data(void *cookie, const void* buffer, size_t bytes)
     uint64_t us_since_last_write = 0;
     int64_t throttle_timeus = 0;
     int frame_size = 4;
+    void * out_buf = (void*)buffer;
+    size_t out_size = bytes;
+    int bResample = 0;
 
     ALOGV("++%s(), bytes = %d", __func__, bytes);
     if (out->pause_status) {
@@ -214,10 +218,29 @@ static int consume_output_data(void *cookie, const void* buffer, size_t bytes)
 
     clock_gettime(CLOCK_MONOTONIC, &tval);
     apply_volume(out->volume_l, in_buf_16, sizeof(uint16_t), bytes);
-    written = aml_out_write_to_mixer(stream, buffer, bytes);
+    if (out->hw_sync_mode && out->resample_handle != NULL) {
+        int ret;
+        ret = aml_audio_resample_process(out->resample_handle, in_buf_16, bytes);
+        if (ret < 0) {
+            ALOGE("resample process error\n");
+            written = -1;
+            goto exit;
+        }
+        out_buf = out->resample_handle->resample_buffer;
+        out_size = out->resample_handle->resample_size;
+        bResample = 1;
+    }
+    written = aml_out_write_to_mixer(stream, out_buf, out_size);
     if (written < 0) {
         ALOGE("%s(), written failed, %d", __func__, written);
         goto exit;
+    }
+
+    /*here may be a problem, after resample, the size write to mixer is changed,
+      to avoid some problem, we assume it is totally wirtten.
+    */
+    if (bResample) {
+        written = bytes;
     }
 
     clock_gettime(CLOCK_MONOTONIC, &new_tval);
@@ -1200,7 +1223,7 @@ ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, const void *b
         }
         mixer_set_padding_size(sm->mixerData, aml_out->port_index, padding_bytes);
         while (padding_bytes > 0) {
-            ALOGI("padding_bytes %d", padding_bytes);
+            ALOGD("padding_bytes %d", padding_bytes);
             aml_out_write_to_mixer(stream, padding_buf, 512 * 4);
             padding_bytes -= 512 * 4;
         }
@@ -1420,6 +1443,7 @@ int out_standby_subMixingPCM(struct audio_stream *stream)
     }
     aml_out->status = STREAM_STANDBY;
     aml_out->standby = true;
+    aml_out->exiting = true;
     delete_mixer_input_port(audio_mixer, aml_out->port_index);
 
     if (adev->debug_flag > 1) {
@@ -1469,7 +1493,7 @@ static int out_resume_subMixingPCM(struct audio_stream_out *stream)
     struct amlAudioMixer *audio_mixer = NULL;
     int ret = 0;
 
-    ALOGI("+%s(), stream %p, standby %d, pause status %d, usecase: %s",
+    ALOGD("+%s(), stream %p, standby %d, pause status %d, usecase: %s",
             __func__,
             aml_out,
             aml_out->standby,
@@ -1490,7 +1514,7 @@ static int out_resume_subMixingPCM(struct audio_stream_out *stream)
     send_mixer_inport_message(audio_mixer, aml_out->port_index, MSG_RESUME);
 
     aml_out->pause_status = false;
-    ALOGI("-%s()", __func__);
+    ALOGD("-%s()", __func__);
     return 0;
 }
 

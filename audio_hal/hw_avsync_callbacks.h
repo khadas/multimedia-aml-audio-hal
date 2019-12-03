@@ -17,7 +17,7 @@
 
 #ifndef _HW_AVSYNC_CALLBACKS_H
 #define _HW_AVSYNC_CALLBACKS_H
-#include <hw_avsync.h>
+#include "hw_avsync.h"
 
 //int on_notify_cbk(void *data);
 //int on_input_avail_cbk(void *data);
@@ -25,5 +25,5 @@ int on_meta_data_cbk(void *cookie,
             uint64_t offset,
             struct hw_avsync_header *header,
             int *delay_ms);
-enum hwsync_status pcm_check_hwsync_status(uint apts_gap);
+enum hwsync_status pcm_check_hwsync_status(unsigned int apts_gap);
 #endif

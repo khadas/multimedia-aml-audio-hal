@@ -17,6 +17,7 @@
 #define LOG_TAG "audio_hw_primary"
 //#define LOG_NDEBUG 0
 
+#include <string.h>
 #include <cutils/log.h>
 #include <system/audio.h>
 #include <hardware/audio.h>
@@ -33,6 +34,7 @@
 
 #define AUDIO_EAC3_FRAME_SIZE 16
 #define AUDIO_AC3_FRAME_SIZE 4
+#define AUDIO_MAT_FRAME_SIZE 64
 #define AUDIO_TV_PCM_FRAME_SIZE 32
 #define AUDIO_DEFAULT_PCM_FRAME_SIZE 4
 
@@ -142,8 +144,13 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
         ALOGI("%s, audio open card(%d), device(%d)", __func__, card, device_index);
         ALOGI("ALSA open configs: channels %d format %d period_count %d period_size %d rate %d",
               config->channels, config->format, config->period_count, config->period_size, config->rate);
+#ifndef TINYALSA_VERSION
         ALOGI("ALSA open configs: threshold start %u stop %u silence %u silence_size %d avail_min %d",
               config->start_threshold, config->stop_threshold, config->silence_threshold, config->silence_size, config->avail_min);
+#else
+        ALOGI("ALSA open configs: threshold start %u stop %u",
+              config->start_threshold, config->stop_threshold, config->silence_threshold);
+#endif
         pcm = pcm_open(card, device_index, PCM_OUT, config);
         if (!pcm || !pcm_is_ready(pcm)) {
             ALOGE("%s, pcm %p open [ready %d] failed", __func__, pcm, pcm_is_ready(pcm));
@@ -280,6 +287,9 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
         break;
     case AUDIO_FORMAT_AC3:
         frame_size = AUDIO_AC3_FRAME_SIZE;
+        break;
+    case AUDIO_FORMAT_MAT:
+        frame_size = AUDIO_MAT_FRAME_SIZE;
         break;
     default:
         frame_size = (aml_out->is_tv_platform == true) ? AUDIO_TV_PCM_FRAME_SIZE : AUDIO_DEFAULT_PCM_FRAME_SIZE;
@@ -515,7 +525,7 @@ int alsa_depop(int card)
 }
 
 size_t aml_alsa_input_read(struct audio_stream_in *stream,
-                        const void *buffer,
+                        void *buffer,
                         size_t bytes)
 {
     struct aml_stream_in *in = (struct aml_stream_in *)stream;
@@ -527,15 +537,15 @@ size_t aml_alsa_input_read(struct audio_stream_in *stream,
     struct pcm *pcm_handle = in->pcm;
     size_t frame_size = in->config.channels * pcm_format_to_bits(in->config.format) / 8;
     while (read_bytes < bytes) {
-        ret = pcm_read(pcm_handle, (unsigned char *)buffer + read_bytes, bytes - read_bytes);
-        if (ret >= 0) {
-            read_bytes += ret*frame_size;
-        }
+        size_t remaining = bytes - read_bytes;
+        ret = pcm_read(pcm_handle, (unsigned char *)buffer + read_bytes, remaining);
+
         if (patch && patch->input_thread_exit) {
-            memset((void*)buffer,0,bytes);
+            memset(buffer,0,bytes);
             return 0;
         }
-        if (ret >= 0) {
+        if (!ret) {
+            read_bytes += remaining;
             ALOGV("ret:%d read_bytes:%d, bytes:%d ",ret,read_bytes,bytes);
         } else if (ret != -EAGAIN ) {
             ALOGE("%s:%d, pcm_read fail, ret:%#x, error info:%s", __func__, __LINE__, ret, strerror(errno));

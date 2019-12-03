@@ -17,6 +17,7 @@
 #ifndef __ALSA_DEVICE_PARSER_H__
 #define __ALSA_DEVICE_PARSER_H__
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
 

@@ -17,6 +17,8 @@
 #define LOG_TAG "audio_hw_primary"
 //#define LOG_NDEBUG 0
 
+#include <string.h>
+#include <time.h>
 #include <cutils/log.h>
 #include <linux/ioctl.h>
 #include <sound/asound.h>
@@ -198,6 +200,8 @@ static int aml_dev_sample_audio_path_latency(struct aml_audio_device *aml_dev)
 
         if (patch->aformat == AUDIO_FORMAT_E_AC3) {
             in_path_ltcy /= EAC3_MULTIPLIER;
+        } else if (patch->aformat == AUDIO_FORMAT_MAT) {
+            in_path_ltcy /= MAT_MULTIPLIER;
         }
 
         if (aml_dev->sink_format == AUDIO_FORMAT_PCM_16_BIT) {
@@ -206,6 +210,8 @@ static int aml_dev_sample_audio_path_latency(struct aml_audio_device *aml_dev)
             out_path_ltcy = alsa_out_spdif_ltcy;
         } else if (aml_dev->sink_format == AUDIO_FORMAT_E_AC3) {
             out_path_ltcy = alsa_out_spdif_ltcy / EAC3_MULTIPLIER;
+        } else if (aml_dev->sink_format == AUDIO_FORMAT_MAT) {
+            out_path_ltcy = alsa_out_spdif_ltcy / MAT_MULTIPLIER;
         }
 
         whole_path_ltcy = in_path_ltcy + out_path_ltcy;
@@ -317,7 +323,7 @@ static inline void aml_dev_avsync_reset(struct aml_audio_patch *patch)
 
 int aml_dev_try_avsync(struct aml_audio_patch *patch)
 {
-    int av_diff = 0, factor = (patch->aformat == AUDIO_FORMAT_E_AC3) ? 2 : 1;
+    int av_diff = 0;
     struct aml_audio_device *aml_dev = (struct aml_audio_device *)patch->dev;
     int ret = 0;
 
@@ -348,7 +354,6 @@ int aml_dev_try_avsync(struct aml_audio_patch *patch)
 
     if (patch->do_tune) {
         int tune_val = patch->av_diffs / (patch->avsync_sample_accumed - 5);
-        //tune_val += 50/factor;
         int user_tune_val = aml_audio_get_src_tune_latency(aml_dev->patch_src);
         ALOGV("%s(), av user tuning latency = %dms",
               __func__, user_tune_val);

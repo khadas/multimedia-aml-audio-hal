@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <sys/time.h>
+#include <time.h>
 #include <stdlib.h>
 
 #ifndef __USE_GNU

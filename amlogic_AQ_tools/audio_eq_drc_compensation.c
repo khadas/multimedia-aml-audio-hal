@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <compiler.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>

@@ -18,6 +18,7 @@
 
 #include <cutils/log.h>
 #include <stdlib.h>
+#include <string.h>
 #include "aml_audio_stream.h"
 #include "audio_android_resample_api.h"
 #include "aml_resample_wrap.h"

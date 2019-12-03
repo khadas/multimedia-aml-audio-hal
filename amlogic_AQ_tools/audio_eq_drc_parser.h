@@ -17,6 +17,8 @@
 #ifndef _AUDIO_EQ_DRC_PARSER_H_
 #define _AUDIO_EQ_DRC_PARSER_H_
 
+#include <stdbool.h>
+
 #define MAX_NAME_SIZE 32
 #define MAX_FILE_NAME_SIZE 128
 #define MAX_EXT_AMP_NUM 8

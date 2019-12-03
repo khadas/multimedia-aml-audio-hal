@@ -68,7 +68,7 @@
  */
 static void dump_ms12_output_data(void *buffer, int size, char *file_name)
 {
-    if (aml_getprop_bool("media.audiohal.outdump")) {
+    if (aml_getprop_bool("media.audiohal.outdump.ms12")) {
         FILE *fp1 = fopen(file_name, "a+");
         if (fp1) {
             int flen = fwrite((char *)buffer, 1, size, fp1);
@@ -92,7 +92,9 @@ int dolby_ms12_register_callback(struct aml_stream_out *aml_out)
             ret = dolby_ms12_register_pcm_callback(pcm_output, (void *)aml_out);
             ALOGI("%s() dolby_ms12_register_pcm_callback return %d", __FUNCTION__, ret);
         }
-        if (adev->optical_format == AUDIO_FORMAT_AC3 || adev->optical_format == AUDIO_FORMAT_E_AC3) {
+        if (adev->optical_format == AUDIO_FORMAT_AC3 ||
+            adev->optical_format == AUDIO_FORMAT_E_AC3 ||
+            adev->optical_format == AUDIO_FORMAT_MAT) {
             ret = dolby_ms12_register_bitstream_callback(bitstream_output, (void *)aml_out);
             ALOGI("%s() dolby_ms12_register_bitstream_callback return %d", __FUNCTION__, ret);
         }
@@ -121,14 +123,14 @@ int get_the_dolby_ms12_prepared(
     , audio_channel_mask_t input_channel_mask
     , int input_sample_rate)
 {
-    ALOGI("+%s()", __FUNCTION__);
+    ALOGD("+%s()", __FUNCTION__);
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     int dolby_ms12_drc_mode = DOLBY_DRC_RF_MODE;
     struct aml_stream_out *out;
-    ALOGI("\n+%s()", __FUNCTION__);
+    ALOGD("\n+%s()", __FUNCTION__);
     pthread_mutex_lock(&ms12->lock);
-    ALOGI("++%s(), locked", __FUNCTION__);
+    ALOGD("++%s(), locked", __FUNCTION__);
     set_audio_system_format(AUDIO_FORMAT_PCM_16_BIT);
     /*
     when HDMITX send pause frame,we treated as INVALID format.
@@ -138,7 +140,7 @@ int get_the_dolby_ms12_prepared(
         input_format = AUDIO_FORMAT_PCM_16_BIT;
     }
     set_audio_main_format(input_format);
-    ALOGI("+%s() dual_decoder_support %d\n", __FUNCTION__, adev->dual_decoder_support);
+    ALOGD("+%s() dual_decoder_support %d\n", __FUNCTION__, adev->dual_decoder_support);
 
 #ifdef DOLBY_MS12_OUTPUT_FORMAT_TEST
     {
@@ -261,9 +263,9 @@ int get_the_dolby_ms12_prepared(
             ALOGI("%s() thread is builded, get dolby_ms12_threadID %ld\n", __FUNCTION__, ms12->dolby_ms12_threadID);
         }
     }
-    ALOGI("--%s(), locked", __FUNCTION__);
+    ALOGD("--%s(), locked", __FUNCTION__);
     pthread_mutex_unlock(&ms12->lock);
-    ALOGI("-%s()\n\n", __FUNCTION__);
+    ALOGD("-%s()\n\n", __FUNCTION__);
     return ret;
 
 Err_dolby_ms12_thread:
@@ -609,8 +611,8 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12)
 
     pthread_mutex_lock(&ms12->lock);
     pthread_mutex_lock(&ms12->main_lock);
-    ALOGI("++%s(), locked", __FUNCTION__);
-    ALOGI("%s() dolby_ms12_set_quit_flag %d", __FUNCTION__, is_quit);
+    ALOGD("++%s(), locked", __FUNCTION__);
+    ALOGD("%s() dolby_ms12_set_quit_flag %d", __FUNCTION__, is_quit);
     dolby_ms12_set_quit_flag(is_quit);
 
     if (ms12->dolby_ms12_threadID != 0) {
@@ -633,10 +635,10 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12)
     ms12->bitsteam_cnt = 0;
     audio_virtual_buf_close(&ms12->main_virtual_buf_handle);
     audio_virtual_buf_close(&ms12->system_virtual_buf_handle);
-    ALOGI("--%s(), locked", __FUNCTION__);
+    ALOGD("--%s(), locked", __FUNCTION__);
     pthread_mutex_unlock(&ms12->main_lock);
     pthread_mutex_unlock(&ms12->lock);
-    ALOGI("-%s()", __FUNCTION__);
+    ALOGD("-%s()", __FUNCTION__);
     return 0;
 }
 

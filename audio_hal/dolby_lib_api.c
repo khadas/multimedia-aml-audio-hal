@@ -93,9 +93,13 @@ enum eDolbyLibType detect_dolby_lib_type(void) {
         //try to open lib see if it's OK?
         hDolbyMS12LibHanle = dlopen(DOLBY_MS12_LIB_PATH_A, RTLD_NOW);
         if (!hDolbyMS12LibHanle) {
+            ALOGI("%s, failed to load libdolbyms12 lib from %s (%s)\n",
+                __FUNCTION__, DOLBY_MS12_LIB_PATH_A, dlerror());
+
             hDolbyMS12LibHanle = dlopen(DOLBY_MS12_LIB_PATH_B, RTLD_NOW);
             if (!hDolbyMS12LibHanle) {
-                ALOGI("%s, failed to load libdolbyms12 lib %s\n", __FUNCTION__, dlerror());
+                ALOGI("%s, failed to load libdolbyms12 lib from %s (%s)\n",
+                    __FUNCTION__, DOLBY_MS12_LIB_PATH_B, dlerror());
             }
         }
     }

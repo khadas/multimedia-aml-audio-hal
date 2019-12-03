@@ -28,6 +28,8 @@
 
 #define IEC61937_PACKET_SIZE_OF_AC3     0x1800
 #define IEC61937_PACKET_SIZE_OF_EAC3    0x6000
+#define IEC61937_PACKET_SIZE_OF_MAT     0xf000
+
 /*
  *@brief get the spdif encoder output buffer
  */
@@ -40,10 +42,13 @@ int config_spdif_encoder_output_buffer(audio_format_t format, struct aml_audio_d
      */
     int ac3_coef = 64;
     int eac3_coef = 32;
+    int mat_coef = 32;
     if (format == AUDIO_FORMAT_AC3)
         adev->temp_buf_size = IEC61937_PACKET_SIZE_OF_AC3 * ac3_coef;//0x1800bytes is 6block of ac3
-    else
+    else if (format == AUDIO_FORMAT_E_AC3)
         adev->temp_buf_size = IEC61937_PACKET_SIZE_OF_EAC3 * eac3_coef;//0x6000bytes is 6block of eac3
+    else if (format == AUDIO_FORMAT_MAT)
+        adev->temp_buf_size = IEC61937_PACKET_SIZE_OF_MAT * mat_coef;
     adev->temp_buf_pos = 0;
     adev->temp_buf = (void *)malloc(adev->temp_buf_size);
     ALOGV("-%s() temp_buf_size %x\n", __FUNCTION__, adev->temp_buf_size);
@@ -82,7 +87,7 @@ int get_the_spdif_encoder_prepared(audio_format_t format, struct aml_stream_out 
     int ret = -1;
     struct aml_audio_device *adev = aml_out->dev;
 
-    if ((format == AUDIO_FORMAT_AC3) || (format == AUDIO_FORMAT_E_AC3)) {
+    if ((format == AUDIO_FORMAT_AC3) || (format == AUDIO_FORMAT_E_AC3) || (format == AUDIO_FORMAT_MAT)) {
         ret = config_spdif_encoder_output_buffer(format, adev);
         if (ret != 0) {
             ALOGE("-%s() config_spdif_encoder_output_buffer fail", __FUNCTION__);

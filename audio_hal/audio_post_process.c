@@ -10,6 +10,7 @@
 
 #define LOG_TAG "audio_post_process"
 
+#include <string.h>
 #include <cutils/log.h>
 #include "audio_post_process.h"
 int audio_post_process(effect_handle_t effect, int16_t *in_buffer, size_t out_frames)

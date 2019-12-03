@@ -20,6 +20,7 @@
 #define __USE_GNU
 #include <cutils/log.h>
 #include <errno.h>
+#include <sched.h>
 #include <pthread.h>
 #include <sys/prctl.h>
 #include <stdlib.h>

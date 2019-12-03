@@ -48,6 +48,7 @@ enum audio_type {
 /*Period of data burst in IEC60958 frames*/
 #define AC3_PERIOD_SIZE  (6144)
 #define EAC3_PERIOD_SIZE (24576)
+#define MAT_PERIOD_SIZE  (61440)
 #define THD_PERIOD_SIZE  (61440)
 
 #define DTS1_PERIOD_SIZE (2048)

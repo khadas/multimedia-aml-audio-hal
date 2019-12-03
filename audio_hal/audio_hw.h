@@ -17,6 +17,7 @@
 #ifndef _AUDIO_HW_H_
 #define _AUDIO_HW_H_
 
+#include <atomic.h>
 #include <audio_utils/resampler.h>
 #include <hardware/audio.h>
 #include <cutils/list.h>
@@ -43,7 +44,7 @@
 #include "audio_format_parse.h"
 #include "aml_alsa_mixer.h"
 //#include "aml_audio_ms12.h"
-#include "../libms12/include/aml_audio_ms12.h"
+#include "../libms12v2/include/aml_audio_ms12.h"
 //#include "aml_audio_mixer.h"
 #include "audio_port.h"
 #include "aml_audio_ease.h"
@@ -102,6 +103,7 @@ static unsigned int DEFAULT_OUT_SAMPLING_RATE = 48000;
 
 #define DDP_FRAME_SIZE      768
 #define EAC3_MULTIPLIER 4
+#define MAT_MULTIPLIER  16
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
@@ -174,7 +176,7 @@ struct format_desc {
      */
     unsigned int sample_rate_mask;
     unsigned int max_bit_rate;
-    /* only used by dd+ format */
+    /* only used by dd+ and mat format */
     bool   atmos_supported;
 };
 
@@ -185,6 +187,7 @@ struct aml_arc_hdmi_desc {
     struct format_desc dtshd_fmt;
     struct format_desc dd_fmt;
     struct format_desc ddp_fmt;
+    struct format_desc mat_fmt;
 };
 
 struct drc_data {
@@ -382,7 +385,7 @@ struct aml_audio_device {
     struct aml_hw_mixer hw_mixer;
     audio_format_t sink_format;
     audio_format_t optical_format;
-    volatile int32_t next_unique_ID;
+    atomic_t next_unique_ID;
     /* list head for audio_patch */
     struct listnode patch_list;
 
@@ -593,6 +596,7 @@ struct aml_stream_out {
     bool need_convert;
     size_t last_playload_used;
     void * alsa_vir_buf_handle;
+    aml_audio_resample_t *resample_handle;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);
@@ -649,11 +653,11 @@ struct aml_stream_in {
 typedef  int (*do_standby_func)(struct aml_stream_out *out);
 typedef  int (*do_startup_func)(struct aml_stream_out *out);
 
-inline int continous_mode(struct aml_audio_device *adev)
+static inline int continous_mode(struct aml_audio_device *adev)
 {
     return adev->continuous_audio_mode;
 }
-inline bool direct_continous(struct audio_stream_out *stream)
+static inline bool direct_continous(struct audio_stream_out *stream)
 {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = out->dev;
@@ -663,7 +667,7 @@ inline bool direct_continous(struct audio_stream_out *stream)
         return false;
     }
 }
-inline bool primary_continous(struct audio_stream_out *stream)
+static inline bool primary_continous(struct audio_stream_out *stream)
 {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = out->dev;
@@ -674,14 +678,16 @@ inline bool primary_continous(struct audio_stream_out *stream)
     }
 }
 /* called when adev locked */
-inline int dolby_stream_active(struct aml_audio_device *adev)
+static inline int dolby_stream_active(struct aml_audio_device *adev)
 {
     int i = 0;
     int is_dolby = 0;
     struct aml_stream_out *out = NULL;
     for (i = 0 ; i < STREAM_USECASE_MAX; i++) {
         out = adev->active_outputs[i];
-        if (out && (out->hal_internal_format == AUDIO_FORMAT_AC3 || out->hal_internal_format == AUDIO_FORMAT_E_AC3)) {
+        if (out && (out->hal_internal_format == AUDIO_FORMAT_AC3 ||
+                    out->hal_internal_format == AUDIO_FORMAT_E_AC3 ||
+                    out->hal_internal_format == AUDIO_FORMAT_MAT)) {
             is_dolby = 1;
             break;
         }
@@ -689,7 +695,7 @@ inline int dolby_stream_active(struct aml_audio_device *adev)
     return is_dolby;
 }
 /* called when adev locked */
-inline int hwsync_lpcm_active(struct aml_audio_device *adev)
+static inline int hwsync_lpcm_active(struct aml_audio_device *adev)
 {
     int i = 0;
     int is_hwsync_lpcm = 0;
@@ -704,7 +710,7 @@ inline int hwsync_lpcm_active(struct aml_audio_device *adev)
     return is_hwsync_lpcm;
 }
 
-inline struct aml_stream_out *direct_active(struct aml_audio_device *adev)
+static inline struct aml_stream_out *direct_active(struct aml_audio_device *adev)
 {
     int i = 0;
     struct aml_stream_out *out = NULL;

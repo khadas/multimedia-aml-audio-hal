@@ -19,6 +19,7 @@
 #ifndef _AUDIO_HWSYNC_H_
 #define _AUDIO_HWSYNC_H_
 
+#include <pthread.h>
 #include <stdbool.h>
 
 #define TSYNC_FIRSTAPTS "/sys/class/tsync/firstapts"
@@ -66,7 +67,8 @@ typedef struct  audio_hwsync {
     int hw_sync_state;
     uint32_t hw_sync_body_cnt;
     uint32_t hw_sync_frame_size;
-    uint8_t hw_sync_body_buf[8192];  // 4096
+    //uint8_t hw_sync_body_buf[8192];  // 4096
+    uint8_t hw_sync_body_buf[24576];    // 6144*4 for EAC3 worst case
     uint8_t body_align[64];
     uint8_t body_align_cnt;
     bool first_apts_flag;//flag to indicate set first apts

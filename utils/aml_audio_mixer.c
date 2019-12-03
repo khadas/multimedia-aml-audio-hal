@@ -17,6 +17,7 @@
 #define LOG_TAG "aml_audio_mixer"
 //#define LOG_NDEBUG 0
 
+#include <compiler.h>
 #include <cutils/log.h>
 #include <errno.h>
 #include <pthread.h>

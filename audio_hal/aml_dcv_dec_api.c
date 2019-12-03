@@ -312,11 +312,19 @@ static int Get_Parameters(void *buf, int *sample_rate, int *frame_size, int *ChN
     if ((ptr8[0] == 0x0b) && (ptr8[1] == 0x77)) {
         int i;
         uint8_t tmp;
+#if 0
         for (i = 0; i < PTR_HEAD_SIZE; i += 2) {
             tmp = ptr8[i];
             ptr8[i] = ptr8[i + 1];
             ptr8[i + 1] = tmp;
         }
+#else
+        for (i = 0; i < PTR_HEAD_SIZE/2; i++) {
+           tmp = ptr8[2*i];
+           ptr8[2*i] = ptr8[2*i+1];
+           ptr8[2*i+1] = tmp;
+        }
+#endif
     }
 
     ddbs_init((short*) ptr8, 0, p_bstrm);
