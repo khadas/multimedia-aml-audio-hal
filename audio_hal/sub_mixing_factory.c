@@ -1581,6 +1581,11 @@ static int out_flush_subMixingPCM(struct audio_stream_out *stream)
 int switchNormalStream(struct aml_stream_out *aml_out, bool on)
 {
     ALOGI("+%s() stream %p, on = %d", __func__, aml_out, on);
+    if (!aml_out) {
+        ALOGE("%s(), no stream", __func__);
+        return -EINVAL;
+
+    }
     if (!aml_out->is_normal_pcm) {
         ALOGE("%s(), not normal pcm stream", __func__);
         return -EINVAL;
