@@ -10997,10 +10997,10 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 #endif
 #else
     adev->is_STB = property_get_bool("ro.vendor.platform.is.stb", false);
-    adev->sink_gain[OUTPORT_SPEAKER] = 1.0;
-    adev->sink_gain[OUTPORT_HDMI] = 1.0;
     ALOGI("%s(), OTT platform", __func__);
 #endif
+    adev->sink_gain[OUTPORT_SPEAKER] = 1.0;
+    adev->sink_gain[OUTPORT_HDMI] = 1.0;
 
     adev->useSubMix = false;
 #ifdef SUBMIXER_V1_1
