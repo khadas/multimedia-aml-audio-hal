@@ -80,40 +80,6 @@ static void dump_ms12_output_data(void *buffer, int size, char *file_name)
 
 static void *dolby_ms12_threadloop(void *data);
 
-int dolby_ms12_register_callback(struct aml_stream_out *aml_out)
-{
-    ALOGI("\n+%s()", __FUNCTION__);
-    struct aml_audio_device *adev = aml_out->dev;
-    int ret = 0;
-#ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
-    if (aml_out->dual_output_flag) {
-        /*dual output, output format contains both AUDIO_FORMAT_PCM_16_BIT and AUDIO_FORMAT_AC3*/
-        if (adev->sink_format == AUDIO_FORMAT_PCM_16_BIT) {
-            ret = dolby_ms12_register_pcm_callback(pcm_output, (void *)aml_out);
-            ALOGI("%s() dolby_ms12_register_pcm_callback return %d", __FUNCTION__, ret);
-        }
-        if (adev->optical_format == AUDIO_FORMAT_AC3 ||
-            adev->optical_format == AUDIO_FORMAT_E_AC3 ||
-            adev->optical_format == AUDIO_FORMAT_MAT) {
-            ret = dolby_ms12_register_bitstream_callback(bitstream_output, (void *)aml_out);
-            ALOGI("%s() dolby_ms12_register_bitstream_callback return %d", __FUNCTION__, ret);
-        }
-    } else {
-        /*Single output, output format is AUDIO_FORMAT_PCM_16_BIT or AUDIO_FORMAT_AC3 or AUDIO_Format_E_AC3*/
-        if (adev->sink_format == AUDIO_FORMAT_PCM_16_BIT) {
-            ret = dolby_ms12_register_pcm_callback(pcm_output, (void *)aml_out);
-            ALOGI("%s() dolby_ms12_register_pcm_callback return %d", __FUNCTION__, ret);
-        } else {
-            ret = dolby_ms12_register_bitstream_callback(bitstream_output, (void *)aml_out);
-            ALOGI("%s() dolby_ms12_register_bitstream_callback return %d", __FUNCTION__, ret);
-        }
-    }
-    ALOGI("-%s() ret %d\n\n", __FUNCTION__, ret);
-#endif
-    return ret;
-
-}
-
 /*
  *@brief get dolby ms12 prepared
  */
@@ -241,7 +207,7 @@ int get_the_dolby_ms12_prepared(
     }
     if (ms12->dolby_ms12_enable) {
         //register Dolby MS12 callback
-        dolby_ms12_register_callback(out);
+        dolby_ms12_register_output_callback(ms12_output, (void *)out);
         ms12->device = usecase_device_adapter_with_ms12(out->device, adev->sink_format);
         ALOGI("%s out [dual_output_flag %d] adev [format sink %#x optical %#x] ms12 [output-format %#x device %d]",
               __FUNCTION__, out->dual_output_flag, adev->sink_format, adev->optical_format, ms12->output_format, ms12->device);
@@ -460,12 +426,13 @@ MAIN_INPUT:
                     , ms12->dolby_ms12_out_max_size);
             if (ms12_output_size > 0) {
                 audio_format_t output_format = get_output_format(stream);
-                if (0 == audio_hal_data_processing(stream
+                if (0 == audio_hal_data_processing_ms12v2(stream
                                                    , ms12->dolby_ms12_out_data
                                                    , ms12_output_size
                                                    , &output_buffer
                                                    , &output_buffer_bytes
-                                                   , output_format)) {
+                                                   , output_format,
+                                                   , 8)) {
                     hw_write(stream, output_buffer, output_buffer_bytes, output_format);
                 }
             }
@@ -678,68 +645,55 @@ exit:
 }
 
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
-int pcm_output(void *buffer, void *priv_data, size_t size)
-{
-    struct aml_stream_out *aml_out = (struct aml_stream_out *)priv_data;
-    struct aml_audio_device *adev = aml_out->dev;
-    void *output_buffer = NULL;
-    size_t output_buffer_bytes = 0;
-    audio_format_t output_format = AUDIO_FORMAT_PCM_16_BIT;
-    int ret = 0;
-
-    if (adev->debug_flag > 1) {
-        ALOGI("+%s() size %zu", __FUNCTION__, size);
-    }
-
-    /*dump ms12 pcm output*/
-    dump_ms12_output_data(buffer, size, MS12_OUTPUT_PCM_FILE);
-
-    if (audio_hal_data_processing((struct audio_stream_out *)aml_out, buffer, size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
-        ret = hw_write((struct audio_stream_out *)aml_out, output_buffer, output_buffer_bytes, output_format);
-    }
-
-    if (adev->debug_flag > 1) {
-        ALOGI("-%s() ret %d", __FUNCTION__, ret);
-    }
-
-    return ret;
-}
-
-int bitstream_output(void *buffer, void *priv_data, size_t size)
+int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12_info)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)priv_data;
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     void *output_buffer = NULL;
     size_t output_buffer_bytes = 0;
-    audio_format_t output_format = AUDIO_FORMAT_AC3;
+    audio_format_t output_format = (ms12_info) ? ms12_info->data_type : AUDIO_FORMAT_PCM_16_BIT;
     int ret = 0;
-    uint64_t before_time;
-    uint64_t after_time;
     ms12->bitsteam_cnt++;
 
     if (adev->debug_flag > 1) {
         ALOGI("+%s() size %zu,dual_output = %d, optical_format = %d, sink_format = %d out total=%d main in=%d", __FUNCTION__, size, aml_out->dual_output_flag, adev->optical_format, adev->sink_format, ms12->bitsteam_cnt, ms12->input_total_ms);
     }
 
-    /*dump ms12 bitstream output*/
-    dump_ms12_output_data(buffer, size, MS12_OUTPUT_BITSTREAM_FILE);
+    if (output_format != AUDIO_FORMAT_PCM_16_BIT) {
+        /* bit stream output */
 
-    before_time = aml_audio_get_systime();
+        /*dump ms12 bitstream output*/
+        dump_ms12_output_data(buffer, size, MS12_OUTPUT_BITSTREAM_FILE);
 
-    if (aml_out->dual_output_flag) {
-        output_format = adev->optical_format;
-        struct audio_stream_out *stream_out = (struct audio_stream_out *)aml_out;
-        ret = aml_audio_spdif_output(stream_out, buffer, size);
-    } else {
-        output_format = adev->sink_format;
+        if (aml_out->dual_output_flag) {
+            struct audio_stream_out *stream_out = (struct audio_stream_out *)aml_out;
+            output_format = adev->optical_format;
+            ret = aml_audio_spdif_output(stream_out, buffer, size);
+        } else {
+            output_format = adev->sink_format;
+            if (audio_hal_data_processing((struct audio_stream_out *)aml_out, buffer, size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
+                ret = hw_write((struct audio_stream_out *)aml_out, output_buffer, output_buffer_bytes, output_format);
+            }
+        }
+
+        return ret;
+    }
+
+    /* pcm output */
+
+    /*dump ms12 pcm output*/
+    dump_ms12_output_data(buffer, size, MS12_OUTPUT_PCM_FILE);
+    if (ms12_info->output_ch == 2) {
         if (audio_hal_data_processing((struct audio_stream_out *)aml_out, buffer, size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
             ret = hw_write((struct audio_stream_out *)aml_out, output_buffer, output_buffer_bytes, output_format);
         }
     }
-    after_time = aml_audio_get_systime();
-
-
+    else {
+        if (audio_hal_data_processing_ms12v2((struct audio_stream_out *)aml_out, buffer, size, &output_buffer, &output_buffer_bytes, output_format, ms12_info->output_ch) == 0) {
+            ret = hw_write((struct audio_stream_out *)aml_out, output_buffer, output_buffer_bytes, output_format);
+        }
+    }
 
     if (adev->debug_flag > 1) {
         ALOGI("-%s() ret %d", __FUNCTION__, ret);

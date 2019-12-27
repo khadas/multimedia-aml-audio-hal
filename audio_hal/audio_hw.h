@@ -749,6 +749,24 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream
                                   , audio_format_t output_format);
 
 /*
+ *@brief audio_hal_data_processing_ms12v2
+ * format:
+ *    if pcm-16bits-8ch, mapping to 8ch
+ *    if raw data, packet it to IEC61937 format with spdif encoder
+ *    if IEC61937 format, write them to hardware
+ * return
+ *    0, success
+ *    -1, fail
+ */
+ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream
+                                  , const void *input_buffer
+                                  , size_t input_buffer_bytes
+                                  , void **output_buffer
+                                  , size_t *output_buffer_bytes
+                                  , audio_format_t output_format
+                                  , int n_ms12_channel);
+
+/*
  *@brief hw_write the api to write the data to audio hardware
  */
 ssize_t hw_write(struct audio_stream_out *stream

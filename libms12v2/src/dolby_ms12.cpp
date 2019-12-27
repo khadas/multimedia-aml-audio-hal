@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "libms12"
+#define LOG_TAG "libms12v2"
 // #define LOG_NDEBUG 0
 // #define LOG_NALOGV 0
 
@@ -178,26 +178,15 @@ extern "C" int dolby_ms12_input_system(void *dolbyMS12_pointer
 }
 
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
-extern "C" int dolby_ms12_register_pcm_callback(void *callback, void *priv_data)
+extern "C" int dolby_ms12_register_output_callback(void *callback, void *priv_data)
 {
     android::DolbyMS12* dolby_ms12_instance = getInstance();
     if (dolby_ms12_instance) {
-        return dolby_ms12_instance->DolbyMS12RegisterPCMCallback((android::output_callback)callback, priv_data);
+        return dolby_ms12_instance->DolbyMS12RegisterOutputCallback((android::output_callback)callback, priv_data);
     } else {
         return -1;
     }
 }
-
-extern "C" int dolby_ms12_register_bitstream_callback(void *callback, void *priv_data)
-{
-    android::DolbyMS12* dolby_ms12_instance = getInstance();
-    if (dolby_ms12_instance) {
-        return dolby_ms12_instance->DolbyMS12RegisterBitstreamCallback((android::output_callback)callback, priv_data);
-    } else {
-        return -1;
-    }
-}
-
 #else
 
 extern "C" int dolby_ms12_output(void *dolbyMS12_pointer

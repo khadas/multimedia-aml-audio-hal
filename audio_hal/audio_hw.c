@@ -85,6 +85,7 @@
 #include <dolby_ms12_status.h>
 #include <SPDIFEncoderAD.h>
 #include "audio_hw_ms12.h"
+#include "dolby_ms12.h"
 #include "dolby_lib_api.h"
 
 //#define ENABLE_NANO_NEW_PATH 1
@@ -6817,6 +6818,216 @@ static void output_mute(struct audio_stream_out *stream, size_t *output_buffer_b
     return;
 }
 #define EQ_GAIN_DEFAULT (0.16)
+/* ms12v2 output format is 8 channel 16 bit */
+ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream,
+                                const void *buffer,
+                                size_t bytes,
+                                void **output_buffer,
+                                size_t *output_buffer_bytes,
+                                audio_format_t output_format,
+				int nchannels)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
+    struct aml_audio_device *adev = aml_out->dev;
+    int16_t *tmp_buffer = (int16_t *) buffer;
+    int16_t *effect_tmp_buf = NULL;
+    int out_frames = bytes / (nchannels * 2); /* input is nchannel 16 bit */
+    size_t i;
+    int j, ret;
+    uint32_t latency_frames = 0;
+    uint64_t total_frame = 0;
+
+    /* raw data need packet to IEC61937 format by spdif encoder */
+    if ((output_format == AUDIO_FORMAT_AC3) || (output_format == AUDIO_FORMAT_E_AC3) || (output_format == AUDIO_FORMAT_MAT)) {
+        //ALOGI("%s, aml_out->hal_format %x , is_iec61937_format = %d, \n", __func__, aml_out->hal_format,is_iec61937_format(stream));
+        if ((is_iec61937_format(stream) == true) ||
+            (adev->dolby_lib_type == eDolbyDcvLib)) {
+            *output_buffer = (void *) buffer;
+            *output_buffer_bytes = bytes;
+        } else {
+            if (adev->spdif_encoder_init_flag == false) {
+                ALOGI("%s, go to prepare spdif encoder, output_format %#x\n", __func__, output_format);
+                ret = get_the_spdif_encoder_prepared(output_format, aml_out);
+                if (ret) {
+                    ALOGE("%s() get_the_spdif_encoder_prepared failed", __func__);
+                    return ret;
+                }
+                aml_out->spdif_enc_init_frame_write_sum = aml_out->frame_write_sum;
+                adev->spdif_encoder_init_flag = true;
+            }
+            spdif_encoder_ad_write(buffer, bytes);
+            adev->temp_buf_pos = spdif_encoder_ad_get_current_position();
+            if (adev->temp_buf_pos <= 0) {
+                adev->temp_buf_pos = 0;
+            }
+            spdif_encoder_ad_flush_output_current_position();
+
+            //ALOGI("%s: SPDIF", __func__);
+            *output_buffer = adev->temp_buf;
+            *output_buffer_bytes = adev->temp_buf_pos;
+        }
+    } else {
+        /* 8 channel 16 bit PCM, and there is no effect applied after MS12 processing */
+        if (aml_out->is_tv_platform == 1) {
+            int16_t *tmp_buffer = (int16_t *)buffer;
+            size_t out_frames = bytes / (nchannels * 2); /* input is nchannels 16 bit */
+
+            int16_t *effect_tmp_buf;
+            effect_descriptor_t tmpdesc;
+            int32_t *spk_tmp_buf;
+            float source_gain;
+            float gain_speaker = adev->eq_data.p_gain.speaker;
+
+            /* handling audio effect process here */
+            if (adev->effect_buf_size < bytes) {
+                adev->effect_buf = realloc(adev->effect_buf, bytes);
+                if (!adev->effect_buf) {
+                    ALOGE ("realloc effect buf failed size %zu format = %#x", bytes, output_format);
+                    return -ENOMEM;
+                } else {
+                    ALOGI("realloc effect_buf size from %zu to %zu format = %#x", adev->effect_buf_size, bytes, output_format);
+                }
+                adev->effect_buf_size = bytes;
+
+                /* double the size for spk_output_buf for 16->32 bit conversion */
+                adev->spk_output_buf = realloc(adev->spk_output_buf, bytes*2);
+                if (!adev->spk_output_buf) {
+                    ALOGE ("realloc headphone buf failed size %zu format = %#x", bytes, output_format);
+                    return -ENOMEM;
+                }
+            }
+
+            effect_tmp_buf = (int16_t *)adev->effect_buf;
+            spk_tmp_buf = (int32_t *)adev->spk_output_buf;
+
+#ifdef ENABLE_AVSYNC_TUNING
+            tuning_spker_latency(adev, effect_tmp_buf, tmp_buffer, bytes);
+#else
+            memcpy(effect_tmp_buf, tmp_buffer, bytes);
+#endif
+
+            /*apply dtv source gain for speaker*/
+            if (adev->patch_src == SRC_DTV && adev->audio_patching)
+                source_gain = adev->eq_data.s_gain.dtv;
+            else if (adev->patch_src == SRC_HDMIIN && adev->audio_patching)
+                source_gain = adev->eq_data.s_gain.hdmi;
+            else if (adev->patch_src == SRC_LINEIN && adev->audio_patching)
+                source_gain = adev->eq_data.s_gain.av;
+            else if (adev->patch_src == SRC_ATV && adev->audio_patching)
+                source_gain = adev->eq_data.s_gain.atv;
+            else
+                source_gain = 1.0;
+
+            if (source_gain != 1.0)
+                apply_volume(source_gain, effect_tmp_buf, sizeof(int16_t), bytes);
+
+            /*aduio effect process for speaker*/
+            if (adev->native_postprocess.num_postprocessors == adev->native_postprocess.total_postprocessors) {
+                /* no effect processing for ms12v2 */
+#if 0
+                for (j = 0; j < adev->native_postprocess.num_postprocessors; j++) {
+                    audio_post_process(adev->native_postprocess.postprocessors[j], effect_tmp_buf, out_frames);
+                }
+                /*
+                 according to dts profile2 block diagram: Trusurround:X->Truvolume->TBHDX->customer modules->MC Dynamics
+                 virtualx will be called twice,first implementation for process Trusurround:X->Truvolume->TBHDX
+                 final implementation for process MC Dynamics
+                */
+                if (adev->native_postprocess.postprocessors[0] != NULL) {
+                    (*(adev->native_postprocess.postprocessors[0]))->get_descriptor(adev->native_postprocess.postprocessors[0], &tmpdesc);
+                    if (0 == strcmp(tmpdesc.name,"VirtualX")) {
+                        audio_post_process(adev->native_postprocess.postprocessors[0], effect_tmp_buf, out_frames);
+                    }
+                }
+#endif
+            } else {
+                gain_speaker *= EQ_GAIN_DEFAULT;
+            }
+
+            if (aml_getprop_bool("media.audiohal.outdump")) {
+                FILE *fp1 = fopen("/data/audio/audio_spk.pcm", "a+");
+                if (fp1) {
+                    int flen = fwrite((char *)tmp_buffer, 1, bytes, fp1);
+                    ALOGV("%s buffer %p size %zu\n", __FUNCTION__, effect_tmp_buf, bytes);
+                    fclose(fp1);
+                }
+            }
+
+            /* skip aml_audio_switch_output_mode processing for nchannels input */
+#if 0
+            if (adev->patch_src == SRC_DTV && adev->audio_patch != NULL) {
+                aml_audio_switch_output_mode((int16_t *)effect_tmp_buf, bytes, adev->audio_patch->mode);
+            } else if ( adev->audio_patch == NULL) {
+               if (adev->sound_track_mode == 3)
+                  adev->sound_track_mode = AM_AOUT_OUTPUT_LRMIX;
+               aml_audio_switch_output_mode((int16_t *)effect_tmp_buf, bytes, adev->sound_track_mode);
+            }
+#endif
+
+            /* apply volume for spk/hp, SPDIF/HDMI keep the max volume */
+            gain_speaker *= (adev->sink_gain[OUTPORT_SPEAKER]);
+            apply_volume_16to32(gain_speaker, effect_tmp_buf, spk_tmp_buf, bytes);
+
+            /* nchannels 32 bits --> 8 ch 32 bit mapping */
+            if (aml_out->tmp_buffer_8ch_size < out_frames * 32) {
+                aml_out->tmp_buffer_8ch = realloc(aml_out->tmp_buffer_8ch, out_frames * 32);
+                if (!aml_out->tmp_buffer_8ch) {
+                    ALOGE("%s: realloc tmp_buffer_8ch buf failed size = %zu format = %#x",
+                        __func__, 8 * bytes, output_format);
+                    return -ENOMEM;
+                } else {
+                    ALOGI("%s: realloc tmp_buffer_8ch size from %zu to %zu format = %#x",
+                        __func__, aml_out->tmp_buffer_8ch_size, out_frames * 32, output_format);
+                }
+                aml_out->tmp_buffer_8ch_size = out_frames * 32;
+            }
+
+            /* TODO: channel mapping from nchannels -> output speaker configuration */
+            for (i = 0; i < out_frames; i++) {
+                for (j = 0; j < nchannels; j++) {
+                    aml_out->tmp_buffer_8ch[8 * i + j] = (int32_t)spk_tmp_buf[nchannels * i + j];
+                }
+                for(j = nchannels; j < 8; j++) {
+                    aml_out->tmp_buffer_8ch[8 * i + j] = 0;
+                }
+            }
+
+            *output_buffer = aml_out->tmp_buffer_8ch;
+            *output_buffer_bytes = out_frames * 32; /* from nchannels 32 bit to 8 ch 32 bit */
+        } else {
+            /* OTT case, output buffer is 8 channel 16 bit, apply gain only */
+            float gain_speaker = 1.0;
+            if (adev->is_STB)
+                gain_speaker = adev->sink_gain[adev->active_outport];
+            else
+                gain_speaker = adev->sink_gain[OUTPORT_SPEAKER];
+
+#if 0
+            if (adev->patch_src == SRC_DTV && adev->audio_patch != NULL) {
+                aml_audio_switch_output_mode((int16_t *)buffer, bytes, adev->audio_patch->mode);
+            }
+#endif
+            *output_buffer = (void *) buffer;
+            *output_buffer_bytes = bytes;
+            apply_volume(gain_speaker, *output_buffer, sizeof(uint16_t), bytes);
+        }
+    }
+
+#ifdef ENABLE_DTV_PATCH
+    /* TODO: ms12v2, need return 2 channel ms12 output for tuner2mix_patch */
+#if 0
+    if (adev->patch_src == SRC_DTV && adev->tuner2mix_patch == 1) {
+        dtv_in_write(stream,buffer, bytes);
+    }
+#endif
+#endif
+
+    if (adev->audio_patching) {
+        output_mute(stream, output_buffer_bytes);
+    }
+    return 0;
+}
+
 ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                                 const void *buffer,
                                 size_t bytes,
