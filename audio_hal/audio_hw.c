@@ -7119,26 +7119,9 @@ ssize_t hw_write (struct audio_stream_out *stream
         }
 
         if (adev->useSubMix) {
-            if (aml_out->usecase == STREAM_PCM_DIRECT && adev->audio_patching) {
-                if (adev->is_STB && (adev->ddp).digital_raw > 0 &&
-                        output_format != AUDIO_FORMAT_PCM_16_BIT && output_format != AUDIO_FORMAT_PCM) {
-                    // TODO: mbox+dvb and bypass case
-                    ret = aml_alsa_output_open(stream);
-                    if (ret) {
-                        ALOGE("%s() open failed", __func__);
-                    }
-                } else {
-                    ret = aml_alsa_output_open(stream);
-                    if (ret) {
-                        ALOGE("%s() open failed", __func__);
-                    }
-                }
-            } else {
-                // TODO: as discussed with lianlian, these code may still need in the future
-                //ret = aml_alsa_output_open(stream);
-                //if (ret) {
-                //    ALOGE("%s() open failed", __func__);
-                //}
+            ret = aml_alsa_output_open(stream);
+            if (ret) {
+                ALOGE("%s() open failed", __func__);
             }
         } else {
             if (!adev->tuner2mix_patch) {
