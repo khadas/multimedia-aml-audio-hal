@@ -55,6 +55,9 @@ namespace android
 #define DEFAULT_MAIN_DDP_FILE_NAME "/data/main.ac3"
 #define DEFAULT_ASSOCIATE_DDP_FILE_NAME "/data/associate.ac3"
 
+//@@@MAT input file
+#define DEFAULT_MAIN_MAT_FILE_NAME "/data/main.mat"
+
 #define DEFAULT_OUTPUT_PCM_MULTI_FILE_NAME "/data/outputmulti.wav"
 #define DEFAULT_OUTPUT_PCM_DOWNMIX_FILE_NAME "/data/outputdownmix.wav"
 #define DEFAULT_OUTPUT_DD_FILE_NAME "/data/output.ac3"
@@ -249,6 +252,12 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_MAT) {
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MAT_FILE_NAME);
+                (*row_index)++;
+                mMainFlags = true;
+                mAppSoundFlags = false;
+                mSystemSoundFlags = false;
             } else if ((mAudioStreamOutFormat == AUDIO_FORMAT_AAC) || (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1)) {
                 //fixme, which he-aac format is allowed to this flow.
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V1_FILE_NAME);
@@ -283,6 +292,14 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_DDP_FILE_NAME);
                 (*row_index)++;
 
+                mMainFlags = true;
+                mAppSoundFlags = false;
+                mSystemSoundFlags = false;
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_MAT) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MAT_FILE_NAME);
+                (*row_index)++;
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
@@ -355,15 +372,40 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
         sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_DD_FILE_NAME);
         (*row_index)++;
         if (mDualOutputFlag == true) {
-            sprintf(ConfigParams[*row_index], "%s", "-oms");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_PCM_DOWNMIX_FILE_NAME);
-            (*row_index)++;
+            if (mDAPInitMode != 0) {
+                sprintf(ConfigParams[*row_index], "%s", "-o_dap_speaker");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_DAP_FILE_NAME);
+                (*row_index)++;
+            } else {
+                sprintf(ConfigParams[*row_index], "%s", "-oms");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_PCM_DOWNMIX_FILE_NAME);
+                (*row_index)++;
+            }
         }
     } else if (mDolbyMS12OutFormat == AUDIO_FORMAT_E_AC3) {
         sprintf(ConfigParams[*row_index], "%s", "-odp");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_DDP_FILE_NAME);
+        (*row_index)++;
+        if (mDualOutputFlag == true) {
+            if (mDAPInitMode != 0) {
+                sprintf(ConfigParams[*row_index], "%s", "-o_dap_speaker");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_DAP_FILE_NAME);
+                (*row_index)++;
+            } else {
+                sprintf(ConfigParams[*row_index], "%s", "-oms");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_PCM_DOWNMIX_FILE_NAME);
+                (*row_index)++;
+            }
+        }
+    } else if (mDolbyMS12OutFormat == AUDIO_FORMAT_MAT) {
+        sprintf(ConfigParams[*row_index], "%s", "-omat");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_MAT_FILE_NAME);
         (*row_index)++;
     } else if ((mDolbyMS12OutFormat == AUDIO_FORMAT_PCM_16_BIT) && (mStereoOutputFlag == false) && (mDAPInitMode != 0)) { //pcm multi
         sprintf(ConfigParams[*row_index], "%s", "-om");
@@ -1138,10 +1180,17 @@ int DolbyMS12ConfigParams::SetOTTProcessingGraphSwitchesRuntime(char **ConfigPar
 
 //DAP SWITCHES (device specific)
 //all run-time
-int DolbyMS12ConfigParams::SetDAPDeviceSwitches(char **ConfigParams, int *row_index)
+int DolbyMS12ConfigParams::SetDAPDeviceSwitches(char **ConfigParams, int *row_index, int is_runtime)
 {
     String8 tmpParam("");
     ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
+    if (mDAPTuningFile && !is_runtime) {
+        sprintf(ConfigParams[*row_index], "%s", "-dap_tuning");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mDAPTuningFile);
+        (*row_index)++;
+    }
+
     if ((mDAPCalibrationBoost >= 0) && (mDAPCalibrationBoost <= 192)) {
         sprintf(ConfigParams[*row_index], "%s", "-dap_calibration_boost");
         (*row_index)++;
@@ -1339,7 +1388,7 @@ char **DolbyMS12ConfigParams::GetDolbyMS12ConfigParams(int *argc)
         SetHEAACSwitches(mConfigParams, &mParamNum);
         SetOTTProcessingGraphSwitches(mConfigParams, &mParamNum);
         if (mDAPInitMode) {
-            SetDAPDeviceSwitches(mConfigParams, &mParamNum);
+            SetDAPDeviceSwitches(mConfigParams, &mParamNum, 0);
             SetDAPContentSwitches(mConfigParams, &mParamNum);
         }
         *argc = mParamNum;
@@ -1371,7 +1420,7 @@ char **DolbyMS12ConfigParams::GetDolbyMS12RuntimeConfigParams(int *argc)
         SetPCMSwitchesRuntime(mConfigParams, &mParamNum);
         SetOTTProcessingGraphSwitchesRuntime(mConfigParams, &mParamNum);
         if (mDAPInitMode) {
-            SetDAPDeviceSwitches(mConfigParams, &mParamNum);
+            SetDAPDeviceSwitches(mConfigParams, &mParamNum, 1);
             SetDAPContentSwitches(mConfigParams, &mParamNum);
         }
         *argc = mParamNum;

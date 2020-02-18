@@ -64,7 +64,7 @@ public:
     virtual int SetPCMSwitchesRuntime(char **ConfigParams, int *row_index);
 
     virtual int SetHEAACSwitches(char **ConfigParams, int *row_index);
-    virtual int SetDAPDeviceSwitches(char **ConfigParams, int *row_index);
+    virtual int SetDAPDeviceSwitches(char **ConfigParams, int *row_index, int is_runtime);
     virtual int SetDAPContentSwitches(char **ConfigParams, int *row_index);
     virtual char **GetDolbyMS12ConfigParams(int *argc);
     virtual char **GetDolbyMS12RuntimeConfigParams(int *argc);
