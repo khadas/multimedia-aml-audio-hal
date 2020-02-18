@@ -56,20 +56,28 @@ public:
     virtual bool SetDolbyMS12ParamsbyOutProfile();
     virtual int SetInputOutputFileName(char **ConfigParams, int *row_index);
     virtual int SetFunctionalSwitches(char **ConfigParams, int *row_index);
+#if 0
     virtual int SetFunctionalSwitchesRuntime(char **ConfigParams, int *row_index);
     virtual int SetFunctionalSwitchesRuntime_lite(char **ConfigParams, int *row_index);
-
     virtual int SetDdplusSwitches(char **ConfigParams, int *row_index);
+#endif
 
     virtual int SetPCMSwitches(char **ConfigParams, int *row_index);
+#if 0
     virtual int SetPCMSwitchesRuntime(char **ConfigParams, int *row_index);
-
+#endif
+    virtual int SetAc4Switches(char **ConfigParams, int *row_index);
     virtual int SetHEAACSwitches(char **ConfigParams, int *row_index);
-    virtual int SetDAPDeviceSwitches(char **ConfigParams, int *row_index);
+    virtual int SetDAPDeviceSwitches(char **ConfigParams, int *row_index, int is_runtime);
     virtual int SetDAPContentSwitches(char **ConfigParams, int *row_index);
     virtual char **GetDolbyMS12ConfigParams(int *argc);
+#if 0
     virtual char **GetDolbyMS12RuntimeConfigParams(int *argc);
+#endif
+    virtual char **UpdateDolbyMS12RuntimeConfigParams(int *argc, char *cmd);
+#if 0
     virtual char **GetDolbyMS12RuntimeConfigParams_lite(int *argc);
+#endif
 
     //init the  mConfigParams Array
     virtual char **PrepareConfigParams(int max_raw_size, int max_column_size);
@@ -126,13 +134,13 @@ public:
     {
         mDRCCut = val;
     }
-    virtual void setDRCboostSystemVal(int val)
+    virtual void setDRCboostStereoVal(int val)
     {
-        mDRCBoostSystem = val;
+        mDRCBoostStereo = val;
     }
-    virtual void setDRCcutSystemVal(int val)
+    virtual void setDRCcutStereoVal(int val)
     {
-        mDRCCutSystem = val;
+        mDRCCutStereo = val;
     }
     virtual void setChannelConfigOfAppSoundsInput(audio_channel_mask_t channel_mask)
     {
@@ -260,9 +268,43 @@ public:
     }
 
     //DDPLUS SWITCHES
+#if 0
     virtual void setDDPAssociatedSubstreamSelection(int val)
     {
         mDdplusAssocSubstream = val;
+    }
+#endif
+
+    //AC4 SWITCHES
+    virtual void setAC4Lang(char *str)
+    {
+        memset(mAC4Lang, 0, sizeof(mAC4Lang));
+        strncpy(mAC4Lang, str, 3);
+    }
+    virtual void setAC4Lang2(char *str)
+    {
+        memset(mAC4Lang2, 0, sizeof(mAC4Lang2));
+        strncpy(mAC4Lang2, str, 3);
+    }
+    virtual void setAC4Ac(int val)
+    {
+        mAC4Ac = val;
+    }
+    virtual void setAC4Pat(int val)
+    {
+        mAC4Pat = val;
+    }
+    virtual void setAC4PresGroupIdx(int val)
+    {
+        mAC4PresGroupIdx = val;
+    }
+    virtual void setAC4De(int val)
+    {
+        mAC4De = val;
+    }
+    virtual void setAC4ShortProgId(int val)
+    {
+        mAC4ShortProgId = val;
     }
 
     //PCM SWITCHES
@@ -458,6 +500,8 @@ public:
 protected:
 
 private:
+    int ms_get_int_array_from_str(char **p_csv_string, int num_el, int *p_vals);
+    int ms_get_int_from_str(char **p_csv_string, int *p_vals);
     // DolbyMS12ConfigParams(const DolbyMS12ConfigParams&);
     // DolbyMS12ConfigParams& operator = (const DolbyMS12ConfigParams&);
     // static DolbyMS12ConfigParams *gInstance;
@@ -485,8 +529,8 @@ private:
     //bool mLowComplexityMode = false;
     int mDRCBoost;
     int mDRCCut;
-    int mDRCBoostSystem;
-    int mDRCCutSystem;
+    int mDRCBoostStereo;
+    int mDRCCutStereo;
     int mChannelConfAppSoundsIn;
     int mChannelConfSystemIn;
     bool mMainFlags;//has dd/ddp/he-aac audio
@@ -539,12 +583,20 @@ private:
     };//System sound mixer gain values for System Sounds input
 
     //DDPLUS SWITCHES
-    int mDdplusAssocSubstream;//[ddplus] Associated substream selection, [0,3], no default
 
     //PCM SWITCHES
     int mChannelConfigInExtPCMInput;//Channel configuration of external PCM input, default is 7;
     bool mLFEPresentInExtPCMInput = true;//LFE present in external PCM input
     int mCompressorProfile;//[pcm] Compressor profile
+
+    //AC4 SWITCHES
+    char mAC4Lang[4];
+    char mAC4Lang2[4];
+    int mAC4Ac;//[ac4] Preferred associated type of service, 1:Visually Impaired (VI, default), 2: Hearing Impaired (HI), 3: Commentary
+    int mAC4Pat;//[ac4] Prefer Presentation Selection by associated type over language, 0: Prefer selection by language, 1: Prefer selection by associated type (default)
+    int mAC4PresGroupIdx;//[ac4] Presentation group index to be decoded. 0>>>510: Presentation group index, -1: switch back to automatic selection by language and associated type (default)
+    int mAC4De;//[ac4] Dialogue Enhancement gain [0-12], default 0
+    int mAC4ShortProgId;//[ac4] The short program identifier as 16 bit unsigned value or -1 for no program (default)
 
     //HE-AAC SWITCHES
     int mAssocInstanse;//[he-aac] Associated instance restricted to 2 channels

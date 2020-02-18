@@ -102,6 +102,8 @@ void get_sink_format (struct audio_stream_out *stream)
     if ((source_format != AUDIO_FORMAT_PCM_16_BIT) && \
         (source_format != AUDIO_FORMAT_AC3) && \
         (source_format != AUDIO_FORMAT_E_AC3) && \
+        (source_format != AUDIO_FORMAT_MAT) && \
+        (source_format != AUDIO_FORMAT_AC4) && \
         (source_format != AUDIO_FORMAT_DTS) &&
         (source_format != AUDIO_FORMAT_DTS_HD)) {
         /*unsupport format [dts-hd/true-hd]*/

@@ -1512,6 +1512,19 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         ret = 0;
         goto exit;
     }
+
+    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+        ret = str_parms_get_str(parms, "ms12_runtime", value, sizeof(value));
+        if (ret >= 0) {
+            char *parm = strstr(kvpairs, "=");
+            pthread_mutex_lock(&adev->lock);
+            if (parm)
+                aml_ms12_update_runtime_params(&(adev->ms12), parm+1);
+            pthread_mutex_unlock(&adev->lock);
+            goto exit;
+        }
+    }
+
 exit:
     str_parms_destroy (parms);
 
@@ -1667,13 +1680,16 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
         // MS12 initial DB gain is 0 when setup
         // without "adev->ms12->curDBGain != iMS12DB" conditional filter, audio will have gap when continous changing volume
         if (adev->ms12.curDBGain != iMS12DB) {
+            char param[16];
+            char *argv[3] = {"ms12_runtime", "--sys_prim_mixgain", param};
             // set duration to 10 will not introduce gap
             ret = set_dolby_ms12_primary_input_db_gain(&adev->ms12, iMS12DB , 10);
             if (ret < 0) {
                 ALOGE("%s,set dolby primary gain failed", __FUNCTION__);
             }
             adev->ms12.curDBGain = iMS12DB;
-            aml_ms12_update_runtime_params_lite(&(adev->ms12));
+            sprintf(param, "0,10,%d", iMS12DB);
+            aml_ms12_update_runtime_params_direct(&(adev->ms12), 3, argv);
             ALOGI("%s,out->volume_l = %f,  iMS12DB = %d", __FUNCTION__, out->volume_l, iMS12DB);
         }
 
@@ -1815,11 +1831,12 @@ static int out_pause_new (struct audio_stream_out *stream)
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
         if (aml_dev->continuous_audio_mode == 1) {
             if ((aml_dev->ms12.dolby_ms12_enable == true) && (aml_dev->ms12.is_continuous_paused == false)) {
+                char *argv[3] = {"ms12_runtime", "-pause", "1"};
                 aml_dev->ms12.is_continuous_paused = true;
                 pthread_mutex_lock(&ms12->lock);
                 int ms12_runtime_update_ret = 0;
                 dolby_ms12_set_pause_flag(aml_dev->ms12.is_continuous_paused);
-                ms12_runtime_update_ret = aml_ms12_update_runtime_params(&(aml_dev->ms12));
+                ms12_runtime_update_ret = aml_ms12_update_runtime_params_direct(&(aml_dev->ms12), 3, argv);
                 pthread_mutex_unlock(&ms12->lock);
                 ALOGI("%s ms12 set pause flag runtime return %d\n", __func__, ms12_runtime_update_ret);
             } else {
@@ -1875,11 +1892,12 @@ static int out_resume_new (struct audio_stream_out *stream)
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
         if (aml_dev->continuous_audio_mode == 1) {
             if ((aml_dev->ms12.dolby_ms12_enable == true) && (aml_dev->ms12.is_continuous_paused == true)) {
+                char *argv[3] = {"ms12_runtime", "-pause", "0"};
                 aml_dev->ms12.is_continuous_paused = false;
                 pthread_mutex_lock(&ms12->lock);
                 int ms12_runtime_update_ret = 0;
                 dolby_ms12_set_pause_flag(aml_dev->ms12.is_continuous_paused);
-                ms12_runtime_update_ret = aml_ms12_update_runtime_params(&(aml_dev->ms12));
+                ms12_runtime_update_ret = aml_ms12_update_runtime_params_direct(&(aml_dev->ms12), 3, argv);
                 pthread_mutex_unlock(&ms12->lock);
                 ALOGI("%s ms12 set unpause flag runtime return %d\n", __func__, ms12_runtime_update_ret);
             }
@@ -4507,6 +4525,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     if (continous_mode(adev) && (eDolbyMS12Lib == adev->dolby_lib_type)) {
         if (out->volume_l != 1.0) {
             if (!audio_is_linear_pcm(out->hal_internal_format)) {
+                char *argv[3] = {"ms12_runtime", "--sys_prim_mixgain", "0,10,0"};
                 /*we change the volume in this stream, but it will be closed,
                   we need to restore the ms12 to normal one
                 */
@@ -4514,7 +4533,8 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
                 ALOGI("restore the ms12 volume");
                 set_dolby_ms12_primary_input_db_gain(&(adev->ms12), iMS12DB , 10);
                 adev->ms12.curDBGain = iMS12DB;
-                aml_ms12_update_runtime_params(&(adev->ms12));
+                //restore to full volume
+                aml_ms12_update_runtime_params_direct(&(adev->ms12), 3, argv);
             }
         }
     }
@@ -5199,14 +5219,17 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
 #ifdef ENABLE_DTV_PATCH
         ret = str_parms_get_int(parms, "associate_audio_mixing_enable", &val);
         if (ret >= 0) {
+            char *argv_1[3] = {"ms12_runtime", "-xa", "1"};
+            char *argv_0[3] = {"ms12_runtime", "-xa", "0"};
             pthread_mutex_lock(&adev->lock);
             pthread_mutex_lock(&ms12->lock);
             dtv_assoc_audio_cache(-1);
             adev->associate_audio_mixing_enable = val;
             ALOGI("associate_audio_mixing_enable set to %d\n", adev->associate_audio_mixing_enable);
             dolby_ms12_set_asscociated_audio_mixing(adev->associate_audio_mixing_enable);
-            int ms12_runtime_update_ret = aml_ms12_update_runtime_params(& (adev->ms12));
-            ALOGI("aml_ms12_update_runtime_params return %d\n", ms12_runtime_update_ret);
+            int ms12_runtime_update_ret = aml_ms12_update_runtime_params_direct(
+                &(adev->ms12), 3, (val) ? argv_1 : argv_0);
+            ALOGI("[%d] aml_ms12_update_runtime_params_direct return %d\n", __LINE__, ms12_runtime_update_ret);
             pthread_mutex_unlock(&adev->lock);
             pthread_mutex_unlock(&ms12->lock);
             goto exit;
@@ -5217,6 +5240,8 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         if (ret >= 0) {
             int mix_user_prefer = 0;
             int mixing_level = val;
+            char *argv_1[3] = {"ms12_runtime", "-xu", "1"};
+            char *argv_0[3] = {"ms12_runtime", "-xu", "0"};
 
             pthread_mutex_lock(&adev->lock);
             pthread_mutex_lock(&ms12->lock);
@@ -5229,8 +5254,11 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             adev->mixing_level = mix_user_prefer;
             ALOGI("mixing_level set to %d\n", adev->mixing_level);
             dolby_ms12_set_user_control_value_for_mixing_main_and_associated_audio(adev->mixing_level);
-            int ms12_runtime_update_ret = aml_ms12_update_runtime_params(& (adev->ms12));
-            ALOGI("aml_ms12_update_runtime_params return %d\n", ms12_runtime_update_ret);
+            int ms12_runtime_update_ret = aml_ms12_update_runtime_params_direct(
+                &(adev->ms12),
+                3,
+                (val) ? argv_1 : argv_0);
+            ALOGI("[%d]aml_ms12_update_runtime_params_direct return %d\n", __LINE__, ms12_runtime_update_ret);
             pthread_mutex_unlock(&ms12->lock);
             pthread_mutex_unlock(&adev->lock);
             goto exit;
@@ -5299,7 +5327,6 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 } else {
                     // enable/disable atoms lock
                     dolby_ms12_set_atmos_lock_flag(b_atmos_lock);
-                    aml_ms12_update_runtime_params(&(adev->ms12));
                     adev->atoms_lock_flag = b_atmos_lock;
                     ALOGI("%s set adev->atoms_lock_flag = %d, \n", __func__,adev->atoms_lock_flag);
                 }
@@ -5311,6 +5338,13 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             goto exit;
         }
 
+        ret = str_parms_get_str(parms, "ms12_runtime", value, sizeof(value));
+        if (ret > 0) {
+            pthread_mutex_lock(&adev->lock);
+            aml_ms12_update_runtime_params(&(adev->ms12), value);
+            pthread_mutex_unlock(&adev->lock);
+            goto exit;
+        }
     }
     ret = str_parms_get_str(parms, "SOURCE_GAIN", value, sizeof(value));
     if (ret >= 0) {
@@ -5594,6 +5628,20 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
 		adev->tv_mute = tv_mute;
         return 0;
     }
+
+    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+        ret = str_parms_get_str(parms, "ms12_runtime", value, sizeof(value));
+        if (ret >= 0) {
+            char *parm = strstr(kvpairs, "=");
+            pthread_mutex_lock(&adev->lock);
+            if (parm)
+                aml_ms12_update_runtime_params(&(adev->ms12), parm+1);
+            pthread_mutex_unlock(&adev->lock);
+        }
+        ret = 0;
+        goto exit;
+    }
+
 exit:
     str_parms_destroy (parms);
 
@@ -6294,13 +6342,14 @@ int do_output_standby_l(struct audio_stream *stream)
                     pthread_mutex_lock(&adev->ms12.lock);
                     if (adev->ms12_main1_dolby_dummy == false
                         && !audio_is_linear_pcm(aml_out->hal_internal_format)) {
+                        char *argv[3] = {"ms12_runtime", "-pause", "0"};
                         dolby_ms12_set_main_dummy(0, true);
                         dolby_ms12_flush_main_input_buffer();
                         dolby_ms12_set_pause_flag(false);
                         //int iMS12DB = 0;//restore to full volume
                         //set_dolby_ms12_primary_input_db_gain(&(adev->ms12), iMS12DB , 10);
                         //adev->ms12.curDBGain = iMS12DB;
-                        aml_ms12_update_runtime_params(&(adev->ms12));
+                        aml_ms12_update_runtime_params_direct(&(adev->ms12), 3, argv);
                         adev->ms12.is_continuous_paused = false;
                         adev->ms12_main1_dolby_dummy = true;
                         ALOGI("%s set main dd+ dummy", __func__);
@@ -6312,9 +6361,11 @@ int do_output_standby_l(struct audio_stream *stream)
                         dolby_ms12_flush_main_input_buffer();
                         adev->ms12_ott_enable = true;
 #else
+                        char *argv[3] = {"ms12_runtime", "-pause", "0"};
                         dolby_ms12_flush_main_input_buffer();
                         dolby_ms12_set_pause_flag(false);
-                        aml_ms12_update_runtime_params(&(adev->ms12));
+                        aml_ms12_update_runtime_params_direct(
+                            &(adev->ms12), 3, argv);
                         adev->ms12.is_continuous_paused = false;
                         dolby_ms12_set_main_dummy(1, true);
                         adev->ms12_ott_enable = false;
@@ -8289,10 +8340,12 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         }
         if (continous_mode(adev)) {
             if ((adev->ms12.dolby_ms12_enable == true) && (adev->ms12.is_continuous_paused == true)) {
+                char *argv[3] = {"ms12_runtime", "-pause", "0"};
                 pthread_mutex_lock(&ms12->lock);
                 int ms12_runtime_update_ret = 0;
                 dolby_ms12_set_pause_flag(false);
-                ms12_runtime_update_ret = aml_ms12_update_runtime_params(&(adev->ms12));
+                ms12_runtime_update_ret = aml_ms12_update_runtime_params_direct(&(adev->ms12), 3, argv);
+
                 adev->ms12.is_continuous_paused = false;
                 pthread_mutex_unlock(&ms12->lock);
                 ALOGI("%s ms12 set unpause flag runtime return %d\n", __func__, ms12_runtime_update_ret);

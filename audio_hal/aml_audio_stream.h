@@ -103,6 +103,7 @@ static inline bool is_digital_raw_format(audio_format_t format)
     case AUDIO_FORMAT_AC3:
     case AUDIO_FORMAT_E_AC3:
     case AUDIO_FORMAT_MAT:
+    case AUDIO_FORMAT_AC4:
     case AUDIO_FORMAT_DTS:
     case AUDIO_FORMAT_DTS_HD:
     case AUDIO_FORMAT_DOLBY_TRUEHD:

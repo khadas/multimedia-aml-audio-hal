@@ -70,6 +70,7 @@ bool dolby_ms12_config_params_set_surround_sound_by_out_profile(void);
 // int dolby_ms12_config_params_set_input_output_file_name(char **ConfigParams, int *row_index);
 // int dolby_ms12_config_params_set_functional_switches(char **ConfigParams, int *row_index);
 // int dolby_ms12_config_params_set_ddplus_switches(char **ConfigParams, int *row_index);
+// int dolby_ms12_config_params_set_ac4_switches(char **ConfigParams, int *row_index);
 // int dolby_ms12_config_params_set_pcm_switches(char **ConfigParams, int *row_index);
 // int dolby_ms12_config_params_set_heaac_switches(char **ConfigParams, int *row_index);
 // int dolby_ms12_config_params_set_dap_device_switches(char **ConfigParams, int *row_index);
@@ -84,6 +85,7 @@ bool dolby_ms12_config_params_set_surround_sound_by_out_profile(void);
  */
 char **dolby_ms12_config_params_get_config_params(int *argc);
 
+#if 0
 /**
  * @brief Get the dolby_ms12_update_runtime_params() input params
  * @int *argc //dolby_ms12_init *argc
@@ -91,6 +93,17 @@ char **dolby_ms12_config_params_get_config_params(int *argc);
  * @return the char **argv
  */
 char **dolby_ms12_config_params_get_runtime_config_params(int *argc);
+#endif
+
+/**
+ * @brief Update dolby_ms12 runtime params
+ * @int *argc //dolby_ms12_init *argc
+ * @char *cmd //dolby_ms12_init *argv
+ *
+ * @return the char **argv
+ */
+char **dolby_ms12_config_params_update_runtime_config_params(int *argc, char *cmd);
+
 //char **dolby_ms12_config_params_prepare_config_params(int max_raw_size, int max_column_size);
 //void dolby_ms12_config_params_cleanup_config_params(char **ConfigParams, int max_raw_size);
 
@@ -149,13 +162,13 @@ void dolby_ms12_set_drc_cut(int val);
  * @brief set DRC boost value for 2-channel downmix
  * int val//0 - 100; Default = 100
  */
-void dolby_ms12_set_drc_boost_system(int val);
+void dolby_ms12_set_drc_boost_stereo(int val);
 
 /**
  * @brief set DRC cut value for 2-channel downmix
  * int val//0 - 100; Default = 100
  */
-void dolby_ms12_set_drc_cut_system(int val);
+void dolby_ms12_set_drc_cut_stereo(int val);
 
 /**
  * @brief Channel configuration of Application Sounds input
@@ -332,6 +345,50 @@ void dolby_ms12_set_system_sound_mixer_gain_values_for_system_sounds_input(MixGa
  * 1 - 3; No default
  */
 void dolby_ms12_set_ddp_associated_substream_selection(int val);
+
+//AC4 SWITCHES
+/**
+ * @brief [ac4] 1st preferred language code (3 Letter ISO 639)
+ */
+void dolby_ms12_set_ac4_lang(char *str);
+
+/**
+ * @brief [ac4] 2nd preferred language code (3 Letter ISO 639)
+ */
+void dolby_ms12_set_ac4_lang2(char *str);
+
+/**
+ * @brief [ac4] Preferred associated type of service
+ * 1: Visually Impaired (VI) (Default)
+ * 2: Hearing Impaired (HI)
+ * 3: Commentary
+ */
+void dolby_ms12_set_ac4_ac(int val);
+
+/**
+ * @brief [ac4] Preferred presentation selection by associated type over language
+ * 0: Perfer selection by language
+ * 1: Prefer selection by associated type (default)
+ */
+void dolby_ms12_set_ac4_pat(int val);
+
+/**
+ * @brief [ac4] Presentation group index to be decoded. Overrides the presentation selection by preferred language amd associated type.
+ * 0..510: Presentation group index
+ * -1: Switch back to automatic selection by language and associated type (default)
+ */
+void dolby_ms12_set_ac4_presgroupidx(int val);
+
+/**
+ * @brief [ac4] Dialogue enhancement gain that will be applied in the decoder
+ * [0-12] default 0db
+ */
+void dolby_ms12_set_ac4_de(int val);
+
+/**
+ * @brief [ac4] The short program identifier as an 16 bit unsigned value or -1 for no program ID (default)
+ */
+void dolby_ms12_set_ac4_shortprogid(int val);
 
 //PCM SWITCHES
 /**

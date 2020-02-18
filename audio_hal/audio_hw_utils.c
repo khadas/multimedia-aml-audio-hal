@@ -188,6 +188,8 @@ int get_codec_type(int format)
     case AUDIO_FORMAT_DOLBY_TRUEHD:
     case AUDIO_FORMAT_MAT:
         return TYPE_TRUE_HD;
+    case AUDIO_FORMAT_AC4:
+        return TYPE_AC4;
     case AUDIO_FORMAT_PCM:
         return TYPE_PCM;
     default:

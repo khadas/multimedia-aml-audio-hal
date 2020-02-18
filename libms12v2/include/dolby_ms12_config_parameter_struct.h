@@ -107,4 +107,11 @@ typedef struct
     int de_ducking;//(0...16, def: 0)
 }DAPDialogueEnhancer;
 
+typedef struct
+{
+    int mode; // (0,1,2, def 1)
+    int boost; // (0..96, def: 96)
+}DAPSurVirtulizer;
+
+
 #endif //end of _DOLBY_MS12_CONFIG_PARAMMETER_STRUCT_H_

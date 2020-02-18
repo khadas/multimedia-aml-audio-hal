@@ -584,8 +584,6 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12)
 
     if (ms12->dolby_ms12_threadID != 0) {
         ms12->dolby_ms12_thread_exit = true;
-        int ms12_runtime_update_ret = aml_ms12_update_runtime_params(ms12);
-        ALOGI("aml_ms12_update_runtime_params return %d\n", ms12_runtime_update_ret);
         pthread_join(ms12->dolby_ms12_threadID, NULL);
         ms12->dolby_ms12_threadID = 0;
         ALOGI("%s() dolby_ms12_threadID reset to %ld\n", __FUNCTION__, ms12->dolby_ms12_threadID);
@@ -633,7 +631,7 @@ int set_dolby_ms12_primary_input_db_gain(struct dolby_ms12_desc *ms12, int db_ga
     gain.duration = duration;
     gain.shape = 0;
     dolby_ms12_set_system_sound_mixer_gain_values_for_primary_input(&gain);
-    dolby_ms12_set_input_mixer_gain_values_for_main_program_input(&gain);
+    //dolby_ms12_set_input_mixer_gain_values_for_main_program_input(&gain);
     //Fixme when tunnel mode is working, the Alexa start and mute the main input!
     //dolby_ms12_set_input_mixer_gain_values_for_ott_sounds_input(&gain);
     // only update very limited parameter with out lock
@@ -782,8 +780,14 @@ int set_system_app_mixing_status(struct aml_stream_out *aml_out, int stream_stat
     dolby_ms12_set_system_app_audio_mixing(system_app_mixing_status);
 
     if (ms12->dolby_ms12_enable) {
+        char *argv_0[3] = {"ms12_runtime", "-xs", "0"};
+        char *argv_1[3] = {"ms12_runtime", "-xs", "1"};
         pthread_mutex_lock(&ms12->lock);
-        ret = aml_ms12_update_runtime_params(&(adev->ms12));
+        ret = aml_ms12_update_runtime_params_direct(
+            &(adev->ms12),
+            3,
+            (system_app_mixing_status == SYSTEM_APP_SOUND_MIXING_ON) ?
+                argv_1 : argv_0);
         pthread_mutex_unlock(&ms12->lock);
         ALOGI("%s return %d stream-status %d set system-app-audio-mixing %d\n",
               __func__, ret, stream_status, system_app_mixing_status);

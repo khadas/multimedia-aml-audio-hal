@@ -120,9 +120,15 @@ int aml_ms12_config(struct dolby_ms12_desc *ms12_desc
  */
 int aml_ms12_cleanup(struct dolby_ms12_desc *ms12_desc);
 
-int aml_ms12_update_runtime_params(struct dolby_ms12_desc *ms12_desc);
+int aml_ms12_update_runtime_params(struct dolby_ms12_desc *ms12_desc, char *cmd);
 
+int aml_ms12_update_runtime_params_direct(struct dolby_ms12_desc *ms12_desc
+                    , int argc
+                    , char **argv);
+
+#if 0
 int aml_ms12_update_runtime_params_lite(struct dolby_ms12_desc *ms12_desc);
+#endif
 
 int aml_ms12_lib_preload();
 

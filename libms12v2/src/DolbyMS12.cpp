@@ -133,9 +133,9 @@ int DolbyMS12::GetLibHandle(void)
     }
 
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
-    FuncDolbyMS12RegisterOutputCallback = (int (*)(output_callback , void *)) dlsym(mDolbyMS12LibHanle, "ms12_output_register_output_callback");
+    FuncDolbyMS12RegisterOutputCallback = (int (*)(output_callback , void *)) dlsym(mDolbyMS12LibHanle, "ms12_register_output_callback");
     if (!FuncDolbyMS12RegisterOutputCallback) {
-        ALOGE("%s, dlsym ms12_output_register_pcm_callback fail\n", __FUNCTION__);
+        ALOGE("%s, dlsym ms12_register_output_callback fail\n", __FUNCTION__);
         goto ERROR;
     }
 #else

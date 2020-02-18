@@ -117,6 +117,7 @@ enum {
     TYPE_TRUE_HD = 7,
     TYPE_DTS_HD_MA = 8,//should not used after we unify DTS-HD&DTS-HD MA
     TYPE_PCM_HIGH_SR = 9,
+    TYPE_AC4 = 10
 };
 
 #define FRAMESIZE_16BIT_STEREO 4
