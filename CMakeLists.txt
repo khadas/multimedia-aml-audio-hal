@@ -77,6 +77,8 @@ add_library(audio_hal SHARED
 	utils/aml_configs/aml_conf_parser.c
 )
 
+add_definitions(-DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
+
 set(PREBUILD_STATIC_LIBS
 	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/lib_aml_ng.a
 	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/Amlogic_DRC_Param_Generator.a

@@ -73,10 +73,7 @@ public:
     );
 
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
-
-    virtual int     DolbyMS12RegisterPCMCallback(output_callback callback, void *priv_data);
-
-    virtual int     DolbyMS12RegisterBitstreamCallback(output_callback callback, void *priv_data);
+    virtual int     DolbyMS12RegisterOutputCallback(output_callback callback, void *priv_data);
 
 #else
 

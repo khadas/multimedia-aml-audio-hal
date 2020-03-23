@@ -66,6 +66,14 @@ int dolby_ms12_system_process(
     , size_t bytes
     , size_t *used_size);
 
+typedef struct aml_dec_info {
+    int output_sr ;   /** the decoded data samplerate*/
+    int output_ch ;   /** the decoded data channels*/
+    int output_bitwidth; /**the decoded sample bit width*/
+    int data_type;
+    int reserved[32];
+} aml_dec_info_t;
+
 /*
  *@brief get dolby ms12 cleanup
  */
@@ -87,16 +95,6 @@ int set_system_app_mixing_status(struct aml_stream_out *aml_out, int stream_stat
 /*
  *@brief an callback for dolby ms12 pcm output
  */
-int pcm_output(void *buffer, void *priv_data, size_t size);
-
-/*
- *@brief an callback for dolby ms12 bitstream output
- */
-int bitstream_output(void *buffer, void *priv_data, size_t size);
-
-/*
- *@brief dolby ms12 register the callback
- */
-int dolby_ms12_register_callback(struct aml_stream_out *aml_out);
+int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12_info);
 
 #endif //end of _AUDIO_HW_MS12_H_

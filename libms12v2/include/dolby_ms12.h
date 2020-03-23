@@ -113,20 +113,12 @@ int dolby_ms12_input_system(void *dolby_mS12_pointer
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
 
 /*@@
-    @brief register the pcm callback
+    @brief register the output callback
 
-    @void *callback //pcm callback handle
+    @void *callback //output callback handle
     @void *priv_data //priv data
 */
-int dolby_ms12_register_pcm_callback(void *callback, void *priv_data);
-
-/*@@
-    @brief register the bitstream callback
-
-    @void *callback //bitstream callback handle
-    @void *priv_data //priv data
-*/
-int dolby_ms12_register_bitstream_callback(void *callback, void *priv_data);
+int dolby_ms12_register_output_callback(void *callback, void *priv_data);
 #else
 /*@@
     @brief Get output data

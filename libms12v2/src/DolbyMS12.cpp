@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "libms12"
+#define LOG_TAG "libms12v2"
 //#define LOG_NDEBUG 0
 //#define LOG_NALOGV 0
 
@@ -43,8 +43,7 @@ int (*FuncDolbyMS12InputAssociate)(void *, const void *, size_t, int, int, int);
 int (*FuncDolbyMS12InputSystem)(void *, const void *, size_t, int, int, int);
 
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
-int (*FuncDolbyMS12RegisterPCMCallback)(output_callback , void *);
-int (*FuncDolbyMS12RegisterBitstreamCallback)(output_callback , void *);
+int (*FuncDolbyMS12RegisterOutputCallback)(output_callback , void *);
 #else
 int (*FuncDolbyMS12Output)(void *, const void *, size_t);
 #endif
@@ -134,14 +133,9 @@ int DolbyMS12::GetLibHandle(void)
     }
 
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
-    FuncDolbyMS12RegisterPCMCallback = (int (*)(output_callback , void *)) dlsym(mDolbyMS12LibHanle, "ms12_output_register_pcm_callback");
-    if (!FuncDolbyMS12RegisterPCMCallback) {
+    FuncDolbyMS12RegisterOutputCallback = (int (*)(output_callback , void *)) dlsym(mDolbyMS12LibHanle, "ms12_output_register_output_callback");
+    if (!FuncDolbyMS12RegisterOutputCallback) {
         ALOGE("%s, dlsym ms12_output_register_pcm_callback fail\n", __FUNCTION__);
-        goto ERROR;
-    }
-    FuncDolbyMS12RegisterBitstreamCallback = (int (*)(output_callback , void *)) dlsym(mDolbyMS12LibHanle, "ms12_output_register_bitstream_callback");
-    if (!FuncDolbyMS12RegisterBitstreamCallback) {
-        ALOGE("%s, dlsym ms12_output_register_bitstream_callback fail\n", __FUNCTION__);
         goto ERROR;
     }
 #else
@@ -259,8 +253,7 @@ void DolbyMS12::ReleaseLibHandle(void)
     FuncDolbyMS12InputAssociate = NULL;
     FuncDolbyMS12InputSystem = NULL;
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
-    FuncDolbyMS12RegisterPCMCallback = NULL;
-    FuncDolbyMS12RegisterBitstreamCallback = NULL;
+    FuncDolbyMS12RegisterOutputCallback = NULL;
 #else
     FuncDolbyMS12Output = NULL;
 #endif
@@ -410,30 +403,16 @@ int DolbyMS12::DolbyMS12InputSystem(
 }
 
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
-int DolbyMS12::DolbyMS12RegisterPCMCallback(output_callback callback, void *priv_data)
+int DolbyMS12::DolbyMS12RegisterOutputCallback(output_callback callback, void *priv_data)
 {
     int ret = 0;
     ALOGV("+%s()", __FUNCTION__);
-    if (!FuncDolbyMS12RegisterPCMCallback) {
+    if (!FuncDolbyMS12RegisterOutputCallback) {
         ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
         return -1;
     }
 
-    ret = (*FuncDolbyMS12RegisterPCMCallback)(callback, priv_data);
-    ALOGV("-%s() ret %d", __FUNCTION__, ret);
-    return ret;
-}
-
-int DolbyMS12::DolbyMS12RegisterBitstreamCallback(output_callback callback, void *priv_data)
-{
-    int ret = 0;
-    ALOGV("+%s()", __FUNCTION__);
-    if (!FuncDolbyMS12RegisterBitstreamCallback) {
-        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
-        return -1;
-    }
-
-    ret = (*FuncDolbyMS12RegisterBitstreamCallback)(callback , priv_data);
+    ret = (*FuncDolbyMS12RegisterOutputCallback)(callback , priv_data);
     ALOGV("-%s() ret %d", __FUNCTION__, ret);
     return ret;
 }

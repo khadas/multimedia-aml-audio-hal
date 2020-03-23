@@ -15,6 +15,8 @@ add_library(ms12v2 SHARED
 	src/DolbyMS12Status.cpp
 )
 
+add_definitions(-DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
+
 set_target_properties(ms12v2 PROPERTIES
 	VERSION ${PROJECT_VERSION}
 	SOVERSION 1)
