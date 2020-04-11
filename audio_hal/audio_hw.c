@@ -1312,7 +1312,7 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
     struct aml_stream_in *in;
     struct str_parms *parms;
     char *str;
-    char value[32];
+    char value[1024];
     int ret;
     uint val = 0;
     bool force_input_standby = false;
@@ -1681,14 +1681,14 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
         // without "adev->ms12->curDBGain != iMS12DB" conditional filter, audio will have gap when continous changing volume
         if (adev->ms12.curDBGain != iMS12DB) {
             char param[16];
-            char *argv[3] = {"ms12_runtime", "--sys_prim_mixgain", param};
+            char *argv[3] = {"ms12_runtime", "-sys_prim_mixgain", param};
             // set duration to 10 will not introduce gap
             ret = set_dolby_ms12_primary_input_db_gain(&adev->ms12, iMS12DB , 10);
             if (ret < 0) {
                 ALOGE("%s,set dolby primary gain failed", __FUNCTION__);
             }
             adev->ms12.curDBGain = iMS12DB;
-            sprintf(param, "0,10,%d", iMS12DB);
+            sprintf(param, "%d,10,0", iMS12DB);
             aml_ms12_update_runtime_params_direct(&(adev->ms12), 3, argv);
             ALOGI("%s,out->volume_l = %f,  iMS12DB = %d", __FUNCTION__, out->volume_l, iMS12DB);
         }
@@ -4525,7 +4525,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     if (continous_mode(adev) && (eDolbyMS12Lib == adev->dolby_lib_type)) {
         if (out->volume_l != 1.0) {
             if (!audio_is_linear_pcm(out->hal_internal_format)) {
-                char *argv[3] = {"ms12_runtime", "--sys_prim_mixgain", "0,10,0"};
+                char *argv[3] = {"ms12_runtime", "-sys_prim_mixgain", "0,10,0"};
                 /*we change the volume in this stream, but it will be closed,
                   we need to restore the ms12 to normal one
                 */
@@ -4808,7 +4808,7 @@ static int aml_audio_input_routing(struct audio_hw_device *dev,
     return 0;
 }
 
-#define VAL_LEN 64
+#define VAL_LEN 1024
 static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs)
 {
     ALOGD ("%s(%p, %s)", __FUNCTION__, dev, kvpairs);
@@ -7017,6 +7017,7 @@ ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream,
 
             /* apply volume for spk/hp, SPDIF/HDMI keep the max volume */
             gain_speaker *= (adev->sink_gain[OUTPORT_SPEAKER]);
+            gain_speaker *= aml_out->volume_l;
             apply_volume_16to32(gain_speaker, effect_tmp_buf, spk_tmp_buf, bytes);
 
             /* nchannels 32 bits --> 8 ch 32 bit mapping */
@@ -7060,6 +7061,7 @@ ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream,
 #endif
             *output_buffer = (void *) buffer;
             *output_buffer_bytes = bytes;
+            gain_speaker *= aml_out->volume_l;
             apply_volume(gain_speaker, *output_buffer, sizeof(uint16_t), bytes);
         }
     }
