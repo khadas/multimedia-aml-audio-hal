@@ -91,12 +91,11 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     , mAudioStreamOutChannelMask(AUDIO_CHANNEL_OUT_STEREO)
     , mAudioSteamOutSampleRate(48000)
     // , mAudioSteamOutDevices(AUDIO_DEVICE_OUT_SPEAKER)
-    , mDolbyMS12OutFormat(AUDIO_FORMAT_AC3)
+    , mDolbyMS12OutConfig(MS12_OUTPUT_MASK_DD)
     , mDolbyMS12OutSampleRate(48000)
     , mDolbyMS12OutChannelMask(AUDIO_CHANNEL_OUT_7POINT1)
     //, mDolbyMS12OutChannelMask(AUDIO_CHANNEL_OUT_STEREO)
     , mConfigParams(NULL)
-    , mStereoOutputFlag(false)
     // , mMultiOutputFlag(true)
     , mDRCBoost(100)
     , mDRCCut(100)
@@ -120,7 +119,6 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     , mDonwnmix71PCMto51(0)
     , mLockingChannelModeENC(1)//Encoder Channel Mode Locking Mode as 5.1
     , mRISCPrecisionFlag(1)
-    , mDualMonoReproMode(0)
     , mVerbosity(2)
     , mOutputBitDepth(16)//use 16 bit per sample
     , mAssociatedAudioMixing(1)
@@ -153,7 +151,6 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     , mDAPSurDecEnable(true)
     , mHasAssociateInput(false)
     , mHasSystemInput(false)
-    , mDualOutputFlag(false)
     , mActivateOTTSignal(false)
     , mChannelConfOTTSoundsIn(2)//2.0 if mActivateOTTSignal is true
     , mLFEPresentInOTTSoundIn(0)//on(default) if mActivateOTTSignal is true
@@ -198,7 +195,7 @@ void DolbyMS12ConfigParams::SetAudioStreamOutParams(
     , audio_format_t input_format
     , audio_channel_mask_t channel_mask
     , int sample_rate
-    , audio_format_t output_format)
+    , int output_config)
 {
     ALOGD("+%s()", __FUNCTION__);
     mAudioOutFlags = flags;
@@ -217,44 +214,20 @@ void DolbyMS12ConfigParams::SetAudioStreamOutParams(
     }
 
     mAudioSteamOutSampleRate = sample_rate;
-    mDolbyMS12OutFormat = output_format;
-    ALOGI("-%s() Flags %x Format %#x InputChannelMask %x SampleRate %d OutputFormat %#x\n",
-          __FUNCTION__, mAudioOutFlags, mAudioStreamOutFormat, mAudioStreamOutChannelMask,
-          mAudioSteamOutSampleRate, mDolbyMS12OutFormat);
-}
+    mDolbyMS12OutConfig = output_config & MS12_OUTPUT_MASK_PUBLIC;
 
-bool DolbyMS12ConfigParams::SetDolbyMS12ParamsbyOutProfile()
-{
-    ALOGD("+%s()", __FUNCTION__);
-
-    if (mDolbyMS12OutChannelMask == AUDIO_CHANNEL_OUT_7POINT1) {
-        mStereoOutputFlag = false;
-    } else if (mDolbyMS12OutChannelMask == AUDIO_CHANNEL_OUT_5POINT1) {
-        mStereoOutputFlag = false;
-    } else { //AUDIO_CHANNEL_OUT_STEREO
-        mStereoOutputFlag = true;
+    // speaker output w/o a DAP tuning file will use downmix output instead
+    if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_SPEAKER) {
+        if (mDAPInitMode) {
+            mDolbyMS12OutConfig |= MS12_OUTPUT_MASK_DAP;
+        } else {
+            mDolbyMS12OutConfig |= MS12_OUTPUT_MASK_STEREO;
+        }
     }
-    ALOGD("%s() mStereoOutputFlag %#x\n", __FUNCTION__, mStereoOutputFlag);
-    ALOGD("%s() mAudioStreamOutFormat %#x mDolbyMS12OutFormat %#x\n",
-          __FUNCTION__, mAudioStreamOutFormat, mDolbyMS12OutFormat);
 
-    //Todo, if DAP is enable, here need to modify!!!
-    /*
-        if ((mAudioStreamOutFormat == mDolbyMS12OutFormat) && \
-                (mHasAssociateInput == false) && \
-                (mHasSystemInput == false) && \
-                (mAudioStreamOutChannelMask == mDolbyMS12OutChannelMask) && \
-                (mAudioSteamOutSampleRate == mDolbyMS12OutSampleRate)) {
-            ALOGD("-%s() dolbyms12 in/out Format/channelMask/SampleRate is same, bypass the audio!\n", __FUNCTION__);
-            return false;//do not use dolbyms12
-        }
-        else {
-            ALOGD("-%s() dolbyms12 in format is differ with out format!\n", __FUNCTION__);
-            return true;
-        }
-    */
-    ALOGD("-%s() Enable dolbyms12!\n", __FUNCTION__);
-    return true;
+    ALOGD("-%s() AudioStreamOut Flags %x Format %#x InputChannelMask %x SampleRate %d OutputConfig %#x\n",
+          __FUNCTION__, mAudioOutFlags, mAudioStreamOutFormat, mAudioStreamOutChannelMask,
+          mAudioSteamOutSampleRate, mDolbyMS12OutConfig);
 }
 
 //input and output
@@ -417,63 +390,42 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
     }
 
 
-    //OUTPUT mDolbyMS12OutFormat(AUDIO_FORMAT_E_AC3)
-    if (mDolbyMS12OutFormat == AUDIO_FORMAT_AC3) {
+    if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_DD) {
         sprintf(ConfigParams[*row_index], "%s", "-od");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_DD_FILE_NAME);
         (*row_index)++;
-        if (mDualOutputFlag == true) {
-            if (mDAPInitMode != 0) {
-                sprintf(ConfigParams[*row_index], "%s", "-o_dap_speaker");
-                (*row_index)++;
-                sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_DAP_FILE_NAME);
-                (*row_index)++;
-            } else {
-                sprintf(ConfigParams[*row_index], "%s", "-oms");
-                (*row_index)++;
-                sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_PCM_DOWNMIX_FILE_NAME);
-                (*row_index)++;
-            }
-        }
-    } else if (mDolbyMS12OutFormat == AUDIO_FORMAT_E_AC3) {
+    }
+
+    if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_DDP) {
         sprintf(ConfigParams[*row_index], "%s", "-odp");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_DDP_FILE_NAME);
         (*row_index)++;
-        if (mDualOutputFlag == true) {
-            if (mDAPInitMode != 0) {
-                sprintf(ConfigParams[*row_index], "%s", "-o_dap_speaker");
-                (*row_index)++;
-                sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_DAP_FILE_NAME);
-                (*row_index)++;
-            } else {
-                sprintf(ConfigParams[*row_index], "%s", "-oms");
-                (*row_index)++;
-                sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_PCM_DOWNMIX_FILE_NAME);
-                (*row_index)++;
-            }
-        }
-    } else if (mDolbyMS12OutFormat == AUDIO_FORMAT_MAT) {
+    }
+
+    if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_MAT) {
         sprintf(ConfigParams[*row_index], "%s", "-omat");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_MAT_FILE_NAME);
         (*row_index)++;
-    } else if ((mDolbyMS12OutFormat == AUDIO_FORMAT_PCM_16_BIT) && (mDAPInitMode != 0)) {
-        // DAP output
+    }
+
+    if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_DAP) {
         sprintf(ConfigParams[*row_index], "%s", "-o_dap_speaker");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_DAP_FILE_NAME);
         (*row_index)++;
-    } else if ((mDolbyMS12OutFormat == AUDIO_FORMAT_PCM_16_BIT) &&
-        (audio_channel_count_from_out_mask(mDolbyMS12OutChannelMask) > 2) && (mDAPInitMode == 0)) {
-        // pcm multichannel
+    }
+
+    if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_MC) {
         sprintf(ConfigParams[*row_index], "%s", "-om");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_PCM_MULTI_FILE_NAME);
         (*row_index)++;
-    } else {
-        // pcm 2-channel downmix output
+    }
+
+    if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_STEREO) {
         sprintf(ConfigParams[*row_index], "%s", "-oms");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_PCM_DOWNMIX_FILE_NAME);
@@ -564,7 +516,7 @@ int DolbyMS12ConfigParams::SystemSoundChannelMaskConvertToChannelConfiguration(a
 int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_index)
 {
     ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
-    if (mStereoOutputFlag == true) {
+    if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_STEREO) {
         if ((mDRCBoostStereo >= 0) && (mDRCBoostStereo <= 100)) {
             sprintf(ConfigParams[*row_index], "%s", "-bs");
             (*row_index)++;
@@ -1466,7 +1418,7 @@ char **DolbyMS12ConfigParams::GetDolbyMS12ConfigParams(int *argc)
         SetPCMSwitches(mConfigParams, &mParamNum);
         SetHEAACSwitches(mConfigParams, &mParamNum);
         SetOTTProcessingGraphSwitches(mConfigParams, &mParamNum);
-        if (mDAPInitMode) {
+        if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_DAP) {
             SetDAPDeviceSwitches(mConfigParams, &mParamNum, 0);
             SetDAPContentSwitches(mConfigParams, &mParamNum);
         }

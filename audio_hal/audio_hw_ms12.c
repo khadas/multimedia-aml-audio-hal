@@ -80,6 +80,18 @@ static void dump_ms12_output_data(void *buffer, int size, char *file_name)
 
 static void *dolby_ms12_threadloop(void *data);
 
+static int _get_ms12_output_config(audio_format_t format)
+{
+    if (format == AUDIO_FORMAT_AC3)
+        return MS12_OUTPUT_MASK_DD;
+    else if (format == AUDIO_FORMAT_E_AC3)
+        return MS12_OUTPUT_MASK_DDP;
+    else if (format == AUDIO_FORMAT_MAT)
+        return MS12_OUTPUT_MASK_MAT;
+    else
+        return MS12_OUTPUT_MASK_SPEAKER;
+}
+
 /*
  *@brief get dolby ms12 prepared
  */
@@ -199,23 +211,29 @@ int get_the_dolby_ms12_prepared(
 
     //init the dolby ms12
     if (out->dual_output_flag) {
-        dolby_ms12_set_dual_output_flag(out->dual_output_flag);
-        aml_ms12_config(ms12, input_format, input_channel_mask, input_sample_rate, adev->optical_format);
+        int output_config = _get_ms12_output_config(adev->optical_format);
+        aml_ms12_config(ms12, input_format, input_channel_mask, input_sample_rate, output_config | MS12_OUTPUT_MASK_SPEAKER);
     } else {
-        dolby_ms12_set_dual_output_flag(out->dual_output_flag);
-        aml_ms12_config(ms12, input_format, input_channel_mask, input_sample_rate, adev->sink_format);
+        int output_config = _get_ms12_output_config(adev->sink_format);
+        aml_ms12_config(ms12, input_format, input_channel_mask, input_sample_rate, output_config);
     }
     if (ms12->dolby_ms12_enable) {
         //register Dolby MS12 callback
         dolby_ms12_register_output_callback(ms12_output, (void *)out);
         ms12->device = usecase_device_adapter_with_ms12(out->device, adev->sink_format);
-        ALOGI("%s out [dual_output_flag %d] adev [format sink %#x optical %#x] ms12 [output-format %#x device %d]",
-              __FUNCTION__, out->dual_output_flag, adev->sink_format, adev->optical_format, ms12->output_format, ms12->device);
+        ALOGI("%s out [dual_output_flag %d] adev [format sink %#x optical %#x] ms12 [output-config %#x device %d]",
+              __FUNCTION__, out->dual_output_flag, adev->sink_format, adev->optical_format, ms12->output_config, ms12->device);
         memcpy((void *) & (adev->ms12_config), (const void *) & (out->config), sizeof(struct pcm_config));
         get_hardware_config_parameters(
             &(adev->ms12_config)
             , adev->sink_format
-            , audio_channel_count_from_out_mask(ms12->output_channelmask)
+            /* for tv_platform, the I2S PCM output is always 8 channel, and because there are
+             * other processing like 16->32 bit change and 2->8 channel change, the ALSA device
+             * channel number should not be related to ms12 output channelmask
+             * hard code to 8 channel firstly for tv_platform.
+             * TODO: for non_tv_platform
+             */
+            , (out->is_tv_platform) ? 8: audio_channel_count_from_out_mask(ms12->output_channelmask)
             , ms12->output_samplerate
             , out->is_tv_platform);
 
@@ -593,7 +611,7 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12)
     dolby_ms12_flush_main_input_buffer();
     dolby_ms12_config_params_set_system_flag(false);
     aml_ms12_cleanup(ms12);
-    ms12->output_format = AUDIO_FORMAT_INVALID;
+    ms12->output_config = 0;
     ms12->dolby_ms12_enable = false;
     ms12->is_dolby_atmos = false;
     ms12->input_total_ms = 0;
