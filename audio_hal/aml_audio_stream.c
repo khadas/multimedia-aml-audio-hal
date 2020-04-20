@@ -126,15 +126,8 @@ void get_sink_format (struct audio_stream_out *stream)
             optical_audio_format = sink_audio_format;
             break;
         case DD:
-            if (adev->continuous_audio_mode == 0) {
-                sink_audio_format = min(source_format, AUDIO_FORMAT_AC3);
-            } else {
-                sink_audio_format = AUDIO_FORMAT_AC3;
-                if (source_format == AUDIO_FORMAT_PCM_16_BIT) {
-                    ALOGI("%s continuous_audio_mode %d source_format %#x\n", __FUNCTION__, adev->continuous_audio_mode, source_format);
-                }
-            }
-            optical_audio_format = sink_audio_format;
+            sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;
+            optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_DTS;
             break;
         case AUTO:
             sink_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? min(source_format, sink_capability) : AUDIO_FORMAT_DTS;
@@ -164,13 +157,8 @@ void get_sink_format (struct audio_stream_out *stream)
             optical_audio_format = sink_audio_format;
             break;
         case DD:
-            if (adev->continuous_audio_mode == 0) {
-                sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;
-                optical_audio_format = min(source_format, AUDIO_FORMAT_AC3);
-            } else {
-                sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;
-                optical_audio_format = AUDIO_FORMAT_AC3;
-            }
+            sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;
+            optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_DTS;
             break;
         case AUTO:
             if (adev->continuous_audio_mode == 0) {
