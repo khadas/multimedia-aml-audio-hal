@@ -21,6 +21,7 @@
 #include <system/audio.h>
 //#include <system/audio_policy.h>
 #include "dolby_ms12_config_parameter_struct.h"
+#include "dolby_ms12_output_mask.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,19 +52,14 @@ bool dolby_ms12_config_params_get_system_flag(void);
  * @audio_format_t input_format //audio stream out format
  * @audio_channel_mask_t channel_mask //audio stream out channel mask
  * @int sample_rate //audio stream out sample rate
- * @audio_format_t output_format //dolby ms12 output format[ec3/ac3/pcm]
+ * @int output_config //dolby ms12 output mask[dd/ddp/mat/stereo/mc/speaker]
  */
 void dolby_ms12_config_params_set_audio_stream_out_params(
     audio_output_flags_t flags
     , audio_format_t input_format
     , audio_channel_mask_t channel_mask
     , int sample_rate
-    , audio_format_t output_format);
-
-/**
- * @brief Set the surround sound to DolbyMS12GetOutProfile
- */
-bool dolby_ms12_config_params_set_surround_sound_by_out_profile(void);
+    , int output_config);
 
 // /*config params begin*/
 // /**/

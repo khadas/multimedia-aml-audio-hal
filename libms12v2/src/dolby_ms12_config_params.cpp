@@ -113,31 +113,13 @@ extern "C" void dolby_ms12_config_params_set_audio_stream_out_params(
     , audio_format_t input_format
     , audio_channel_mask_t channel_mask
     , int sample_rate
-    , audio_format_t output_format)
+    , int output_config)
 {
     ALOGV("%s()\n", __FUNCTION__);
     android::DolbyMS12ConfigParams *config_param = getInstance();
     if (config_param) {
-        config_param->SetAudioStreamOutParams(flags, input_format, channel_mask, sample_rate, output_format);
+        config_param->SetAudioStreamOutParams(flags, input_format, channel_mask, sample_rate, output_config);
     }
-}
-
-extern "C" bool dolby_ms12_config_params_set_surround_sound_by_out_profile(void)
-{
-    ALOGV("%s()\n", __FUNCTION__);
-#if 0
-    // compile error, nor this function was called by anyone, comment out here
-    android::DolbyMS12ConfigParams *config_param = getInstance();
-    if (config_param) {
-        audio_policy_forced_cfg_t force_use = android::AudioSystem::getForceUse(AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND);
-        return config_param->SetDolbyMS12ParamsbyOutProfile(force_use);
-    } else {
-        return false;
-    }
-#else
-    return false;
-#endif
-
 }
 
 /*config params begin*/
@@ -293,14 +275,14 @@ extern "C" void dolby_ms12_config_params_cleanup_config_params(char **ConfigPara
         return config_param->CleanupConfigParams(ConfigParams, max_raw_size);
     }
 }
-extern "C" audio_format_t dolby_ms12_config_params_get_dobly_config_output_format(void)
+extern "C" int dolby_ms12_config_params_get_dobly_config_output_config(void)
 {
     ALOGV("%s()\n", __FUNCTION__);
     android::DolbyMS12ConfigParams *config_param = getInstance();
     if (config_param) {
-        return config_param->GetDoblyConfigOutputFormat();
+        return config_param->GetDoblyConfigOutputConfig();
     } else {
-        return AUDIO_FORMAT_INVALID;
+        return 0;
     }
 }
 
@@ -811,15 +793,6 @@ extern "C" void dolby_ms12_set_dap_dialogue_enhancer(DAPDialogueEnhancer *dapDia
     android::DolbyMS12ConfigParams *config_param = getInstance();
     if (config_param) {
         config_param->setDAPDialogueEnhancer(dapDialogueEnhancerParamters);
-    }
-}
-
-extern "C" void dolby_ms12_set_dual_output_flag(bool need_dual_output)
-{
-    ALOGV("%s()\n", __FUNCTION__);
-    android::DolbyMS12ConfigParams *config_param = getInstance();
-    if (config_param) {
-        config_param->setDualOutputFlag(need_dual_output);
     }
 }
 

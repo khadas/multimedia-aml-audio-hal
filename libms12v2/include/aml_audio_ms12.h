@@ -32,7 +32,7 @@ struct dolby_ms12_desc {
     audio_format_t input_config_format;
     audio_channel_mask_t config_channel_mask;
     int config_sample_rate;
-    audio_format_t output_format;
+    int output_config;
     int output_samplerate;
     audio_channel_mask_t output_channelmask;
     int ms12_out_bytes;
@@ -109,12 +109,13 @@ int get_dolby_ms12_init(struct dolby_ms12_desc *ms12_desc);
  * ms12_config_format: AUDIO_FORMAT_PCM_16_BIT/AUDIO_FORMAT_PCM_32_BIT/AUDIO_FORMAT_AC3/AUDIO_FORMAT_E_AC3/AUDIO_FORMAT_MAT
  * config_channel_mask: AUDIO_CHANNEL_OUT_STEREO/AUDIO_CHANNEL_OUT_5POINT1/AUDIO_CHANNEL_OUT_7POINT1
  * config_sample_rate: sample rate.
+ * output_config: bit mask | of {MS12_OUTPUT_MASK_DD/DDP/MAT/STEREO/SPEAKER}
  */
 int aml_ms12_config(struct dolby_ms12_desc *ms12_desc
                     , audio_format_t config_format
                     , audio_channel_mask_t config_channel_mask
                     , int config_sample_rate
-                    , audio_format_t output_format);
+                    , int output_config);
 /*
  *@brief cleanup the dolby ms12
  */

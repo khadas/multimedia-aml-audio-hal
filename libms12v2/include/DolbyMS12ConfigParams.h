@@ -24,6 +24,7 @@
 #include <mutex>
 
 #include "dolby_ms12_config_parameter_struct.h"
+#include "dolby_ms12_output_mask.h"
 
 //@@@DDPlus input file
 #define DEFAULT_MAIN_DDP_FILE_NAME "/data/main.ac3"
@@ -52,8 +53,7 @@ public:
                                          , audio_format_t input_format
                                          , audio_channel_mask_t channel_mask
                                          , int sample_rate
-                                         , audio_format_t output_format);
-    virtual bool SetDolbyMS12ParamsbyOutProfile();
+                                         , int output_format);
     virtual int SetInputOutputFileName(char **ConfigParams, int *row_index);
     virtual int SetFunctionalSwitches(char **ConfigParams, int *row_index);
 #if 0
@@ -84,9 +84,9 @@ public:
     //cleanup the mConfigParams Array
     virtual void CleanupConfigParams(char **ConfigParams, int max_raw_size);
 
-    virtual audio_format_t GetDoblyConfigOutputFormat(void)
+    virtual int GetDoblyConfigOutputConfig(void)
     {
-        return mDolbyMS12OutFormat;
+        return mDolbyMS12OutConfig;
     }
     virtual int GetDolbyConfigOutputSampleRate(void)
     {
@@ -399,17 +399,6 @@ public:
         }
     }
 
-    virtual void setDualOutputFlag(bool need_dual_output)
-    {
-        mDualOutputFlag = need_dual_output;
-        ALOGI("%s() set mDualOutputFlag %d", __FUNCTION__, mDualOutputFlag);
-    }
-
-    virtual bool getDualOutputFlag(void)
-    {
-        return mDualOutputFlag;
-    }
-
     /*OTT Processing Graph Begin*/
     virtual int SetOTTProcessingGraphSwitches(char **ConfigParams, int *row_index);
 
@@ -518,11 +507,10 @@ private:
 
     //dolby ms12 output
 
-    audio_format_t mDolbyMS12OutFormat;
+    int mDolbyMS12OutConfig;
     int mDolbyMS12OutSampleRate;
     audio_channel_mask_t mDolbyMS12OutChannelMask;
     char **mConfigParams;//[MAX_ARGC][MAX_ARGV_STRING_LEN];
-    bool mStereoOutputFlag;
 
 
     // bool mMultiOutputFlag;
@@ -657,8 +645,6 @@ private:
         .de_amount = 0,
         .de_ducking = 0,
     };
-
-    bool mDualOutputFlag;
 
     bool mActivateOTTSignal;
     int mChannelConfOTTSoundsIn;

@@ -27,8 +27,8 @@ int get_dolby_ms12_output_details(struct dolby_ms12_desc *ms12_desc)
     ms12_desc->dolby_ms12_init_argv = dolby_ms12_config_params_get_config_params(&ms12_desc->dolby_ms12_init_argc);
     ms12_desc->output_samplerate = dolby_ms12_config_params_get_dolby_config_output_samplerate();
     ms12_desc->output_channelmask = dolby_ms12_config_params_get_dolby_config_output_channelmask();
-    ALOGD("%s() dolby_ms12_init_argv %p argc %d dolby ms12 output format %#x samplerate %d channelmask %#x\n",
-          __func__, ms12_desc->dolby_ms12_init_argv, ms12_desc->dolby_ms12_init_argc, ms12_desc->output_format,
+    ALOGD("%s() dolby_ms12_init_argv %p argc %d dolby ms12 output config %#x samplerate %d channelmask %#x\n",
+          __func__, ms12_desc->dolby_ms12_init_argv, ms12_desc->dolby_ms12_init_argc, ms12_desc->output_config,
           ms12_desc->output_samplerate, ms12_desc->output_channelmask);
     return 0;
 }
@@ -65,8 +65,15 @@ int get_dolby_ms12_init(struct dolby_ms12_desc *ms12_desc)
 #endif
         else {
             ms12_desc->dolby_ms12_enable = true;
-            ALOGD("%s() dolby ms12 output format %#x\n", __FUNCTION__, ms12_desc->output_format);
-            set_offload_playback_dolby_ms12_output_format(ms12_desc->output_format);
+            ALOGD("%s() dolby ms12 output config %#x\n", __FUNCTION__, ms12_desc->output_config);
+            if (ms12_desc->output_config & MS12_OUTPUT_MASK_DD)
+                set_offload_playback_dolby_ms12_output_format(AUDIO_FORMAT_AC3);
+            else if (ms12_desc->output_config & MS12_OUTPUT_MASK_DDP)
+                set_offload_playback_dolby_ms12_output_format(AUDIO_FORMAT_E_AC3);
+            else if (ms12_desc->output_config & MS12_OUTPUT_MASK_MAT)
+                set_offload_playback_dolby_ms12_output_format(AUDIO_FORMAT_MAT);
+            else
+                set_offload_playback_dolby_ms12_output_format(AUDIO_FORMAT_PCM);
             ALOGD("%s() init DolbyMS12 success\n", __FUNCTION__);
         }
         ms12_desc->curDBGain = 0;
@@ -79,16 +86,15 @@ int aml_ms12_config(struct dolby_ms12_desc *ms12_desc
                     , audio_format_t config_format
                     , audio_channel_mask_t config_channel_mask
                     , int config_sample_rate
-                    , audio_format_t output_format)
+                    , int output_config)
 {
     ALOGD("+%s() %d\n", __FUNCTION__, __LINE__);
     ms12_desc->input_config_format = config_format;
     ms12_desc->config_channel_mask = config_channel_mask;
     ms12_desc->config_sample_rate = config_sample_rate;
-    //ms12_desc->output_format = get_dolby_ms12_suitable_output_format();
-    ms12_desc->output_format = output_format;
-    ALOGI("%s() config input format %#x channel mask %#x samplerate %d output format %#x\n",
-          __FUNCTION__, config_format, config_channel_mask, config_sample_rate, output_format);
+    ms12_desc->output_config = output_config;
+    ALOGI("%s() config input format %#x channle mask %#x samplerate %d output config %#x\n",
+          __FUNCTION__, config_format, config_channel_mask, config_sample_rate, output_config);
     dolby_ms12_config_params_reset_config_params();
     if (get_audio_system_format() == AUDIO_FORMAT_PCM_16_BIT) {
         dolby_ms12_config_params_set_system_flag(true);
@@ -101,7 +107,7 @@ int aml_ms12_config(struct dolby_ms12_desc *ms12_desc
         , ms12_desc->input_config_format
         , ms12_desc->config_channel_mask
         , ms12_desc->config_sample_rate
-        , ms12_desc->output_format);
+        , ms12_desc->output_config);
     get_dolby_ms12_output_details(ms12_desc);
 
     get_dolby_ms12_init(ms12_desc);
