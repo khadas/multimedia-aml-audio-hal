@@ -44,6 +44,7 @@ static struct aml_mixer_list gAmlMixerList[] = {
     {AML_MIXER_ID_HDMI_OUT_AUDIO_MUTE,  "Audio hdmi-out mute"},
     /* for HDMI ARC status */
     {AML_MIXER_ID_HDMI_ARC_AUDIO_ENABLE, "HDMI ARC Switch"},
+    {AML_MIXER_ID_HDMI_EARC_AUDIO_ENABLE, "eARC_RX attended type"},
     {AML_MIXER_ID_AUDIO_IN_SRC,         "Audio In Source"},
     {AML_MIXER_ID_I2SIN_AUDIO_TYPE,     "I2SIN Audio Type"},
     {AML_MIXER_ID_SPDIFIN_AUDIO_TYPE,   "SPDIFIN Audio Type"},
@@ -77,6 +78,7 @@ static struct aml_mixer_list gAmlMixerList[] = {
     {AML_MIXER_ID_AED_MULTI_DRC_ENABLE, "AED Multi-band DRC enable"},
     {AML_MIXER_ID_AED_FULL_DRC_ENABLE,  "AED Full-band DRC enable"},
     {AML_MIXER_ID_SPDIF_IN_SAMPLERATE,  "SPDIFIN audio samplerate"},
+    {AML_MIXER_ID_EARC_AUDIO_TYPE,      "eARC_TX Audio Codec Type"},
 };
 
 static char *get_mixer_name_by_id(int mixer_id)

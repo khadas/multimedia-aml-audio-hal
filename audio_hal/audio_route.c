@@ -606,6 +606,11 @@ static int alloc_mixer_state(struct audio_route *ar)
         if (!is_supported_ctl_type(type))
             continue;
 
+        if (num_values > 64) {
+            ar->mixer_state[i].num_values = 0;
+            continue;
+        }
+
         size_t value_sz = sizeof_ctl_type(type);
         ar->mixer_state[i].old_value.ptr = calloc(num_values, value_sz);
         ar->mixer_state[i].new_value.ptr = calloc(num_values, value_sz);
@@ -648,6 +653,11 @@ int audio_route_update_mixer(struct audio_route *ar)
     unsigned int i;
     unsigned int j;
     struct mixer_ctl *ctl;
+
+    if (!ar) {
+        ALOGE("invalid audio_route");
+        return -1;
+    }
 
     for (i = 0; i < ar->num_mixer_ctls; i++) {
         unsigned int num_values = ar->mixer_state[i].num_values;
