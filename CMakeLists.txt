@@ -20,6 +20,15 @@ target_include_directories(spdifenc PRIVATE
 
 target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations)
 
+option(USE_DTV "Compile with DTV option" ON)
+
+if(USE_DTV)
+    list(APPEND DTV_FILES audio_hal/audio_dtv_ad.c)
+    list(APPEND DTV_FILES audio_hal/audio_hw_dtv.c)
+    list(APPEND DTV_INC $ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/include/aml_dvb/am_adp)
+    list(APPEND DTV_LIBS -L$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/lib/aml_libs_nf -lamadec -lam_adp )
+endif()
+
 #############################################
 # libaudio_hal
 #############################################
@@ -40,10 +49,8 @@ add_library(audio_hal SHARED
 	audio_hal/aml_resample_wrap.cpp
 	audio_hal/audio_android_resample_api.c
 	audio_hal/audio_data_process.c
-	audio_hal/audio_dtv_ad.c
 	audio_hal/audio_format_parse.c
 	audio_hal/audio_hw.c
-	audio_hal/audio_hw_dtv.c
 	audio_hal/audio_hw_ms12.c
 	audio_hal/audio_hw_profile.c
 	audio_hal/audio_hwsync.c
@@ -75,6 +82,7 @@ add_library(audio_hal SHARED
 	utils/aml_volume_utils.c
 	utils/aml_configs/aml_conf_loader.c
 	utils/aml_configs/aml_conf_parser.c
+    ${DTV_FILES}
 )
 
 add_definitions(-DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
@@ -89,7 +97,7 @@ set_target_properties(audio_hal PROPERTIES
 	SOVERSION 1)
 
 target_include_directories(audio_hal PRIVATE
-	$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/include/aml_dvb/am_adp
+    ${DTV_INC}
 	./include
 	./include/utils
 	./include/amlogic_AQ_tools
@@ -102,7 +110,7 @@ target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-de
 target_link_libraries(audio_hal
 #	audioprocessing spdifenc ms12v2 ${PREBUILD_STATIC_LIBS}
 	audioprocessing spdifenc ms12v2
-	-L$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/lib/aml_libs_nf -lcutils -lamaudioutils -ltinyalsa -lamadec -lamavutils -lam_adp -llog -lexpat -lpthread -ldl -lstdc++ -Wl,-z,defs)
+    ${DTV_LIBS} -lcutils -lamaudioutils -ltinyalsa -lamavutils -llog -lexpat -lpthread -ldl -lstdc++ -Wl,-z,defs)
 
 install(TARGETS audio_hal
 	LIBRARY DESTINATION "lib")

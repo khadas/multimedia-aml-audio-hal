@@ -77,7 +77,13 @@
 #include "aml_avsync_tuning.h"
 #include "aml_ng.h"
 #include "aml_audio_timer.h"
+#ifdef USE_DTV
+// for dtv playback
 #include "audio_dtv_ad.h"
+#include "audio_hw_dtv.h"
+#define ENABLE_DTV_PATCH
+#define ENABLE_TUNER_IN
+#endif
 
 // for invoke bluetooth rc hal
 //#include "audio_hal_thunks.h"
@@ -93,13 +99,7 @@
 #include "jb_nano.h"
 #endif
 
-// for dtv playback
-#include "audio_hw_dtv.h"
-//#include "../bt_voice/kehwin/audio_kw.h"
 
-
-#define ENABLE_DTV_PATCH
-#define ENABLE_TUNER_IN
 //#define ENABLE_NOISE_GATE
 //#define ENABLE_DRC
 //#define ENABLE_EQ
