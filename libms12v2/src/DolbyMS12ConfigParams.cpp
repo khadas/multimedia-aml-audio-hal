@@ -1396,7 +1396,7 @@ int DolbyMS12ConfigParams::SetDAPContentSwitches(char **ConfigParams, int *row_i
     if (ContenDAPDialogueEnhancer.de_enable == 1) {
         sprintf(ConfigParams[*row_index], "%s", "-dap_dialogue_enhancer");
         (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d,%d,%d", ContenDAPDialogueEnhancer.de_enable, ContenDAPDialogueEnhancer.de_amount, ContenDAPDialogueEnhancer.de_ducking);
+        sprintf(ConfigParams[*row_index], "%d,%d", ContenDAPDialogueEnhancer.de_enable, ContenDAPDialogueEnhancer.de_amount);
         (*row_index)++;
     }
 

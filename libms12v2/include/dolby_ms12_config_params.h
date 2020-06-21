@@ -531,7 +531,6 @@ void dolby_ms12_set_dap_ieq(DAPIEQ *dapIEQParameters);
  * @brief dap dialogue enhancer
  * - de_enable (0,1, def: 0)
  * - de_amount (0...16, def: 0)
- * - de_ducking (0...16, def: 0)
  */
 void dolby_ms12_set_dap_dialogue_enhancer(DAPDialogueEnhancer *dapDialogueEnhancerParamters);
 

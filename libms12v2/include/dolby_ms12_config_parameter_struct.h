@@ -104,7 +104,6 @@ typedef struct
 {
     int de_enable;// (0,1, def: 0)
     int de_amount;//(0...16, def: 0)
-    int de_ducking;//(0...16, def: 0)
 }DAPDialogueEnhancer;
 
 typedef struct

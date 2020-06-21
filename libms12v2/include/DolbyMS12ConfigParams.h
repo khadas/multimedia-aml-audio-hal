@@ -643,7 +643,6 @@ private:
     DAPDialogueEnhancer ContenDAPDialogueEnhancer = {
         .de_enable = 0,
         .de_amount = 0,
-        .de_ducking = 0,
     };
 
     bool mActivateOTTSignal;
