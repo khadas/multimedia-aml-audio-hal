@@ -39,6 +39,7 @@
 
 #define HW_AVSYNC_HEADER_SIZE_V1 16
 #define HW_AVSYNC_HEADER_SIZE_V2 20
+#define HW_AVSYNC_MAX_HEADER_SIZE  24
 
 
 //TODO: After precisely calc the pts, change it back to 1s
@@ -48,6 +49,7 @@
 #define APTS_DISCONTINUE_THRESHOLD_MAX    (5*90000)
 
 #define HWSYNC_APTS_NUM     512
+#define  HWSYNC_MAX_BODY_SIZE  (6*2*2048)
 
 enum hwsync_status {
     CONTINUATION,  // good sync condition
@@ -67,6 +69,7 @@ typedef struct  audio_hwsync {
     int hw_sync_state;
     uint32_t hw_sync_body_cnt;
     uint32_t hw_sync_frame_size;
+    int bvariable_frame_size;
     //uint8_t hw_sync_body_buf[8192];  // 4096
     uint8_t hw_sync_body_buf[24576];    // 6144*4 for EAC3 worst case
     uint8_t body_align[64];
@@ -108,6 +111,14 @@ static inline uint32_t hwsync_header_get_size(uint8_t *header)
            (((uint32_t)header[5]) << 16) |
            (((uint32_t)header[6]) << 8) |
            ((uint32_t)header[7]);
+}
+
+static inline uint32_t hwsync_header_get_offset(uint8_t *header)
+{
+    return (((uint32_t)header[16]) << 24) |
+           (((uint32_t)header[17]) << 16) |
+           (((uint32_t)header[18]) << 8) |
+           ((uint32_t)header[19]);
 }
 
 static inline uint64_t get_pts_gap(uint64_t a, uint64_t b)
