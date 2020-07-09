@@ -531,6 +531,9 @@ struct aml_stream_out {
     audio_format_t hal_format;
     /* samplerate exposed to AudioFlinger. */
     unsigned int hal_rate;
+    unsigned int hal_ch;
+    /* frame size for every output stream */
+    unsigned int hal_frame_size;
     audio_output_flags_t flags;
     audio_devices_t out_device;
     struct pcm *pcm;

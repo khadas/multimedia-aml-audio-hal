@@ -4528,6 +4528,14 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         ret = -EINVAL;
         goto err;
     }
+
+    out->hal_ch = audio_channel_count_from_out_mask(out->hal_channel_mask);
+    out->hal_frame_size = audio_bytes_per_frame(out->hal_ch, out->hal_internal_format);
+    if (out->hal_ch == 0)
+        out->hal_ch = 2;
+    if (out->hal_frame_size == 0)
+        out->hal_frame_size = 1;
+
     out->stream.common.get_sample_rate = out_get_sample_rate;
     out->stream.common.set_sample_rate = out_set_sample_rate;
     out->stream.common.get_buffer_size = out_get_buffer_size;
@@ -7732,7 +7740,7 @@ ssize_t hw_write (struct audio_stream_out *stream
     */
     if (!continous_mode(adev)) {
         if (aml_out->hal_internal_format == AUDIO_FORMAT_PCM_16_BIT) {
-            write_frames = aml_out->input_bytes_size / 4;
+            write_frames = aml_out->input_bytes_size / aml_out->hal_frame_size;
             //total_frame = write_frames;
         } else {
             total_frame = aml_out->frame_write_sum + aml_out->frame_skip_sum;

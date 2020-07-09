@@ -157,6 +157,7 @@ void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out
     p_hwsync->first_apts_flag = false;
     p_hwsync->hw_sync_state = HW_SYNC_STATE_HEADER;
     p_hwsync->hw_sync_header_cnt = 0;
+    p_hwsync->bvariable_frame_size = 0;
     p_hwsync->version_num = 0;
     memset(p_hwsync->pts_tab, 0, sizeof(apts_tab_t)*HWSYNC_APTS_NUM);
     pthread_mutex_init(&p_hwsync->lock, NULL);
@@ -190,6 +191,7 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
     uint64_t time_diff = 0;
     int pts_found = 0;
     struct aml_audio_device *adev = p_hwsync->aout->dev;
+    size_t  v2_hwsync_header = HW_AVSYNC_HEADER_SIZE_V2;
     int debug_enable = (adev->debug_flag > 8);
     if (p_hwsync == NULL || in_buffer == NULL) {
         return 0;
@@ -218,22 +220,48 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
                 }
             }
             if ((p_hwsync->version_num  == 1 && p_hwsync->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V1 ) ||
-                (p_hwsync->version_num  == 2 && p_hwsync->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V2 )) {
+                (p_hwsync->version_num  == 2 && p_hwsync->hw_sync_header_cnt == v2_hwsync_header )) {
                 uint64_t pts;
+                /**/
+
+                if (p_hwsync->version_num  == 2 && p_hwsync->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V2 ) {
+                    v2_hwsync_header = hwsync_header_get_offset(&p_hwsync->hw_sync_header[0]);
+                    if (v2_hwsync_header > HW_AVSYNC_MAX_HEADER_SIZE) {
+                        ALOGE("buffer overwrite, check the header size %zu \n",v2_hwsync_header);
+                        break;
+                    }
+                    if (v2_hwsync_header > p_hwsync->hw_sync_header_cnt) {
+                        ALOGV("need skip more sync header, %zu\n",v2_hwsync_header);
+                        continue;
+                    }
+                }
                 if ((in_bytes - remain) > p_hwsync->hw_sync_header_cnt) {
                     ALOGI("got the frame sync header cost %zu", in_bytes - remain);
                 }
                 p_hwsync->hw_sync_state = HW_SYNC_STATE_BODY;
                 p_hwsync->hw_sync_body_cnt = hwsync_header_get_size(&p_hwsync->hw_sync_header[0]);
+                if (p_hwsync->hw_sync_frame_size && p_hwsync->hw_sync_body_cnt) {
+                    if (p_hwsync->hw_sync_frame_size != p_hwsync->hw_sync_body_cnt) {
+                        p_hwsync->bvariable_frame_size = 1;
+                        if (adev->debug_flag > 8)
+                            ALOGI("old frame size=%d new=%d", p_hwsync->hw_sync_frame_size, p_hwsync->hw_sync_body_cnt);
+                    }
+                }
                 p_hwsync->hw_sync_frame_size = p_hwsync->hw_sync_body_cnt;
                 p_hwsync->body_align_cnt = 0; //  alisan zz
                 p_hwsync->hw_sync_header_cnt = 0; //8.1
                 pts = hwsync_header_get_pts(&p_hwsync->hw_sync_header[0]);
                 pts = pts * 90 / 1000000;
                 time_diff = get_pts_gap(pts, p_hwsync->last_apts_from_header) / 90;
-                if (debug_enable > 8) {
-                ALOGV("pts 0x%"PRIx64",frame len %u\n", pts, p_hwsync->hw_sync_body_cnt);
-                ALOGV("last pts 0x%"PRIx64",diff 0x%"PRIx64" ms\n", p_hwsync->last_apts_from_header, time_diff);
+                if (adev->debug_flag > 8) {
+                    ALOGV("pts 0x%"PRIx64",frame len %u\n", pts, p_hwsync->hw_sync_body_cnt);
+                    ALOGV("last pts 0x%"PRIx64",diff 0x%"PRIx64" ms\n", p_hwsync->last_apts_from_header, time_diff);
+                }
+                if (p_hwsync->hw_sync_frame_size > HWSYNC_MAX_BODY_SIZE) {
+                    ALOGE("hwsync frame body %d bigger than pre-defined size %d, need check !!!!!\n",
+                                p_hwsync->hw_sync_frame_size,HWSYNC_MAX_BODY_SIZE);
+                    p_hwsync->hw_sync_state = HW_SYNC_STATE_HEADER;
+                    return 0;
                 }
                 if (time_diff > 32) {
                     ALOGV("pts  time gap %"PRIx64" ms,last %"PRIx64",cur %"PRIx64"\n", time_diff,
@@ -439,7 +467,7 @@ int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsign
     size_t align  = 0;
     int ret = -1;
     struct aml_audio_device *adev = NULL;
-    struct audio_stream_out *stream = NULL;
+    struct aml_stream_out  *out = NULL;
     int    debug_enable = 0;
     //struct aml_audio_device *adev = p_hwsync->aout->dev;
     //struct audio_stream_out *stream = (struct audio_stream_out *)p_hwsync->aout;
@@ -447,6 +475,10 @@ int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsign
     uint32_t latency_frames = 0;
     uint32_t latency_pts = 0;
     apts_tab_t *pts_tab = NULL;
+    uint32_t nearest_pts = 0;
+    uint32_t nearest_offset = 0;
+    uint32_t min_offset = 0x7fffffff;
+    int match_index = -1;
 
     // add protection to avoid NULL pointer.
     if (!p_hwsync) {
@@ -458,8 +490,8 @@ int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsign
         ALOGE("%s,p_hwsync->aout == NULL", __func__);
         return -1;
     }
-    stream = (struct audio_stream_out *)p_hwsync->aout;
 
+    out = p_hwsync->aout;
     adev = p_hwsync->aout->dev;
     if (adev == NULL) {
         ALOGE("%s,adev == NULL", __func__);
@@ -471,16 +503,24 @@ int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsign
         ALOGI("%s offset %zu,first %d", __func__, offset, p_hwsync->first_apts_flag);
     }
     pthread_mutex_lock(&p_hwsync->lock);
-    if (p_hwsync->first_apts_flag == false) {
-        align = 0;
+
+    /*the hw_sync_frame_size will be an issue if it is fixed one*/
+    //ALOGI("Adaptive steam =%d", p_hwsync->bvariable_frame_size);
+    if (!p_hwsync->bvariable_frame_size) {
+        if (p_hwsync->hw_sync_frame_size) {
+            align = offset - offset % p_hwsync->hw_sync_frame_size;
+        } else {
+            align = offset;
+        }
     } else {
-        align = offset - offset % p_hwsync->hw_sync_frame_size;
+        align = offset;
     }
     pts_tab = p_hwsync->pts_tab;
     for (i = 0; i < HWSYNC_APTS_NUM; i++) {
         if (pts_tab[i].valid) {
             if (pts_tab[i].offset == align) {
                 *p_apts = pts_tab[i].pts;
+                nearest_offset = pts_tab[i].offset;
                 ret = 0;
                 if (debug_enable) {
                     ALOGI("%s first flag %d,pts checkout done,offset %zu,align %zu,pts 0x%x",
@@ -488,20 +528,41 @@ int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsign
                 }
                 break;
             } else if (pts_tab[i].offset < align) {
+                /*find the nearest one*/
+                if ((align - pts_tab[i].offset) < min_offset) {
+                    min_offset = align - pts_tab[i].offset;
+                    match_index = i;
+                    nearest_pts = pts_tab[i].pts;
+                    nearest_offset = pts_tab[i].offset;
+                }
                 pts_tab[i].valid = 0;
             }
         }
     }
     if (i == HWSYNC_APTS_NUM) {
-        ALOGE("%s,apts lookup failed,align %zu,offset %zu", __func__, align, offset);
-    } else if (p_hwsync->first_apts_flag) {
-        latency_frames = out_get_latency_frames(stream);
-        //if (get_output_format(stream) == AUDIO_FORMAT_E_AC3) {
-        //    latency_frames /= 4;
-        //}
-        latency_pts = latency_frames / 48 * 90;
-        if (*p_apts > latency_pts) {
-            *p_apts -= latency_pts;
+        if (nearest_pts) {
+            ret = 0;
+            *p_apts = nearest_pts;
+            /*keep it as valid, it may be used for next lookup*/
+            pts_tab[match_index].valid = 1;
+            if (debug_enable)
+                ALOGI("find nearest pts 0x%x offset %zu align %zu", *p_apts, nearest_offset, align);
+        } else {
+            ALOGE("%s,apts lookup failed,align %zu,offset %zu", __func__, align, offset);
+        }
+    }
+    if ((ret == 0) && audio_is_linear_pcm(out->hal_internal_format)) {
+        int diff = 0;
+        int pts_diff = 0;
+        uint32_t frame_size = out->hal_frame_size;
+        uint32_t sample_rate  = out->hal_rate;
+        diff = (offset >= nearest_offset) ? (offset - nearest_offset) : 0;
+        if ((frame_size != 0) && (sample_rate != 0)) {
+            pts_diff = (diff * 1000/frame_size)/sample_rate;
+        }
+        *p_apts +=  pts_diff * 90;
+        if (debug_enable) {
+            ALOGI("data offset =%d pts offset =%d diff =%d pts=0x%x pts diff =%d", offset, nearest_offset, offset - nearest_offset, *p_apts, pts_diff);
         }
     }
     pthread_mutex_unlock(&p_hwsync->lock);
