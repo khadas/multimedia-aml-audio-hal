@@ -38,35 +38,26 @@ static audio_format_t get_sink_capability (struct audio_stream_out *stream)
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
     struct aml_arc_hdmi_desc *hdmi_desc = &adev->hdmi_descs;
-
-    bool dd_is_support = hdmi_desc->dd_fmt.is_support;
-    bool ddp_is_support = hdmi_desc->ddp_fmt.is_support;
-
     audio_format_t sink_capability = AUDIO_FORMAT_PCM_16_BIT;
+    char *cap = (char *) get_hdmi_sink_cap(AUDIO_PARAMETER_STREAM_SUP_FORMATS, 0, &(adev->hdmi_descs));
 
-    //STB case
-    if (adev->is_STB)
-    {
-        char *cap = NULL;
-        cap = (char *) get_hdmi_sink_cap (AUDIO_PARAMETER_STREAM_SUP_FORMATS,0,&(adev->hdmi_descs));
-        if (cap) {
-            if (strstr(cap, "AUDIO_FORMAT_E_AC3") != NULL) {
-                sink_capability = AUDIO_FORMAT_E_AC3;
-            } else if (strstr(cap, "AUDIO_FORMAT_AC3") != NULL) {
-                sink_capability = AUDIO_FORMAT_AC3;
-            }
-            ALOGI ("%s mbox+dvb case sink_capability =  %d\n", __FUNCTION__, sink_capability);
-            free(cap);
-            cap = NULL;
-        }
-    } else {
-        if (ddp_is_support) {
+    if (cap) {
+        if (hdmi_desc->mat_fmt.is_support) {
+            sink_capability = AUDIO_FORMAT_MAT;
+        } else if (hdmi_desc->ddp_fmt.is_support) {
             sink_capability = AUDIO_FORMAT_E_AC3;
-        } else if (dd_is_support) {
+        } else if (hdmi_desc->dd_fmt.is_support) {
             sink_capability = AUDIO_FORMAT_AC3;
         }
-        ALOGI ("%s dd support %d ddp support %d\n", __FUNCTION__, dd_is_support, ddp_is_support);
+
+        free(cap);
     }
+
+    ALOGI ("%s dd support %d ddp support %d mat support \n", __FUNCTION__,
+        hdmi_desc->dd_fmt.is_support,
+        hdmi_desc->ddp_fmt.is_support,
+        hdmi_desc->mat_fmt.is_support);
+
     return sink_capability;
 }
 
@@ -111,6 +102,7 @@ void get_sink_format (struct audio_stream_out *stream)
         source_format = AUDIO_FORMAT_PCM_16_BIT;
     }
 
+#if 0
     // "adev->hdmi_format" is the UI selection item.
     // "adev->active_outport" was set when HDMI ARC cable plug in/off
     // condition 1: ARC port, single output.
@@ -181,6 +173,24 @@ void get_sink_format (struct audio_stream_out *stream)
             break;
         }
     }
+#else
+    switch (adev->hdmi_format) {
+    case PCM:
+        break;
+    case DD:
+        optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_DTS;
+        break;
+    case AUTO:
+    default:
+        if ((source_format == AUDIO_FORMAT_DTS) || (source_format == AUDIO_FORMAT_DTS_HD)) {
+            optical_audio_format = AUDIO_FORMAT_DTS;
+        } else {
+            optical_audio_format = sink_capability;
+        }
+        break;
+    }
+#endif
+
     adev->sink_format = sink_audio_format;
     adev->optical_format = optical_audio_format;
 

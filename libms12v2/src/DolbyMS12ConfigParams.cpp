@@ -119,6 +119,7 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     , mDonwnmix71PCMto51(0)
     , mLockingChannelModeENC(1)//Encoder Channel Mode Locking Mode as 5.1
     , mRISCPrecisionFlag(1)
+    , mDualMonoReproMode(0)
     , mVerbosity(2)
     , mOutputBitDepth(16)//use 16 bit per sample
     , mAssociatedAudioMixing(1)
