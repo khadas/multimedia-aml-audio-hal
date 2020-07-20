@@ -27,20 +27,32 @@ typedef struct AML_AUDIO_DELAY {
 } aml_audio_delay_st;
 
 
-typedef enum AML_AUDIO_DELAY_TYPE{
+typedef enum AML_AUDIO_DELAY_TYPE {
     AML_DELAY_OUTPORT_SPEAKER           = 0,
     AML_DELAY_OUTPORT_SPDIF             = 1,
     AML_DELAY_OUTPORT_ALL               = 2,
-
-    AML_DELAY_OUTPORT_BUTT              = 3,
+    AML_DELAY_INPORT_ALL                = 3,
+    AML_DELAY_BUTT                      = 4,
 } aml_audio_delay_type_e;
+
+typedef enum AML_AUDIO_INPUT_DELAY_TYPE {
+    AML_DELAY_INPUT_HDMI                = 0,
+    AML_DELAY_INPUT_ARC                 = 1,
+    AML_DELAY_INPUT_OPT                 = 2,
+    AML_DELAY_INPUT_HDMI_BT             = 3,
+    AML_DELAY_INPUT_DEFAULT             = 4,
+    AML_DELAY_INPUT_MAX                 = 5
+}  aml_audio_delay_input_type_e;
 
 int aml_audio_delay_init();
 int aml_audio_delay_deinit();
 int aml_audio_delay_set_time(aml_audio_delay_type_e enAudioDelayType, int s32DelayTimeMs);
+int aml_audio_delay_input_set_time(aml_audio_delay_input_type_e enAudioInputDelayType, int s32DelayTimeMs);
+int aml_audio_delay_input_set_type(aml_audio_delay_input_type_e enAudioDelayType);
+int aml_audio_delay_input_get_ms();
 int aml_audio_delay_clear(aml_audio_delay_type_e enAudioDelayType);
 int aml_audio_delay_process(aml_audio_delay_type_e enAudioDelayType, void *pData, int s32Size, audio_format_t enFormat, int nChannel);
-
+int aml_audio_delay_input_process(void *pData, int s32Size, audio_format_t enFormat, int nChannel, int nsampleRate, int nSampleSize);
 
 #endif
 

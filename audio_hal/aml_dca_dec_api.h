@@ -36,6 +36,7 @@ struct dca_dts_dec {
     int outlen_raw;
     int is_dtscd;
     int digital_raw;
+    bool is_dtv;
     //int (*get_parameters) (void *, int *, int *, int *);
     int (*decoder_process)(unsigned char*, int, unsigned char *, int *, char *, int *,struct pcm_info *);
     pthread_mutex_t lock;
@@ -50,5 +51,8 @@ int dca_decode_release(struct aml_audio_parser *parser);
 int dca_decoder_init_patch(struct dca_dts_dec *dts_dec);
 int dca_decoder_release_patch(struct dca_dts_dec *dts_dec);
 int dca_decoder_process_patch(struct dca_dts_dec *dts_dec, unsigned char*buffer, int bytes);
+
+
+void dca_decoder_config(struct audio_stream_out *stream, bool *dtscd_flag);
 
 #endif

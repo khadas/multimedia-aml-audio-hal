@@ -46,6 +46,16 @@ void dolby_ms12_config_params_set_system_flag(bool flag);
 bool dolby_ms12_config_params_get_system_flag(void);
 
 /**
+ * @brief Set app flag
+ */
+void dolby_ms12_config_params_set_app_flag(bool flag);
+
+/**
+ * @brief Get app flag
+ */
+bool dolby_ms12_config_params_get_app_flag(void);
+
+/**
  * @brief Set input&output parameters
 
  * @audio_output_flags_t flags //audio stream out flags
@@ -61,6 +71,27 @@ void dolby_ms12_config_params_set_audio_stream_out_params(
     , int sample_rate
     , int output_config);
 
+/**
+ * @brief Set channel mask for application sound input
+ *
+ * @mask channel mask to set
+ */
+void dolby_ms12_config_params_set_channel_mask_app(audio_channel_mask_t mask);
+
+/**
+ * @brief Set channel mask for system sound input
+ *
+ * @mask channel mask to set
+ */
+void dolby_ms12_config_params_set_channel_mask_system(audio_channel_mask_t mask);
+
+/**
+ * @brief Set channel mask for UI(OTT) sound input
+ *
+ * @mask channel mask to set
+ */
+void dolby_ms12_config_params_set_channel_mask_ui(audio_channel_mask_t mask);
+
 // /*config params begin*/
 // /**/
 // int dolby_ms12_config_params_set_input_output_file_name(char **ConfigParams, int *row_index);
@@ -72,6 +103,14 @@ void dolby_ms12_config_params_set_audio_stream_out_params(
 // int dolby_ms12_config_params_set_dap_device_switches(char **ConfigParams, int *row_index);
 // int dolby_ms12_config_params_set_dap_content_switches(char **ConfigParams, int *row_index);
 // /*config params end*/
+
+/**
+ * @brief Get MS12 DAP runtime parameters
+ * @key query dap parameter name
+ *
+ * @return an allocated string for settings
+ */
+char *dolby_ms12_query_dap_parameters(const char *key);
 
 /**
  * @brief Get the dolby_ms12_init() input params
@@ -169,12 +208,17 @@ void dolby_ms12_set_drc_cut_stereo(int val);
 /**
  * @brief Channel configuration of Application Sounds input
  */
-void dolby_ms12_set_channel_config_of_app_sound_input(audio_channel_mask_t channel_mask);
+void dolby_ms12_set_channel_mask_of_app_sound_input(audio_channel_mask_t channel_mask);
 
 /**
  * @brief Channel configuration of System Sounds input
  */
-void dolby_ms12_set_channel_config_of_system_sound_input(audio_channel_mask_t channel_mask);
+void dolby_ms12_set_channel_mask_of_system_sound_input(audio_channel_mask_t channel_mask);
+
+/**
+ * @brief Channel configuration of UI(OTT) Sounds input
+ */
+void dolby_ms12_set_channel_mask_of_ui_sound_input(audio_channel_mask_t channel_mask);
 
 /**
  * @brief DAPv2 initialisation mode
@@ -221,20 +265,6 @@ void dolby_ms12_set_downmix_modes(int val);
  * 1 = on
  */
 void dolby_ms12_set_evalution_mode(int val);
-
-/**
- * @brief LFE present in Application Sounds input
- * 0 = off
- * 1 = on (default)
- */
-void dolby_ms12_set_lfe_present_in_app_sounds_in(int val);
-
-/**
- * @brief LFE present in System Sounds input
- * 0 = off
- * 1 = on (default)
- */
-void dolby_ms12_set_lfe_present_in_system_sounds_in(int val);
 
 /**
  * @brief Downmix 7.1 PCM signal to 5.1 on the multichannel outputs
@@ -388,23 +418,6 @@ void dolby_ms12_set_ac4_shortprogid(int val);
 
 //PCM SWITCHES
 /**
- * @brief Channel configuration of external PCM input
- * 0 = reserved
- * 1 = 1/0 (C)
- * 2 = 2/0 (L, R)
- * 7 = 3/2 (L, C, R, l, r) (default)
- * 21 = 3/2/2 (L, C, R, l, r, Lrs, Rrs)
- */
-void dolby_ms12_set_channel_config_of_external_pcm_input(int val);
-
-/**
- * @brief LFE present in external PCM input
- * 0 = off
- * 1 = on (default)
- */
-void dolby_ms12_set_lfe_present_in_external_pcm_input(int val);
-
-/**
  * @brief [pcm] Compressor profile
  * 0 [clipping protection only]
  * 1 [film-standard, default]
@@ -441,6 +454,7 @@ void dolby_ms12_set_heaac_dualmono_reproduction_mode(int val);
  * @brief [he-aac] Set ARIB channel mapping flag
  * 0 = Standard channel mapping (Default)
  * 1 = ARIB channel mapping (without attenuation)
+ *
  */
 void dolby_ms12_set_heaac_arib_channel_mapping_flag(int val);
 
@@ -466,6 +480,12 @@ void dolby_ms12_set_dap_surround_decoder_enable(bool val);
  * - surround_boost (0...96, def: 96)
  */
 void dolby_ms12_set_dap_surround_virtuallizer(DAPSurroundVirtualizer *dapVirtualizerParamters);
+
+/**
+ * @brief Virtualizer Parameter
+ * - virtualizer_enable (0,1, def: 1)
+ */
+int dolby_ms12_get_dap_surround_virtuallizer(void);
 
 /**
  * @brief dap graphic eq
@@ -511,9 +531,8 @@ void dolby_ms12_set_dap_mi_streering(DAPMISteering *dapMiSteeringParamters);
 
 /**
  * @brief dap leveler
- * - leveler_enable (0,1, def: 0)
- * - leveler_amount (0...10, def: 7)
- * - leveler_ignore_il (0, 1, def: 0)
+ * - leveler_enable (0,1,2, def: 0)
+ * - leveler_amount (0...10, def: 4)
  */
 void dolby_ms12_set_dap_leveler(DAPLeveler *dapLevelerParameters);
 
@@ -607,6 +626,25 @@ void dolby_ms12_set_ott_sound_input_enable(bool flag);
  * @brief get ott sound input enable
  */
 bool dolby_ms12_get_ott_sound_input_enable(void);
+
+/**
+ * @brief set the ms12 ddp(5.1) out parameter
+ *-legacy_ddplus_out  <int>   Downmix Atmos signals rendered from 5.1.2 to 5.1
+ *                            before reencoding to Dolby Digital Plus to connect legacy AVRs.
+ *                            In case of AC-4 or Dolby Digital Plus input,
+ *                            the decoder is configured to directly output 5.1 to save computational complexity.
+ *                            0 = off (default) (output 5.1.2 DDP with Atmos)
+ *                            1 = on (output 5.1 DDP)
+ */
+void dolby_ms12_set_ddp_5_1_out(bool flag);
+
+/**
+ * @brief get the status of ms12 out ddp(5.1)
+ *        return true  when OUT ddp(5.1)
+ *               false when OUT ddp-atmos(5.1.2)
+ */
+bool dolby_ms12_get_ddp_5_1_out(void);
+
 /*End*/
 
 #ifdef __cplusplus

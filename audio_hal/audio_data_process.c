@@ -105,7 +105,7 @@ int do_mixing_2ch(void *data_mixed,
 }
 // 2->8ch, 32bit, in out no overlap
 int extend_channel_2_8(void *data_out, void *data_in,
-        size_t frames, int ch_cnt_in, int ch_cnt_out)
+        size_t frames, int ch_cnt_out, int ch_cnt_in)
 {
     (void *)ch_cnt_out;
     (void *)ch_cnt_in;
@@ -126,7 +126,7 @@ int extend_channel_2_8(void *data_out, void *data_in,
 }
 
 int extend_channel_5_8(void *data_out, void *data_in,
-        size_t frames, int ch_cnt_in, int ch_cnt_out)
+        size_t frames, int ch_cnt_out, int ch_cnt_in)
 {
     (void *)ch_cnt_out;
     (void *)ch_cnt_in;

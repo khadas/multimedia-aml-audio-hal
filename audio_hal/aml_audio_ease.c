@@ -191,17 +191,18 @@ int aml_audio_ease_config(aml_audio_ease_t * ease_handle, ease_setting_t *settin
 
 int aml_audio_ease_process(aml_audio_ease_t * ease_handle, void * in_data, size_t size) {
 
-    audio_format_t format = ease_handle->data_format.format;
-    int ch = ease_handle->data_format.ch;
+    audio_format_t format;
+    int ch;
     int nframes = 0;
 
     int i = 0, j = 0;
     float vol_delta;
 
-    if (ease_handle == NULL || in_data == NULL || ch == 0 || size == 0 || ease_handle->ease_status == Invalid
-            || (format != AUDIO_FORMAT_PCM_16_BIT && format != AUDIO_FORMAT_PCM_32_BIT)) {
+    if (ease_handle == NULL || in_data == NULL || ease_handle->data_format.ch == 0 || size == 0 || ease_handle->ease_status == Invalid) {
          return -1;
     }
+    ch = ease_handle->data_format.ch;
+    format = ease_handle->data_format.format;
     pthread_mutex_lock(&ease_handle->ease_lock);
     nframes  = size / (audio_bytes_per_sample(format) * ch);
 

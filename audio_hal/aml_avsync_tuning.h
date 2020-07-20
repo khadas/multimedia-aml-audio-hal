@@ -20,8 +20,15 @@
 /* FIXME: add more SAMPLERATE and CHANNEL COUNT support */
 #define SAMPLE_RATE_MS (48)
 #define CHANNEL_CNT (2)
-/* 16 bits */
 #define FRAME_SIZE (2)
+
+/* check avsync latency times*/
+#define AVSYNC_SAMPLE_MAX_CNT (3)
+#define AVSYNC_ALSA_OUT_MAX_LATENCY (60)
+#define AVSYNC_RINGBUFFER_MIN_LATENCY (20)
+#define AVSYNC_SKIP_CNT (0)
+
+#define MAX_VEDIO_LATENCY (300)
 
 struct aml_audio_patch;
 struct aml_audio_device;

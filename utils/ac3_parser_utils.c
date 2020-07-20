@@ -200,8 +200,8 @@ int parse_dolby_frame_header
         //ALOGV("dolby head:0x%x 0x%x 0x%x 0x%x 0x%x 0x%x \n",
         //    inheader[0],inheader[1],inheader[2], inheader[3],inheader[4],inheader[5]);
         int bsid = (inheader[5] >> 3) & 0x1f;//bitstream_id,bit[40,44]
-        if (bsid > 16)
-            goto error;//invalid bitstream_id
+        /*if (bsid > 32)
+            goto error;//invalid bitstream_id*/
         if (bsid <= 8)
             nIsEc3 = 0;
         else if ( (bsid <= 16) && (bsid > 10) )
@@ -252,27 +252,25 @@ int parse_dolby_frame_header
             lfeOn = inheader[4] &0x1;
             numblkscod = (sr_code == 0x3) ? 0x3 : ( (inheader[4] >> 4) & 0x3);
             numblk_per_frame = (numblkscod == 0x3) ? 6 : (numblkscod + 1);
-
+            ALOGV("%s() ec3 numblkscod %d numblk_per_frame %d substreamid %d strmtyp %d\n",
+                __FUNCTION__, numblkscod, numblk_per_frame, substreamid, strmtyp);
             if (substreamid == 0 && strmtyp == 0) {
                 if (*framevalid_flag == 0) {
                     *timeslice_61937 = 0;
-                    *numblks += numblk_per_frame;
                     *framevalid_flag = 1;
                 } else if (*framevalid_flag == 1) {
                     if (*numblks  == 6) {
                         *timeslice_61937 = 1;
-                        *numblks = numblk_per_frame;
                     } else if (*numblks  > 6) {
                         *timeslice_61937 = 2;
-                        *numblks = numblk_per_frame;
                     } else {
                         *timeslice_61937 = 0;
-                        *numblks += numblk_per_frame;
                     }
                 }
             } else if (strmtyp == 1) {
                 *timeslice_61937 = 3;
             }
+            *numblks = numblk_per_frame;
 
         }
         // ALOGV("%s acmod %d lfeOn %d\n", nIsEc3==0?"ac3":"ec3",acmod, lfeOn);

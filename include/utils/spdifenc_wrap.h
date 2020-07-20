@@ -25,6 +25,7 @@ int spdifenc_init(struct pcm *mypcm, audio_format_t format);
 int spdifenc_write(const void *buffer, size_t numBytes);
 uint64_t  spdifenc_get_total(void);
 int spdifenc_set_mute(bool mute);
+audio_format_t  spdifenc_get_format(void);
 
 //#ifdef __cplusplus
 //}

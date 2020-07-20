@@ -31,7 +31,6 @@
 #undef  LOG_TAG
 #define LOG_TAG "aml_dump_debug"
 
-static int gDumpDataFd = -1;
 
 void DoDumpData(const void *data_buf, int size, int aud_src_type) {
     int tmp_type = -1;
@@ -42,10 +41,6 @@ void DoDumpData(const void *data_buf, int size, int aud_src_type) {
     property_get("media.audiohal.dumpdata.en", prop_value, "null");
     if (strcasecmp(prop_value, "null") == 0
             || strcasecmp(prop_value, "0") == 0) {
-        if (gDumpDataFd >= 0) {
-            close(gDumpDataFd);
-            gDumpDataFd = -1;
-        }
         return;
     }
 
@@ -71,26 +66,15 @@ void DoDumpData(const void *data_buf, int size, int aud_src_type) {
     if (strcasecmp(file_path, "null") == 0) {
         file_path[0] = '\0';
     }
-
-    if (gDumpDataFd < 0 && file_path[0] != '\0') {
-        if (access(file_path, 0) == 0) {
-            gDumpDataFd = open(file_path, O_RDWR | O_SYNC);
-            if (gDumpDataFd < 0) {
-                ALOGE("%s, Open device file \"%s\" error: %s.\n",
-                        __FUNCTION__, file_path, strerror(errno));
-            }
+    FILE *fp1 = fopen(file_path, "a+");
+    if (fp1) {
+        int flen = fwrite((char *)data_buf, 1, size, fp1);
+        if (flen > 0) {
+            ALOGV("%s buffer %p size %d\n", __FUNCTION__, data_buf, size);
         } else {
-            gDumpDataFd = open(file_path, O_WRONLY | O_CREAT | O_EXCL,
-                    S_IRUSR | S_IWUSR);
-            if (gDumpDataFd < 0) {
-                ALOGE("%s, Create device file \"%s\" error: %s.\n",
-                        __FUNCTION__, file_path, strerror(errno));
-            }
+            ALOGV("%s error flen %d\n", __FUNCTION__, flen);
         }
-    }
-
-    if (gDumpDataFd >= 0) {
-        write(gDumpDataFd, data_buf, size);
+        fclose(fp1);
     }
     return;
 }

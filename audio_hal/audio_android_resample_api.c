@@ -18,7 +18,6 @@
 
 #include <cutils/log.h>
 #include <stdlib.h>
-#include <string.h>
 #include "aml_audio_stream.h"
 #include "audio_android_resample_api.h"
 #include "aml_resample_wrap.h"
@@ -147,7 +146,7 @@ int android_resample_process(void *handle, void * in_buffer, size_t bytes, void 
     int ret = -1;
     unsigned int input_sr;
     unsigned int output_sr;
-    size_t need_size = 0;
+    uint64_t need_size = 0;
 
     int resample_size = RESAMPLE_FRAME * 2 * 2;
     if (handle == NULL) {
@@ -158,7 +157,7 @@ int android_resample_process(void *handle, void * in_buffer, size_t bytes, void 
     resample = (android_resample_handle_t *)handle;
     input_sr = resample->input_sr;
     output_sr = resample->output_sr;
-    need_size = (uint64_t)(resample_size*input_sr + (output_sr - 1))/output_sr;
+    need_size = ((uint64_t)resample_size*input_sr + (output_sr - 1))/output_sr;
 
     if (get_buffer_write_space(&resample->ring_buf) > (int)bytes) {
         ring_buffer_write(&resample->ring_buf, in_buffer, bytes, UNCOVER_WRITE);

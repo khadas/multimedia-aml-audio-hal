@@ -44,6 +44,7 @@ class Provider: public AudioBufferProvider
 public:
     Provider(size_t frameSize, read_func read, void *handle)
     : mFrameSize(frameSize),
+    mWorkBufSize(0),
     mRead(read),
     mHandle(handle) {
         mWorkBuf = (unsigned char*)malloc (8192);
@@ -58,7 +59,6 @@ public:
         size_t byte_read;
         size_t requestedFrames = buffer->frameCount;
         size_t input_size = requestedFrames * mFrameSize;
-
         if (input_size > mWorkBufSize) {
             mWorkBuf = (unsigned char *)realloc(mWorkBuf, input_size);
             if (!mWorkBuf) {
@@ -81,7 +81,6 @@ public:
         }
 
         buffer->raw = (char *)mWorkBuf;
-
         return NO_ERROR;
     }
     virtual void releaseBuffer(Buffer* buffer) {

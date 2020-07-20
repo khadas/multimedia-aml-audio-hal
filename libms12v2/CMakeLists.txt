@@ -15,7 +15,7 @@ add_library(ms12v2 SHARED
 	src/DolbyMS12Status.cpp
 )
 
-add_definitions(-DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
+add_definitions(-DNDEBUG -DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
 
 set_target_properties(ms12v2 PROPERTIES
 	VERSION ${PROJECT_VERSION}
@@ -23,7 +23,8 @@ set_target_properties(ms12v2 PROPERTIES
 
 target_include_directories(ms12v2 PRIVATE
 	./include
-	${PROJECT_SOURCE_DIR}/include)
+	${PROJECT_SOURCE_DIR}/include
+	${PROJECT_SOURCE_DIR}/include/utils)
 
 target_link_libraries(ms12v2
 	-lcutils -llog -lpthread -ldl -lstdc++)

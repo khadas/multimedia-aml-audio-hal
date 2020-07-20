@@ -205,6 +205,7 @@ int parser_load_from_file(struct parser *pParser, const char *filename)
     SECTION *pCurSection = NULL;
     char             *pM = NULL;
     SECTION        *pSec = NULL;
+    int len;
 
     // open the config file
     ALOGD("%s: name = %s", __func__, filename);
@@ -212,7 +213,8 @@ int parser_load_from_file(struct parser *pParser, const char *filename)
         ALOGE("[%s:%d]\n", __func__, __LINE__);
         return -1;
     }
-    strcpy(pParser->mpFileName, filename);
+    len = sizeof(filename) > (MAX_PASER_NAME_LEN - 1) ? (MAX_PASER_NAME_LEN - 1) : sizeof(filename);
+    strncpy(pParser->mpFileName, filename, len);
     pParser->m_pIniFile = fopen(pParser->mpFileName, "r");
     if (pParser->m_pIniFile == NULL) {
         // open default config file
@@ -251,7 +253,7 @@ int parser_load_from_file(struct parser *pParser, const char *filename)
         /* insert the the link */
         if (pParser->mpFirstLine == NULL) {
             pParser->mpFirstLine = pLINE;
-        } else {
+        } else if (pCurLINE) {
             pCurLINE->pNext = pLINE;
         }
         pCurLINE = pLINE;
@@ -264,7 +266,7 @@ int parser_load_from_file(struct parser *pParser, const char *filename)
             pSec->pNext = NULL;
             if (pParser->mpFirstSection == NULL) { //first section
                 pParser->mpFirstSection = pSec;
-            } else {
+            } else if (pCurSection) {
                 pCurSection->pNext = pSec;
             }
             pCurSection = pSec;

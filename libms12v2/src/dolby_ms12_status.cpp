@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "libms12v2"
+#define LOG_TAG "libms12"
 // #define LOG_NDEBUG 0
 // #define LOG_NALOGV 0
 
@@ -248,6 +248,30 @@ extern "C" audio_format_t get_audio_system_format(void)
     android::DolbyMS12Status* dolby_ms12_status_instance = getInstance();
     if (dolby_ms12_status_instance) {
         return dolby_ms12_status_instance->getAudioSystemFormat();
+    } else {
+        return AUDIO_FORMAT_INVALID;
+    }
+}
+
+/*
+ *@brief set Audio Hal App format
+ */
+extern "C" void set_audio_app_format(audio_format_t format)
+{
+    android::DolbyMS12Status* dolby_ms12_status_instance = getInstance();
+    if (dolby_ms12_status_instance) {
+        return dolby_ms12_status_instance->setAudioAppFormat(format);
+    }
+}
+
+/*
+ *@brief get Audio Hal App format
+ */
+extern "C" audio_format_t get_audio_app_format(void)
+{
+    android::DolbyMS12Status* dolby_ms12_status_instance = getInstance();
+    if (dolby_ms12_status_instance) {
+        return dolby_ms12_status_instance->getAudioAppFormat();
     } else {
         return AUDIO_FORMAT_INVALID;
     }

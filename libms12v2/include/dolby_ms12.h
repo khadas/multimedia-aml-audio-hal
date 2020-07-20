@@ -26,7 +26,7 @@ extern "C" {
 #include <stddef.h>
 
 
-//get the handle of dlopen "/system/lib/libdolbyms12.so"
+//get the handle of dlopen "/vendor/lib/libdolbyms12.so"
 int get_libdolbyms12_handle(void);
 
 //release the handle of dlopen
@@ -109,6 +109,13 @@ int dolby_ms12_input_system(void *dolby_mS12_pointer
                             , int audio_stream_out_channel_num
                             , int audio_stream_out_sample_rate);
 
+int dolby_ms12_input_app(void *dolby_mS12_pointer
+                            , const void *audio_stream_out_buffer
+                            , size_t audio_stream_out_buffer_size
+                            , int audio_stream_out_format
+                            , int audio_stream_out_channel_num
+                            , int audio_stream_out_sample_rate);
+
 
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
 
@@ -119,6 +126,7 @@ int dolby_ms12_input_system(void *dolby_mS12_pointer
     @void *priv_data //priv data
 */
 int dolby_ms12_register_output_callback(void *callback, void *priv_data);
+
 #else
 /*@@
     @brief Get output data
@@ -172,10 +180,14 @@ int dolby_ms12_set_quit_flag(int is_quit);
 void dolby_ms12_flush_input_buffer(void);
 
 void dolby_ms12_flush_main_input_buffer(void);
+
+void dolby_ms12_flush_app_input_buffer(void);
+
 /*@@
-    @brief get the n bytes consumed of payload(OTT audio or DD/DD+ stream)
+    @brief get the n bytes consumed by ms12 decoder
 */
-unsigned long long dolby_ms12_get_consumed_payload(void);
+unsigned long long dolby_ms12_get_decoder_n_bytes_consumed(void *ms12_pointer, int format, int is_main);
+
 
 /*@@
     @brief get the pcm output size
@@ -217,6 +229,35 @@ int dolby_ms12_get_gain(int idx);
     @brief get dolby atmos info
 */
 int dolby_ms12_get_input_atmos_info();
+
+
+/*@@
+    @brief set the main audio volume
+*/
+int dolby_ms12_set_main_volume(float volume);
+
+/*@@
+    @brief get PCM's nframes which outputed by decoder
+*/
+unsigned long long dolby_ms12_get_decoder_nframes_pcm_output(void *ms12_pointer, int format, int is_main);
+
+
+/*@@
+    @brief set dolby-ms12's debug level
+*/
+void dolby_ms12_set_debug_level(int level);
+
+/*@@
+    @brief get the sys consumed size
+*/
+unsigned long long dolby_ms12_get_consumed_sys_audio();
+
+/*@@
+    @brief get the total delay(which means frame nums)
+*/
+
+int dolby_ms12_get_total_nframes_delay(void *ms12_pointer);
+
 
 #ifdef __cplusplus
 }

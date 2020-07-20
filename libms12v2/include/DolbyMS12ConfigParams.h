@@ -25,18 +25,44 @@
 
 #include "dolby_ms12_config_parameter_struct.h"
 #include "dolby_ms12_output_mask.h"
+#include "dolby_ms12_input_mask.h"
+
 
 //@@@DDPlus input file
+// do not change file names, the pattern are used by MS12 lib
+// to determine node input types
 #define DEFAULT_MAIN_DDP_FILE_NAME "/data/main.ac3"
 #define DEFAULT_MAIN2_DDP_FILE_NAME "/data/main2.ac3"
 #define DEFAULT_ASSOCIATE_DDP_FILE_NAME "/data/associate.ac3"
 
+//#define DEFAULT_DUMMY_DDP_FILE_NAME "dummy_main.ac3"
+//#define DEFAULT_DUMMY2_DDP_FILE_NAME "dummy_main2.ac3"
 #define DEFAULT_DUMMY_DDP_FILE_NAME "dummy.ac3"
+#define DEFAULT_DUMMY2_DDP_FILE_NAME "dummy.ac3"
 #define DEFAULT_DAP_TUNING_FILE_NAME "/vendor/etc/ms12_tuning.dat"
+
 
 #ifdef __cplusplus
 namespace android
 {
+
+#define MS12_INPUT_MAIN   0
+#define MS12_INPUT_MAIN2  1
+#define MS12_INPUT_SYSTEM 2
+#define MS12_INPUT_APP    3
+#define MS12_INPUT_UI     4
+#define MS12_INPUT_MAX    5
+
+#define MIN_USER_CONTROL_VALUES (-32)
+#define MAX_USER_CONTROL_VALUES (32)
+
+#define MAX_MS12_INPUT_CMD_LEN 16
+
+typedef struct ms12InputNameMaskTable_t {
+char fileTypeCmd[MAX_MS12_INPUT_CMD_LEN];
+int mask;
+}
+ms12InputTable_t;
 
 class DolbyMS12ConfigParams
 {
@@ -66,10 +92,12 @@ public:
 #if 0
     virtual int SetPCMSwitchesRuntime(char **ConfigParams, int *row_index);
 #endif
+
     virtual int SetAc4Switches(char **ConfigParams, int *row_index);
     virtual int SetHEAACSwitches(char **ConfigParams, int *row_index);
     virtual int SetDAPDeviceSwitches(char **ConfigParams, int *row_index, int is_runtime);
     virtual int SetDAPContentSwitches(char **ConfigParams, int *row_index);
+    virtual char *QueryDapParameters(const char *key);
     virtual char **GetDolbyMS12ConfigParams(int *argc);
 #if 0
     virtual char **GetDolbyMS12RuntimeConfigParams(int *argc);
@@ -94,7 +122,7 @@ public:
     }
     virtual audio_channel_mask_t GetDolbyConfigOutputChannelMask(void)
     {
-        return mDolbyMS12OutChannelMask;
+        return mDolbyMS12OutChannelMask[MS12_INPUT_MAIN];
     }
     virtual void ResetConfigParams(void);
     //associate flags
@@ -120,8 +148,22 @@ public:
         ALOGI("%s() mHasSystemInput %d\n", __FUNCTION__, mHasSystemInput);
         return mHasSystemInput;
     }
-    virtual int APPSoundChannelMaskConvertToChannelConfiguration(audio_channel_mask_t channel_mask);
-    virtual int SystemSoundChannelMaskConvertToChannelConfiguration(audio_channel_mask_t channel_mask);
+
+    //app flags
+    virtual void setAppFlag(bool flag)
+    {
+        ALOGI("%s() App flag %d\n", __FUNCTION__, flag);
+        mHasAppInput = flag;
+        mAppSoundFlags = flag;
+    }
+    virtual int getAppFlag(void)
+    {
+        ALOGI("%s() mHasAppInput %d\n", __FUNCTION__, mHasAppInput);
+        return mHasAppInput;
+    }
+
+    virtual int ChannelMask2ChannelConfig(audio_channel_mask_t channel_mask);
+    virtual int ChannelMask2LFEConfig(audio_channel_mask_t channel_mask);
 
     //*Begin||Add the APT to set the params*//
     //Functional Switches
@@ -142,13 +184,17 @@ public:
     {
         mDRCCutStereo = val;
     }
-    virtual void setChannelConfigOfAppSoundsInput(audio_channel_mask_t channel_mask)
+    virtual void setChannelMaskOfAppSoundsInput(audio_channel_mask_t channel_mask)
     {
-        mChannelConfAppSoundsIn = APPSoundChannelMaskConvertToChannelConfiguration(channel_mask);
+        mDolbyMS12OutChannelMask[MS12_INPUT_APP] = channel_mask;
     }
-    virtual void setChannelConfigOfSystemSoundsInput(audio_channel_mask_t channel_mask)
+    virtual void setChannelMaskOfSystemSoundsInput(audio_channel_mask_t channel_mask)
     {
-        mChannelConfSystemIn = SystemSoundChannelMaskConvertToChannelConfiguration(channel_mask);
+        mDolbyMS12OutChannelMask[MS12_INPUT_SYSTEM] = channel_mask;
+    }
+    virtual void setChannelMaskOfUiSoundsInput(audio_channel_mask_t channel_mask)
+    {
+        mDolbyMS12OutChannelMask[MS12_INPUT_UI] = channel_mask;
     }
     virtual void setDAPV2InitialisationMode(int val)
     {
@@ -173,10 +219,6 @@ public:
     virtual void setEvalutionMode(int val)
     {
         mEvaluationMode = val;    // 0 or 1
-    }
-    virtual void setLFEpresentInAPPSoundsIn(int val)
-    {
-        mLFEPresentInAppSoundIn = val;    // 0 or 1
     }
     virtual void setLFEpresetInSystemSoundsIn(int val)
     {
@@ -308,14 +350,6 @@ public:
     }
 
     //PCM SWITCHES
-    virtual void setChnanelConfOfExternalPCMInput(audio_channel_mask_t channel_mask)
-    {
-        mChannelConfigInExtPCMInput = APPSoundChannelMaskConvertToChannelConfiguration(channel_mask);
-    }
-    virtual void setLFEpresentInExternalPCMInput(int val)
-    {
-        mLFEPresentInExtPCMInput = val;
-    }
     virtual void setPCMCompressorProfile(int val)
     {
         mCompressorProfile = val;
@@ -353,6 +387,10 @@ public:
         if (dapVirtualizerParamters) {
             memcpy(&DeviceDAPSurroundVirtualizer, dapVirtualizerParamters, sizeof(DeviceDAPSurroundVirtualizer));
         }
+    }
+    virtual int getDAPSurroundVirtualizer(void)
+    {
+        return DeviceDAPSurroundVirtualizer.virtualizer_enable;
     }
     virtual void setDAPGraphicEQ(DAPGraphicEQ *dapGraphicEQParamters)
     {
@@ -397,6 +435,17 @@ public:
         if (dapDialogueEnhancerParamters) {
             memcpy(&ContenDAPDialogueEnhancer, dapDialogueEnhancerParamters, sizeof(ContenDAPDialogueEnhancer));
         }
+    }
+
+    virtual void setDualOutputFlag(bool need_dual_output)
+    {
+        mDualOutputFlag = need_dual_output;
+        ALOGI("%s() set mDualOutputFlag %d", __FUNCTION__, mDualOutputFlag);
+    }
+
+    virtual bool getDualOutputFlag(void)
+    {
+        return mDualOutputFlag;
     }
 
     /*OTT Processing Graph Begin*/
@@ -458,7 +507,7 @@ public:
     virtual void setDolbyMain2NameAsDummy(bool is_dummy)
     {
         if (is_dummy) {
-            memcpy(mDolbyMain2FileName, DEFAULT_DUMMY_DDP_FILE_NAME, sizeof(DEFAULT_DUMMY_DDP_FILE_NAME));
+            memcpy(mDolbyMain2FileName, DEFAULT_DUMMY2_DDP_FILE_NAME, sizeof(DEFAULT_DUMMY_DDP_FILE_NAME));
         } else {
             memcpy(mDolbyMain2FileName, DEFAULT_MAIN2_DDP_FILE_NAME, sizeof(DEFAULT_MAIN2_DDP_FILE_NAME));
         }
@@ -482,6 +531,39 @@ public:
     }
     /*OTT Processing Graph End*/
 
+    virtual void setLegacyDDPOut(bool isLegacyDDPOut)
+    {
+        mIsLegecyDDPOut = isLegacyDDPOut;
+        ALOGI("%s() mIsLegecyDDPOut %d\n", __FUNCTION__, mIsLegecyDDPOut);
+    }
+
+    virtual bool getLegacyDDPOut(void)
+    {
+        return mIsLegecyDDPOut;
+    }
+
+    virtual void setInputCMDMask(const char *input_cmd);
+
+    virtual int getInputCMDMask(void)
+    {
+        return mDolbyInputCMDMask;
+    }
+
+    virtual bool isAssociatedAudioControlSuitable(void)
+    {
+        int curMask = getInputCMDMask();
+        int ddp_dual_input = MS12_INPUT_MASK_MAIN_DDP|MS12_INPUT_MASK_ASSOCIATE;
+
+        bool is_ac4_single = ((curMask & MS12_INPUT_MASK_MAIN_AC4) == MS12_INPUT_MASK_MAIN_AC4);
+        bool is_ddp_dual_input = ((curMask & ddp_dual_input) == ddp_dual_input);
+
+        if (is_ac4_single || is_ddp_dual_input)
+            return true;
+        else
+            return false;
+    }
+
+
     //*End||Add the APT to set the params*//
 
 
@@ -495,21 +577,17 @@ private:
     // DolbyMS12ConfigParams& operator = (const DolbyMS12ConfigParams&);
     // static DolbyMS12ConfigParams *gInstance;
     // static android::Mutex mLock;
-    static std::mutex mLock;
     // audio_devices_t mAudioSteamOutDevices;
     int mParamNum;
 
     //dolby ms12 input
     audio_output_flags_t mAudioOutFlags;
     audio_format_t mAudioStreamOutFormat;
-    audio_channel_mask_t mAudioStreamOutChannelMask;
-    int mAudioSteamOutSampleRate;
+    audio_channel_mask_t mDolbyMS12OutChannelMask[MS12_INPUT_MAX];
 
     //dolby ms12 output
-
     int mDolbyMS12OutConfig;
     int mDolbyMS12OutSampleRate;
-    audio_channel_mask_t mDolbyMS12OutChannelMask;
     char **mConfigParams;//[MAX_ARGC][MAX_ARGV_STRING_LEN];
 
 
@@ -519,8 +597,6 @@ private:
     int mDRCCut;
     int mDRCBoostStereo;
     int mDRCCutStereo;
-    int mChannelConfAppSoundsIn;
-    int mChannelConfSystemIn;
     bool mMainFlags;//has dd/ddp/he-aac audio
     bool mAppSoundFlags;
     bool mSystemSoundFlags;
@@ -531,7 +607,6 @@ private:
     int mDAPDRCMode;//for multi-ch and dap output[default is 0]
     int mDownmixMode;//Lt/Rt[val=0, default] or Lo/Ro
     int mEvaluationMode;//default is 0
-    int mLFEPresentInAppSoundIn;//default is 1[means on]
     int mLFEPresentInSystemSoundIn;//default is 0[means off]
     int mDonwnmix71PCMto51;//default 0[means off]
     int mLockingChannelModeENC;//0 default, auto; 1 locked as 5.1 channel mode.
@@ -573,9 +648,13 @@ private:
     //DDPLUS SWITCHES
 
     //PCM SWITCHES
-    int mChannelConfigInExtPCMInput;//Channel configuration of external PCM input, default is 7;
-    bool mLFEPresentInExtPCMInput = true;//LFE present in external PCM input
     int mCompressorProfile;//[pcm] Compressor profile
+
+    //HE-AAC SWITCHES
+    int mAssocInstanse;//[he-aac] Associated instance restricted to 2 channels
+    int mDefDialnormVal;//[he-aac] Default dialnorm value (dB/4),  0 - 127; Default = 108 (-27dB)
+    int mDualMonoreproductionMode;//[he-aac] Dual-mono reproduction mode, 0:Stereo(default), 1:Left/first, 2:Right/second
+    int mAribChannelMappingFlag;//[he-aac] ARIB channel mapping flag, 0:standard(default), 1:ARIB (w/o attenuation)
 
     //AC4 SWITCHES
     char mAC4Lang[4];
@@ -586,18 +665,13 @@ private:
     int mAC4De;//[ac4] Dialogue Enhancement gain [0-12], default 0
     int mAC4ShortProgId;//[ac4] The short program identifier as 16 bit unsigned value or -1 for no program (default)
 
-    //HE-AAC SWITCHES
-    int mAssocInstanse;//[he-aac] Associated instance restricted to 2 channels
-    int mDefDialnormVal;//[he-aac] Default dialnorm value (dB/4),  0 - 127; Default = 108 (-27dB)
-    int mDualMonoreproductionMode;//[he-aac] Dual-mono reproduction mode, 0:Stereo(default), 1:Left/first, 2:Right/second
-    int mAribChannelMappingFlag;//[he-aac] ARIB channel mapping flag, 0:standard(default), 1:ARIB (w/o attenuation)
-
     //DAP SWITCHES (device specific)
     const char *mDAPTuningFile;
     int mDAPGains = 0;//postgain (-2080...480, def: 0)
     bool mDAPSurDecEnable = true;//DAP surround decoder enable flag (Default 1)
     bool mHasAssociateInput = false;
     bool mHasSystemInput = false;
+    bool mHasAppInput = false;
     DAPSurroundVirtualizer DeviceDAPSurroundVirtualizer = {
         .virtualizer_enable = 1,
         .surround_boost = 96,
@@ -645,9 +719,9 @@ private:
         .de_amount = 0,
     };
 
+    bool mDualOutputFlag;
+
     bool mActivateOTTSignal;
-    int mChannelConfOTTSoundsIn;
-    int mLFEPresentInOTTSoundIn;
     bool mAtmosLock;
     bool mPause;
 
@@ -661,6 +735,8 @@ private:
         .duration = 0,
         .shape = 0,
     };//System sound mixer gain values for System Sounds input
+    bool mIsLegecyDDPOut;
+    int mDolbyInputCMDMask;
 }; //class DolbyMS12ConfigParams
 
 

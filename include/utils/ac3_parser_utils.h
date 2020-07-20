@@ -21,6 +21,8 @@
 #define ISDD(bsid)       ((bsid) <= BS_STD)
 #define BS_AXE           16
 #define ISDDP(bsid)      ((bsid) <= BS_AXE && (bsid) > 10)
+#define BS_MAT           32
+#define ISMAT(bsid)      ((bsid) <= BS_MAT && (bsid) > 16)
 
 
 /*

@@ -349,6 +349,28 @@ int scan_dolby_main_frame_ext(void *input_buffer
                     ret = -1;
                 }
             }
+        } else if (pc == 0x16) {
+            payload_size = (pcpd >> 16);
+            if (bytes - sync_word_offset >= (size_t)payload_size) {
+                if (bytes - sync_word_offset >= MAT_PERIOD_SIZE) {
+                    *used_size = sync_word_offset + MAT_PERIOD_SIZE;
+                    is_iec61937_packat = 1;
+                } else {
+                    *used_size = sync_word_offset + payload_size;
+                }
+                ret = 0;
+            } else {
+                if (bytes - sync_word_offset > 0) {
+                    *used_size = bytes;
+                    *payload_deficiency = payload_size - (bytes - sync_word_offset - IEC61937_HEADER_SIZE);
+                    ret = 1;
+                } else {
+                    *used_size = bytes;
+                    ALOGV("%s useful data len %lu mat iec61937 packet size %#x payload_size %#x",
+                         __FUNCTION__, (unsigned long)(bytes - sync_word_offset), MAT_PERIOD_SIZE, payload_size);
+                    ret = -1;
+                }
+            }
         } else {
             ret = -1;
             ALOGE("%s error pc %x\n", __FUNCTION__, pc);

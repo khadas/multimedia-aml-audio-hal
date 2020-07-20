@@ -242,4 +242,34 @@ int aml_audio_resample_process(aml_audio_resample_t * aml_audio_resample, void *
     return 0;
 }
 
+int aml_audio_resample_reset(aml_audio_resample_t * aml_audio_resample)
+{
+    int ret = -1;
+
+    audio_resample_func_t * resample_func = NULL;
+
+    if (aml_audio_resample == NULL) {
+        ALOGE("resample_handle is NULL\n");
+        return -1;
+    }
+
+    resample_func = get_resample_function(aml_audio_resample->resample_type);
+    if (resample_func == NULL) {
+        ALOGE("resample_func is NULL\n");
+    }
+
+    if (resample_func && aml_audio_resample->resample_handle) {
+        resample_func->resample_close(aml_audio_resample->resample_handle);
+
+        ret = resample_func->resample_open(&aml_audio_resample->resample_handle, &aml_audio_resample->resample_config);
+        if (ret < 0) {
+            ALOGE("resample_reset failed\n");
+            return -1;
+
+        }
+    }
+    ALOGI("%s", __FUNCTION__);
+    return 0;
+}
+
 

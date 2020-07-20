@@ -20,7 +20,7 @@ target_include_directories(spdifenc PRIVATE
 
 target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations)
 
-option(USE_DTV "Compile with DTV option" ON)
+option(USE_DTV "Compile with DTV option" OFF)
 
 if(USE_DTV)
     list(APPEND DTV_FILES audio_hal/audio_dtv_ad.c)
@@ -36,11 +36,16 @@ add_library(audio_hal SHARED
 	audio_hal/alsa_config_parameters.c
 	audio_hal/alsa_manager.c
 	audio_hal/aml_ac3_parser.c
+        audio_hal/aml_audio_ac3parser.c
+        audio_hal/aml_audio_ac4parser.c
+        audio_hal/aml_audio_bitsparser.c
 	audio_hal/aml_audio_delay.c
 	audio_hal/aml_audio_ease.c
 	audio_hal/amlAudioMixer.c
+        audio_hal/aml_audio_ms12_bypass.c
 	audio_hal/aml_audio_resample_manager.c
 	audio_hal/aml_audio_stream.c
+        audio_hal/aml_audio_spdif_output.c
 	audio_hal/aml_audio_timer.c
 	audio_hal/aml_avsync_tuning.c
 	audio_hal/aml_dca_dec_api.c
@@ -51,6 +56,7 @@ add_library(audio_hal SHARED
 	audio_hal/audio_data_process.c
 	audio_hal/audio_format_parse.c
 	audio_hal/audio_hw.c
+        audio_hal/audio_hw_insert_silence_data.c
 	audio_hal/audio_hw_ms12.c
 	audio_hal/audio_hw_profile.c
 	audio_hal/audio_hwsync.c
@@ -78,14 +84,16 @@ add_library(audio_hal SHARED
 	utils/aml_buffer_provider.c
 	utils/aml_data_utils.c
 	utils/aml_dump_debug.c
+        utils/aml_malloc_debug.c
 	utils/aml_ringbuffer.c
 	utils/aml_volume_utils.c
 	utils/aml_configs/aml_conf_loader.c
 	utils/aml_configs/aml_conf_parser.c
+        utils/earc_utils.c
     ${DTV_FILES}
 )
 
-add_definitions(-DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
+add_definitions(-DNDEBUG -DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
 
 set(PREBUILD_STATIC_LIBS
 	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/lib_aml_ng.a

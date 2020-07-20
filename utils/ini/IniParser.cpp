@@ -260,8 +260,8 @@ INI_LINE* IniParser::newLine(const char* name, const char* value) {
     pLine = new INI_LINE();
     if (pLine != NULL) {
         pLine->pNext = NULL;
-        strcpy(pLine->Name, name);
-        strcpy(pLine->Value, value);
+        strncpy(pLine->Name, name, CC_MAX_INI_LINE_NAME_LEN - 1);
+        strncpy(pLine->Value, value, CC_MAX_INI_FILE_LINE_LEN - 1);
 
 #if CC_MEMORY_NEW_DEL_TRACE == 1
         new_mem(__FUNCTION__, "pLine", pLine);
@@ -278,7 +278,7 @@ INI_SECTION* IniParser::newSection(const char* section, INI_LINE* pLine) {
     if (pSec != NULL) {
         pSec->pLine = pLine;
         pSec->pNext = NULL;
-        strcpy(pSec->Name, section);
+        strncpy(pSec->Name, section, CC_MAX_INI_LINE_NAME_LEN - 1);
 
 #if CC_MEMORY_NEW_DEL_TRACE == 1
         new_mem(__FUNCTION__, "pSec", pSec);
@@ -331,9 +331,13 @@ int IniParser::setKeyValue(void* user, const char* section, const char* key, con
                 pSec->pCurLine = pLine;
             } else {
                 if (set_mode == 1) {
-                    strcpy(pLine->Value, value);
+                    strncpy(pLine->Value, value, CC_MAX_INI_FILE_LINE_LEN - 1);
                 } else {
-                    strcat(pLine->Value, value);
+                    int len = strlen(pLine->Value) + strlen(value);
+                    if (len > CC_MAX_INI_FILE_LINE_LEN - 1)
+                        len = CC_MAX_INI_FILE_LINE_LEN - 1;
+                    strncat(pLine->Value, value, len - strlen(pLine->Value));
+                    pLine->Value[len] = 0;
                 }
             }
         }
@@ -352,10 +356,11 @@ int IniParser::handler(void* user, const char* section, const char* name,
 #if CC_MEMORY_NEW_DEL_TRACE == 1
 
 #define CC_MEM_RECORD_CNT    (1024)
+#define MEMND_MAX_NAME_LENGHT (50)
 
 typedef struct tag_memnd {
-    char fun_name[50];
-    char var_name[50];
+    char fun_name[MEMND_MAX_NAME_LENGHT];
+    char var_name[MEMND_MAX_NAME_LENGHT];
     void *ptr;
 } memnd;
 
@@ -366,16 +371,16 @@ static memnd gMemDelItems[CC_MEM_RECORD_CNT];
 static int gMemDelInd = 0;
 
 static void new_mem(const char *fun_name, const char *var_name, void *ptr) {
-    strcpy(gMemNewItems[gMemNewInd].fun_name, fun_name);
-    strcpy(gMemNewItems[gMemNewInd].var_name, var_name);
+    strncpy(gMemNewItems[gMemNewInd].fun_name, fun_name, MEMND_MAX_NAME_LENGHT - 1);
+    strncpy(gMemNewItems[gMemNewInd].var_name, var_name, MEMND_MAX_NAME_LENGHT - 1);
     gMemNewItems[gMemNewInd].ptr = ptr;
 
     gMemNewInd += 1;
 }
 
 static void del_mem(const char *fun_name, const char *var_name, void *ptr) {
-    strcpy(gMemDelItems[gMemDelInd].fun_name, fun_name);
-    strcpy(gMemDelItems[gMemDelInd].var_name, var_name);
+    strncpy(gMemDelItems[gMemDelInd].fun_name, fun_name, MEMND_MAX_NAME_LENGHT - 1);
+    strncpy(gMemDelItems[gMemDelInd].var_name, var_name, MEMND_MAX_NAME_LENGHT - 1);
     gMemDelItems[gMemDelInd].ptr = ptr;
 
     gMemDelInd += 1;

@@ -229,6 +229,50 @@ size_t ring_buffer_read(struct ring_buffer *rbuffer, unsigned char* buffer, size
 }
 
 /*************************************************
+Function: ring_buffer_seek
+Description: seek read or write pointer to add or
+            reduce audio latency
+Input: rbuffer: the source ring buffer
+       bytes: seek space in byte,
+              bytes > 0, reduce audio latency, move read pointer
+              bytes < 0, add audio latency, move write pointer
+Return: 0: do nothing for ringbuffer.
+        bytes: moved space in byte
+*************************************************/
+int ring_buffer_seek(struct ring_buffer *rbuffer, int bytes)
+{
+    struct ring_buffer *buf = rbuffer;
+    int seek_bytes = 0;
+
+    pthread_mutex_lock(&buf->lock);
+
+    if (buf->start_addr == NULL || buf->rd == NULL || buf->wr == NULL
+            || buf->size == 0 || bytes == 0) {
+        pthread_mutex_unlock(&buf->lock);
+        return 0;
+    }
+
+    if (bytes > 0) {
+        seek_bytes = get_read_space(buf->wr, buf->rd, buf->size, buf->last_is_write);
+        if (seek_bytes > bytes) {
+            seek_bytes = bytes;
+        }
+        buf->rd = update_pointer(buf->rd, seek_bytes, buf->start_addr, buf->size);
+    } else {
+        seek_bytes = get_write_space(buf->wr, buf->rd, buf->size, buf->last_is_write);
+        bytes *= -1;
+        if (seek_bytes > bytes) {
+            seek_bytes = bytes;
+        }
+        buf->wr = update_pointer(buf->wr, seek_bytes, buf->start_addr, buf->size);
+        seek_bytes *= -1;
+    }
+
+    pthread_mutex_unlock(&buf->lock);
+    return seek_bytes;
+}
+
+/*************************************************
 Function: ring_buffer_init
 Description: initialize ring buffer
 Input: rbuffer: the ring buffer to be initialized
@@ -325,7 +369,7 @@ int ring_buffer_reset_size(struct ring_buffer *rbuffer, int buffer_size)
         ALOGW("resized buffer size exceed largest buffer size, max %d, cur %d\n", \
               rbuffer->size, buffer_size);
         ring_buffer_release(rbuffer);
-        rbuffer->size = buffer_size;
+        //rbuffer->size = buffer_size;
         return ring_buffer_init(rbuffer, buffer_size);
     }
 

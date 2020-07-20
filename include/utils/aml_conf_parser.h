@@ -18,6 +18,7 @@
 #define _PARSER_H_
 
 #define MAX_INI_FILE_LINE_LEN (512)
+#define MAX_PASER_NAME_LEN (256)
 
 /*
  * example.conf
@@ -72,7 +73,7 @@ typedef struct _SECTION {
  ** Parser
  **/
 struct parser {
-    char    mpFileName[256];                  // path of config file
+    char    mpFileName[MAX_PASER_NAME_LEN];                  // path of config file
     FILE    *m_pIniFile;                      // handle
     LINE    *mpFirstLine;                     // first line in this config file
     SECTION *mpFirstSection;                  // first section in this config file
@@ -81,7 +82,7 @@ struct parser {
 /* load from */
 #define AML_PARAM_AUDIO_HAL_SYSTEM "/system/etc/tvaudiohal.conf"
 /* save to */
-#define AML_PARAM_AUDIO_HAL_PARAM  "/mnt/vendor/param/tvaudiohal.conf"
+#define AML_PARAM_AUDIO_HAL_PARAM  "/data/vendor/pq/tvaudiohal.conf"
 
 #define AML_SECTION_AUDIO_HAL      "AUDIO_HAL"
 

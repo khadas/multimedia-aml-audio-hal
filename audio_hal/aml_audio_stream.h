@@ -64,7 +64,8 @@ enum auge_input_source {
 enum digital_format {
     PCM = 0,
     DD = 4,
-    AUTO = 5
+    AUTO = 5,
+    BYPASS = 6
 };
 
 /**\brief Audio output mode*/
@@ -93,6 +94,19 @@ typedef enum hdmiin_audio_packet {
     AUDIO_PACKET_MAS
 } hdmiin_audio_packet_t;
 
+enum {
+    AUDIO_CODING_TYPE_UNDEFINED = 0,
+    AUDIO_CODING_TYPE_STEREO_LPCM,
+    AUDIO_CODING_TYPE_MULTICH_2CH_LPCM,
+    AUDIO_CODING_TYPE_MULTICH_8CH_LPCM
+};
+
+enum {
+    ATTEND_TYPE_NONE = 0,
+    ATTEND_TYPE_ARC,
+    ATTEND_TYPE_EARC
+};
+
 static inline bool is_main_write_usecase(stream_usecase_t usecase)
 {
     return usecase > 0;
@@ -103,12 +117,33 @@ static inline bool is_digital_raw_format(audio_format_t format)
     switch (format) {
     case AUDIO_FORMAT_AC3:
     case AUDIO_FORMAT_E_AC3:
-    case AUDIO_FORMAT_MAT:
     case AUDIO_FORMAT_AC4:
+    case AUDIO_FORMAT_MAT:
     case AUDIO_FORMAT_DTS:
     case AUDIO_FORMAT_DTS_HD:
     case AUDIO_FORMAT_DOLBY_TRUEHD:
     case AUDIO_FORMAT_IEC61937:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static inline bool is_dolby_format(audio_format_t format) {
+    switch (format) {
+    case AUDIO_FORMAT_AC3:
+    case AUDIO_FORMAT_E_AC3:
+    case AUDIO_FORMAT_DOLBY_TRUEHD:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static inline bool is_dts_format(audio_format_t format) {
+    switch (format) {
+    case AUDIO_FORMAT_DTS:
+    case AUDIO_FORMAT_DTS_HD:
         return true;
     default:
         return false;
@@ -122,23 +157,25 @@ static inline stream_usecase_t attr_to_usecase(uint32_t devices __unused,
     if ((flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) && (format != AUDIO_FORMAT_IEC61937)) {
         if (audio_is_linear_pcm(format)) {
             return STREAM_PCM_HWSYNC;
-        }
-
-        if (is_digital_raw_format(format)) {
+        } else if (is_digital_raw_format(format)) {
             return STREAM_RAW_HWSYNC;
+        } else {
+            return STREAM_USECASE_MAX;
         }
-
-        return STREAM_USECASE_INVAL;
     }
 
     // non hwsync cases
     if (/*devices == AUDIO_DEVICE_OUT_HDMI ||*/
         is_digital_raw_format(format)) {
         return STREAM_RAW_DIRECT;
-    }
-    //multi-channel LPCM or hi-res LPCM
-    else if ((flags & AUDIO_OUTPUT_FLAG_DIRECT) && audio_is_linear_pcm(format)) {
-        return STREAM_PCM_DIRECT;
+    } else if ((flags & AUDIO_OUTPUT_FLAG_DIRECT) && audio_is_linear_pcm(format)) {
+        if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
+            // AAudio case
+            return STREAM_PCM_MMAP;
+        } else {
+            //multi-channel LPCM or hi-res LPCM
+            return STREAM_PCM_DIRECT;
+        }
     } else {
         return STREAM_PCM_NORMAL;
     }
@@ -153,7 +190,7 @@ static inline stream_usecase_t convert_usecase_mask_to_stream_usecase(usecase_ma
     }
     ALOGI("%s mask %#x i %d", __func__, mask, i);
     if (i >= STREAM_USECASE_MAX) {
-        return STREAM_USECASE_INVAL;
+        return STREAM_USECASE_MAX;
     } else {
         return (stream_usecase_t)i;
     }
@@ -182,7 +219,8 @@ static inline alsa_device_t usecase_device_adapter_with_ms12(alsa_device_t useca
     switch (usecase_device) {
     case DIGITAL_DEVICE:
     case I2S_DEVICE:
-        if ((output_format == AUDIO_FORMAT_AC3) || (output_format == AUDIO_FORMAT_E_AC3) || (output_format == AUDIO_FORMAT_MAT) ) {
+        if ((output_format == AUDIO_FORMAT_AC3) || (output_format == AUDIO_FORMAT_E_AC3)
+            || (output_format == AUDIO_FORMAT_MAT) ) {
             return DIGITAL_DEVICE;
         } else {
             return I2S_DEVICE;
@@ -218,7 +256,8 @@ struct aml_audio_patch {
     void *audio_parse_para;
     audio_devices_t input_src;
     audio_format_t  aformat;
-    int  sample_rate;
+    int input_sample_rate;
+    int sample_rate;
     audio_channel_mask_t chanmask;
     audio_channel_mask_t in_chanmask;
     int in_sample_rate;
@@ -238,14 +277,21 @@ struct aml_audio_patch {
     void *mixed_buf;
 #endif
 
+    /* for initial flushing */
+    int init_flush_count;
+
     /* for AVSYNC tuning */
-    int is_src_stable;
+    int rbuf_ltcy;
     int av_diffs;
-    int do_tune;
+    int average_av_diffs;
     int avsync_sample_accumed;
-    int avsync_sample_max_cnt;
-    int avsync_sample_interval;
+    bool need_do_avsync;
+    bool input_signal_stable;
+    bool is_avsync_start;
+    bool skip_frames;
+    int skip_avsync_cnt;
     /* end of AVSYNC tuning */
+
     /*for dtv play parameters */
     int dtv_aformat;
     int dtv_has_video;
@@ -262,6 +308,7 @@ struct aml_audio_patch {
     unsigned int decoder_offset ;
     unsigned int outlen_after_last_validpts;
     unsigned long last_valid_pts;
+    unsigned long last_out_pts;
     unsigned int first_apts_lookup_over;
     int dtv_symple_rate;
     int dtv_pcm_channel;
@@ -272,12 +319,16 @@ struct aml_audio_patch {
     int spdif_step_clk;
     int i2s_step_clk;
     int dtv_audio_mode;
+    int dtv_pcr_mode;
+    int tsync_mode;
     int dtv_apts_lookup;
     int dtv_audio_tune;
     int pll_state;
     unsigned int last_apts;
     unsigned int last_pcrpts;
     dtv_avsync_process_cb avsync_callback;
+    int dtv_faded_out;
+    int dtv_ac3_fmsize;
     pthread_mutex_t dtv_output_mutex;
     pthread_mutex_t dtv_input_mutex;
     pthread_mutex_t assoc_mutex;
@@ -288,10 +339,8 @@ struct aml_audio_patch {
     struct resample_para dtv_resample;
     unsigned char *resample_outbuf;
     AM_AOUT_OutputMode_t   mode;
-    unsigned char avsync_adelay;
-    unsigned char avsync_tuned;
-    unsigned char avsync_drop;
-    void *drop_buf;
+    bool ac3_pcm_dropping;
+    int last_audio_delay;
 };
 
 struct audio_stream_out;
@@ -317,16 +366,20 @@ bool is_hdmi_in_stable_sw(struct audio_stream_in *stream);
 /*@brief check the ATV audio stability by HW register */
 bool is_atv_in_stable_hw(struct audio_stream_in *stream);
 int set_audio_source(struct aml_mixer_handle *mixer_handle,
-		enum input_source audio_source, bool is_auge);
+                enum input_source audio_source, bool is_auge);
 int get_HW_resample(struct aml_mixer_handle *mixer_handle);
 int enable_HW_resample(struct aml_mixer_handle *mixer_handle, int enable_sr);
 bool Stop_watch(struct timespec start_ts, int64_t time);
 bool signal_status_check(audio_devices_t in_device, int *mute_time,
                          struct audio_stream_in *stream);
 int set_spdifin_pao(struct aml_mixer_handle *mixer_handle, int enable);
-int get_hdmiin_samplerate(struct aml_mixer_handle *mixer_handle);
+eMixerHwResample get_hdmiin_samplerate(struct aml_mixer_handle *mixer_handle);
 hdmiin_audio_packet_t get_hdmiin_audio_packet(struct aml_mixer_handle *mixer_handle);
 int get_hdmiin_channel(struct aml_mixer_handle *mixer_handle);
+int get_arcin_channel(struct aml_mixer_handle *mixer_handle);
+int get_arcin_ca(struct aml_mixer_handle *mixer_handle);
+eMixerHwResample get_eArcIn_samplerate(struct aml_mixer_handle *mixer_handle);
+audio_channel_mask_t aml_map_ca_to_mask(int ca);
 
 /*
  *@brief clean the tmp_buffer_8ch&audioeffect_tmp_buffer and release audio stream
@@ -339,7 +392,27 @@ int set_stream_dual_output(struct audio_stream_out *stream, bool en);
 int update_stream_dual_output(struct audio_stream_out *stream);
 bool is_dual_output_stream(struct audio_stream_out *stream);
 
-int get_spdifin_samplerate(struct aml_mixer_handle *mixer_handle);
+eMixerHwResample get_spdifin_samplerate(struct aml_mixer_handle *mixer_handle);
 unsigned int inport_to_device(enum IN_PORT inport);
+int set_resample_source(struct aml_mixer_handle *mixer_handle, enum ResampleSource source);
+void get_audio_indicator(struct aml_audio_device *dev, char *temp_buf);
+void update_audio_format(struct aml_audio_device *adev, audio_format_t format);
+/*
+ *This Dolby MultiStreamDecoder was built using the following components(only the decoder):
+ *- Dolby Digital Plus Decoder
+ *- Dolby HE-AAC Decoder
+ *- Dolby AC-4 Decoder
+ *- Dolby MAT Decoder
+ *- Dolby TrueHD Decoder
+ *
+ *means that Dolby MS12 supports DD/DDP/Dolby-TrueHD/AC4/MAT as the compression format.
+ */
+bool is_dolby_ms12_support_compression_format(audio_format_t format);
+/*
+ *if the stream's flag is direct and format is PCM
+ *    return true;
+ *otherwise, return false;
+ */
+bool is_direct_stream_and_pcm_format(struct aml_stream_out *out);
 
 #endif /* _AML_AUDIO_STREAM_H_ */

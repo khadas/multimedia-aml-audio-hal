@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "libms12v2"
+#define LOG_TAG "libms12"
 // #define LOG_NDEBUG 0
 // #define LOG_NALOGV 0
 
@@ -41,14 +41,26 @@ namespace android
 DolbyMS12Status::DolbyMS12Status() :
     mDoblyMS12StatusInputPCM(MIXER_PLAYBACK_START)
     , mDolbyMS12StatusInputRaw(DIRECT_0R_OFFLOAD_PLAYBACK_STOP)
+    , mMixerAudioStreamOutformat(AUDIO_FORMAT_INVALID)
+    , mMixerAudioChannelMask(AUDIO_CHANNEL_NONE)
+    , mMixerAudioStreamOutSampleRate(0)
+    , mMixerOutDevices(AUDIO_DEVICE_NONE)
+    , mDirectOrOffloadAudioStreamOutformat(AUDIO_FORMAT_INVALID)
+    , mDirectOrOffloadAudioChannelMask(AUDIO_CHANNEL_NONE)
+    , mDirectOrOffloadAudioStreamOutSampleRate(0)
+    , mDirectOrOffloadOutDevices(AUDIO_DEVICE_NONE)
     , mOffloadPlaybackDolbyMS12Outputformat(AUDIO_FORMAT_DEFAULT)
     //, mForceUse(AUDIO_POLICY_FORCE_NONE)
-    , mForceUse(0)
+    , mOffloadPlaybackAudioStreamOutformat(AUDIO_FORMAT_INVALID)
     , mAudioMainFormat(AUDIO_FORMAT_INVALID)
     , mAudioAssociateFormat(AUDIO_FORMAT_INVALID)
     , mAudioSystemFormat(AUDIO_FORMAT_INVALID)
+    , mAudioAppFormat(AUDIO_FORMAT_INVALID)
     , mDDSupportFlag(false)
+    , mDDMaxAudioChannelMask(AUDIO_CHANNEL_NONE)
     , mDDPSupportFlag(false)
+    , mDDPMaxAudioChannelMask(AUDIO_CHANNEL_NONE)
+    , mMaxFormatByUserSetting(AUDIO_FORMAT_DEFAULT)
 {
     ALOGD("%s()", __FUNCTION__);
 }
@@ -107,6 +119,23 @@ audio_format_t DolbyMS12Status::getAudioSystemFormat(void)
 {
     return mAudioSystemFormat;
 }
+
+/*
+ *@brief set Audio Hal App format
+ */
+void DolbyMS12Status::setAudioAppFormat(audio_format_t format)
+{
+    mAudioAppFormat = format;
+}
+
+/*
+ *@brief get Audio Hal App format
+ */
+audio_format_t DolbyMS12Status::getAudioAppFormat(void)
+{
+    return mAudioAppFormat;
+}
+
 
 /*
  *@brief set dd support flag

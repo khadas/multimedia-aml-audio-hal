@@ -26,9 +26,7 @@
 #include "dolby_lib_api.h"
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
-#define PCM  0/*AUDIO_FORMAT_PCM_16_BIT*/
-#define DD   4/*AUDIO_FORMAT_AC3*/
-#define AUTO 5/*choose by sink capability/source format/Digital format*/
+
 
 /*
  *@brief get sink capability
@@ -42,9 +40,12 @@ static audio_format_t get_sink_capability (struct audio_stream_out *stream)
     char *cap = (char *) get_hdmi_sink_cap(AUDIO_PARAMETER_STREAM_SUP_FORMATS, 0, &(adev->hdmi_descs));
 
     if (cap) {
+#ifdef ENABLE_MAT_OUTPUT
         if (hdmi_desc->mat_fmt.is_support) {
             sink_capability = AUDIO_FORMAT_MAT;
-        } else if (hdmi_desc->ddp_fmt.is_support) {
+        } else
+#endif
+        if (hdmi_desc->ddp_fmt.is_support) {
             sink_capability = AUDIO_FORMAT_E_AC3;
         } else if (hdmi_desc->dd_fmt.is_support) {
             sink_capability = AUDIO_FORMAT_AC3;
@@ -63,7 +64,9 @@ static audio_format_t get_sink_capability (struct audio_stream_out *stream)
 
 bool is_sink_support_dolby_passthrough(audio_format_t sink_capability)
 {
-    return sink_capability == AUDIO_FORMAT_E_AC3 || sink_capability == AUDIO_FORMAT_AC3;
+    return sink_capability == AUDIO_FORMAT_MAT ||
+        sink_capability == AUDIO_FORMAT_E_AC3 ||
+        sink_capability == AUDIO_FORMAT_AC3;
 }
 
 /*
@@ -78,13 +81,29 @@ bool is_sink_support_dolby_passthrough(audio_format_t sink_capability)
 void get_sink_format (struct audio_stream_out *stream)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
-    struct aml_audio_device *adev = aml_out->dev;
+    struct aml_audio_device *adev;
     /*set default value for sink_audio_format/optical_audio_format*/
     audio_format_t sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;
     audio_format_t optical_audio_format = AUDIO_FORMAT_PCM_16_BIT;
+    audio_format_t sink_capability, source_format;
+    int hdmi_format;
 
-    audio_format_t sink_capability = get_sink_capability(stream);
-    audio_format_t source_format = aml_out->hal_internal_format;
+    if (!stream) {
+        return;
+    }
+
+    adev = aml_out->dev;
+    hdmi_format = adev->hdmi_format;
+    sink_capability = get_sink_capability(stream);
+    source_format = aml_out->hal_internal_format;
+
+    if (aml_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
+        ALOGD("get_sink_format: a2dp set to pcm");
+        adev->sink_format = AUDIO_FORMAT_PCM_16_BIT;
+        adev->optical_format = AUDIO_FORMAT_PCM_16_BIT;
+        aml_out->dual_output_flag = false;
+        return;
+    }
 
     /*when device is HDMI_ARC*/
     ALOGI("!!!%s() Sink devices %#x Source format %#x digital_format(hdmi_format) %#x Sink Capability %#x\n",
@@ -174,11 +193,22 @@ void get_sink_format (struct audio_stream_out *stream)
         }
     }
 #else
-    switch (adev->hdmi_format) {
+
+    if (eDolbyMS12Lib != adev->dolby_lib_type) {
+        /* if MS12 library does not exist, then output format is same as BYPASS case */
+        hdmi_format = BYPASS;
+    }
+
+    switch (hdmi_format) {
     case PCM:
         break;
     case DD:
         optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_DTS;
+        sink_audio_format = optical_audio_format;
+        break;
+    case BYPASS:
+        sink_audio_format = min(sink_capability,source_format);
+        optical_audio_format = sink_audio_format;
         break;
     case AUTO:
     default:
@@ -187,6 +217,7 @@ void get_sink_format (struct audio_stream_out *stream)
         } else {
             optical_audio_format = sink_capability;
         }
+        sink_audio_format = optical_audio_format;
         break;
     }
 #endif
@@ -194,19 +225,15 @@ void get_sink_format (struct audio_stream_out *stream)
     adev->sink_format = sink_audio_format;
     adev->optical_format = optical_audio_format;
 
+#if 0
     /* use single output for HDMI_ARC */
     if ((adev->active_outport == OUTPORT_HDMI_ARC) &&
         adev->bHDMIConnected)
         adev->sink_format = adev->optical_format;
+#endif
 
-    /* set the dual output format flag */
-    //if (adev->sink_format != adev->optical_format) {
-    //    aml_out->dual_output_flag = true;
-    //} else {
-    //    aml_out->dual_output_flag = false;
-    //}
-    ALOGI("%s sink_format %#x optical_format %#x, stream device %d\n",
-           __FUNCTION__, adev->sink_format, adev->optical_format, aml_out->device);
+    ALOGI("%s sink_format %#x optical_format %#x,soure fmt %#x stream device %d\n",
+           __FUNCTION__, adev->sink_format, adev->optical_format, source_format, aml_out->device);
     return ;
 }
 
@@ -350,7 +377,7 @@ bool is_spdif_in_stable_hw (struct audio_stream_in *stream)
 int set_audio_source(struct aml_mixer_handle *mixer_handle,
         enum input_source audio_source, bool is_auge)
 {
-    int src = audio_source;
+    int src;
 
     if (is_auge) {
         switch (audio_source) {
@@ -370,37 +397,84 @@ int set_audio_source(struct aml_mixer_handle *mixer_handle,
             src = SPDIFIN_AUGE;
             break;
         default:
-            ALOGW("%s(), src: %d not support", __func__, src);
             src = FRHDMIRX;
+            ALOGW("%s(),audio_source %d src: %d not support", __func__, audio_source, src);
             break;
         }
+    } else {
+        src = (int)audio_source;
     }
 
     return aml_mixer_ctrl_set_int(mixer_handle, AML_MIXER_ID_AUDIO_IN_SRC, src);
 }
 
-int set_spdifin_pao(struct aml_mixer_handle *mixer_handle,int enable)
+int set_resample_source(struct aml_mixer_handle *mixer_handle, enum ResampleSource source)
 {
-    return aml_mixer_ctrl_set_int(mixer_handle,AML_MIXER_ID_SPDIFIN_PAO, enable);
+    return aml_mixer_ctrl_set_int(mixer_handle, AML_MIXER_ID_HW_RESAMPLE_SOURCE, source);
 }
 
-int get_spdifin_samplerate(struct aml_mixer_handle *mixer_handle)
+int set_spdifin_pao(struct aml_mixer_handle *mixer_handle,int enable)
+{
+    return aml_mixer_ctrl_set_int(mixer_handle, AML_MIXER_ID_SPDIFIN_PAO, enable);
+}
+
+eMixerHwResample get_spdifin_samplerate(struct aml_mixer_handle *mixer_handle)
 {
     int index = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_SPDIF_IN_SAMPLERATE);
 
-    return index;
+    if ((index > HW_RESAMPLE_DISABLE) && (index < HW_RESAMPLE_MAX)) {
+        return index;
+    }
+
+    return HW_RESAMPLE_DISABLE;
 }
 
-int get_hdmiin_samplerate(struct aml_mixer_handle *mixer_handle)
+static inline eMixerHwResample _sr_enum(int sr)
+{
+    switch (sr) {
+        case 32000:
+            return HW_RESAMPLE_32K;
+        case 44100:
+            return HW_RESAMPLE_44K;
+        case 48000:
+            return HW_RESAMPLE_48K;
+        case 88200:
+            return HW_RESAMPLE_88K;
+        case 96000:
+            return HW_RESAMPLE_96K;
+        case 176400:
+            return HW_RESAMPLE_176K;
+        case 192000:
+            return HW_RESAMPLE_192K;
+        default:
+            return HW_RESAMPLE_DISABLE;
+    }
+}
+
+eMixerHwResample get_eArcIn_samplerate(struct aml_mixer_handle *mixer_handle)
+{
+    int sr = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_EARCRX_AUDIO_SAMPLERATE);
+
+    /* eARC mix control does not return sample rate as enum type as HDMIIN and SPDIF */
+    return _sr_enum(sr);
+}
+
+eMixerHwResample get_hdmiin_samplerate(struct aml_mixer_handle *mixer_handle)
 {
     int stable = 0;
+    int r;
 
     stable = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_HDMI_IN_AUDIO_STABLE);
     if (!stable) {
-        return -1;
+        return HW_RESAMPLE_DISABLE;
     }
 
-    return aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_HDMI_IN_SAMPLERATE);
+    r = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_HDMI_IN_SAMPLERATE);
+    if ((r > HW_RESAMPLE_DISABLE) && (r < HW_RESAMPLE_MAX)) {
+        return r;
+    }
+
+    return HW_RESAMPLE_DISABLE;
 }
 
 int get_hdmiin_channel(struct aml_mixer_handle *mixer_handle)
@@ -413,12 +487,75 @@ int get_hdmiin_channel(struct aml_mixer_handle *mixer_handle)
         return -1;
     }
 
-    /*hmdirx audio support: N/A, 2, 3, 4, 5, 6, 7, 8*/
+    /* hmdirx audio support: N/A, 2, 3, 4, 5, 6, 7, 8 as enum */
     channel_index = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_HDMI_IN_CHANNELS);
-    if (channel_index != 7)
-        return 2;
-    else
-        return 8;
+    if ((channel_index > 0) && (channel_index <= 7))
+        return channel_index + 1;
+
+    return 2;
+}
+
+int get_arcin_channel(struct aml_mixer_handle *mixer_handle)
+{
+    if (aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_EARCRX_ATTENDED_TYPE) == ATTEND_TYPE_EARC) {
+        if (aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_EARCRX_AUDIO_CODING_TYPE) == AUDIO_CODING_TYPE_MULTICH_8CH_LPCM) {
+            return 8;
+        }
+    }
+
+    return 2;
+}
+
+/* return audio channel assignment, see CEA-861-D Table 20 */
+int get_arcin_ca(struct aml_mixer_handle *mixer_handle)
+{
+    if (aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_EARCRX_ATTENDED_TYPE) == ATTEND_TYPE_EARC) {
+        return aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_EARCRX_CA);
+    }
+
+    return 0;
+}
+
+audio_channel_mask_t aml_map_ca_to_mask(int ca)
+{
+    audio_channel_mask_t mask = 0;
+
+#if 0
+    /* FLC/FRC and RLC/RRC are represented by AUDIO_CHANNEL_IN_LEFT_PROCESSED/AUDIO_CHANNEL_IN_RIGHT_PROCESSED */
+    const audio_channel_mask_t mask_tab[] = {
+        AUDIO_CHANNEL_IN_STEREO,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK_LEFT | AUDIO_CHANNEL_IN_BACK_RIGHT,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK_LEFT | AUDIO_CHANNEL_IN_BACK_RIGHT | AUDIO_CHANNEL_IN_BACK,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK_LEFT | AUDIO_CHANNEL_IN_BACK_RIGHT | AUDIO_CHANNEL_IN_LEFT_PROCESSED | AUDIO_CHANNEL_IN_RIGHT_PROCESSED,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_LEFT_PROCESSED | AUDIO_CHANNEL_IN_RIGHT_PROCESSED,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK | AUDIO_CHANNEL_IN_LEFT_PROCESSED | AUDIO_CHANNEL_IN_RIGHT_PROCESSED,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK_LEFT | AUDIO_CHANNEL_IN_BACK_RIGHT | AUDIO_CHANNEL_IN_LEFT_PROCESSED | AUDIO_CHANNEL_IN_RIGHT_PROCESSED,
+    };
+#else
+    const audio_channel_mask_t mask_tab[] = {
+        AUDIO_CHANNEL_IN_STEREO,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK_LEFT | AUDIO_CHANNEL_IN_BACK_RIGHT,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK_LEFT | AUDIO_CHANNEL_IN_BACK_RIGHT | AUDIO_CHANNEL_IN_BACK,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK_LEFT | AUDIO_CHANNEL_IN_BACK_RIGHT | AUDIO_CHANNEL_IN_LEFT_PROCESSED | AUDIO_CHANNEL_IN_RIGHT_PROCESSED,
+        AUDIO_CHANNEL_IN_STEREO,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK,
+        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_BACK_LEFT,
+    };
+#endif
+
+    if ((ca >= 0) || (ca <= 0x1f)) {
+        mask = AUDIO_CHANNEL_IN_STEREO;
+        if (ca & 1)
+            mask |= AUDIO_CHANNEL_IN_LOW_FREQUENCY;
+        if ((ca >> 1) & 1)
+            mask |= AUDIO_CHANNEL_IN_CENTER;
+        mask |=  mask_tab[ca/4];
+        return mask;
+    }
+
+    return 0;
 }
 
 int get_HW_resample(struct aml_mixer_handle *mixer_handle)
@@ -462,19 +599,19 @@ bool signal_status_check(audio_devices_t in_device, int *mute_time,
     }
     if ((in_device & AUDIO_DEVICE_IN_TV_TUNER) &&
             !is_atv_in_stable_hw (stream)) {
-        *mute_time = 500;
+        *mute_time = 100;
         return false;
     }
     if (((in_device & AUDIO_DEVICE_IN_SPDIF) ||
             ((in_device & AUDIO_DEVICE_IN_HDMI_ARC) &&
                     (access(SYS_NODE_EARC_RX, F_OK) == -1))) &&
-           !is_spdif_in_stable_hw(stream)) {
-        *mute_time = 1000;
+            !is_spdif_in_stable_hw(stream)) {
+        *mute_time = 100;
         return false;
     }
     if ((in_device & AUDIO_DEVICE_IN_LINE) &&
             !is_av_in_stable_hw(stream)) {
-       *mute_time = 1000;
+       *mute_time = 100;
        return false;
     }
     return true;
@@ -531,3 +668,118 @@ unsigned int inport_to_device(enum IN_PORT inport)
     return device;
 }
 
+void get_audio_indicator(struct aml_audio_device *dev, char *temp_buf) {
+    struct aml_audio_device *adev = (struct aml_audio_device *) dev;
+
+    if (adev->update_type == TYPE_PCM)
+        sprintf (temp_buf, "audioindicator=");
+    else if (adev->update_type == TYPE_AC3)
+        sprintf (temp_buf, "audioindicator=Dolby AC3");
+    else if (adev->update_type == TYPE_EAC3)
+        sprintf (temp_buf, "audioindicator=Dolby EAC3");
+    else if (adev->update_type == TYPE_AC4)
+        sprintf (temp_buf, "audioindicator=Dolby AC4");
+    else if (adev->update_type == TYPE_MAT)
+        sprintf (temp_buf, "audioindicator=Dolby MAT");
+    else if (adev->update_type == TYPE_TRUE_HD)
+        sprintf (temp_buf, "audioindicator=Dolby TrueHD");
+    else if (adev->update_type == TYPE_DDP_ATMOS)
+        sprintf (temp_buf, "audioindicator=Dolby EAC3,Dolby Atmos");
+    else if (adev->update_type == TYPE_TRUE_HD_ATMOS)
+        sprintf (temp_buf, "audioindicator=Dolby TrueHD,Dolby Atmos");
+    else if (adev->update_type == TYPE_MAT_ATMOS)
+        sprintf (temp_buf, "audioindicator=Dolby MAT,Dolby Atmos");
+    else if (adev->update_type == TYPE_AC4_ATMOS)
+        sprintf (temp_buf, "audioindicator=Dolby AC4,Dolby Atmos");
+    else if (adev->update_type == TYPE_DTS)
+        sprintf (temp_buf, "audioindicator=DTS");
+    else if (adev->update_type == TYPE_DTS_HD_MA)
+        sprintf (temp_buf, "audioindicator=DTS HD");
+    ALOGI("%s(), [%s]", __func__, temp_buf);
+}
+
+
+bool is_dolby_ms12_support_compression_format(audio_format_t format)
+{
+    return (format == AUDIO_FORMAT_AC3 ||
+            format == AUDIO_FORMAT_E_AC3 ||
+            format == AUDIO_FORMAT_DOLBY_TRUEHD ||
+            format == AUDIO_FORMAT_AC4 ||
+            format == AUDIO_FORMAT_MAT);
+}
+
+
+void update_audio_format(struct aml_audio_device *adev, audio_format_t format)
+{
+    int atmos_flag = 0;
+    int update_type = TYPE_PCM;
+    bool is_dolby_active = dolby_stream_active(adev);
+    bool is_dolby_format = is_dolby_ms12_support_compression_format(format);
+    /*
+     *for dolby & pcm case or dolby case
+     *to update the dolby stream's format
+     */
+    if (is_dolby_active && is_dolby_format) {
+        if (eDolbyMS12Lib == adev->dolby_lib_type) {
+            atmos_flag = adev->ms12.is_dolby_atmos;
+        } else {
+            atmos_flag = adev->ddp.is_dolby_atmos;
+        }
+
+        if (adev->hal_internal_format != format ||
+                atmos_flag != adev->is_dolby_atmos) {
+
+            update_type = get_codec_type(format);
+
+            if (atmos_flag == 1) {
+                if (format == AUDIO_FORMAT_E_AC3)
+                    update_type = TYPE_DDP_ATMOS;
+                else if (format == AUDIO_FORMAT_DOLBY_TRUEHD)
+                    update_type = TYPE_TRUE_HD_ATMOS;
+                else if (format == AUDIO_FORMAT_MAT)
+                    update_type = TYPE_MAT_ATMOS;
+                else if (format == AUDIO_FORMAT_AC4)
+                    update_type = TYPE_AC4_ATMOS;
+            }
+
+            aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_AUDIO_HAL_FORMAT, update_type);
+
+            ALOGD("%s()audio hal format change from %x to %x, atmos flag = %d, update_type = %d\n",
+                __FUNCTION__, adev->hal_internal_format, format, atmos_flag, update_type);
+
+            adev->hal_internal_format = format;
+            adev->is_dolby_atmos = atmos_flag;
+            adev->update_type = update_type;
+        }
+    }
+    /*
+     *to update the audio format for other cases
+     *DTS-format / DTS format & Mixer-PCM
+     *only Mixer-PCM
+     */
+    else if (!is_dolby_active && !is_dolby_format) {
+        if (adev->hal_internal_format != format) {
+            adev->hal_internal_format = format;
+            adev->is_dolby_atmos = false;
+            adev->update_type = get_codec_type(format);
+            aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_AUDIO_HAL_FORMAT, adev->update_type);
+            ALOGD("%s()audio hal format change from %x to %x, atmos flag = %d, update_type = %d\n",
+                __FUNCTION__, adev->hal_internal_format, format, atmos_flag, update_type);
+        }
+    }
+    /*
+     * **Dolby stream is active, and get the Mixer-PCM case steam format,
+     * **we should ignore this Mixer-PCM update request.
+     * else if (is_dolby_active && !is_dolby_format) {
+     * }
+     * **If Dolby steam is not active, the available format is LPCM or DTS
+     * **The following case do not exit at all **
+     * else //(!is_dolby_acrive && is_dolby_format) {
+     * }
+     */
+}
+
+bool is_direct_stream_and_pcm_format(struct aml_stream_out *out)
+{
+    return audio_is_linear_pcm(out->hal_internal_format) && (out->flags & AUDIO_OUTPUT_FLAG_DIRECT);
+}

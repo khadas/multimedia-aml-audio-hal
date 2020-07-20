@@ -66,10 +66,12 @@ int audio_virtual_buf_open(void ** pphandle, char * buf_name, uint64_t buf_ns_be
         }
 
         strncpy(phandle->buf_name, buf_name, name_length);
-        phandle->buf_name[name_length + 1] = '\0';
+        phandle->buf_name[name_length] = '\0';
 
     } else {
         ALOGE("buf name is NULL\n");
+        free(phandle);
+        phandle = NULL;
         return -1;
     }
     phandle->state = VIRTUAL_BUF_IDLE;
@@ -178,7 +180,7 @@ int audio_virtual_buf_process(void *phandle, uint64_t frame_ns)
         if (t >= 1.0) {
             buf_ns_cur = virtual_handle->buf_ns_target;
         } else {
-            buf_ns_cur = (virtual_handle->buf_ns_target - virtual_handle->buf_ns_begin) * t * t + virtual_handle->buf_ns_begin;
+            buf_ns_cur = (virtual_handle->buf_ns_target - virtual_handle->buf_ns_begin) * t + virtual_handle->buf_ns_begin;
         }
         virtual_handle->buf_ns_cur = buf_ns_cur;
     }
@@ -192,7 +194,7 @@ int audio_virtual_buf_process(void *phandle, uint64_t frame_ns)
         } else {
             sleep_ns = delay_ns - buf_ns;
         }
-        //ALOGD("%s buffered ns =%lld buf_size_ns=%lld gap=%lld read=%lld write=%lld sleep=%lld",
+        // ALOGD("%s buffered ns =%lld buf_size_ns=%lld gap=%lld read=%lld write=%lld sleep=%lld",
         //  virtual_handle->buf_name,delay_ns, buf_ns, process_gap, read_ns, write_ns, sleep_ns);
 
     } else {
@@ -213,5 +215,21 @@ int audio_virtual_buf_process(void *phandle, uint64_t frame_ns)
     return 0;
 }
 
+int audio_virtual_buf_reset(void *phandle) {
+    audio_virtual_buf_t *virtual_handle = NULL;
+
+    if (phandle == NULL) {
+        return -1;
+    }
+    virtual_handle = (audio_virtual_buf_t *)phandle;
+
+    virtual_handle->state = VIRTUAL_BUF_IDLE;
+    virtual_handle->buf_write_ns = 0;
+    virtual_handle->buf_read_ns  = 0;
+    virtual_handle->last_process_ns = 0;
+    ALOGI("reset virtual buf");
+
+    return 0;
+}
 
 

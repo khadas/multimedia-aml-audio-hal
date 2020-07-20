@@ -20,6 +20,7 @@
 #include "dolby_ms12_status.h"
 #include <system/audio.h>
 #include <time.h>
+#include "aml_ringbuffer.h"
 
 
 
@@ -65,6 +66,7 @@ struct dolby_ms12_desc {
     int device;//alsa_device_t
     struct timespec timestamp; //zzz
     uint64_t last_frames_postion;
+    uint64_t last_ms12_pcm_out_position;
     /*
     latency frame is maintained by the whole device output.
     whatever what bistream is outputed we need use this latency frames.
@@ -82,6 +84,28 @@ struct dolby_ms12_desc {
     int bitsteam_cnt;
     void * main_virtual_buf_handle;
     void * system_virtual_buf_handle;
+    ring_buffer_t spdif_ring_buffer;
+    unsigned char *lpcm_temp_buffer;
+
+    /*
+     *-ac4_de             * <int> [ac4] Dialogue Enhancement gain that will be applied in the decoder
+     *                      Range: 0 to 12 dB (in 1 dB steps, default is 0 dB)
+     */
+    int ac4_de;
+    int nbytes_of_dmx_output_pcm_frame;
+    void * ac3_parser_handle;
+    int hdmi_format;
+    audio_format_t  optical_format;
+    struct timespec  sys_audio_timestamp;
+    uint64_t  sys_audio_frame_pos;
+    uint64_t  sys_audio_base_pos;
+    uint64_t  last_sys_audio_cost_pos;
+    /*ms12 main input information */
+    audio_format_t main_input_fmt;
+    unsigned int   main_input_sr;
+    void * ms12_bypass_handle;
+    bool   is_bypass_ms12;
+    int    atmos_info_change_cnt;
 };
 
 /*

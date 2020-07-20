@@ -18,13 +18,26 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AudioSPDIF-wrap"
+
 #include <stdint.h>
+#include <sys/ioctl.h>
+#include <sys/time.h>
+#include <sound/asound.h>
 #include <cutils/log.h>
 #include <system/audio.h>
 #include <audio_utils/spdif/SPDIFEncoder.h>
+
 #include <tinyalsa/asoundlib.h>
 #include <cutils/properties.h>
 #include <string.h>
+
+#ifndef PCM_STATE_SETUP
+#define PCM_STATE_SETUP 1
+#endif
+
+#ifndef PCM_STATE_PREPARED
+#define PCM_STATE_PREPARED 2
+#endif
 
 extern "C"
 {
@@ -125,6 +138,19 @@ public:
             memset(buf, 0, bytes);
             mFirstFrameMuted = true;
         }
+        /*to avoid ca noise in Sony TV*/
+        {
+            struct snd_pcm_status status;
+            pcm_ioctl(pcm_handle, SNDRV_PCM_IOCTL_STATUS, &status);
+            if (status.state == PCM_STATE_SETUP ||
+                status.state == PCM_STATE_PREPARED ||
+                status.state == PCM_STATE_XRUN) {
+                ALOGI("mute the first raw data");
+                memset(buf, 0, bytes);
+            }
+        }
+
+
         ret = pcm_write(pcm_handle, buffer, bytes);
         if (ret)
             return ret;
@@ -155,6 +181,10 @@ public:
             memset(buf, 0, bytes);
         }
         return 0;
+    }
+    audio_format_t getformat()
+    {
+        return mFormat;
     }
 protected:
     struct pcm *pcm_handle;
@@ -195,4 +225,13 @@ extern "C" int spdifenc_set_mute(bool mute)
     else
         return -1;
 }
+
+extern "C" audio_format_t  spdifenc_get_format(void)
+{
+    if (myencoder)
+        return myencoder->getformat();
+    else
+        return AUDIO_FORMAT_INVALID;
+}
+
 }

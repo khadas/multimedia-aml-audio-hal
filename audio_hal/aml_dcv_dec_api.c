@@ -37,6 +37,7 @@
 #include "audio_hw_utils.h"
 #include "aml_dcv_dec_api.h"
 #include "aml_ac3_parser.h"
+#include <aml_android_utils.h>
 
 enum {
     EXITING_STATUS = -1001,
@@ -265,7 +266,7 @@ static int Get_DDP_Parameters(void *buf, int *sample_rate, int *frame_size, int 
     }
     ddbs_unprj(p_bstrm, &acmod, 3);
     ddbs_unprj(p_bstrm, &lfeon, 1);
-    numch = chanary[acmod];
+    //numch = chanary[acmod];
     numch = 2;
     *ChNum = numch;
     //ALOGI("DEBUG[%s %d]:numch=%d,sr=%d,frs=%d",__FUNCTION__,__LINE__,*ChNum,*sample_rate,*frame_size);
@@ -303,40 +304,32 @@ static int Get_Parameters(void *buf, int *sample_rate, int *frame_size, int *ChN
     DDP_BSTRM *p_bstrm = &bstrm;
     DDPshort    bsid;
     int chnum = 0;
-    uint8_t ptr8[PTR_HEAD_SIZE];
+    uint8_t pdata[PTR_HEAD_SIZE];
 
-    memcpy(ptr8, buf, PTR_HEAD_SIZE);
+    memcpy(pdata, buf, PTR_HEAD_SIZE);
 
     //ALOGI("LZG->ptr_head:0x%x 0x%x 0x%x 0x%x 0x%x 0x%x \n",
     //     ptr8[0],ptr8[1],ptr8[2], ptr8[3],ptr8[4],ptr8[5] );
-    if ((ptr8[0] == 0x0b) && (ptr8[1] == 0x77)) {
+    if ((pdata[0] == 0x0b) && (pdata[1] == 0x77)) {
         int i;
         uint8_t tmp;
-#if 0
-        for (i = 0; i < PTR_HEAD_SIZE; i += 2) {
-            tmp = ptr8[i];
-            ptr8[i] = ptr8[i + 1];
-            ptr8[i + 1] = tmp;
+        for (i = 0; (i + 1) < PTR_HEAD_SIZE; i += 2) {
+            tmp = pdata[i];
+            pdata[i] = pdata[i + 1];
+            pdata[i + 1] = tmp;
         }
-#else
-        for (i = 0; i < PTR_HEAD_SIZE/2; i++) {
-           tmp = ptr8[2*i];
-           ptr8[2*i] = ptr8[2*i+1];
-           ptr8[2*i+1] = tmp;
-        }
-#endif
     }
 
-    ddbs_init((short*) ptr8, 0, p_bstrm);
+    ddbs_init((short*) pdata, 0, p_bstrm);
     int ret = ddbs_getbsid(p_bstrm, &bsid);
     if (ret < 0) {
         return -1;
     }
     if (ISDDP(bsid)) {
-        Get_DDP_Parameters(ptr8, sample_rate, frame_size, ChNum);
+        Get_DDP_Parameters(pdata, sample_rate, frame_size, ChNum);
         *is_eac3 = 1;
     } else if (ISDD(bsid)) {
-        Get_DD_Parameters(ptr8, sample_rate, frame_size, ChNum);
+        Get_DD_Parameters(pdata, sample_rate, frame_size, ChNum);
         *is_eac3 = 0;
     }
     return 0;
@@ -502,7 +495,7 @@ int Write_buffer(struct aml_audio_parser *parser, unsigned char *buffer, int siz
 
 #define MAX_DECODER_FRAME_LENGTH 6144 * 3
 #define READ_PERIOD_LENGTH 2048
-#define MAX_DDP_FRAME_LENGTH 2560
+#define MAX_DDP_FRAME_LENGTH 4096
 #define MAX_DDP_BUFFER_SIZE (MAX_DECODER_FRAME_LENGTH * 4 / 3 + 2 * MAX_DECODER_FRAME_LENGTH + 8)
 
 void *decode_threadloop(void *data)
@@ -562,7 +555,7 @@ void *decode_threadloop(void *data)
         resampler_init(&parser->aml_resample);
     }
 
-    struct aml_stream_in *in = (struct aml_stream_in *)parser->stream;
+    struct aml_stream_in *in = parser->in;
     u32AlsaFrameSize = in->config.channels * pcm_format_to_bits(in->config.format) / 8;
     prctl(PR_SET_NAME, (unsigned long)"audio_dcv_dec");
     while (parser->decode_ThreadExitFlag == 0) {
@@ -583,6 +576,14 @@ void *decode_threadloop(void *data)
                 usleep(1000);
                 continue;
             }
+            if (aml_getprop_bool("media.audiohal.dumpdcvin")) {
+                FILE *fp1 = fopen("/data/vendor/audiohal/dcv.raw", "a+");
+                if (fp1) {
+                    int flen = fwrite((char *)inbuf + remain_size, 1, s32AlsaReadFrames * u32AlsaFrameSize, fp1);
+                    fclose(fp1);
+                }
+            }
+
             remain_size += s32AlsaReadFrames * u32AlsaFrameSize;
         }
 
@@ -595,6 +596,11 @@ void *decode_threadloop(void *data)
         while (parser->decode_ThreadExitFlag == 0 && remain_size > 16) {
             if ((read_pointer[0] == 0x0b && read_pointer[1] == 0x77) || \
                 (read_pointer[0] == 0x77 && read_pointer[1] == 0x0b)) {
+                /*if the data is 0x0b 0x77 0x0b, we should use 0x77 0x0b as the sync word*/
+                if (read_pointer[0] == 0x0b && read_pointer[1] == 0x77 && read_pointer[2] == 0x0b) {
+                    remain_size--;
+                    read_pointer++;
+                }
                 Get_Parameters(read_pointer, &mSample_rate, &s32DolbyFrameSize, &mChNum, &is_eac3);
                 if ((s32DolbyFrameSize == 0) || (s32DolbyFrameSize < PTR_HEAD_SIZE) || \
                     (mChNum == 0) || (mSample_rate == 0)) {
@@ -690,12 +696,22 @@ static int stop_decode_thread(struct aml_audio_parser *parser)
 
 int dcv_decode_init(struct aml_audio_parser *parser)
 {
+    ring_buffer_reset(&(parser->aml_ringbuffer));
+    struct aml_stream_in *in = parser->in;
+    parser->aml_pcm = in->pcm;
+    parser->in_sample_rate = in->config.rate;
+    parser->out_sample_rate = in->requested_rate;
+    parser->decode_dev_op_mutex = &in->lock;
+    parser->data_ready = 0;
     return start_decode_thread(parser);
 }
 
 int dcv_decode_release(struct aml_audio_parser *parser)
 {
-    return stop_decode_thread(parser);
+    int s32Ret = 0;
+    s32Ret = stop_decode_thread(parser);
+    ring_buffer_reset(&(parser->aml_ringbuffer));
+    return s32Ret;
 }
 
 int dcv_decoder_init_patch(struct dolby_ddp_dec *ddp_dec)

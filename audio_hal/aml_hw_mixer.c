@@ -22,7 +22,6 @@
 #include <cutils/log.h>
 
 #include "aml_hw_mixer.h"
-#include "audio_hw_utils.h"
 
 //code here for audio hw mixer when hwsync with af mixer output stream output
 //at the same,need do a software mixer in audio hw c.
@@ -99,6 +98,7 @@ int aml_hw_mixer_get_content_l(struct aml_hw_mixer *mixer)
 int aml_hw_mixer_write(struct aml_hw_mixer *mixer, const void *buffer, size_t bytes)
 {
     int retry = 5;
+    int mutexed = 0;
     unsigned tail, space, write_bytes = bytes;
 
     if (!mixer || !mixer->start_buf) {
@@ -108,17 +108,23 @@ int aml_hw_mixer_write(struct aml_hw_mixer *mixer, const void *buffer, size_t by
 
     while (retry--) {
         pthread_mutex_lock(&mixer->lock);
+        mutexed = 1;
         space = aml_hw_mixer_get_space(mixer);
         if (space < bytes) {
             pthread_mutex_unlock(&mixer->lock);
+            mutexed = 0;
             usleep(10 * 1000);
-        } else
+        } else {
             break;
+        }
     }
 
+    if (mutexed == 0) {
+        pthread_mutex_lock(&mixer->lock);
+    }
     if (retry < 0) {
-        ALOGE("%s: write data no space,space %d,bytes %zu,rp %d,wp %d, reset all ptr",
-            __func__, space, bytes, mixer->rp, mixer->wp);
+        ALOGE("%s: write data no space, bytes %zu,rp %d,wp %d, reset all ptr",
+            __func__, bytes, mixer->rp, mixer->wp);
         mixer->wp = 0;
         mixer->rp = 0;
         pthread_mutex_unlock(&mixer->lock);
@@ -163,9 +169,6 @@ int aml_hw_mixer_mixing(struct aml_hw_mixer *mixer, void *buffer, int bytes, aud
 {
     int32_t i, tail;
     int32_t cached_bytes, read_bytes = bytes;
-
-    if (getprop_bool("media.audiohal.mixer"))
-        aml_audio_dump_audio_bitstreams("/data/audio/beforemix.raw", buffer, bytes);
 
     pthread_mutex_lock(&mixer->lock);
     cached_bytes = aml_hw_mixer_get_content_l(mixer);
@@ -229,9 +232,6 @@ int aml_hw_mixer_mixing(struct aml_hw_mixer *mixer, void *buffer, int bytes, aud
         ALOGE("%s(), format %#x not supporte!", __func__, format);
     }
     pthread_mutex_unlock(&mixer->lock);
-
-    if (getprop_bool("media.audiohal.mixer"))
-        aml_audio_dump_audio_bitstreams("/data/audio/mixed.raw", buffer, bytes);
 
     return 0;
 }

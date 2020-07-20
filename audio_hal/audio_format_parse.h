@@ -27,7 +27,7 @@ enum IEC61937_PC_Value {
     IEC61937_DTS3               = 0x0D,          ///< DTS type III (2048 samples)
     IEC61937_DTSHD              = 0x11,          ///< DTS HD data
     IEC61937_EAC3               = 0x15,          ///< E-AC-3 data
-    IEC61937_TRUEHD             = 0x16,          ///< TrueHD data
+    IEC61937_MAT                = 0x16,          ///< MAT data
     IEC61937_PAUSE              = 0x03,          ///< Pause
 };
 
@@ -37,8 +37,9 @@ enum audio_type {
     EAC3,
     DTS,
     DTSHD,
-    TRUEHD,
+    MAT,
     PAUSE,
+    TRUEHD,
     DTSCD,
     MUTE,
 };
@@ -56,6 +57,8 @@ enum audio_type {
 #define DTS3_PERIOD_SIZE (8192)
 /*min DTSHD Period 2048; max DTSHD Period 65536*/
 #define DTSHD_PERIOD_SIZE (2048)
+
+#define DEFAULT_SAMPLE_RATE 48000
 
 enum parser_state {
     IEC61937_UNSYNC,
@@ -82,7 +85,7 @@ typedef struct audio_type_parse {
 
     int read_bytes;
     int package_size;
-
+    int audio_samplerate;
     int running_flag;
     // used for software detection
     int state;
@@ -136,5 +139,6 @@ int audio_type_parse(void *buffer, size_t bytes, int *package_size, audio_channe
  */
 void feeddata_audio_type_parse(void **status, char * input, int size);
 
+int audio_parse_get_audio_samplerate(audio_type_parse_t *status);
 
 #endif

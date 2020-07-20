@@ -243,9 +243,11 @@ int dtv_assoc_read(unsigned char *data, int size)
 
 void dtv_assoc_set_main_frame_size(int main_frame_size)
 {
+    pthread_mutex_lock(&assoc_mutex);
     dtv_assoc_audio *param = get_assoc_audio();
 
     param->main_frame_size = main_frame_size;
+    pthread_mutex_unlock(&assoc_mutex);
 }
 
 void dtv_assoc_get_main_frame_size(int* main_frame_size)
@@ -257,9 +259,11 @@ void dtv_assoc_get_main_frame_size(int* main_frame_size)
 
 void dtv_assoc_set_ad_frame_size(int ad_frame_size)
 {
+    pthread_mutex_lock(&assoc_mutex);
     dtv_assoc_audio *param = get_assoc_audio();
 
     param->ad_frame_size = ad_frame_size;
+    pthread_mutex_unlock(&assoc_mutex);
 }
 
 void dtv_assoc_get_ad_frame_size(int* ad_frame_size)
@@ -350,15 +354,17 @@ static void dtv_assoc_audio_pause(unsigned int handle)
         return;
     }
     ALOGI("%s, paused\n", __FUNCTION__);
+    pthread_mutex_lock(&assoc_mutex);
     dtv_assoc_audio *param = get_assoc_audio();
-    if (handle == 0) {
+    /*if (handle == 0) {
         return ;
-    }
+    }*/
     if (param->assoc_enable == DTV_ASSOC_STAT_ENABLE) {
         audio_ad_set_source(DTV_ASSOC_STAT_DISABLE, param->sub_apid, param->sub_afmt, NULL);
     }
     param->assoc_enable = DTV_ASSOC_STAT_DISABLE;
     param->sub_apid = 0;
+    pthread_mutex_unlock(&assoc_mutex);
     return ;
 }
 static void dtv_assoc_audio_resume(unsigned int handle, int pid)

@@ -19,7 +19,6 @@
 #ifndef _AUDIO_HWSYNC_H_
 #define _AUDIO_HWSYNC_H_
 
-#include <pthread.h>
 #include <stdbool.h>
 
 #define TSYNC_FIRSTAPTS "/sys/class/tsync/firstapts"
@@ -49,12 +48,20 @@
 #define APTS_DISCONTINUE_THRESHOLD_MAX    (5*90000)
 
 #define HWSYNC_APTS_NUM     512
+/*6 ch 16 bit  he-aac  size  6*2*2048 */
 #define  HWSYNC_MAX_BODY_SIZE  (6*2*2048)
 
 enum hwsync_status {
     CONTINUATION,  // good sync condition
     ADJUSTMENT,    // can be adjusted by discarding or padding data
     RESYNC,        // pts need resync
+};
+
+enum tsync_status {
+    TSYNC_STATUS_INIT,
+    TSYNC_STATUS_RUNNING,
+    TSYNC_STATUS_PAUSED,
+    TSYNC_STATUS_STOP
 };
 
 typedef struct apts_tab {
@@ -64,14 +71,13 @@ typedef struct apts_tab {
 } apts_tab_t;
 
 typedef struct  audio_hwsync {
-    uint8_t hw_sync_header[HW_AVSYNC_HEADER_SIZE_V2];
+    uint8_t hw_sync_header[HW_AVSYNC_MAX_HEADER_SIZE];
     size_t hw_sync_header_cnt;
     int hw_sync_state;
     uint32_t hw_sync_body_cnt;
     uint32_t hw_sync_frame_size;
-    int bvariable_frame_size;
-    //uint8_t hw_sync_body_buf[8192];  // 4096
-    uint8_t hw_sync_body_buf[24576];    // 6144*4 for EAC3 worst case
+    int      bvariable_frame_size;
+    uint8_t hw_sync_body_buf[HWSYNC_MAX_BODY_SIZE];
     uint8_t body_align[64];
     uint8_t body_align_cnt;
     bool first_apts_flag;//flag to indicate set first apts

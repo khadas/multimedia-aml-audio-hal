@@ -9,7 +9,7 @@
  */
 
 
-#define LOG_TAG "libms12v2"
+#define LOG_TAG "libms12"
 // #define LOG_NDEBUG 0
 
 #include <cutils/log.h>
@@ -21,6 +21,7 @@
 
 
 #define DOLBY_SAMPLE_SIZE 4//2ch x 2bytes(16bits) = 4 bytes
+
 
 int get_dolby_ms12_output_details(struct dolby_ms12_desc *ms12_desc)
 {
@@ -88,7 +89,7 @@ int aml_ms12_config(struct dolby_ms12_desc *ms12_desc
                     , int config_sample_rate
                     , int output_config)
 {
-    ALOGD("+%s() %d\n", __FUNCTION__, __LINE__);
+    ALOGI("+%s() %d\n", __FUNCTION__, __LINE__);
     ms12_desc->input_config_format = config_format;
     ms12_desc->config_channel_mask = config_channel_mask;
     ms12_desc->config_sample_rate = config_sample_rate;
@@ -99,7 +100,14 @@ int aml_ms12_config(struct dolby_ms12_desc *ms12_desc
     if (get_audio_system_format() == AUDIO_FORMAT_PCM_16_BIT) {
         dolby_ms12_config_params_set_system_flag(true);
     }
-    if ((get_audio_associate_format() == AUDIO_FORMAT_AC3) || (get_audio_associate_format() == AUDIO_FORMAT_E_AC3)) {
+
+    if (get_audio_app_format() == AUDIO_FORMAT_PCM_16_BIT) {
+        dolby_ms12_config_params_set_app_flag(true);
+    }
+
+
+    if ((get_audio_associate_format() == AUDIO_FORMAT_AC3) || (get_audio_associate_format() == AUDIO_FORMAT_E_AC3) ||
+        (get_audio_associate_format() == AUDIO_FORMAT_MAT)) {
         dolby_ms12_config_params_set_associate_flag(true);
     }
     dolby_ms12_config_params_set_audio_stream_out_params(
@@ -111,7 +119,7 @@ int aml_ms12_config(struct dolby_ms12_desc *ms12_desc
     get_dolby_ms12_output_details(ms12_desc);
 
     get_dolby_ms12_init(ms12_desc);
-    ALOGD("-%s() %d\n", __FUNCTION__, __LINE__);
+    ALOGI("-%s() %d\n", __FUNCTION__, __LINE__);
     return 0;
 }
 
@@ -119,15 +127,7 @@ int aml_ms12_lib_preload() {
     int ret = 0;
     void * dolby_ms12_ptr = NULL;
     ALOGD("+%s()\n", __FUNCTION__);
-    ret = get_libdolbyms12_handle();
-    if (ret == 0) {
-        dolby_ms12_ptr = dolby_ms12_init(1, NULL);
-        if (dolby_ms12_ptr) {
-            dolby_ms12_release(dolby_ms12_ptr);
-        }
-    }
-    ALOGD("-%s()\n", __FUNCTION__);
-    return 0;
+    return get_libdolbyms12_handle();
 }
 
 int aml_ms12_lib_release() {
@@ -171,7 +171,13 @@ int aml_ms12_update_runtime_params(struct dolby_ms12_desc *ms12_desc, char *cmd)
         if (get_audio_system_format() == AUDIO_FORMAT_PCM_16_BIT) {
             dolby_ms12_config_params_set_system_flag(true);
         }
-        if ((get_audio_associate_format() == AUDIO_FORMAT_AC3) || (get_audio_associate_format() == AUDIO_FORMAT_E_AC3)) {
+
+        if (get_audio_app_format() == AUDIO_FORMAT_PCM_16_BIT) {
+            dolby_ms12_config_params_set_app_flag(true);
+        }
+
+        if ((get_audio_associate_format() == AUDIO_FORMAT_AC3) || (get_audio_associate_format() == AUDIO_FORMAT_E_AC3) ||
+            (get_audio_associate_format() == AUDIO_FORMAT_MAT)) {
             dolby_ms12_config_params_set_associate_flag(true);
         }
         ms12_desc->dolby_ms12_init_argv = dolby_ms12_config_params_update_runtime_config_params(&ms12_desc->dolby_ms12_init_argc, cmd);
@@ -213,4 +219,3 @@ int aml_ms12_update_runtime_params_lite(struct dolby_ms12_desc *ms12_desc)
     return ret;
 }
 #endif
-

@@ -24,6 +24,15 @@
 
 #include "audio_hw.h"
 
+#define DDP_OUTPUT_SAMPLE_RATE (48000)
+#define SAMPLE_NUMS_IN_ONE_BLOCK (256)
+#define DDP_FRAME_DURATION(sample_nums, sample_rate) ((sample_nums) / (sample_rate))
+
+#define MAIN_INPUT_STREAM 1
+#define ASSOC_INPUT_STREAM 0
+#define SYSTEM_INPUT_STREAM 0
+#define RESERVED_LENGTH 31
+
 /*
  *@brief get dolby ms12 prepared
  */
@@ -66,13 +75,36 @@ int dolby_ms12_system_process(
     , size_t bytes
     , size_t *used_size);
 
+enum MS12_PCM_TYPE {
+    NORMAL_LPCM = 0,
+    DAP_LPCM = 1,
+};
+
 typedef struct aml_dec_info {
     int output_sr ;   /** the decoded data samplerate*/
     int output_ch ;   /** the decoded data channels*/
     int output_bitwidth; /**the decoded sample bit width*/
     int data_type;
-    int reserved[32];
+    enum MS12_PCM_TYPE pcm_type;
+    int reserved[RESERVED_LENGTH];
 } aml_dec_info_t;
+
+
+/*
+ *@brief dolby ms12 app process
+ *
+ * input parameters
+ *     stream: audio_stream_out handle
+ *     buffer: data buffer address
+ *     bytes: data size
+ * output parameters
+ *     used_size: buffer used size
+ */
+int dolby_ms12_app_process(
+    struct audio_stream_out *stream
+    , const void *buffer
+    , size_t bytes
+    , size_t *used_size);
 
 /*
  *@brief get dolby ms12 cleanup
@@ -93,8 +125,62 @@ int set_dolby_ms12_primary_input_db_gain(struct dolby_ms12_desc *ms12,
 int set_system_app_mixing_status(struct aml_stream_out *aml_out, int stream_status);
 
 /*
- *@brief an callback for dolby ms12 pcm output
+ *@brief an callback for dolby ms12 output
  */
 int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12_info);
+
+/*
+ *@brief dolby ms12 flush the main related buffer
+ */
+int dolby_ms12_main_flush(struct audio_stream_out *stream);
+
+/*
+ *@brief dolby ms12 flush the app related buffer
+ */
+void dolby_ms12_app_flush();
+
+/*
+ *@brief dolby ms12 enable to debug by the property 'vendor.audio.dolbyms12.debug'
+ */
+void dolby_ms12_enable_debug();
+
+/*
+ *@brief check that dolby ms12 output ddp atmos(5.1.2)/ddp(5.1) is suitable or not.
+ */
+bool is_ms12_out_ddp_5_1_suitable(bool is_ddp_atmos);
+
+/*
+ *@brief bypass iec61937 audio data
+ */
+int dolby_ms12_bypass_process();
+
+/*
+ *@brief set dolby ms12 ad mixing enable
+ */
+void set_ms12_ad_mixing_enable(struct dolby_ms12_desc *ms12, int ad_mixing_enable);
+
+/*
+ *@brief set dolby ms12 mixing level
+ */
+void set_ms12_ad_mixing_level(struct dolby_ms12_desc *ms12, int mixing_level);
+
+/*
+ *@brief set dolby ms12 pause
+ */
+void set_dolby_ms12_runtime_pause(struct dolby_ms12_desc *ms12, int is_pause);
+
+/*
+ *@brief set dolby ms12 system mixing enable
+ */
+void set_dolby_ms12_runtime_system_mixing_enable(struct dolby_ms12_desc *ms12, int sys_mixing_enable);
+bool is_bypass_ms12(struct audio_stream_out *stream);
+
+void set_ms12_atmos_lock(struct dolby_ms12_desc *ms12, bool is_atmos_lock_on);
+
+/*
+ *@brief get the platform's capability of DDP-ATMOS.
+ */
+bool is_platform_supported_ddp_atmos(bool atmos_supported, enum OUT_PORT current_out_port);
+
 
 #endif //end of _AUDIO_HW_MS12_H_

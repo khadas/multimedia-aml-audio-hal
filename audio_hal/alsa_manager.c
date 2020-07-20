@@ -30,6 +30,7 @@
 #include "dolby_lib_api.h"
 #include "aml_audio_stream.h"
 #include "audio_virtual_buf.h"
+#include "alsa_config_parameters.h"
 #define AML_ZERO_ADD_MIN_SIZE 1024
 
 #define AUDIO_EAC3_FRAME_SIZE 16
@@ -41,8 +42,11 @@
 #define MAX_AVSYNC_GAP (10*90000)
 #define MAX_AVSYNC_WAIT_TIME (3*1000*1000)
 
-#define ALSA_OUT_BUF_NS (10000000000LL)   //10s
-#define ALSA_PREFILL_BUF_NS (10000000000LL)   //10s
+#define ALSA_OUT_BUF_NS (64000000LL)
+#define ALSA_DELAY_UP_THRESHOLD_MS (48)  /*the start threshold is 42ms, so we assume it as 48ms*/
+#define VIRTUAL_BUF_DELAY_PERIOD_MS (4)
+#define MS_TO_NANO_SEC  (1000000LL)
+
 
 
 /*
@@ -86,8 +90,9 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
     unsigned int device = aml_out->device;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     ALOGI("\n+%s stream %p,device %d", __func__, stream,device);
+
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
-        if (adev->ms12.dolby_ms12_enable) {
+        if ((adev->ms12.dolby_ms12_enable) && !is_bypass_dolbyms12(stream)) {
             config = &(adev->ms12_config);
             device = ms12->device;
             ALOGI("%s indeed choose ms12 [config and device(%d)]", __func__, ms12->device);
@@ -95,6 +100,14 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
                 ALOGI("%s stream device(%d) differ with current device(%d)!", __func__, aml_out->device, device);
                 aml_out->is_device_differ_with_ms12 = true;
             }
+        }
+        else {
+            ALOGI("%s hal_format %#x is_bypass_dolbyms12 %d\n",
+                __func__, aml_out->hal_format, is_bypass_dolbyms12(stream));
+            get_hardware_config_parameters(config, aml_out->hal_format
+                , audio_channel_count_from_out_mask(aml_out->hal_channel_mask)
+                , aml_out->config.rate, aml_out->is_tv_platform, continous_mode(adev));
+            device =  audio_is_linear_pcm(aml_out->hal_format) ? I2S_DEVICE : DIGITAL_DEVICE;
         }
     } else if (eDolbyDcvLib == adev->dolby_lib_type) {
         if (is_dual_output_stream(stream) && adev->optical_format != AUDIO_FORMAT_PCM_16_BIT) {
@@ -111,7 +124,22 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
             config_raw.start_threshold = DEFAULT_PLAYBACK_PERIOD_SIZE * PLAYBACK_PERIOD_COUNT;
             config_raw.format = PCM_FORMAT_S16_LE;
             config = &config_raw;
-            device = DIGITAL_DEVICE;
+        }
+        /*
+         *none-license dts decoder, TV platform
+         *when conneted the ARC, output dts bitstream
+         *when only speaker, output zero pcm
+         */
+        if (is_dts_format(aml_out->hal_format)) {
+            get_hardware_config_parameters(config, aml_out->hal_format
+                , audio_channel_count_from_out_mask(aml_out->hal_channel_mask)
+                , aml_out->config.rate, aml_out->is_tv_platform, continous_mode(adev));
+            if (adev->is_TV) {
+                if (adev->active_outport == OUTPORT_HDMI_ARC)
+                    device = DIGITAL_DEVICE;
+                else if (adev->active_outport == OUTPORT_SPEAKER)
+                    device = I2S_DEVICE;
+            }
         }
     }
     int card = aml_out->card;
@@ -174,8 +202,8 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
                 return -ENOENT;
             }
             aml_out->earc_pcm = earc_pcm;
-            adev->pcm_refs[EARC_DEVICE]++;
             adev->pcm_handle[EARC_DEVICE] = earc_pcm;
+            adev->pcm_refs[EARC_DEVICE]++;
         }
     }
     aml_out->pcm = pcm;
@@ -299,10 +327,12 @@ static int aml_alsa_add_zero(struct aml_stream_out *stream, int size)
 
 size_t aml_alsa_output_write(struct audio_stream_out *stream,
                              void *buffer,
-                             size_t bytes)
+                             size_t bytes,
+                             audio_format_t out_format)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
+    struct aml_audio_patch *patch = adev->audio_patch;
     int ret = 0;
     struct pcm_config *config = &aml_out->config;
     size_t frame_size = audio_stream_out_frame_size(stream);
@@ -320,7 +350,7 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
     int64_t pretime = 0;
     unsigned char*audio_data = (unsigned char*)buffer;
 
-    switch (adev->sink_format) {
+    switch (out_format) {
     case AUDIO_FORMAT_E_AC3:
         frame_size = AUDIO_EAC3_FRAME_SIZE;
         break;
@@ -406,7 +436,7 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
             return bytes;
         } else {
             //emset(audio_data, 0, need_drop_inject);
-            if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm && adev->bHDMIARCon) {
+            if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm) {
                 ret = pcm_write(aml_out->earc_pcm, audio_data + need_drop_inject, bytes - need_drop_inject);
             } else {
                 ret = pcm_write(aml_out->pcm, audio_data + need_drop_inject, bytes - need_drop_inject);
@@ -465,25 +495,68 @@ write:
     if (adev->patch_src == SRC_DTV && adev->parental_control_av_mute) {
         memset(buffer,0x0,bytes);
     }
+
+    if (aml_out->pcm == NULL) {
+        ALOGE("%s: pcm is null", __func__);
+        return bytes;
+    }
+
+    /*+[SE][BUG][SWPL-14811][zhizhong] add drop ac3 pcm function*/
+    if (adev->patch_src ==  SRC_DTV && aml_out->need_drop_size > 0) {
+        if (aml_out->need_drop_size >= (int)bytes) {
+            aml_out->need_drop_size -= bytes;
+            ALOGI("av sync drop %d pcm, need drop:%d more,apts:0x%x,pcr:0x%x\n",
+                (int)bytes, aml_out->need_drop_size, patch->last_apts, patch->last_pcrpts);
+            if (patch->last_apts >= patch->last_pcrpts) {
+                ALOGI("pts already ok, drop finish\n");
+                aml_out->need_drop_size = 0;
+            } else
+                return bytes;
+        } else {
+            ALOGI("bytes:%d, need_drop_size=%d\n", bytes, aml_out->need_drop_size);
+            ret = pcm_write(aml_out->pcm, audio_data + aml_out->need_drop_size,
+                    bytes - aml_out->need_drop_size);
+            aml_out->need_drop_size = 0;
+            ALOGI("drop finish\n");
+            return bytes;
+        }
+    }
+
     if (getprop_bool("media.audiohal.outdump")) {
         aml_audio_dump_audio_bitstreams("/data/audio/pcm_write.raw",
             buffer, bytes);
     }
-    if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm && adev->bHDMIARCon) {
+    {
+        struct snd_pcm_status status;
+
+        pcm_ioctl(aml_out->pcm, SNDRV_PCM_IOCTL_STATUS, &status);
+        if (status.state == PCM_STATE_XRUN) {
+            ALOGW("%s alsa underrun",__func__);
+        }
+    }
+
+    if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm) {
         ret = pcm_write(aml_out->earc_pcm, buffer, bytes);
         if (ret < 0) {
             ALOGE("%s write failed,aml_out->earc_pcm handle:%p, ret:%#x, err info:%s",
                     __func__, aml_out->earc_pcm, ret, strerror(errno));
         }
     } else {
+        if (adev->raw_to_pcm_flag) {
+            pcm_stop(aml_out->pcm);
+            adev->raw_to_pcm_flag = false;
+            ALOGI("raw to lpcm switch %s\n",__func__);
+        }
         ret = pcm_write(aml_out->pcm, buffer, bytes);
         if (ret < 0) {
-            ALOGE("%s write failed,pcm handle:%p, ret:%#x, err info:%s", __func__,
-                    aml_out->pcm, ret, strerror(errno));
+        ALOGE("%s write failed,pcm handle %p %s, stream %p, %s",
+            __func__, aml_out->pcm, pcm_get_error(aml_out->pcm),
+            aml_out, usecase2Str(aml_out->usecase));
         }
     }
 
-    if ((adev->continuous_audio_mode == 1) && (eDolbyMS12Lib == adev->dolby_lib_type) && (bytes != 0)) {
+    if ((adev->continuous_audio_mode == 1) && (eDolbyMS12Lib == adev->dolby_lib_type) && (bytes != 0)  && \
+        (adev->ms12.main_input_fmt != AUDIO_FORMAT_AC4)) {
         uint64_t input_ns = 0;
         int mutex_lock_success = 0;
         int sample_rate = 48000;
@@ -499,11 +572,30 @@ write:
         if (aml_out->alsa_vir_buf_handle == NULL) {
             /*set the buf to 10s, and then fill the buff, we will use this to make the data consuming to stable*/
             audio_virtual_buf_open(&aml_out->alsa_vir_buf_handle, "alsa out", ALSA_OUT_BUF_NS, ALSA_OUT_BUF_NS, 0);
-            audio_virtual_buf_process(aml_out->alsa_vir_buf_handle, ALSA_OUT_BUF_NS - input_ns/2);
+            audio_virtual_buf_process(aml_out->alsa_vir_buf_handle, ALSA_OUT_BUF_NS);
         }
 
-
         audio_virtual_buf_process(aml_out->alsa_vir_buf_handle, input_ns);
+
+        /* alsa output rate is not exactly with system time, we need check whether
+         * the delay is too big, if it is too big, we should delay the virtual buf
+         */
+        {
+            int rate_multiply = 1;
+            uint64_t frame_ms = 0;
+            snd_pcm_sframes_t frames = 0;
+            ret = pcm_ioctl(aml_out->pcm, SNDRV_PCM_IOCTL_DELAY, &frames);
+            if (out_format == AUDIO_FORMAT_E_AC3) {
+                rate_multiply = 4;
+            }
+            frame_ms = (uint64_t)frames * 1000LL/ (sample_rate * rate_multiply);
+            ALOGV("alsa frame delay=%ld ms=%lld", frames, frame_ms);
+            if (frame_ms > ALSA_DELAY_UP_THRESHOLD_MS) {
+                ALOGI("alsa delay is =%lld catch up =%d", frame_ms, VIRTUAL_BUF_DELAY_PERIOD_MS);
+                audio_virtual_buf_process(aml_out->alsa_vir_buf_handle, VIRTUAL_BUF_DELAY_PERIOD_MS * MS_TO_NANO_SEC);
+            }
+        }
+
         if(mutex_lock_success) {
             pthread_mutex_lock(&adev->alsa_pcm_lock);
         }
@@ -580,8 +672,9 @@ int alsa_depop(int card)
     return 0;
 }
 
+#define WAIT_COUNT_MAX 30
 size_t aml_alsa_input_read(struct audio_stream_in *stream,
-                        void *buffer,
+                        const void *buffer,
                         size_t bytes)
 {
     struct aml_stream_in *in = (struct aml_stream_in *)stream;
@@ -590,26 +683,53 @@ size_t aml_alsa_input_read(struct audio_stream_in *stream,
     char  *read_buf = (char *)buffer;
     int ret = 0;
     size_t  read_bytes = 0;
+    int nodata_count = 0;
     struct pcm *pcm_handle = in->pcm;
     size_t frame_size = in->config.channels * pcm_format_to_bits(in->config.format) / 8;
-    while (read_bytes < bytes) {
-        size_t remaining = bytes - read_bytes;
-        ret = pcm_read(pcm_handle, (unsigned char *)buffer + read_bytes, remaining);
 
+    while (read_bytes < bytes) {
         if (patch && patch->input_thread_exit) {
-            memset(buffer,0,bytes);
+            memset((void*)buffer,0,bytes);
             return 0;
         }
-        if (!ret) {
-            read_bytes += remaining;
-            ALOGV("ret:%d read_bytes:%d, bytes:%d ",ret,read_bytes,bytes);
-        } else if (ret != -EAGAIN ) {
-            ALOGE("%s:%d, pcm_read fail, ret:%#x, error info:%s", __func__, __LINE__, ret, strerror(errno));
+
+        ret = pcm_read(pcm_handle, (unsigned char *)buffer + read_bytes, bytes - read_bytes);
+        if (ret >= 0) {
+            nodata_count = 0;
+            read_bytes += ret*frame_size;
+            ALOGV("pcm_handle:%p, ret:%d read_bytes:%d, bytes:%d ",
+                pcm_handle,ret,read_bytes,bytes);
+        } else if (ret != -EAGAIN) {
+            ALOGD("%s:%d, pcm_read fail, ret:%#x, error info:%s",
+                __func__, __LINE__, ret, strerror(errno));
             return ret;
         } else {
              usleep( (bytes - read_bytes) * 1000000 / audio_stream_in_frame_size(stream) /
                 in->requested_rate / 2);
+             nodata_count++;
+             if (nodata_count >= WAIT_COUNT_MAX) {
+                 nodata_count = 0;
+                 ALOGV("aml_alsa_input_read immediate return");
+                 memset((void*)buffer,0,bytes);
+                 return 0;
+             }
         }
     }
     return 0;
 }
+
+int aml_alsa_input_flush(struct audio_stream_in *stream)
+{
+    struct aml_stream_in *in = (struct aml_stream_in *)stream;
+    struct pcm *pcm_handle = in->pcm;
+    int ret = 0;
+
+    ret = pcm_ioctl(pcm_handle, SNDRV_PCM_IOCTL_RESET, 0);
+    if (ret < 0) {
+        ALOGE("cannot reset pcm!");
+        return ret;
+    }
+
+    return 0;
+}
+

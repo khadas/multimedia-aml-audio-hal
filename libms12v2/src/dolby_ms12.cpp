@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "libms12v2"
+#define LOG_TAG "libms12"
 // #define LOG_NDEBUG 0
 // #define LOG_NALOGV 0
 
@@ -177,6 +177,30 @@ extern "C" int dolby_ms12_input_system(void *dolbyMS12_pointer
     }
 }
 
+extern "C" int dolby_ms12_input_app(void *dolbyMS12_pointer
+                                       , const void *audio_stream_out_buffer //ms12 input buffer
+                                       , size_t audio_stream_out_buffer_size //ms12 input buffer size
+                                       , int audio_stream_out_format
+                                       , int audio_stream_out_channel_num
+                                       , int audio_stream_out_sample_rate
+                                      )
+{
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance)
+        return dolby_ms12_instance->DolbyMS12InputApp(dolbyMS12_pointer
+                , audio_stream_out_buffer //ms12 input buffer
+                , audio_stream_out_buffer_size //ms12 input buffer size
+                , audio_stream_out_format
+                , audio_stream_out_channel_num
+                , audio_stream_out_sample_rate
+                                                        );
+    else {
+        return -1;
+    }
+}
+
+
+
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
 extern "C" int dolby_ms12_register_output_callback(void *callback, void *priv_data)
 {
@@ -267,6 +291,15 @@ extern "C" void dolby_ms12_flush_main_input_buffer(void)
     }
 }
 
+extern "C" void dolby_ms12_flush_app_input_buffer(void)
+{
+    ALOGI("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        dolby_ms12_instance->DolbyMS12FlushAppInputBuffer();
+    }
+}
+
 extern "C" void dolby_ms12_set_main_dummy(int type, int dummy)
 {
     ALOGI("%s()\n", __FUNCTION__);
@@ -277,12 +310,12 @@ extern "C" void dolby_ms12_set_main_dummy(int type, int dummy)
 }
 
 
-extern "C" unsigned long long dolby_ms12_get_consumed_payload(void)
+extern "C" unsigned long long dolby_ms12_get_decoder_n_bytes_consumed(void *ms12_pointer, int format, int is_main)
 {
     ALOGV("%s()\n", __FUNCTION__);
     android::DolbyMS12* dolby_ms12_instance = getInstance();
     if (dolby_ms12_instance) {
-        return dolby_ms12_instance->DolbyMS12GetNBytesConsumedOfUDC();
+        return dolby_ms12_instance->DolbyMS12GetDecoderNBytesConsumed(ms12_pointer, format, is_main);
     } else {
         return -1;
     }
@@ -356,6 +389,15 @@ extern "C" int dolby_ms12_get_system_buffer_avail(int * max_size)
     }
 }
 
+extern "C" int dolby_ms12_set_main_volume(float volume)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12SetMainVolume(volume);
+    }
+    return -1;
+}
 
 extern "C" int dolby_ms12_get_input_atmos_info()
 {
@@ -367,3 +409,48 @@ extern "C" int dolby_ms12_get_input_atmos_info()
         return -1;
     }
 }
+
+
+extern "C" unsigned long long dolby_ms12_get_decoder_nframes_pcm_output(void *ms12_pointer, int format, int is_main)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetDecoderNFramesPcmOutput(ms12_pointer, format, is_main);
+    } else {
+        return -1;
+    }
+}
+
+extern "C" void dolby_ms12_set_debug_level(int level)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        dolby_ms12_instance->DolbyMS12SetDebugLevel(level);
+    }
+}
+
+extern "C" unsigned long long dolby_ms12_get_consumed_sys_audio(void)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetNBytesConsumedSysSound();
+    } else {
+        return -1;
+    }
+}
+
+extern "C" int dolby_ms12_get_total_nframes_delay(void *ms12_pointer)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetTotalNFramesDelay(ms12_pointer);
+    } else {
+        return -1;
+    }
+}
+
+

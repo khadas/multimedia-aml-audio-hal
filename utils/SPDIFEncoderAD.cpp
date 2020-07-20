@@ -62,7 +62,9 @@ public:
             memcpy((void *)iec61937_buffer, (const void*)buffer, actual_write_size);
         else
             return -1;
+#if 0
         if (actual_write_size > 0) {
+#endif
             outBufCurrentPos += actual_write_size;
             mTotalBytes += actual_write_size;
             ALOGV("%s() actual_write_size %zu outBufCurrentPos %zu\n", __FUNCTION__, actual_write_size, outBufCurrentPos);
@@ -79,9 +81,11 @@ public:
             }
 #endif
             return actual_write_size;
+#if 0
         }
         else
             return -1;
+#endif
     }
     /*
      *@brief get current iec61937 data size

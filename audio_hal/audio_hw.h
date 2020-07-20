@@ -53,6 +53,19 @@
 #ifdef ADD_AUDIO_DELAY_INTERFACE
 #include "aml_audio_delay.h"
 #endif
+
+#ifndef PCM_STATE_SETUP
+#define PCM_STATE_SETUP 1
+#endif
+
+#ifndef PCM_STATE_PREPARED
+#define PCM_STATE_PREPARED 2
+#endif
+
+#ifndef PCM_NONBLOCK
+#define PCM_NONBLOCK 0x00000010
+#endif
+
 /* number of frames per period */
 /*
  * change DEFAULT_PERIOD_SIZE from 1024 to 512 for passing CTS
@@ -104,12 +117,13 @@ static unsigned int DEFAULT_OUT_SAMPLING_RATE = 48000;
 
 #define DDP_FRAME_SIZE      768
 #define EAC3_MULTIPLIER 4
-#define MAT_MULTIPLIER  16
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
 #define SYS_NODE_EARC_RX           "/sys/class/extcon/earcrx/state"
 #define SYS_NODE_EARC_TX           "/sys/class/extcon/earctx/state"
+
+#define MS12_DAP_TUNING_PATH       "/vendor/etc/ms12_tuning.dat"
 
 #define IS_HDMI_IN_HW(device) ((device) == AUDIO_DEVICE_IN_HDMI ||\
                              (device) == AUDIO_DEVICE_IN_HDMI_ARC)
@@ -117,10 +131,20 @@ static unsigned int DEFAULT_OUT_SAMPLING_RATE = 48000;
 #define IS_HDMI_ARC_OUT_HW(device) ((access(SYS_NODE_EARC_TX, F_OK) == 0) &&\
                 (device & AUDIO_DEVICE_OUT_HDMI_ARC))
 
-#define SUPPORT_EARC_OUT_HW (access(SYS_NODE_EARC_TX, F_OK) == 0)
+#define MAT_MULTIPLIER 16
 
-enum {
+#define SUPPORT_EARC_OUT_HW (access(SYS_NODE_EARC_TX, F_OK) == 0)
+#define JITTER_DURATION_MS  6
+
+#define MS12_DECODER_LATENCY 32
+#define MS12_ENCODER_LATENCY 32
+#define MS12_DAP_LATENCY 40
+#define MS12_PIPELINE_LATENCY 6
+
+/*the same as "AUDIO HAL FORMAT" in kernel*/
+enum audio_hal_format {
     TYPE_PCM = 0,
+    TYPE_DTS_EXPRESS = 1,
     TYPE_AC3 = 2,
     TYPE_DTS = 3,
     TYPE_EAC3 = 4,
@@ -129,7 +153,12 @@ enum {
     TYPE_TRUE_HD = 7,
     TYPE_DTS_HD_MA = 8,//should not used after we unify DTS-HD&DTS-HD MA
     TYPE_PCM_HIGH_SR = 9,
-    TYPE_AC4 = 10
+    TYPE_AC4 = 10,
+    TYPE_MAT = 11,
+    TYPE_DDP_ATMOS = 12,
+    TYPE_TRUE_HD_ATMOS = 13,
+    TYPE_MAT_ATMOS = 14,
+    TYPE_AC4_ATMOS = 15,
 };
 
 #define FRAMESIZE_16BIT_STEREO 4
@@ -149,6 +178,12 @@ enum Result {
 };
 
 #define AML_HAL_MIXER_BUF_SIZE  64*1024
+
+/* each MS12 callback for ALSA output is for 256 samples ~5ms for 48k
+ * 30 times -> 150ms latency for initial draining
+ */
+#define PATCH_INIT_FLUSH_CNT       30
+#define PATCH_STOP_FLUSH_THRESHOLD 4096
 
 #define SYSTEM_APP_SOUND_MIXING_ON 1
 #define SYSTEM_APP_SOUND_MIXING_OFF 0
@@ -194,7 +229,10 @@ struct format_desc {
 };
 
 struct aml_arc_hdmi_desc {
+    int EDID_length;
     unsigned int avr_port;
+    char SAD[38]; /* 3 bytes for each audio format, max 30 bytes for audio edid, 8 bytes for TLV header */
+    bool default_edid;
     struct format_desc pcm_fmt;
     struct format_desc dts_fmt;
     struct format_desc dtshd_fmt;
@@ -247,7 +285,8 @@ enum OUT_PORT {
     OUTPORT_REMOTE_SUBMIX       = 6,
     OUTPORT_BT_SCO              = 7,
     OUTPORT_BT_SCO_HEADSET      = 8,
-    OUTPORT_MAX                 = 9,
+    OUTPORT_A2DP                = 9,
+    OUTPORT_MAX                 = 10,
 };
 
 enum IN_PORT {
@@ -269,15 +308,15 @@ struct audio_patch_set {
 };
 
 typedef enum stream_usecase {
-    STREAM_PCM_NORMAL = 0,
-    STREAM_PCM_DIRECT,
-    STREAM_PCM_HWSYNC,
-    STREAM_RAW_DIRECT,
-    STREAM_RAW_HWSYNC,
-    STREAM_PCM_PATCH,
-    STREAM_RAW_PATCH,
-    STREAM_USECASE_MAX,
-    STREAM_USECASE_INVAL = -1
+    STREAM_PCM_NORMAL       = 0,
+    STREAM_PCM_DIRECT       = 1,
+    STREAM_PCM_HWSYNC       = 2,
+    STREAM_RAW_DIRECT       = 3,
+    STREAM_RAW_HWSYNC       = 4,
+    STREAM_PCM_PATCH        = 5,
+    STREAM_RAW_PATCH        = 6,
+    STREAM_PCM_MMAP         = 7,
+    STREAM_USECASE_MAX      = 8,
 } stream_usecase_t;
 
 typedef enum alsa_device {
@@ -316,7 +355,7 @@ typedef union {
 } aec_timestamp;
 
 struct aml_audio_mixer;
-const char *usecase_to_str(stream_usecase_t usecase);
+const char* usecase2Str(stream_usecase_t enUsecase);
 const char* outport2String(enum OUT_PORT enOutPort);
 const char* inport2String(enum IN_PORT enInPort);
 
@@ -331,6 +370,18 @@ struct aml_bt_output {
     size_t resampler_buffer_size_in_frames;
     size_t resampler_in_frames;
 };
+
+enum mic_in_dev {
+    DEV_MIC_PDM = 0,
+    DEV_MIC_TDM,
+    DEV_MIC_CNT
+};
+
+struct mic_in_desc {
+    enum mic_in_dev mic;
+    struct pcm_config config;
+};
+
 #define MAX_STREAM_NUM   5
 #define HDMI_ARC_MAX_FORMAT  20
 struct aml_audio_device {
@@ -365,9 +416,9 @@ struct aml_audio_device {
     unsigned hdmi_arc_ad[HDMI_ARC_MAX_FORMAT];
     bool hi_pcm_mode;
     bool audio_patching;
+    bool atv_switch;
     /* audio configuration for dolby HDMI/SPDIF output */
     int hdmi_format;
-    int spdif_format;
     int hdmi_is_pth_active;
     int disable_pcm_mixing;
     /* mute/unmute for vchip  lock control */
@@ -376,6 +427,7 @@ struct aml_audio_device {
     struct audio_config output_config;
     struct aml_arc_hdmi_desc hdmi_descs;
     int arc_hdmi_updated;
+    int a2dp_updated;
     struct aml_native_postprocess native_postprocess;
     /* to classify audio patch sources */
     enum patch_src_assortion patch_src;
@@ -460,8 +512,12 @@ struct aml_audio_device {
     size_t frame_trigger_thred;
     struct aml_audio_parser *aml_parser;
     int continuous_audio_mode;
+    int continuous_audio_mode_default;
+    int delay_disable_continuous;
     bool atoms_lock_flag;
     bool need_remove_conti_mode;
+    int  exiting_ms12;
+    struct timespec ms12_exiting_start;
     int debug_flag;
     int dcvlib_bypass_enable;
     int dtslib_bypass_enable;
@@ -491,7 +547,8 @@ struct aml_audio_device {
     bool useSubMix;
     //int cnt_stream_using_mixer;
     int tsync_fd;
-    bool rawtopcm_flag;
+    bool raw_to_pcm_flag;
+    bool is_netflix;
     int dtv_aformat;
     unsigned int dtv_i2s_clock;
     unsigned int dtv_spidif_clock;
@@ -503,8 +560,37 @@ struct aml_audio_device {
     int reset_dtv_audio;
     int patch_start;
     int mute_start;
+    int timer_in_ms;
     aml_audio_ease_t  *audio_ease;
     int sound_track_mode;
+
+    /* MIC_IN<->PDM/TDM and default configs */
+    struct mic_in_desc *mic_desc;
+    bool virtualx_mulch;
+    int effect_in_ch;
+    /*
+    for karaoke use case, the apk will acess
+    the sound card device directly.the apk will
+    send the direct mode flag to audio hal. the audio
+    hal need by-pass hw acess until the apk release flag
+    */
+    unsigned int direct_mode;
+    /*three variable used for when audio discontinue and underrun,
+      whether mute output*/
+    int discontinue_mute_flag;
+    int audio_discontinue;
+    int no_underrun_count;
+    int no_underrun_max;
+    int count;/*record the number of adev_open calls*/
+    /* display audio format on UI, both streaming and hdmiin*/
+    audio_format_t hal_internal_format;
+    bool is_dolby_atmos;
+    int update_type;
+    uint64_t  sys_audio_frame_written;
+    audio_format_t spdif_out_format;
+    uint32_t       spdif_out_rate;
+    int   dap_bypass_enable;
+    float dap_bypassgain;
 };
 
 struct meta_data {
@@ -531,11 +617,13 @@ struct aml_stream_out {
     audio_format_t hal_format;
     /* samplerate exposed to AudioFlinger. */
     unsigned int hal_rate;
+    /* channel number for every output stream */
     unsigned int hal_ch;
     /* frame size for every output stream */
     unsigned int hal_frame_size;
     audio_output_flags_t flags;
     audio_devices_t out_device;
+    struct a2dp_stream_out *a2dp_out;
     struct pcm *pcm;
     struct pcm *earc_pcm;
     struct resampler_itfe *resampler;
@@ -558,6 +646,7 @@ struct aml_stream_out {
     void *audioeffect_tmp_buffer;
     bool pause_status;
     bool hw_sync_mode;
+    int  tsync_status;
     float volume_l;
     float volume_r;
     int last_codec_type;
@@ -596,10 +685,10 @@ struct aml_stream_out {
     int dropped_size;
     unsigned long long mute_bytes;
     bool is_get_mute_bytes;
-    size_t frame_deficiency;
+    int frame_deficiency;
     bool normal_pcm_mixing_config;
     uint32_t latency_frames;
-    enum MIXER_INPUT_PORT port_index;
+    aml_mixer_input_port_type_e enInputPortType;
     int exiting;
     pthread_mutex_t cond_lock;
     pthread_cond_t cond;
@@ -614,7 +703,18 @@ struct aml_stream_out {
     bool need_convert;
     size_t last_playload_used;
     void * alsa_vir_buf_handle;
+    void    *pstMmapAudioParam;    // aml_mmap_audio_param_st (aml_mmap_audio.h)
     aml_audio_resample_t *resample_handle;
+    int need_drop_size;
+    bool bypass_submix;
+    int ddp_frame_nblks;
+    uint64_t total_ddp_frame_nblks;
+    int framevalid_flag;
+    bool restore_continuous;
+    uint64_t  last_frame_reported;
+    struct timespec  last_timestamp_reported;
+    bool continuous_mode_check;
+    void * ac4_parser_handle;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);
@@ -684,11 +784,11 @@ inline struct pcm_config update_earc_out_config(struct pcm_config *config)
     return earc_config;
 }
 
-static inline int continous_mode(struct aml_audio_device *adev)
+inline int continous_mode(struct aml_audio_device *adev)
 {
     return adev->continuous_audio_mode;
 }
-static inline bool direct_continous(struct audio_stream_out *stream)
+inline bool direct_continous(struct audio_stream_out *stream)
 {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = out->dev;
@@ -698,7 +798,7 @@ static inline bool direct_continous(struct audio_stream_out *stream)
         return false;
     }
 }
-static inline bool primary_continous(struct audio_stream_out *stream)
+inline bool primary_continous(struct audio_stream_out *stream)
 {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = out->dev;
@@ -709,16 +809,18 @@ static inline bool primary_continous(struct audio_stream_out *stream)
     }
 }
 /* called when adev locked */
-static inline int dolby_stream_active(struct aml_audio_device *adev)
+inline int dolby_stream_active(struct aml_audio_device *adev)
 {
     int i = 0;
     int is_dolby = 0;
     struct aml_stream_out *out = NULL;
     for (i = 0 ; i < STREAM_USECASE_MAX; i++) {
         out = adev->active_outputs[i];
-        if (out && (out->hal_internal_format == AUDIO_FORMAT_AC3 ||
-                    out->hal_internal_format == AUDIO_FORMAT_E_AC3 ||
-                    out->hal_internal_format == AUDIO_FORMAT_MAT)) {
+        if (out && (out->hal_internal_format == AUDIO_FORMAT_AC3
+            || out->hal_internal_format == AUDIO_FORMAT_E_AC3
+            || out->hal_internal_format == AUDIO_FORMAT_DOLBY_TRUEHD
+            || out->hal_internal_format == AUDIO_FORMAT_AC4
+            || out->hal_internal_format == AUDIO_FORMAT_MAT)) {
             is_dolby = 1;
             break;
         }
@@ -741,7 +843,7 @@ static inline int hwsync_lpcm_active(struct aml_audio_device *adev)
     return is_hwsync_lpcm;
 }
 
-static inline struct aml_stream_out *direct_active(struct aml_audio_device *adev)
+inline struct aml_stream_out *direct_active(struct aml_audio_device *adev)
 {
     int i = 0;
     struct aml_stream_out *out = NULL;
@@ -759,8 +861,6 @@ static inline struct aml_stream_out *direct_active(struct aml_audio_device *adev
 audio_format_t get_output_format(struct audio_stream_out *stream);
 void *audio_patch_output_threadloop(void *data);
 
-ssize_t aml_audio_spdif_output(struct audio_stream_out *stream,
-                               void *buffer, size_t bytes);
 
 /*
  *@brief audio_hal_data_processing
@@ -818,5 +918,9 @@ int dsp_process_output(struct aml_audio_device *adev, void *in_buffer,
 int release_patch_l(struct aml_audio_device *adev);
 int start_ease_in(struct aml_audio_device *adev);
 int start_ease_out(struct aml_audio_device *adev);
+
+enum hwsync_status check_hwsync_status (uint apts_gap);
+void config_output(struct audio_stream_out *stream,bool reset_decoder);
+bool is_bypass_dolbyms12(struct audio_stream_out *stream);
 
 #endif

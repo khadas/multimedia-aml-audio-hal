@@ -96,15 +96,13 @@ int on_meta_data_cbk(void *cookie,
         ALOGV("%s(), frame_size %d, pts %lldms",
                     __func__, header->frame_size, header->pts/1000000);
     }
-#if 0 //For HW sync the frame size is not necessariy constant, do not need this check
     if (offset != mdata_list->mdata.payload_offset) {
         ALOGV("%s(), offset %lld not equal payload offset %lld, try next time",
                     __func__, offset, mdata_list->mdata.payload_offset);
         ret = -EAGAIN;
         goto err_lock;
     }
-#endif
-    pts32 = (uint32_t)(header->pts *9 / 100000);
+    pts32 = (uint32_t)(header->pts / 1000000 * 90);
     list_remove(&mdata_list->list);
     pthread_mutex_unlock(&out->mdata_lock);
     free(mdata_list);
@@ -115,7 +113,7 @@ int on_meta_data_cbk(void *cookie,
         int delay_count = 0;
         hwsync_header_construct(header);
         pts32 -= latency*90;
-        ALOGI("%s(), set tsync start pts %d, latency %d, last position %lld",
+        ALOGD("%s(), set tsync start pts %d, latency %d, last position %lld",
             __func__, pts32, latency, out->last_frames_postion);
         while (delay_count < 10) {
             vframe_ready_cnt = get_sysfs_int("/sys/class/video/vframe_ready_cnt");
@@ -159,8 +157,11 @@ int on_meta_data_cbk(void *cookie,
             ALOGD("%s(): audio pts %dms, pcr %dms, latency %lldms, pcr leads %dms",
                 __func__, pts32/90, pcr/90, latency/90, (int)(pcr - pts32)/90);
         apts_gap = get_pts_gap(pcr, pts32);
-        //sync_status = pcm_check_hwsync_status(apts_gap);
-        sync_status = pcm_check_hwsync_status1(pcr, pts32);
+        if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
+            sync_status = pcm_check_hwsync_status(apts_gap);
+        } else {
+            sync_status = pcm_check_hwsync_status1(pcr, pts32);
+        }
         // limit the gap handle to 0.5~5 s.
         if (sync_status == ADJUSTMENT) {
             // two cases: apts leading or pcr leading

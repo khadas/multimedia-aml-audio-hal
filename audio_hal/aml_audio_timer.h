@@ -20,6 +20,10 @@
 
 #include <stdint.h>
 
+#define   NSPERSECOND   1000000000UL
+#define   USPERSECOND   1000000UL
+#define   MSPERSECOND   1000UL
+
 int aml_audio_sleep(uint64_t us);
 
 uint64_t aml_audio_get_systime(void);

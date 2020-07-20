@@ -17,11 +17,12 @@
 #ifndef _AML_ALSA_MIXER_H_
 #define _AML_ALSA_MIXER_H_
 
-#include <pthread.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include <pthread.h>
+#include <tinyalsa/asoundlib.h>
 
 /*
  *  Value of the Alsa Mixer Control Point
@@ -46,6 +47,7 @@ typedef enum MIXER_AUDIO_IN_SOURCE {
     AUDIOIN_SRC_ATV     = 1,
     AUDIOIN_SRC_HDMI    = 2,
     AUDIOIN_SRC_SPDIFIN = 3,
+    AUDIOIN_SRC_HDMI_ARC_IN = 4,
     AUDIOIN_SRC_MAX,
 } eMixerAudioInSrc;
 
@@ -102,6 +104,26 @@ struct aml_mixer_ctrl {
     char ctrl_name[50];
 };
 
+/* the same as toddr source*/
+typedef enum ResampleSource {
+    RESAMPLE_FROM_TDMIN_A     = 0,
+    RESAMPLE_FROM_TDMIN_B     = 1,
+    RESAMPLE_FROM_TDMIN_C     = 2,
+    RESAMPLE_FROM_SPDIFIN     = 3,
+    RESAMPLE_FROM_PDMIN       = 4,
+    RESAMPLE_FROM_FRATV       = 5,
+    RESAMPLE_FROM_TDBIN_LB    = 6,
+    RESAMPLE_FROM_LOOPBACK_A  = 7,
+    RESAMPLE_FROM_FRHDMIRX    = 8,
+    RESAMPLE_FROM_LOOPBACK_B  = 9,
+    RESAMPLE_FROM_SPDIFIN_LB  = 10,
+    RESAMPLE_FROM_EARCRX_DMAC = 11,
+    RESAMPLE_FROM_RESERVED_0  = 12,
+    RESAMPLE_FROM_RESERVED_1  = 13,
+    RESAMPLE_FROM_RESERVED_2  = 14,
+    RESAMPLE_FROM_VAD         = 15,
+} eMixerAudioResampleSource;
+
 /*
  *  Alsa Mixer Control Command List
  **/
@@ -110,7 +132,12 @@ typedef enum AML_MIXER_CTRL_ID {
     AML_MIXER_ID_SPDIF_MUTE,
     AML_MIXER_ID_HDMI_OUT_AUDIO_MUTE,
     AML_MIXER_ID_HDMI_ARC_AUDIO_ENABLE,
+	/* eARC latency and CDS */
     AML_MIXER_ID_HDMI_EARC_AUDIO_ENABLE,
+    AML_MIXER_ID_EARCRX_LATENCY,
+    AML_MIXER_ID_EARCTX_LATENCY,
+    AML_MIXER_ID_EARCRX_CDS, /* Capability Data Structure */
+    AML_MIXER_ID_EARCTX_CDS,
     AML_MIXER_ID_AUDIO_IN_SRC,
     AML_MIXER_ID_I2SIN_AUDIO_TYPE,
     AML_MIXER_ID_SPDIFIN_AUDIO_TYPE,
@@ -136,7 +163,19 @@ typedef enum AML_MIXER_CTRL_ID {
     AML_MIXER_ID_AED_MULTI_DRC_ENABLE,
     AML_MIXER_ID_AED_FULL_DRC_ENABLE,
     AML_MIXER_ID_SPDIF_IN_SAMPLERATE,
+    AML_MIXER_ID_HW_RESAMPLE_SOURCE,
+    AML_MIXER_ID_AUDIO_HAL_FORMAT,
+    AML_MIXER_ID_EARCRX_ATTENDED_TYPE,
+    AML_MIXER_ID_EARCRX_AUDIO_CODING_TYPE,
+    AML_MIXER_ID_EARCRX_CS_MUTE,
+    AML_MIXER_ID_EARCRX_AUDIO_SAMPLERATE,
+    AML_MIXER_ID_EARCRX_AUDIO_BIT_DEPTH,
+    AML_MIXER_ID_EARCRX_CHANNEL_MAP,
+    AML_MIXER_ID_EARCRX_CA,
     AML_MIXER_ID_EARC_AUDIO_TYPE,
+    AML_MIXER_ID_EARC_RX_ATTENDED_TYPE,//TODO-find which one to use tinymix "eARC_RX attended type "
+    AML_MIXER_ID_HDMIIN_AUDIO_EDID,
+    AML_MIXER_ID_EARC_TX_ATTENDED_TYPE,//TODO-find which one to use tinymix "eARC_TX attended type"
     AML_MIXER_ID_MAX,
 } eMixerCtrlID;
 
@@ -169,6 +208,8 @@ struct aml_mixer_handle {
 int open_mixer_handle(struct aml_mixer_handle *mixer_handle);
 int close_mixer_handle(struct aml_mixer_handle *mixer_handle);
 
+int aml_mixer_ctrl_get_count(struct aml_mixer_handle *mixer_handle, int mixer_id);
+
 /*
  * get interface
  **/
@@ -187,6 +228,12 @@ int aml_mixer_get_spdifin_type(int mixer_id);
  **/
 int aml_mixer_ctrl_set_int(struct aml_mixer_handle *mixer_handle, int mixer_id, int value);
 int aml_mixer_ctrl_set_str(struct aml_mixer_handle *mixer_handle, int mixer_id, char *value);
+int aml_mixer_ctrl_set_array(struct aml_mixer_handle *mixer_handle, int mixer_id, void *array, int count);
+
+int mixer_get_int(struct mixer *pMixer, int mixer_id);
+int mixer_set_int(struct mixer *pMixer, int mixer_id, int value);
+int mixer_get_array(struct mixer *pMixer, int mixer_id, void *array, int count);
+int mixer_set_array(struct mixer *pMixer, int mixer_id, void *array, int count);
 
 #ifdef __cplusplus
 }

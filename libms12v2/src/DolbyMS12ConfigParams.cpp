@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "libms12v2"
+#define LOG_TAG "libms12"
 // #define LOG_NDEBUG 0
 // #define LOG_NALOGV 0
 
@@ -42,12 +42,14 @@ namespace android
 #define MAX_ARGV_STRING_LEN 256
 
 //here the file path is fake
+//@@pcm [main pcm sounds]
+#define DEFAULT_MAIN_PCM_FILE_NAME "/data/main48000Hz.wav"
 //@@pcm [application sounds]
-#define DEFAULT_APPLICATION_PCM_FILE_NAME "/data/application"
+#define DEFAULT_APPLICATION_PCM_FILE_NAME "/data/app48000Hz.wav"
 //@@pcm [system sounds]
-#define DEFAULT_SYSTEM_PCM_FILE_NAME "/data/system48kHz.wav"
+#define DEFAULT_SYSTEM_PCM_FILE_NAME "/data/system48000Hz.wav"
 //@@pcm [ott sounds]
-#define DEFAULT_OTT_PCM_FILE_NAME "/data/ott48kHz.wav"
+#define DEFAULT_OTT_PCM_FILE_NAME "/data/ott48000Hz.wav"
 //@@HE-AAC input file
 #define DEFAULT_MAIN_HEAAC_V1_FILE_NAME "/data/main.loas"
 #define DEFAULT_ASSOCIATE_HEAAC_V1_FILE_NAME "/data/associate.loas"
@@ -60,6 +62,7 @@ namespace android
 
 //@@@MAT input file
 #define DEFAULT_MAIN_MAT_FILE_NAME "/data/main.mat"
+#define DEFAULT_ASSOCIATE_MAT_FILE_NAME "/data/associate.wav"
 //@@@MLP input file
 #define DEFAULT_MAIN_MLP_FILE_NAME "/data/main.mlp"
 //@@@AC4 input file
@@ -71,9 +74,7 @@ namespace android
 #define DEFAULT_OUTPUT_DD_FILE_NAME "/data/output.ac3"
 #define DEFAULT_OUTPUT_DDP_FILE_NAME "/data/output.ec3"
 #define DEFAULT_OUTPUT_MAT_FILE_NAME "/data/output.mat"
-
-#define DEFAULT_APP_SOUNDS_CHANNEL_cONFIGURATION 7//means 3/2 (L, R, C, l, r)
-#define DEFAULT_SYSTEM_SOUNDS_CHANNEL_cONFIGURATION 2//means 2/0 (L, R)
+#define DEFAULT_SOUNDS_CHANNEL_CONFIGURATION 2//means 2/0 (L, R)
 
 //DRC Mode
 #define DDPI_UDC_COMP_LINE 2
@@ -81,6 +82,9 @@ namespace android
 #define DRC_HIGH_CUT_BIT 3
 #define DRC_LOW_BST_BIT 16
 
+//dap leveler
+#define MAX_DAP_LEVELER 10
+#define MIN_DAP_LEVELER 0
 
 DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     // mDolbyMS12GetOutProfile(NULL)
@@ -88,21 +92,20 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     mParamNum(0)
     , mAudioOutFlags(AUDIO_OUTPUT_FLAG_NONE)
     , mAudioStreamOutFormat(AUDIO_FORMAT_PCM_16_BIT)
-    , mAudioStreamOutChannelMask(AUDIO_CHANNEL_OUT_STEREO)
-    , mAudioSteamOutSampleRate(48000)
     // , mAudioSteamOutDevices(AUDIO_DEVICE_OUT_SPEAKER)
+    , mDolbyMS12OutChannelMask{AUDIO_CHANNEL_OUT_STEREO,
+                               AUDIO_CHANNEL_OUT_STEREO,
+                               AUDIO_CHANNEL_OUT_STEREO,
+                               AUDIO_CHANNEL_OUT_STEREO,
+                               AUDIO_CHANNEL_OUT_STEREO}
     , mDolbyMS12OutConfig(MS12_OUTPUT_MASK_DD)
     , mDolbyMS12OutSampleRate(48000)
-    , mDolbyMS12OutChannelMask(AUDIO_CHANNEL_OUT_7POINT1)
-    //, mDolbyMS12OutChannelMask(AUDIO_CHANNEL_OUT_STEREO)
     , mConfigParams(NULL)
     // , mMultiOutputFlag(true)
     , mDRCBoost(100)
     , mDRCCut(100)
     , mDRCBoostStereo(100)
     , mDRCCutStereo(100)
-    , mChannelConfAppSoundsIn(7)//5.1
-    , mChannelConfSystemIn(2)//2.0
     , mMainFlags(true)
     //, mMainFlags(false) // always have mMainFlags on? zz
     , mAppSoundFlags(false)
@@ -114,21 +117,17 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     , mDAPDRCMode(0)
     , mDownmixMode(0)
     , mEvaluationMode(0)
-    , mLFEPresentInAppSoundIn(1)
-    , mLFEPresentInSystemSoundIn(0)
     , mDonwnmix71PCMto51(0)
     , mLockingChannelModeENC(1)//Encoder Channel Mode Locking Mode as 5.1
     , mRISCPrecisionFlag(1)
     , mDualMonoReproMode(0)
-    , mVerbosity(2)
+    , mVerbosity(0)
     , mOutputBitDepth(16)//use 16 bit per sample
     , mAssociatedAudioMixing(1)
     , mSystemAPPAudioMixing(1)
     , mUserControlVal(0)
 
     //DDPLUS SWITCHES
-    , mChannelConfigInExtPCMInput(7)
-    , mLFEPresentInExtPCMInput(true)
     , mCompressorProfile(0)
 
     //HE-AAC SWITCHES
@@ -152,19 +151,22 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     , mDAPSurDecEnable(true)
     , mHasAssociateInput(false)
     , mHasSystemInput(false)
+    , mHasAppInput(false)
+    , mDualOutputFlag(false)
     , mActivateOTTSignal(false)
-    , mChannelConfOTTSoundsIn(2)//2.0 if mActivateOTTSignal is true
-    , mLFEPresentInOTTSoundIn(0)//on(default) if mActivateOTTSignal is true
     , mAtmosLock(false)//off(default) if mActivateOTTSignal is true
     , mPause(false)//Unpause(default) if mActivateOTTSignal is true
     , mMain1IsDummy(false)
     , mOTTSoundInputEnable(false)
+    , mIsLegecyDDPOut(false)
+    , mDolbyInputCMDMask(0)
 {
-    ALOGD("+%s() mAudioOutFlags %d mAudioStreamOutFormat %#x mDolbyMS12OutChannelMask=%#x mHasAssociateInput %d mHasSystemInput %d\n",
-          __FUNCTION__, mAudioOutFlags, mAudioStreamOutFormat, mDolbyMS12OutChannelMask, mHasAssociateInput, mHasSystemInput);
+    ALOGD("+%s() mAudioOutFlags %d mAudioStreamOutFormat %#x mHasAssociateInput %d mHasSystemInput %d AppInput %d\n",
+          __FUNCTION__, mAudioOutFlags, mAudioStreamOutFormat, mHasAssociateInput, mHasSystemInput, mHasAppInput);
     mConfigParams = PrepareConfigParams(MAX_ARGC, MAX_ARGV_STRING_LEN);
     if (!mConfigParams) {
         ALOGD("%s() line %d prepare the array fail", __FUNCTION__, __LINE__);
+		return;
     }
     memset(mDolbyMain1FileName, 0, sizeof(mDolbyMain1FileName));
     memcpy(mDolbyMain1FileName, DEFAULT_MAIN_DDP_FILE_NAME, sizeof(DEFAULT_MAIN_DDP_FILE_NAME));
@@ -179,8 +181,15 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     if ((access(mDAPTuningFile, F_OK)) != -1) {
         mDAPInitMode = 2;
     }
-
     ALOGD("-%s() main1 %s main2 %s DAPInitMode %d", __FUNCTION__, mDolbyMain1FileName, mDolbyMain2FileName, mDAPInitMode);
+
+    char *vb = getenv("ms12_verbose");
+    if (vb) {
+        int level = atoi(vb);
+        if ((level >= 0) && (level <= 3)) {
+            mVerbosity = level;
+        }
+    }
 }
 
 DolbyMS12ConfigParams::~DolbyMS12ConfigParams()
@@ -201,20 +210,7 @@ void DolbyMS12ConfigParams::SetAudioStreamOutParams(
     ALOGD("+%s()", __FUNCTION__);
     mAudioOutFlags = flags;
     mAudioStreamOutFormat = input_format;
-    mAudioStreamOutChannelMask = channel_mask;
-    if ((input_format == AUDIO_FORMAT_PCM_16_BIT) || (input_format == AUDIO_FORMAT_PCM_32_BIT)) {
-        if (mHasSystemInput != false) {
-            mChannelConfAppSoundsIn = APPSoundChannelMaskConvertToChannelConfiguration(mAudioStreamOutChannelMask);
-        } else {
-            if (mActivateOTTSignal == true) {
-                mChannelConfOTTSoundsIn = SystemSoundChannelMaskConvertToChannelConfiguration(mAudioStreamOutChannelMask);
-            } else {
-                mChannelConfSystemIn = SystemSoundChannelMaskConvertToChannelConfiguration(mAudioStreamOutChannelMask);
-            }
-        }
-    }
-
-    mAudioSteamOutSampleRate = sample_rate;
+    mDolbyMS12OutChannelMask[MS12_INPUT_MAIN] = channel_mask;
     mDolbyMS12OutConfig = output_config & MS12_OUTPUT_MASK_PUBLIC;
 
     // speaker output w/o a DAP tuning file will use downmix output instead
@@ -225,16 +221,42 @@ void DolbyMS12ConfigParams::SetAudioStreamOutParams(
             mDolbyMS12OutConfig |= MS12_OUTPUT_MASK_STEREO;
         }
     }
-
     ALOGD("-%s() AudioStreamOut Flags %x Format %#x InputChannelMask %x SampleRate %d OutputConfig %#x\n",
-          __FUNCTION__, mAudioOutFlags, mAudioStreamOutFormat, mAudioStreamOutChannelMask,
-          mAudioSteamOutSampleRate, mDolbyMS12OutConfig);
+          __FUNCTION__, mAudioOutFlags, mAudioStreamOutFormat, channel_mask,
+          sample_rate, mDolbyMS12OutConfig);
 }
 
+static const ms12InputTable_t ms12InTable[] {
+    {"-imddp",          MS12_INPUT_MASK_MAIN_DDP  },
+    {"-impcm",          MS12_INPUT_MASK_MAIN_PCM  },
+    {"-imac4",          MS12_INPUT_MASK_MAIN_AC4  },
+    {"-immat",          MS12_INPUT_MASK_MAIN_MAT  },
+    {"-immlp",          MS12_INPUT_MASK_MAIN_MLP  },
+    {"-imheaac",        MS12_INPUT_MASK_MAIN_HEAAC},
+    {"-im2",            MS12_INPUT_MASK_MAIN2     },
+    {"-iui",            MS12_INPUT_MASK_UI_SOUND  },
+    {"-ia",             MS12_INPUT_MASK_ASSOCIATE },
+    {"-is",             MS12_INPUT_MASK_SYSTEM    },
+    {"-it",             MS12_INPUT_MASK_INPUT_TYPE},
+
+};
+
+void DolbyMS12ConfigParams::setInputCMDMask(const char *input_cmd)
+{
+    int cnt = sizeof(ms12InTable)/sizeof(ms12InputTable_t);
+    int num = 0;
+
+    for (num = 0; num < cnt; num++) {
+        if (strncmp(ms12InTable[num].fileTypeCmd, input_cmd, sizeof(ms12InTable[num].fileTypeCmd)) == 0) {
+            mDolbyInputCMDMask = mDolbyInputCMDMask | ms12InTable[num].mask;
+        }
+    }
+}
 //input and output
 int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_index)
 {
     ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
+    mDolbyInputCMDMask = 0;
 
     if (mActivateOTTSignal == false) {
         if (mHasAssociateInput == false) {
@@ -246,24 +268,28 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
+                setInputCMDMask("-imddp");
             } else if (mAudioStreamOutFormat == AUDIO_FORMAT_MAT) {
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MAT_FILE_NAME);
                 (*row_index)++;
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
+                setInputCMDMask("-immat");
             } else if (mAudioStreamOutFormat == AUDIO_FORMAT_DOLBY_TRUEHD) {
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MLP_FILE_NAME);
                 (*row_index)++;
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
+                setInputCMDMask("-immlp");
             } else if (mAudioStreamOutFormat == AUDIO_FORMAT_AC4) {
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_AC4_FILE_NAME);
                 (*row_index)++;
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
+                setInputCMDMask("-imac4");
             } else if ((mAudioStreamOutFormat == AUDIO_FORMAT_AAC) || (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1)) {
                 //fixme, which he-aac format is allowed to this flow.
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V1_FILE_NAME);
@@ -271,6 +297,7 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
+                setInputCMDMask("-imheaac");
             } else if (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V2) {
                 //fixme, which he-aac format is allowed to this flow.
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V2_FILE_NAME);
@@ -278,22 +305,26 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
+                setInputCMDMask("-imheaac");
             } else { //others the format is pcm
-                sprintf(ConfigParams[*row_index], "%s%d%s", DEFAULT_APPLICATION_PCM_FILE_NAME, mAudioSteamOutSampleRate, "kHz.wav");
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_PCM_FILE_NAME);
                 (*row_index)++;
                 mMainFlags = true;
-                mAppSoundFlags = false;
+                mAppSoundFlags = true;
                 mSystemSoundFlags = true;
+                setInputCMDMask("-impcm");
             }
         } else {
 
             if ((mAudioStreamOutFormat == AUDIO_FORMAT_AC3) || (mAudioStreamOutFormat == AUDIO_FORMAT_E_AC3)) {
                 sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imddp");
                 (*row_index)++;
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_DDP_FILE_NAME);
                 (*row_index)++;
 
                 sprintf(ConfigParams[*row_index], "%s", "-ia");
+                setInputCMDMask("-ia");
                 (*row_index)++;
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_DDP_FILE_NAME);
                 (*row_index)++;
@@ -301,13 +332,49 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_MAT) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-immat");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MAT_FILE_NAME);
+                (*row_index)++;
+
+                sprintf(ConfigParams[*row_index], "%s", "-ia");
+                setInputCMDMask("-ia");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_MAT_FILE_NAME); //TODO:Need to confirm if MAT supports Associated
+                (*row_index)++;
+
+                mMainFlags = true;
+                mAppSoundFlags = false;
+                mSystemSoundFlags = false;
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_DOLBY_TRUEHD) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-immlp");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MLP_FILE_NAME);
+                (*row_index)++;
+                mMainFlags = true;
+                mAppSoundFlags = false;
+                mSystemSoundFlags = false;
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_AC4) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imac4");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_AC4_FILE_NAME);
+                (*row_index)++;
+                mMainFlags = true;
+                mAppSoundFlags = false;
+                mSystemSoundFlags = false;
             } else if ((mAudioStreamOutFormat == AUDIO_FORMAT_AAC) || (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1)) {
                 sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imheaac");
                 (*row_index)++;
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V1_FILE_NAME);
                 (*row_index)++;
 
                 sprintf(ConfigParams[*row_index], "%s", "-ia");
+                setInputCMDMask("-ia");
                 (*row_index)++;
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_HEAAC_V1_FILE_NAME);
                 (*row_index)++;
@@ -317,11 +384,13 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 mSystemSoundFlags = false;
             } else if (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V2) {
                 sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imheaac");
                 (*row_index)++;
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V2_FILE_NAME);
                 (*row_index)++;
 
                 sprintf(ConfigParams[*row_index], "%s", "-ia");
+                setInputCMDMask("-ia");
                 (*row_index)++;
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_HEAAC_V2_FILE_NAME);
                 (*row_index)++;
@@ -335,48 +404,56 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
 
     // have active OTT signal,then configure input Main program input filename? zz
     if (mActivateOTTSignal == true) {
-        if ((mAudioStreamOutFormat == AUDIO_FORMAT_AC3) || (mAudioStreamOutFormat == AUDIO_FORMAT_E_AC3)) {
+        if ((mAudioStreamOutFormat == AUDIO_FORMAT_AC3) || (mAudioStreamOutFormat == AUDIO_FORMAT_E_AC3) || mMain1IsDummy){
             sprintf(ConfigParams[*row_index], "%s", "-im");
+            setInputCMDMask("-imddp");
             (*row_index)++;
             sprintf(ConfigParams[*row_index], "%s", mDolbyMain1FileName);
             (*row_index)++;
 
             sprintf(ConfigParams[*row_index], "%s", "-im2");
+            setInputCMDMask("-im2");
             (*row_index)++;
             sprintf(ConfigParams[*row_index], "%s", mDolbyMain2FileName);
             (*row_index)++;
             ALOGD("%s() main1 %s main2 %s", __FUNCTION__, mDolbyMain1FileName, mDolbyMain2FileName);
         } else if (mAudioStreamOutFormat == AUDIO_FORMAT_MAT) {
             sprintf(ConfigParams[*row_index], "%s", "-im");
+            setInputCMDMask("-immat");
             (*row_index)++;
             sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MAT_FILE_NAME);
             (*row_index)++;
 
             sprintf(ConfigParams[*row_index], "%s", "-im2");
+            setInputCMDMask("-im2");
             (*row_index)++;
             sprintf(ConfigParams[*row_index], "%s", mDolbyMain2FileName);
             (*row_index)++;
             ALOGD("%s() main1 %s main2 %s", __FUNCTION__, mDolbyMain1FileName, mDolbyMain2FileName);
         } else if (mAudioStreamOutFormat == AUDIO_FORMAT_DOLBY_TRUEHD) {
             sprintf(ConfigParams[*row_index], "%s", "-im");
+            setInputCMDMask("-immlp");
             (*row_index)++;
             sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MLP_FILE_NAME);
             (*row_index)++;
 
             sprintf(ConfigParams[*row_index], "%s", "-im2");
+            setInputCMDMask("-im2");
             (*row_index)++;
             sprintf(ConfigParams[*row_index], "%s", mDolbyMain2FileName);
             (*row_index)++;
             ALOGD("%s() main1 %s main2 %s", __FUNCTION__, mDolbyMain1FileName, mDolbyMain2FileName);
         } else if (mAudioStreamOutFormat == AUDIO_FORMAT_AC4) {
             sprintf(ConfigParams[*row_index], "%s", "-im");
+            setInputCMDMask("-imac4");
             (*row_index)++;
             sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_AC4_FILE_NAME);
             (*row_index)++;
             ALOGD("%s() main1 %s", __FUNCTION__, mDolbyMain1FileName);
         }
-        if (mOTTSoundInputEnable == true) {
+        if (mOTTSoundInputEnable == true && mAudioStreamOutFormat != AUDIO_FORMAT_AC4) {
             sprintf(ConfigParams[*row_index], "%s", "-iui");
+            setInputCMDMask("-iui");
             (*row_index)++;
             sprintf(ConfigParams[*row_index], "%s", DEFAULT_OTT_PCM_FILE_NAME);
             (*row_index)++;
@@ -385,11 +462,19 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
 
     if (mHasSystemInput == true) {
         sprintf(ConfigParams[*row_index], "%s", "-is");
+        setInputCMDMask("-is");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%s", DEFAULT_SYSTEM_PCM_FILE_NAME);
         (*row_index)++;
     }
 
+    if (mHasAppInput == true) {
+        sprintf(ConfigParams[*row_index], "%s", "-ias");
+        setInputCMDMask("-ias");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%s", DEFAULT_APPLICATION_PCM_FILE_NAME);
+        (*row_index)++;
+    }
 
     if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_DD) {
         sprintf(ConfigParams[*row_index], "%s", "-od");
@@ -437,37 +522,34 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
     return 0;
 }
 
-int DolbyMS12ConfigParams::APPSoundChannelMaskConvertToChannelConfiguration(audio_channel_mask_t channel_mask)
+int DolbyMS12ConfigParams::ChannelMask2ChannelConfig(audio_channel_mask_t channel_mask)
 {
     ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
-    int ChannelConfiguration = 0;
-    switch (channel_mask) {
-    case AUDIO_CHANNEL_OUT_MONO:
-        ChannelConfiguration = 1;// L
+    int ChannelConfiguration;
+    switch (channel_mask & ~AUDIO_CHANNEL_OUT_LOW_FREQUENCY) {
+    case AUDIO_CHANNEL_OUT_MONO: // C
+        ChannelConfiguration = 1;
         break;
-    case AUDIO_CHANNEL_OUT_STEREO:// L,R
+    case AUDIO_CHANNEL_OUT_STEREO: // L, R
         ChannelConfiguration = 2;
         break;
-    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_FRONT_CENTER):// L,R,C
+    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_FRONT_CENTER): // L, R, C
         ChannelConfiguration = 3;
         break;
-    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_BACK_LEFT):// L, R, l
+    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_BACK_CENTER): // L, R, S
         ChannelConfiguration = 4;
         break;
-    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_BACK_LEFT):// L, R, C, l
+    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_BACK_CENTER):// L, R, C, S
         ChannelConfiguration = 5;
         break;
-    case AUDIO_CHANNEL_OUT_5POINT1:// L, R, C, l
+    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_BACK_LEFT | AUDIO_CHANNEL_OUT_BACK_RIGHT):// L, R, LS, RS
         ChannelConfiguration = 6;
         break;
-    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_BACK_LEFT | AUDIO_CHANNEL_OUT_BACK_RIGHT):// L, R, C, l
+    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_BACK_LEFT | AUDIO_CHANNEL_OUT_BACK_RIGHT):// L, R, C, LS, RS
         ChannelConfiguration = 7;
         break;
-    case  AUDIO_CHANNEL_OUT_7POINT1:// (L, C, R, l, r, Lrs, Rrs)
-        ChannelConfiguration = 21;
-        break;
     default:
-        ChannelConfiguration = DEFAULT_APP_SOUNDS_CHANNEL_cONFIGURATION;
+        ChannelConfiguration = DEFAULT_SOUNDS_CHANNEL_CONFIGURATION;
         break;
     }
 
@@ -475,42 +557,9 @@ int DolbyMS12ConfigParams::APPSoundChannelMaskConvertToChannelConfiguration(audi
     return ChannelConfiguration;
 }
 
-int DolbyMS12ConfigParams::SystemSoundChannelMaskConvertToChannelConfiguration(audio_channel_mask_t channel_mask)
+int DolbyMS12ConfigParams::ChannelMask2LFEConfig(audio_channel_mask_t channel_mask)
 {
-    ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
-    int ChannelConfiguration = 0;
-    switch (channel_mask) {
-    case AUDIO_CHANNEL_OUT_MONO:
-        ChannelConfiguration = 1;// L
-        break;
-    case AUDIO_CHANNEL_OUT_STEREO:// L,R
-        ChannelConfiguration = 2;
-        break;
-    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_FRONT_CENTER):// L,R,C
-        ChannelConfiguration = 3;
-        break;
-    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_BACK_LEFT):// L, R, l
-        ChannelConfiguration = 4;
-        break;
-    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_BACK_LEFT):// L, R, C, l
-        ChannelConfiguration = 5;
-        break;
-    case AUDIO_CHANNEL_OUT_5POINT1:// L, R, C, l
-        ChannelConfiguration = 6;
-        break;
-    case (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_BACK_LEFT | AUDIO_CHANNEL_OUT_BACK_RIGHT):// L, R, C, l
-        ChannelConfiguration = 7;
-        break;
-    case  AUDIO_CHANNEL_OUT_7POINT1:// (L, C, R, l, r, Lrs, Rrs)
-        ChannelConfiguration = 21;
-        break;
-    default:
-        ChannelConfiguration = DEFAULT_SYSTEM_SOUNDS_CHANNEL_cONFIGURATION;
-        break;
-    }
-
-    ALOGV("-%s() line %d ChannelConfiguration %d\n", __FUNCTION__, __LINE__, ChannelConfiguration);
-    return ChannelConfiguration;
+    return (channel_mask & AUDIO_CHANNEL_OUT_LOW_FREQUENCY) ? 1 : 0;
 }
 
 //functional switches
@@ -533,14 +582,13 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
         }
     }
 
-#if 0
-    if (mMultiOutputFlag == false) {
-        sprintf(ConfigParams[*row_index], "%s", "-mc");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", 0);
-        (*row_index)++;
-    }
-#endif
+    // //fixme, not use this params
+    // if (mMultiOutputFlag == true) {
+    //     sprintf(ConfigParams[*row_index], "%s", "-mc");
+    //     (*row_index)++;
+    //     sprintf(ConfigParams[*row_index], "%d", 1);
+    //     (*row_index)++;
+    // }
 
     if ((mDRCBoost >= 0) && (mDRCBoost <= 100)) {
         sprintf(ConfigParams[*row_index], "%s", "-b");
@@ -556,11 +604,10 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
         (*row_index)++;
     }
 
-
     if (mAppSoundFlags == true) {
         sprintf(ConfigParams[*row_index], "%s", "-chas");
         (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mChannelConfAppSoundsIn);
+        sprintf(ConfigParams[*row_index], "%d", ChannelMask2ChannelConfig(mDolbyMS12OutChannelMask[MS12_INPUT_APP]));
         (*row_index)++;
     }
 
@@ -568,7 +615,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
     if ((mActivateOTTSignal == true) && (mMain1IsDummy == true) && (mOTTSoundInputEnable == true)) {
         sprintf(ConfigParams[*row_index], "%s", "-chui");
         (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mChannelConfOTTSoundsIn);
+        sprintf(ConfigParams[*row_index], "%d", ChannelMask2ChannelConfig(mDolbyMS12OutChannelMask[MS12_INPUT_UI]));
         (*row_index)++;
     }
 
@@ -576,7 +623,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
     if (mHasSystemInput == true) {
         sprintf(ConfigParams[*row_index], "%s", "-chs");
         (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mChannelConfSystemIn);
+        sprintf(ConfigParams[*row_index], "%d", ChannelMask2ChannelConfig(mDolbyMS12OutChannelMask[MS12_INPUT_SYSTEM]));
         (*row_index)++;
     }
 
@@ -629,29 +676,27 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
         (*row_index)++;
     }
 
-    if (mLFEPresentInAppSoundIn == 0) {
+    {
         sprintf(ConfigParams[*row_index], "%s", "-las");
         (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mLFEPresentInAppSoundIn);
+        sprintf(ConfigParams[*row_index], "%d", ChannelMask2LFEConfig(mDolbyMS12OutChannelMask[MS12_INPUT_APP]));
         (*row_index)++;
     }
 
-    if (mLFEPresentInSystemSoundIn == 1) {
+    {
         sprintf(ConfigParams[*row_index], "%s", "-ls");
         (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mLFEPresentInSystemSoundIn);
+        sprintf(ConfigParams[*row_index], "%d", ChannelMask2LFEConfig(mDolbyMS12OutChannelMask[MS12_INPUT_SYSTEM]));
         (*row_index)++;
     }
 
-#if 0
     // LFE present in OTT Sounds input
     if ((mActivateOTTSignal == true) && (mMain1IsDummy == true) && (mOTTSoundInputEnable == true)) {
-        sprintf(ConfigParams[*row_index], "%s", "-los");
+        sprintf(ConfigParams[*row_index], "%s", "-lui");
         (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mLFEPresentInOTTSoundIn);
+        sprintf(ConfigParams[*row_index], "%d", ChannelMask2LFEConfig(mDolbyMS12OutChannelMask[MS12_INPUT_UI]));
         (*row_index)++;
     }
-#endif
 
     //TODO: when ms12 HDMI mode is set to FULL or eARC, the downstream sink
     // supports Dolby MAT and if the output mode is set to DD+ output then
@@ -659,10 +704,11 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
     // will be disabled, unless another legacy_ddplus_out=0 is set explicitly.
     // Need provide an API to allow audio HAL to specify whether legacy output
     // is needed from DDP output.
-    if (1) {
+
+    if (mDolbyMS12OutConfig & (MS12_OUTPUT_MASK_DD|MS12_OUTPUT_MASK_DDP)) {
         sprintf(ConfigParams[*row_index], "%s", "-legacy_ddplus_out");
         (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", 0);
+        sprintf(ConfigParams[*row_index], "%d", mIsLegecyDDPOut);
         (*row_index)++;
     }
 
@@ -705,6 +751,185 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
         sprintf(ConfigParams[*row_index], "%s", "-w");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%d", mOutputBitDepth);
+        (*row_index)++;
+    }
+
+    if (isAssociatedAudioControlSuitable()) {
+        sprintf(ConfigParams[*row_index], "%s", "-xa");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mAssociatedAudioMixing);
+        (*row_index)++;
+    }
+
+    //if (mSystemAPPAudioMixing == 0)
+    {
+        sprintf(ConfigParams[*row_index], "%s", "-xs");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mSystemAPPAudioMixing);
+        (*row_index)++;
+    }
+
+    if (isAssociatedAudioControlSuitable()) { //set this params when dual input.
+        if (mUserControlVal > 32) {
+            mUserControlVal = 32;
+        } else if (mUserControlVal < -32) {
+            mUserControlVal = -32;
+        }
+        sprintf(ConfigParams[*row_index], "%s", "-xu");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mUserControlVal);
+        (*row_index)++;
+    }
+
+
+    //fixme, which params are suitable
+    if (mMainFlags == true) {
+        sprintf(ConfigParams[*row_index], "%s", "-main1_mixgain");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d,%d,%d", mMain1MixGain.target, mMain1MixGain.duration, mMain1MixGain.shape);//choose mid-val
+        (*row_index)++;
+    }
+
+    if (mHasAssociateInput == true) {
+        sprintf(ConfigParams[*row_index], "%s", "-main2_mixgain");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d,%d,%d", mMain2MixGain.target, mMain2MixGain.duration, mMain2MixGain.shape);//choose mid-val
+        (*row_index)++;
+    }
+
+    if ((mActivateOTTSignal == true) && (mMain1IsDummy == true) && (mOTTSoundInputEnable == true)) {
+        sprintf(ConfigParams[*row_index], "%s", "-ui_mixgain");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d,%d,%d", mOTTMixGain.target, mOTTMixGain.duration, mOTTMixGain.shape);
+        (*row_index)++;
+    }
+
+    if ((mMainFlags == true) && (mHasSystemInput == true)) {
+        sprintf(ConfigParams[*row_index], "%s", "-sys_prim_mixgain");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d,%d,%d", mSysPrimMixGain.target, mSysPrimMixGain.duration, mSysPrimMixGain.shape);//choose mid-val
+        (*row_index)++;
+    }
+
+    if (mAppSoundFlags == true) {
+        sprintf(ConfigParams[*row_index], "%s", "-sys_apps_mixgain");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d,%d,%d", mSysApppsMixGain.target, mSysApppsMixGain.duration, mSysApppsMixGain.shape);//choose mid-val
+        (*row_index)++;
+    }
+
+    if (mHasSystemInput == true) {
+        sprintf(ConfigParams[*row_index], "%s", "-sys_syss_mixgain");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d,%d,%d", mSysSyssMixGain.target, mSysSyssMixGain.duration, mSysSyssMixGain.shape);//choose mid-val
+        (*row_index)++;
+    }
+
+    ALOGV("-%s() line %d\n", __FUNCTION__, __LINE__);
+    return 0;
+}
+
+#if 0
+//functional switches
+int DolbyMS12ConfigParams::SetFunctionalSwitchesRuntime(char **ConfigParams, int *row_index)
+{
+    ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
+
+    if (mDualMonoReproMode != 0) {
+        sprintf(ConfigParams[*row_index], "%s", "-u");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mDualMonoReproMode);
+        (*row_index)++;
+    }
+
+    if (mDRCBoostStereo != 100) {
+        sprintf(ConfigParams[*row_index], "%s", "-bs");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mDRCBoostStereo);
+        (*row_index)++;
+    }
+
+    if (mDRCCutStereo != 100) {
+        sprintf(ConfigParams[*row_index], "%s", "-cs");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mDRCCutStereo);
+        (*row_index)++;
+    }
+
+    if (mDRCBoostStereo != 100) {
+        sprintf(ConfigParams[*row_index], "%s", "-b");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mDRCBoost);
+        (*row_index)++;
+    }
+
+    if (mDRCCut != 100) {
+        sprintf(ConfigParams[*row_index], "%s", "-c");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mDRCCut);
+        (*row_index)++;
+    }
+
+    if (mAppSoundFlags == true) {
+        sprintf(ConfigParams[*row_index], "%s", "-chas");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mChannelConfAppSoundsIn);
+        (*row_index)++;
+    }
+
+    if ((mActivateOTTSignal == true) && (mMain1IsDummy == true) && (mOTTSoundInputEnable == true)) {
+        sprintf(ConfigParams[*row_index], "%s", "-chui");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mChannelConfOTTSoundsIn);
+        (*row_index)++;
+    }
+
+    if (mHasSystemInput == true) {
+        sprintf(ConfigParams[*row_index], "%s", "-chs");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mChannelConfSystemIn);
+        (*row_index)++;
+    }
+
+    {
+        sprintf(ConfigParams[*row_index], "%s", "-drc");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mDRCModesOfDownmixedOutput);
+        (*row_index)++;
+    }
+
+    if (mDAPDRCMode == 1) {
+        sprintf(ConfigParams[*row_index], "%s", "-dap_drc");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mDAPDRCMode);
+        (*row_index)++;
+    }
+
+    if (mDownmixMode == 1) {
+        sprintf(ConfigParams[*row_index], "%s", "-dmx");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mDownmixMode);
+        (*row_index)++;
+    }
+
+    if (mLFEPresentInAppSoundIn == 0) {
+        sprintf(ConfigParams[*row_index], "%s", "-las");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mLFEPresentInAppSoundIn);
+        (*row_index)++;
+    }
+
+    if (mLFEPresentInSystemSoundIn == 1) {
+        sprintf(ConfigParams[*row_index], "%s", "-ls");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mLFEPresentInSystemSoundIn);
+        (*row_index)++;
+    }
+
+    if ((mActivateOTTSignal == true) && (mMain1IsDummy == true) && (mOTTSoundInputEnable == true)) {
+        sprintf(ConfigParams[*row_index], "%s", "-lui");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%d", mLFEPresentInOTTSoundIn);
         (*row_index)++;
     }
 
@@ -783,198 +1008,6 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
     return 0;
 }
 
-#if 0
-//functional switches
-int DolbyMS12ConfigParams::SetFunctionalSwitchesRuntime(char **ConfigParams, int *row_index)
-{
-    ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
-    if (mStereoOutputFlag == true) {
-        if ((mDRCBoost >= 0) && (mDRCBoost <= 100)) {
-            sprintf(ConfigParams[*row_index], "%s", "-bs");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%d", mDRCBoostSystem);
-            (*row_index)++;
-        }
-
-        if ((mDRCCut >= 0) && (mDRCCut <= 100)) {
-            sprintf(ConfigParams[*row_index], "%s", "-cs");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%d", mDRCCutSystem);
-            (*row_index)++;
-        }
-    }
-
-#if 0
-    if (mMultiOutputFlag == false) {
-        sprintf(ConfigParams[*row_index], "%s", "-mc");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", 0);
-        (*row_index)++;
-    }
-#endif
-
-    if ((mDRCBoost >= 0) && (mDRCBoost <= 100)) {
-        sprintf(ConfigParams[*row_index], "%s", "-b");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mDRCBoost);
-        (*row_index)++;
-    }
-
-    if ((mDRCCut >= 0) && (mDRCCut <= 100)) {
-        sprintf(ConfigParams[*row_index], "%s", "-c");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mDRCCut);
-        (*row_index)++;
-    }
-
-
-    if (mAppSoundFlags == true) {
-        sprintf(ConfigParams[*row_index], "%s", "-chas");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mChannelConfAppSoundsIn);
-        (*row_index)++;
-    }
-
-    if ((mActivateOTTSignal == true) && (mMain1IsDummy == true) && (mOTTSoundInputEnable == true)) {
-        sprintf(ConfigParams[*row_index], "%s", "-chui");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mChannelConfOTTSoundsIn);
-        (*row_index)++;
-    }
-
-    if (mHasSystemInput == true) {
-        sprintf(ConfigParams[*row_index], "%s", "-chs");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mChannelConfSystemIn);
-        (*row_index)++;
-    }
-
-    {
-        sprintf(ConfigParams[*row_index], "%s", "-drc");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mDRCModesOfDownmixedOutput);
-        (*row_index)++;
-    }
-
-    if (mDAPDRCMode == 1) {
-        sprintf(ConfigParams[*row_index], "%s", "-dap_drc");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mDAPDRCMode);
-        (*row_index)++;
-    }
-
-    if (mDownmixMode == 1) {
-        sprintf(ConfigParams[*row_index], "%s", "-dmx");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mDownmixMode);
-        (*row_index)++;
-    }
-
-    if (mLFEPresentInAppSoundIn == 0) {
-        sprintf(ConfigParams[*row_index], "%s", "-las");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mLFEPresentInAppSoundIn);
-        (*row_index)++;
-    }
-
-    if (mLFEPresentInSystemSoundIn == 1) {
-        sprintf(ConfigParams[*row_index], "%s", "-ls");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mLFEPresentInSystemSoundIn);
-        (*row_index)++;
-    }
-
-#if 0
-    if ((mActivateOTTSignal == true) && (mMain1IsDummy == true) && (mOTTSoundInputEnable == true)) {
-        sprintf(ConfigParams[*row_index], "%s", "-los");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mLFEPresentInOTTSoundIn);
-        (*row_index)++;
-    }
-#endif
-
-    if (mDualMonoReproMode != 0) {
-        sprintf(ConfigParams[*row_index], "%s", "-u");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mDualMonoReproMode);
-        (*row_index)++;
-    }
-
-    if ((mAssociatedAudioMixing == 0) && (mHasAssociateInput == true)) {
-        sprintf(ConfigParams[*row_index], "%s", "-xa");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mAssociatedAudioMixing);
-        (*row_index)++;
-    }
-
-    //if (mSystemAPPAudioMixing == 0)
-    {
-        sprintf(ConfigParams[*row_index], "%s", "-xs");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mSystemAPPAudioMixing);
-        (*row_index)++;
-    }
-
-    if (mHasAssociateInput == true) { //set this params when dual input.
-        if (mUserControlVal > 32) {
-            mUserControlVal = 32;
-        } else if (mUserControlVal < -32) {
-            mUserControlVal = -32;
-        }
-        sprintf(ConfigParams[*row_index], "%s", "-xu");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d", mUserControlVal);
-        (*row_index)++;
-    }
-
-
-    //fixme, which params are suitable
-    if (mMainFlags == true) {
-        sprintf(ConfigParams[*row_index], "%s", "-main1_mixgain");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d,%d,%d", mMain1MixGain.target, mMain1MixGain.duration, mMain1MixGain.shape);//choose mid-val
-        (*row_index)++;
-    }
-
-    if (mHasAssociateInput == true) {
-        sprintf(ConfigParams[*row_index], "%s", "-main2_mixgain");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d,%d,%d", mMain2MixGain.target, mMain2MixGain.duration, mMain2MixGain.shape);//choose mid-val
-        (*row_index)++;
-    }
-
-    if ((mActivateOTTSignal == true) && (mMain1IsDummy == true) && (mOTTSoundInputEnable == true)) {
-        sprintf(ConfigParams[*row_index], "%s", "-ott_mixgain");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d,%d,%d", mOTTMixGain.target, mOTTMixGain.duration, mOTTMixGain.shape);
-        (*row_index)++;
-    }
-
-    if ((mMainFlags == true) && (mHasSystemInput == true)) {
-        sprintf(ConfigParams[*row_index], "%s", "-sys_prim_mixgain");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d,%d,%d", mSysPrimMixGain.target, mSysPrimMixGain.duration, mSysPrimMixGain.shape);//choose mid-val
-        (*row_index)++;
-    }
-
-    if (mAppSoundFlags == true) {
-        sprintf(ConfigParams[*row_index], "%s", "-sys_apps_mixgain");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d,%d,%d", mSysApppsMixGain.target, mSysApppsMixGain.duration, mSysApppsMixGain.shape);//choose mid-val
-        (*row_index)++;
-    }
-
-    if (mHasSystemInput == true) {
-        sprintf(ConfigParams[*row_index], "%s", "-sys_syss_mixgain");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d,%d,%d", mSysSyssMixGain.target, mSysSyssMixGain.duration, mSysSyssMixGain.shape);//choose mid-val
-        (*row_index)++;
-    }
-
-    ALOGV("-%s() line %d\n", __FUNCTION__, __LINE__);
-    return 0;
-}
-
 int DolbyMS12ConfigParams::SetFunctionalSwitchesRuntime_lite(char **ConfigParams, int *row_index)
 {
     ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
@@ -989,7 +1022,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitchesRuntime_lite(char **ConfigParams
     sprintf(ConfigParams[*row_index], "%d,%d,%d", mMain2MixGain.target, mMain2MixGain.duration, mMain2MixGain.shape);//choose mid-val
     (*row_index)++;
 
-    sprintf(ConfigParams[*row_index], "%s", "-ott_mixgain");
+    sprintf(ConfigParams[*row_index], "%s", "-ui_mixgain");
     (*row_index)++;
     sprintf(ConfigParams[*row_index], "%d,%d,%d", mOTTMixGain.target, mOTTMixGain.duration, mOTTMixGain.shape);
     (*row_index)++;
@@ -1019,21 +1052,18 @@ int DolbyMS12ConfigParams::SetFunctionalSwitchesRuntime_lite(char **ConfigParams
 //PCM switches
 int DolbyMS12ConfigParams::SetPCMSwitches(char **ConfigParams, int *row_index)
 {
-    ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
-    if ((mSystemSoundFlags == true) || (mAppSoundFlags == true)) {
-        mChannelConfigInExtPCMInput = APPSoundChannelMaskConvertToChannelConfiguration(mAudioStreamOutChannelMask);
+    if ((mAudioStreamOutFormat & AUDIO_FORMAT_MAIN_MASK) == AUDIO_FORMAT_PCM) {
         {
             sprintf(ConfigParams[*row_index], "%s", "-chp");
             (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%d", mChannelConfigInExtPCMInput);
+            sprintf(ConfigParams[*row_index], "%d", ChannelMask2ChannelConfig(mDolbyMS12OutChannelMask[MS12_INPUT_MAIN]));
             (*row_index)++;
         }
 
-        if ((mChannelConfigInExtPCMInput == 1) || (mChannelConfigInExtPCMInput == 2)) {
-            mLFEPresentInExtPCMInput = false;
+        {
             sprintf(ConfigParams[*row_index], "%s", "-lp");
             (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%d", 0);
+            sprintf(ConfigParams[*row_index], "%d", ChannelMask2LFEConfig(mDolbyMS12OutChannelMask[MS12_INPUT_MAIN]));
             (*row_index)++;
         }
 
@@ -1057,7 +1087,7 @@ int DolbyMS12ConfigParams::SetPCMSwitchesRuntime(char **ConfigParams, int *row_i
 {
     ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
     if ((mSystemSoundFlags == true) || (mAppSoundFlags == true)) {
-        mChannelConfigInExtPCMInput = APPSoundChannelMaskConvertToChannelConfiguration(mAudioStreamOutChannelMask);
+        mChannelConfigInExtPCMInput = APPSoundChannelMaskConvertToChannelConfiguration(mDolbyMS12OutChannelMask);
         {
             sprintf(ConfigParams[*row_index], "%s", "-chp");
             (*row_index)++;
@@ -1219,7 +1249,6 @@ int DolbyMS12ConfigParams::SetOTTProcessingGraphSwitches(char **ConfigParams, in
             (*row_index)++;
         }
 #endif
-
         if ((mPause == true) || (mPause == false)) {
             sprintf(ConfigParams[*row_index], "%s", "-pause");
             (*row_index)++;
@@ -1241,8 +1270,8 @@ int DolbyMS12ConfigParams::SetOTTProcessingGraphSwitchesRuntime(char **ConfigPar
         // no matter mAtmosLock == true or mAtmosLock == false
         // we all need to set -atmos_locking flag
         // otherwise atmos_locking function can not perform correctly.
-#if 0
         //if (mAtmosLock == true)
+#if 0
         {
             // MS1.3.2 use "atmos_locking" instead of "atmos_lock"
             // if we use "atmos_lock" we will get following error log from ms12:
@@ -1261,6 +1290,7 @@ int DolbyMS12ConfigParams::SetOTTProcessingGraphSwitchesRuntime(char **ConfigPar
             (*row_index)++;
         }
 #endif
+
         if ((mPause == true) || (mPause == false)) {
             sprintf(ConfigParams[*row_index], "%s", "-pause");
             (*row_index)++;
@@ -1277,7 +1307,7 @@ int DolbyMS12ConfigParams::SetOTTProcessingGraphSwitchesRuntime(char **ConfigPar
 //all run-time
 int DolbyMS12ConfigParams::SetDAPDeviceSwitches(char **ConfigParams, int *row_index, int is_runtime)
 {
-    char tmpParam[32];
+    std::string tmpParam;
     ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
     if (mDAPTuningFile && !is_runtime) {
         sprintf(ConfigParams[*row_index], "%s", "-dap_tuning");
@@ -1299,8 +1329,8 @@ int DolbyMS12ConfigParams::SetDAPDeviceSwitches(char **ConfigParams, int *row_in
         sprintf(ConfigParams[*row_index], "%d", mDAPSurDecEnable);
         (*row_index)++;
     }
-
-    if (DeviceDAPSurroundVirtualizer.virtualizer_enable == 1) {
+    /*virtualizer_mode: 0:OFF  1:ON  2:AUTO*/
+    if (DeviceDAPSurroundVirtualizer.virtualizer_enable <= 2) {
         sprintf(ConfigParams[*row_index], "%s", "-dap_surround_virtualizer");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%d,%d", DeviceDAPSurroundVirtualizer.virtualizer_enable,
@@ -1312,18 +1342,25 @@ int DolbyMS12ConfigParams::SetDAPDeviceSwitches(char **ConfigParams, int *row_in
         sprintf(ConfigParams[*row_index], "%s", "-dap_graphic_eq");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%d,%d", DeviceDAPGraphicEQ.eq_enable, DeviceDAPGraphicEQ.eq_nb_bands);
+        //tmpParam += String8::format("%s", ConfigParams[*row_index]);
+        tmpParam += ConfigParams[*row_index];
         int i = 0;
         for (i = 0; i < DeviceDAPGraphicEQ.eq_nb_bands; i++) {
-            snprintf(tmpParam, sizeof(tmpParam)-1, ",%d", DeviceDAPGraphicEQ.eq_band_center[i]);
-            strcat(ConfigParams[*row_index], tmpParam);
+            sprintf(ConfigParams[*row_index], ",%d", DeviceDAPGraphicEQ.eq_band_center[i]);
+            //tmpParam += String8::format("%s", ConfigParams[*row_index]);
+            tmpParam += ConfigParams[*row_index];
         }
 
         for (i = 0; i < DeviceDAPGraphicEQ.eq_nb_bands; i++) {
-            snprintf(tmpParam, sizeof(tmpParam)-1, ",%d", DeviceDAPGraphicEQ.eq_band_target[i]);
-            strcat(ConfigParams[*row_index], tmpParam);
+            sprintf(ConfigParams[*row_index], ",%d", DeviceDAPGraphicEQ.eq_band_target[i]);
+            //tmpParam += String8::format("%s", ConfigParams[*row_index]);
+            tmpParam += ConfigParams[*row_index];
         }
+        //memcpy(ConfigParams[*row_index], tmpParam.string(), strlen(tmpParam.string()));
+		memcpy(ConfigParams[*row_index], tmpParam.c_str(), tmpParam.size());
         (*row_index)++;
     }
+    tmpParam.clear();
 
     if (DeviceDAPBassEnhancer.bass_enable == 1) {
         sprintf(ConfigParams[*row_index], "%s", "-dap_bass_enhancer");
@@ -1360,8 +1397,8 @@ int DolbyMS12ConfigParams::SetDAPContentSwitches(char **ConfigParams, int *row_i
         sprintf(ConfigParams[*row_index], "%d", ContentDAPMISteering.mi_enable);
         (*row_index)++;
     }
-
-    if (ContentDAPLeveler.leveler_enable == 1) {
+    /*leveler_setting: 0:OFF 1:ON 2:AUTO*/
+    if (ContentDAPLeveler.leveler_enable <= 2) {
         sprintf(ConfigParams[*row_index], "%s", "-dap_leveler");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%d,%d", ContentDAPLeveler.leveler_enable, ContentDAPLeveler.leveler_amount);
@@ -1404,11 +1441,94 @@ int DolbyMS12ConfigParams::SetDAPContentSwitches(char **ConfigParams, int *row_i
     ALOGV("-%s() line %d\n", __FUNCTION__, __LINE__);
     return 0;
 }
+char *DolbyMS12ConfigParams::QueryDapParameters(const char *key)
+{
+    std::ostringstream s;
+    std::istringstream key_str(key);
+    std::string token_str;
+
+    // key is a set of parmaeters with comma as seperator
+    while (std::getline(key_str, token_str, ';')) {
+        const char *token = token_str.c_str();
+        if (!strcmp(token, "dap_surround_decoder_enable")) {
+            s << "dap_surround_decoder_enable="
+              << mDAPSurDecEnable
+              << ";";
+        } else if (!strcmp(token, "dap_drc")) {
+            s << "dap_drc="
+              << mDAPDRCMode
+              << ";";
+        } else if (!strcmp(token, "dap_bass_enhancer")) {
+            s << "dap_bass_enhancer="
+              << DeviceDAPBassEnhancer.bass_enable
+              << "," << DeviceDAPBassEnhancer.bass_boost
+              << "," << DeviceDAPBassEnhancer.bass_cutoff
+              << "," << DeviceDAPBassEnhancer.bass_width
+              << ";";
+        } else if (!strcmp(token, "dap_dialogue_enhancer")) {
+            s << "dap_dialogue_enhancer="
+              << ContenDAPDialogueEnhancer.de_enable
+              << "," << ContenDAPDialogueEnhancer.de_amount
+              << ";";
+        } else if (!strcmp(token, "dap_graphic_eq")) {
+            s << "dap_graphic_eq="
+              << DeviceDAPGraphicEQ.eq_enable
+              << "," << DeviceDAPGraphicEQ.eq_nb_bands;
+            for (int i = 0; i < DeviceDAPGraphicEQ.eq_nb_bands; i++)
+                s << "," << DeviceDAPGraphicEQ.eq_band_center[i];
+            for (int i = 0; i < DeviceDAPGraphicEQ.eq_nb_bands; i++)
+                s << "," << DeviceDAPGraphicEQ.eq_band_target[i];
+            s << ";";
+        } else if (!strcmp(token, "dap_ieq")) {
+            s << "dap_ieq="
+              << ContentDAPIEQ.ieq_enable
+              << "," << ContentDAPIEQ.ieq_amount
+              << "," << ContentDAPIEQ.ieq_nb_bands;
+            for (int i = 0; i < ContentDAPIEQ.ieq_nb_bands; i++)
+                s << "," << ContentDAPIEQ.ieq_band_center[i];
+            for (int i = 0; i < ContentDAPIEQ.ieq_nb_bands; i++)
+                s << "," << ContentDAPIEQ.ieq_band_target[i];
+            s << ";";
+        } else if (!strcmp(token, "dap_gains")) {
+            s << "dap_gains="
+              << mDAPGains
+              << ";";
+        } else if (!strcmp(token, "dap_leveler")) {
+            s << "dap_leveler="
+              << ContentDAPLeveler.leveler_enable
+              << "," << ContentDAPLeveler.leveler_amount
+              << ";";
+        } else if (!strcmp(token, "dap_mi_steering")) {
+            s << "dap_mi_steering="
+              << ContentDAPMISteering.mi_enable
+              << ";";
+        } else if (!strcmp(token, "dap_surround_virtualizer")) {
+            s << "dap_surround_virtualizer="
+              << DeviceDAPSurroundVirtualizer.virtualizer_enable
+              << "," << DeviceDAPSurroundVirtualizer.surround_boost
+              << ";";
+        }
+    }
+
+    std::string ret = s.str();
+    if (ret.empty()) {
+        return strdup("");
+    }
+
+    // remove last ';'
+    ret.resize(ret.size() - 1);
+
+    // return an alloced c_str, which will be freed out of this function.
+    return strdup(ret.c_str());
+}
 
 //get dolby ms12 config params
 char **DolbyMS12ConfigParams::GetDolbyMS12ConfigParams(int *argc)
 {
     ALOGD("+%s()\n", __FUNCTION__);
+
+    *argc = 0;
+    mParamNum = 0;
 
     if (argc && mConfigParams) {
         char params_bin[] = "ms12_exec";
@@ -1479,14 +1599,14 @@ int DolbyMS12ConfigParams::ms_get_int_from_str(char **p_csv_string, int *p_vals)
 }
 
 #if 0
-char **DolbyMS12ConfigParams::GetDolbyMS12RuntimeConfigParams(int *argc)
+char **DolbyMS12ConfigParams::GetDolbyMS12RuntimeConfigParams(int *argc, char *cmd)
 {
     ALOGD("+%s()", __FUNCTION__);
 
     if (argc && mConfigParams) {
-        char params_bin[] = "ms12_exec";
+        char params_bin[] = "ms12_runtime";
         sprintf(mConfigParams[mParamNum++], "%s", params_bin);
-        SetFunctionalSwitchesRuntime(mConfigParams, &mParamNum);
+        GetFunctionalSwitchesRuntime(mConfigParams, &mParamNum);
         SetDdplusSwitches(mConfigParams, &mParamNum);
         SetPCMSwitchesRuntime(mConfigParams, &mParamNum);
         SetOTTProcessingGraphSwitchesRuntime(mConfigParams, &mParamNum);
@@ -1594,6 +1714,18 @@ char **DolbyMS12ConfigParams::UpdateDolbyMS12RuntimeConfigParams(int *argc, char
                 ALOGI("-at AC4Ac: %d", val);
                 mAC4Ac = val;
             }
+        } else if (strcmp(opt, "xa") == 0) {
+            val = atoi(mConfigParams[index]);
+            if ((val >= 0) && (val <= 1)) {
+                ALOGI("-xa Associated audio mixing: %d", val);
+                mAssociatedAudioMixing = val;
+            }
+        } else if (strcmp(opt, "xu") == 0) {
+            val = atoi(mConfigParams[index]);
+            if ((val >= MIN_USER_CONTROL_VALUES) && (val <= MAX_USER_CONTROL_VALUES)) {
+                ALOGI("-xu User control values:[-32 (mute assoc) to 32 (mute main)] %d", val);
+                mUserControlVal = val;
+            }
         } else if (strcmp(opt, "pat") == 0) {
             val = atoi(mConfigParams[index]);
             if ((val >= 0) && (val <= 1)) {
@@ -1608,9 +1740,9 @@ char **DolbyMS12ConfigParams::UpdateDolbyMS12RuntimeConfigParams(int *argc, char
             strncpy(mAC4Lang2, mConfigParams[index], 3);
         } else if (strcmp(opt, "ac4_de") == 0) {
             val = atoi(mConfigParams[index]);
-            if ((val >= 0) && (val <= 1)) {
-                ALOGI("-ac4_de AC4Ac: %d", val);
-                mAC4Ac = val;
+            if ((val >= 0) && (val <= 12)) {
+                ALOGI("-ac4_de mAC4De: %d", val);
+                mAC4De = val;
             }
         } else if (strcmp(opt, "ac4_pres_group_idx") == 0) {
             val = atoi(mConfigParams[index]);
@@ -1708,7 +1840,7 @@ char **DolbyMS12ConfigParams::UpdateDolbyMS12RuntimeConfigParams(int *argc, char
                 &param[0], &param[1]) == 2) {
                 if ((param[0] >= 0) && (param[0] <= 2))
                     ContentDAPLeveler.leveler_enable = param[0];
-                if ((param[1] >= 0) && (param[1] <= 16))
+                if ((param[1] >= MIN_DAP_LEVELER) && (param[1] <= MAX_DAP_LEVELER))
                     ContentDAPLeveler.leveler_amount = param[1];
                 ALOGI("-dap_leveler: %d %d", param[0], param[1]);
             }
@@ -1728,6 +1860,10 @@ char **DolbyMS12ConfigParams::UpdateDolbyMS12RuntimeConfigParams(int *argc, char
                     DeviceDAPSurroundVirtualizer.surround_boost = param[1];
                 ALOGI("-dap_surround_virtualizer: %d %d", param[0], param[1]);
             }
+        } else if (strcmp(opt, "atmos_lock") == 0) {
+            val = atoi(mConfigParams[index]);
+            mAtmosLock = val ? true : false;
+            ALOGI("-atmos_lock: %d", mAtmosLock);
         }
 eq_error:
         index++;

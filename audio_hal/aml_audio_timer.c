@@ -25,7 +25,6 @@
 
 #include "aml_audio_timer.h"
 
-
 uint64_t aml_audio_get_systime(void)
 {
     struct timespec ts;
