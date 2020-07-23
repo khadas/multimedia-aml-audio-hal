@@ -7384,6 +7384,11 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     ALOGE ("realloc headphone buf failed size %zu format = %#x", bytes, output_format);
                     return -ENOMEM;
                 }
+                adev->spdif_output_buf = realloc(adev->spdif_output_buf, bytes*2);
+                if (!adev->spdif_output_buf) {
+                    ALOGE ("realloc spdif buf failed size %zu format = %#x", bytes*2, output_format);
+                    return -ENOMEM;
+                }
             }
 
             effect_tmp_buf = (int16_t *)adev->effect_buf;
