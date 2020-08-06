@@ -204,7 +204,6 @@ void get_sink_format (struct audio_stream_out *stream)
         break;
     case DD:
         optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_DTS;
-        sink_audio_format = optical_audio_format;
         break;
     case BYPASS:
         sink_audio_format = min(sink_capability,source_format);
@@ -225,7 +224,7 @@ void get_sink_format (struct audio_stream_out *stream)
     adev->sink_format = sink_audio_format;
     adev->optical_format = optical_audio_format;
 
-#if 0
+#if 1
     /* use single output for HDMI_ARC */
     if ((adev->active_outport == OUTPORT_HDMI_ARC) &&
         adev->bHDMIConnected)

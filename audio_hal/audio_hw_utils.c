@@ -1180,6 +1180,49 @@ int aml_audio_get_dolby_drc_mode(int *drc_mode, int *drc_cut, int *drc_boost)
     return 0;
 }
 
+static int _earc_coding_type_mapping(int spdif_format)
+{
+    int r;
+    enum {
+        AUDIO_CODING_TYPE_UNDEFINED         = 0,
+        AUDIO_CODING_TYPE_STEREO_LPCM       = 1,
+        AUDIO_CODING_TYPE_MULTICH_2CH_LPCM  = 2,
+        AUDIO_CODING_TYPE_MULTICH_8CH_LPCM  = 3,
+        AUDIO_CODING_TYPE_MULTICH_16CH_LPCM = 4,
+        AUDIO_CODING_TYPE_MULTICH_32CH_LPCM = 5,
+        AUDIO_CODING_TYPE_HBR_LPCM          = 6,
+        AUDIO_CODING_TYPE_AC3               = 7,
+        AUDIO_CODING_TYPE_AC3_LAYOUT_B      = 8,
+        AUDIO_CODING_TYPE_EAC3              = 9,
+        AUDIO_CODING_TYPE_MLP               = 10,
+        AUDIO_CODING_TYPE_DTS               = 11,
+        AUDIO_CODING_TYPE_DTS_HD            = 12,
+        AUDIO_CODING_TYPE_DTS_HD_MA         = 13,
+        AUDIO_CODING_TYPE_SACD_6CH          = 14,
+        AUDIO_CODING_TYPE_SACD_12CH         = 15,
+        AUDIO_CODING_TYPE_PAUSE             = 16,
+    };
+
+    switch (spdif_format) {
+        case AML_DOLBY_DIGITAL:
+           r = AUDIO_CODING_TYPE_AC3;
+           break;
+        case AML_DOLBY_DIGITAL_PLUS:
+           r = AUDIO_CODING_TYPE_EAC3;
+           break;
+        case AML_TRUE_HD:
+           r = AUDIO_CODING_TYPE_MLP;
+           break;
+        case AML_DTS:
+           r = AUDIO_CODING_TYPE_DTS;
+           break;
+        default:
+           r = AUDIO_CODING_TYPE_STEREO_LPCM;
+           break;
+    }
+
+    return r;
+}
 
 void aml_tinymix_set_spdif_format(audio_format_t output_format,struct aml_stream_out *stream)
 {
@@ -1225,7 +1268,7 @@ void aml_tinymix_set_spdif_format(audio_format_t output_format,struct aml_stream
 #endif
     }
     aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_FORMAT, aml_spdif_format);
-    aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_EARC_AUDIO_TYPE,aml_spdif_format);
+    aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_EARC_AUDIO_TYPE, _earc_coding_type_mapping(aml_spdif_format));
     aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_MUTE, spdif_mute);
     ALOGI("%s tinymix AML_MIXER_ID_SPDIF_FORMAT %d,spdif mute %d",
           __FUNCTION__, aml_spdif_format, spdif_mute);

@@ -83,7 +83,7 @@ static struct aml_mixer_list gAmlMixerList[] = {
     {AML_MIXER_ID_SPDIF_IN_SAMPLERATE,  "SPDIFIN audio samplerate"},
     {AML_MIXER_ID_HW_RESAMPLE_SOURCE,   "Hw resample module"},
     {AML_MIXER_ID_AUDIO_HAL_FORMAT,     "Audio HAL Format"},
-    {AML_MIXER_ID_EARC_AUDIO_TYPE,      "eARC_TX Audio Codec Type"},
+    {AML_MIXER_ID_EARC_AUDIO_TYPE,      "eARC_TX Audio Coding Type"},
     {AML_MIXER_ID_HDMIIN_AUDIO_EDID,    "HDMIIN AUDIO EDID"},
 };
 

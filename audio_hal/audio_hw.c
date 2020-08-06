@@ -8112,7 +8112,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                 }
             }
 
-            if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm/* && adev->bHDMIARCon */) {
+            if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm /* && adev->bHDMIARCon */ && audio_is_linear_pcm(adev->optical_format)) {
                 apply_volume_16to32(1.0, tmp_buffer, spk_tmp_buf, bytes);
                 *output_buffer = (void *) spk_tmp_buf;
                 *output_buffer_bytes = bytes * 2;
@@ -8297,6 +8297,8 @@ ssize_t hw_write (struct audio_stream_out *stream
         ALOGI("%s, aml_out %p alsa open output_format %#x\n", __func__, aml_out, output_format);
         if (eDolbyDcvLib == adev->dolby_lib_type) {
             aml_tinymix_set_spdif_format(output_format,aml_out);
+        } else {
+            aml_tinymix_set_spdif_format(adev->optical_format, aml_out);
         }
         if (adev->useSubMix) {
             if (aml_out->usecase == STREAM_PCM_DIRECT && adev->audio_patching) {
@@ -9095,13 +9097,23 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         need_reset_decoder =digital_input_src ? true: false;
         adev->arc_hdmi_updated = 0;
     }
+
     /* here to check if the hdmi audio output format dynamic changed. */
     if (pre_hdmi_out_format != adev->hdmi_format/* &&
         aml_out->hal_internal_format != AUDIO_FORMAT_PCM_16_BIT &&
         aml_out->hal_internal_format != AUDIO_FORMAT_PCM_32_BIT*/) {
         pre_hdmi_out_format = adev->hdmi_format;
         need_reconfig_output = true;
+#if 0
         need_reset_decoder =digital_input_src ? true: false;
+#else
+        // LINUX change
+        // on Linux, MS12 is configured to have a single digital output only to avoid
+        // high CPU loading. When hdmi_format changes, adev->sink_format and adev->
+        // optical format may change too which requires a relaunch of MS12 pipeline
+        // to configure MS12's output format.
+        need_reset_decoder = true;
+#endif
         ALOGI ("%s(), check if the hdmi audio output format dynamic changed!\n", __func__);
     }
 

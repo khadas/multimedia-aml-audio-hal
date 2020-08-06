@@ -363,7 +363,8 @@ int get_the_dolby_ms12_prepared(
         output_config = get_ms12_output_mask(adev->sink_format, adev->optical_format,adev->active_outport == OUTPORT_HDMI_ARC);
     }
 #else
-    // Currently we only enable max one PCM and one bitstream (DD/DDP/MAT) output
+    // LINUX Change
+    // Currently we only enable max one PCM and one bitstream (DD/DDP/MAT) output to save on CPU loading
     int output_config = get_ms12_output_mask(adev->sink_format, adev->optical_format,adev->active_outport == OUTPORT_HDMI_ARC);
 #endif
 
@@ -1196,7 +1197,13 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12
                 ALOGI("hdmi format=%d bypass =%d size=%d",adev->hdmi_format, ms12->is_bypass_ms12, out_size);
             }
             if (out_size != 0) {
-                ret = aml_audio_spdif_output(stream_out, output_buf, out_size,output_format);
+                if (adev->active_outport == OUTPORT_HDMI_ARC) {
+                    if (audio_hal_data_processing((struct audio_stream_out *)aml_out, buffer, size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
+                        ret = hw_write((struct audio_stream_out *)aml_out, output_buffer, output_buffer_bytes, output_format);
+                    }
+                } else {
+                    ret = aml_audio_spdif_output(stream_out, output_buf, out_size,output_format);
+                }
                 dump_ms12_output_data(buffer, size, MS12_OUTPUT_BITSTREAM_FILE);
             }
 

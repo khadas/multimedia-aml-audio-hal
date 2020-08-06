@@ -195,6 +195,18 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
         if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && (!aml_out->earc_pcm)) {
             int earc_port = alsa_device_update_pcm_index(PORT_EARC, PLAYBACK);
             struct pcm_config earc_config = update_earc_out_config(config);
+            if (!audio_is_linear_pcm(adev->optical_format)) {
+                earc_config.format = PCM_FORMAT_S16_LE;
+                if ((adev->optical_format == AUDIO_FORMAT_E_AC3) ||
+                    (adev->optical_format == AUDIO_FORMAT_MAT)) {
+                    earc_config.period_size *= 4;
+                }
+                if (adev->optical_format == AUDIO_FORMAT_MAT) {
+                    earc_config.rate *= 4;
+                }
+            }
+            ALOGI("%s, audio open eARC device, channels %d, format %d period_count %d period_size %d rate %d",
+                  __func__, earc_config.channels, earc_config.format, earc_config.period_count, earc_config.period_size, earc_config.rate);
             earc_pcm = pcm_open(card, earc_port, PCM_OUT, &earc_config);
             if (!earc_pcm || !pcm_is_ready(earc_pcm)) {
                 ALOGE("%s, earc_pcm %p open [ready %d] failed", __func__,
@@ -436,7 +448,7 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
             return bytes;
         } else {
             //emset(audio_data, 0, need_drop_inject);
-            if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm) {
+            if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm && (adev->optical_format == out_format)) {
                 ret = pcm_write(aml_out->earc_pcm, audio_data + need_drop_inject, bytes - need_drop_inject);
             } else {
                 ret = pcm_write(aml_out->pcm, audio_data + need_drop_inject, bytes - need_drop_inject);
@@ -535,7 +547,7 @@ write:
         }
     }
 
-    if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm) {
+    if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm && (adev->optical_format == out_format)) {
         ret = pcm_write(aml_out->earc_pcm, buffer, bytes);
         if (ret < 0) {
             ALOGE("%s write failed,aml_out->earc_pcm handle:%p, ret:%#x, err info:%s",
@@ -555,6 +567,9 @@ write:
         }
     }
 
+// LINUX Change, the rate control is to solve Android
+// audioflinger underrun issue and not needed for Linux
+#if 0
     if ((adev->continuous_audio_mode == 1) && (eDolbyMS12Lib == adev->dolby_lib_type) && (bytes != 0)  && \
         (adev->ms12.main_input_fmt != AUDIO_FORMAT_AC4)) {
         uint64_t input_ns = 0;
@@ -600,6 +615,7 @@ write:
             pthread_mutex_lock(&adev->alsa_pcm_lock);
         }
     }
+#endif
 
     return ret;
 }
