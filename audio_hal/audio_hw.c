@@ -1799,8 +1799,10 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
             out->offload_mute = true;
         }
     }
-    out->volume_l = left;
-    out->volume_r = right;
+    out->volume_l_org = left;
+    out->volume_r_org = right;
+    out->volume_l = left * adev->master_volume;
+    out->volume_r = right * adev->master_volume;
 
     /*
      *The Dolby format(dd/ddp/ac4/true-hd/mat) and direct&UI-PCM(stereo or multi PCM)
@@ -4905,8 +4907,10 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
 
     out->out_device = devices;
     out->flags = flags;
-    out->volume_l = 1.0;
-    out->volume_r = 1.0;
+    out->volume_l_org = 1.0;
+    out->volume_r_org = 1.0;
+    out->volume_l = adev->master_volume;
+    out->volume_r = adev->master_volume;
     out->dev = adev;
     out->standby = true;
     out->frame_write_sum = 0;
@@ -6736,9 +6740,26 @@ static int adev_set_voice_volume (struct audio_hw_device *dev __unused, float vo
     return 0;
 }
 
-static int adev_set_master_volume (struct audio_hw_device *dev __unused, float volume __unused)
+static int adev_set_master_volume (struct audio_hw_device *dev, float volume)
 {
-    return -ENOSYS;
+    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
+    int i;
+
+    pthread_mutex_lock(&adev->lock);
+
+    adev->master_volume = volume;
+
+    for (i = 0; i < STREAM_USECASE_MAX; i++) {
+        struct aml_stream_out *aml_out = adev->active_outputs[i];
+        struct audio_stream_out *out = (struct audio_stream_out *)aml_out;
+        if (aml_out) {
+            out_set_volume(out, aml_out->volume_l_org, aml_out->volume_r_org);
+        }
+    }
+
+    pthread_mutex_unlock(&adev->lock);
+
+    return 0;
 }
 
 static int adev_get_master_volume (struct audio_hw_device *dev __unused,
@@ -7973,8 +7994,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             *output_buffer_bytes = bytes;
         } else {
             float gain_speaker = adev->sink_gain[OUTPORT_SPEAKER];
-            if (aml_out->hw_sync_mode)
-                 gain_speaker *= aml_out->volume_l;
+            gain_speaker *= aml_out->volume_l;
             apply_volume(gain_speaker, tmp_buffer, sizeof(uint32_t), bytes);
 
             /* 2 ch 32 bit --> 8 ch 32 bit mapping, need 8X size of input buffer size */
@@ -8129,6 +8149,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     }
                 } else {
                     gain_speaker *= (adev->sink_gain[OUTPORT_SPEAKER]);
+                    gain_speaker *= aml_out->volume_l;
                     apply_volume_16to32(gain_speaker * source_gain * adev->dap_bypassgain, effect_tmp_buf, spk_tmp_buf, bytes);
                     if (eDolbyMS12Lib == adev->dolby_lib_type) {
                         /* SPDIF with source_gain*/
@@ -12883,6 +12904,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->sink_gain[OUTPORT_SPEAKER] = 1.0;
     adev->sink_gain[OUTPORT_HDMI] = 1.0;
     adev->sink_gain[OUTPORT_A2DP] = 1.0;
+    adev->master_volume = 1.0;
 
     adev->useSubMix = false;
 #ifdef SUBMIXER_V1_1

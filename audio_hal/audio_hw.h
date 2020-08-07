@@ -591,6 +591,9 @@ struct aml_audio_device {
     uint32_t       spdif_out_rate;
     int   dap_bypass_enable;
     float dap_bypassgain;
+
+    /* master volume */
+    float master_volume;
 };
 
 struct meta_data {
@@ -647,6 +650,8 @@ struct aml_stream_out {
     bool pause_status;
     bool hw_sync_mode;
     int  tsync_status;
+    float volume_l_org;
+    float volume_r_org;
     float volume_l;
     float volume_r;
     int last_codec_type;
