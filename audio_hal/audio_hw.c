@@ -3692,7 +3692,9 @@ static int start_input_stream(struct aml_stream_in *in)
         __func__, card, alsa_device, adev->in_device);
 
     /* this assumes routing is done previously */
-    in->pcm = pcm_open(card, alsa_device, PCM_IN | PCM_NONBLOCK, &in->config);
+    // LINUX Change, tinyalsa does not support return with partial written size
+    //in->pcm = pcm_open(card, alsa_device, PCM_IN | PCM_NONBLOCK, &in->config);
+    in->pcm = pcm_open(card, alsa_device, PCM_IN, &in->config);
     if (!pcm_is_ready(in->pcm)) {
         ALOGE("%s: cannot open pcm_in driver: %s", __func__, pcm_get_error(in->pcm));
         pcm_close (in->pcm);
@@ -10091,8 +10093,13 @@ ssize_t process_buffer_write(struct audio_stream_out *stream,
 /* must be called with hw device mutexes locked */
 static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_standby)
 {
-    struct aml_audio_device *aml_dev = aml_out->dev;
+    struct aml_audio_device *aml_dev;
     bool hw_mix;
+
+    if (!aml_out)
+        return 0;
+
+    aml_dev = aml_out->dev;
 
     if (is_standby) {
         ALOGI("++[%s:%d], dev masks:%#x, is_standby:%d, out usecase:%s", __func__, __LINE__,
