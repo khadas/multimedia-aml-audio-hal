@@ -4451,6 +4451,13 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             if (adev->in_device & AUDIO_DEVICE_IN_TV_TUNER) {
                 in->first_buffer_discard = true;
             }
+
+            /* when in_mute, still read from ALSA device to make sure
+             * HW data flows, which is needed for correct audio information
+             * such as audio format etc.
+             */
+            aml_alsa_input_read(stream, buffer, bytes);
+
             memset(buffer, 0, bytes);
             unsigned int estimated_sched_time_us = 1000;
             uint64_t frame_duration = (uint64_t)bytes * 1000000 / audio_stream_in_frame_size(stream) /
@@ -10757,52 +10764,34 @@ void *audio_patch_input_threadloop(void *data)
                     // hdmi in audio channels reconfig
                     int current_channel = get_hdmiin_channel(&aml_dev->alsa_mixer);
                     cur_aformat = audio_parse_get_audio_type(patch->audio_parse_para);
+                    cur_audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
+
 #ifdef HDMI_ARC_PCM_32BIT_INPUT
                     if (audio_is_linear_pcm(cur_aformat)) {
                         cur_aformat = AUDIO_FORMAT_PCM_32_BIT;
                     }
 #endif
                     if ((current_channel != -1 && current_channel != last_channel_count) ||
-                        (cur_aformat != last_aformat)) {
-                        ALOGI("%s(), channel count changed from %d to %d!",
-                            __func__, last_channel_count, current_channel);
-                        last_channel_count = current_channel;
-                        last_aformat = cur_aformat;
-                        ring_buffer_reset(ringbuffer);
-#ifdef ADD_AUDIO_DELAY_INTERFACE
-                        aml_audio_delay_clear(AML_DELAY_INPORT_ALL);
-#endif
+                        (cur_aformat != last_aformat) ||
+                        (cur_audio_packet != last_audio_packet)) {
+                        int period_size = 0;
+                        int buf_size = 0;
+                        int nChans = current_channel;
+                        ALOGI("%s(), HDMI IN ch/format/packet %d/%x/%d -> %d/%x/%d",
+                            __func__,
+                            last_channel_count, last_aformat, last_audio_packet,
+                            current_channel, cur_aformat, cur_audio_packet);
 
 #ifdef HDMI_ARC_PCM_32BIT_INPUT
                         in->hal_format = audio_is_linear_pcm(cur_aformat) ? AUDIO_FORMAT_PCM_32_BIT : AUDIO_FORMAT_PCM_16_BIT;
 #endif
-                        in_reset_config_param(stream_in, AML_INPUT_STREAM_CONFIG_TYPE_CHANNELS, &current_channel);
-                        break;
-                    }
-
-                    cur_audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
-                    //reconfig period size when HBR and non HBR audio switching
-                    if ((last_audio_packet == AUDIO_PACKET_HBR ||
-                            cur_audio_packet == AUDIO_PACKET_HBR) &&
-                            last_audio_packet != cur_audio_packet) {
-                        int period_size = 0;
-                        int buf_size = 0;
-
-                        cur_aformat = audio_parse_get_audio_type(patch->audio_parse_para);
-#ifdef HDMI_ARC_PCM_32BIT_INPUT
-                        if (audio_is_linear_pcm(cur_aformat)) {
-                            cur_aformat = AUDIO_FORMAT_PCM_32_BIT;
-                        }
-#endif
-                        ALOGD("HDMI Format Switch from 0x%x to 0x%x last_type=%d cur_type=%d\n",
-                            last_aformat, cur_aformat, last_audio_packet, cur_audio_packet);
-
                         if (cur_audio_packet == AUDIO_PACKET_HBR) {
                             // if it is high bitrate bitstream, use PAO and increase the buffer size
                             bSpdifin_PAO = true;
                             period_size = DEFAULT_CAPTURE_PERIOD_SIZE * 4;
                             // increase the buffer size
                             buf_size = ring_buffer_size * 8;
+                            nChans = 8; // Fixed 8 channel for HBR input
                         } else {
                             bSpdifin_PAO = false;
                             period_size = DEFAULT_CAPTURE_PERIOD_SIZE;
@@ -10817,7 +10806,10 @@ void *audio_patch_input_threadloop(void *data)
 #ifdef ADD_AUDIO_DELAY_INTERFACE
                         aml_audio_delay_clear(AML_DELAY_INPORT_ALL);
 #endif
-                        in_reset_config_param(stream_in, AML_INPUT_STREAM_CONFIG_TYPE_PERIODS, &period_size);
+                        in->config.period_size = period_size;
+                        in_reset_config_param(stream_in, AML_INPUT_STREAM_CONFIG_TYPE_CHANNELS, &nChans);
+
+                        last_channel_count = current_channel;
                         last_aformat = cur_aformat;
                         last_audio_packet = cur_audio_packet;
                         break;

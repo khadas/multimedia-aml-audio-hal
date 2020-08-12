@@ -564,6 +564,17 @@ void* audio_type_parse_threadloop(void *data)
                     audio_type_status->audio_ch_mask = mask;
                 }
 
+                // check if signal is stable, and disable resampler when it's not stable
+                if (cur_samplerate == HW_RESAMPLE_DISABLE) {
+                    // When signal is not stable, samplerate will be set to HW_RESAMPLE_DISABLE
+                    if (last_resampler_enable) {
+                        ALOGI("Disable resampler for non-stable input");
+                        enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_DISABLE);
+                        last_resampler_enable = 0;
+                    }
+                    continue;
+                }
+
                 // check HW resampler settings when audio type changed or sample rate changed
                 if (audio_type_status->cur_audio_type == LPCM) {
                     if ((!last_resampler_enable) || (last_resampler_sr != cur_samplerate)) {
