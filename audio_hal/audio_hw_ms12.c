@@ -249,11 +249,18 @@ int get_the_dolby_ms12_prepared(
     ALOGI("+%s()", __FUNCTION__);
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    int dolby_ms12_drc_mode = DOLBY_DRC_RF_MODE;
     struct aml_stream_out *out;
+    int ret = 0;
+    // LINUX change
+    // Linux does not use sysfs to get drc settings
+    // drc settings will be from ms12_runtime switches
+    // with set_parameter API
+#if 0
+    int dolby_ms12_drc_mode = DOLBY_DRC_RF_MODE;
     int drc_mode = 0;
     int drc_cut = 0;
     int drc_boost = 0;
+#endif
     struct aml_audio_patch *patch = adev->audio_patch;
     ALOGI("\n+%s()", __FUNCTION__);
     pthread_mutex_lock(&ms12->lock);
@@ -270,6 +277,8 @@ int get_the_dolby_ms12_prepared(
     set_audio_main_format(input_format);
     ALOGI("+%s() dual_decoder_support %d\n", __FUNCTION__, adev->dual_decoder_support);
 
+    // LINUX change
+#if 0
     if (0 == aml_audio_get_dolby_drc_mode(&drc_mode, &drc_cut, &drc_boost))
         dolby_ms12_drc_mode = (drc_mode == DDPI_UDC_COMP_LINE) ? DOLBY_DRC_LINE_MODE : DOLBY_DRC_RF_MODE;
     //for mul-pcm
@@ -278,6 +287,7 @@ int get_the_dolby_ms12_prepared(
     //for 2-channel downmix
     dolby_ms12_set_drc_boost_stereo(drc_boost);
     dolby_ms12_set_drc_cut_stereo(drc_cut);
+
     /*
      * if main input is hdmi-in/dtv/other-source PCM
      * would not go through the DRC processing
@@ -286,6 +296,7 @@ int get_the_dolby_ms12_prepared(
     if (audio_is_linear_pcm(input_format)) {
         dolby_ms12_drc_mode = DOLBY_DRC_LINE_MODE;
     }
+#endif
 
     /*set the associate audio format*/
     if (adev->dual_decoder_support == true) {
@@ -295,10 +306,12 @@ int get_the_dolby_ms12_prepared(
     dolby_ms12_set_asscociated_audio_mixing(adev->associate_audio_mixing_enable);
     dolby_ms12_set_user_control_value_for_mixing_main_and_associated_audio(adev->mixing_level);
 
+    // LINUX change
+#if 0
     dolby_ms12_set_drc_mode(dolby_ms12_drc_mode);
     dolby_ms12_set_dap_drc_mode(dolby_ms12_drc_mode);
     ALOGI("%s dolby_ms12_set_drc_mode %s", __FUNCTION__, (dolby_ms12_drc_mode == DOLBY_DRC_RF_MODE) ? "RF MODE" : "LINE MODE");
-    int ret = 0;
+#endif
 
     /*set the continous output flag*/
     set_dolby_ms12_continuous_mode((bool)adev->continuous_audio_mode);
