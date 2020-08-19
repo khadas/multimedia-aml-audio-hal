@@ -324,8 +324,14 @@ int get_the_dolby_ms12_prepared(
      *In case of AC-4 or Dolby Digital Plus input,
      *set output DDP bitstream format DDP Atmos(5.1.2) or DDP(5.1)
      */
+    // LINUX change
+#if 1
     bool is_atmos_supported = is_platform_supported_ddp_atmos(adev->hdmi_descs.ddp_fmt.atmos_supported, adev->active_outport);
     set_ms12_out_ddp_5_1(input_format, is_atmos_supported);
+#else
+    // set -legacy_ddplus_out option based on Atmos capbility on sink side
+    set_ms12_out_ddp_5_1(input_format, adev->hdmi_descs.ddp_fmt.atmos_supported);
+#endif
 
     /* create  the ms12 output stream here */
     /*************************************/
@@ -1236,15 +1242,6 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12
         }
     } else if (!adev->dap_bypass_enable) {
         if (ms12_info->pcm_type == NORMAL_LPCM) {
-#if 0
-{
-FILE *fp = fopen("/data/vendor/audiohal/ms12_out.pcm", "a+");
-if (fp) {
-    fwrite(buffer, 1, size, fp);
-    fclose(fp);
-}
-}
-#endif
            /*will process spdif_ring_buf in audio_hal_data_prossing */
             if (get_buffer_write_space (&ms12->spdif_ring_buffer) >= (int) size) {
                 ring_buffer_write(&ms12->spdif_ring_buffer, buffer, size, UNCOVER_WRITE);
