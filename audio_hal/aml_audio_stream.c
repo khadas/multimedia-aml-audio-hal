@@ -40,12 +40,10 @@ static audio_format_t get_sink_capability (struct audio_stream_out *stream)
     char *cap = (char *) get_hdmi_sink_cap(AUDIO_PARAMETER_STREAM_SUP_FORMATS, 0, &(adev->hdmi_descs));
 
     if (cap) {
-#ifdef ENABLE_MAT_OUTPUT
-        if (hdmi_desc->mat_fmt.is_support) {
+        if (hdmi_desc->mat_fmt.is_support && hdmi_desc->mat_fmt.atmos_supported) {
+            /* only use MAT output if sink support MAT 2.x (atmos_supported) */
             sink_capability = AUDIO_FORMAT_MAT;
-        } else
-#endif
-        if (hdmi_desc->ddp_fmt.is_support) {
+        } else if (hdmi_desc->ddp_fmt.is_support) {
             sink_capability = AUDIO_FORMAT_E_AC3;
         } else if (hdmi_desc->dd_fmt.is_support) {
             sink_capability = AUDIO_FORMAT_AC3;
@@ -54,10 +52,10 @@ static audio_format_t get_sink_capability (struct audio_stream_out *stream)
         free(cap);
     }
 
-    ALOGI ("%s dd support %d ddp support %d mat support \n", __FUNCTION__,
+    ALOGI ("%s dd support %d ddp support %d mat 2.x support %d\n", __FUNCTION__,
         hdmi_desc->dd_fmt.is_support,
         hdmi_desc->ddp_fmt.is_support,
-        hdmi_desc->mat_fmt.is_support);
+        hdmi_desc->mat_fmt.atmos_supported);
 
     return sink_capability;
 }
@@ -213,10 +211,10 @@ void get_sink_format (struct audio_stream_out *stream)
     default:
         if ((source_format == AUDIO_FORMAT_DTS) || (source_format == AUDIO_FORMAT_DTS_HD)) {
             optical_audio_format = AUDIO_FORMAT_DTS;
+            sink_audio_format = optical_audio_format;
         } else {
             optical_audio_format = sink_capability;
         }
-        sink_audio_format = optical_audio_format;
         break;
     }
 #endif

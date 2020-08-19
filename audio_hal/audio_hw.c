@@ -840,7 +840,7 @@ static int start_output_stream_direct (struct aml_stream_out *out)
 #endif
     set_codec_type (codec_type);
     /* mute spdif when dd+ output */
-    if (codec_type == TYPE_EAC3) {
+    if ((codec_type == TYPE_EAC3) || (codec_type == TYPE_MAT) || (codec_type == TYPE_TRUE_HD)) {
         aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_MUTE, 1);
     }
 

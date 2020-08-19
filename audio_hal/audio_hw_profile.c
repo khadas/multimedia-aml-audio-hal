@@ -101,39 +101,65 @@ char*  get_hdmi_sink_cap(const char *keys,audio_format_t format,struct aml_arc_h
     fd = open("/sys/class/amhdmitx/amhdmitx0/aud_cap", O_RDONLY);
     if (fd >= 0) {
         int nread = read(fd, infobuf, 1024);
+
         /* check the format cap */
         if (strstr(keys, AUDIO_PARAMETER_STREAM_SUP_FORMATS)) {
+            char *info = infobuf;
+            char *save_ptr = infobuf;
             ALOGD("query hdmi format...\n");
             size += sprintf(aud_cap, "sup_formats=%s", "AUDIO_FORMAT_PCM_16_BIT");
-            if (mystrstr(infobuf, "Dobly_Digital+/ATMOS")) {
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_E_AC3|AUDIO_FORMAT_E_AC3_JOC");
-                p_hdmi_descs->ddp_fmt.is_support = 1;
-                p_hdmi_descs->ddp_fmt.atmos_supported = 1;
-            } else if (mystrstr(infobuf, "Dobly_Digital+")) {
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_E_AC3");
-                p_hdmi_descs->ddp_fmt.is_support = 1;
+
+            // The aud_cap string returned is mal-formatted, there are \0 in the
+            // middle of audio formats, and the line separator is \0xa only.
+            // removing all \0 to make the buffer only has \0xa as line separator.
+            while (info - infobuf < nread) {
+                if (*info) *save_ptr++ = *info;
+                info++;
             }
-            if (mystrstr(infobuf, "ATMOS")) {
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_E_AC3_JOC");
+            if (info != save_ptr) {
+                memset(save_ptr, 0, info - save_ptr);
             }
-            if (mystrstr(infobuf, "AC-3")) {
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_AC3");
-                p_hdmi_descs->dd_fmt.is_support = 1;
-            }
-            if (mystrstr(infobuf, "DTS-HD")) {
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DTS|AUDIO_FORMAT_DTS_HD");
-                p_hdmi_descs->dts_fmt.is_support = 1;
-            } else if (mystrstr(infobuf, "DTS")) {
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DTS");
-                p_hdmi_descs->dts_fmt.is_support = 1;
-            }
-            if (mystrstr(infobuf, "MAT/ATMOS")) {
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_MAT|AUDIO_FORMAT_DOLBY_TRUEHD");
-                p_hdmi_descs->mat_fmt.is_support = 1;
-                p_hdmi_descs->mat_fmt.atmos_supported = 1;
-            } else if (mystrstr(infobuf, "MAT")) {
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DOLBY_TRUEHD");
-                p_hdmi_descs->mat_fmt.is_support = 1;
+            // process aud_cap returned format one by one
+            info = strtok_r(infobuf, "\n", &save_ptr);
+            while (info) {
+                if (strstr(info, "Dobly_Digital+/ATMOS")) {
+                    size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_E_AC3|AUDIO_FORMAT_E_AC3_JOC");
+                    p_hdmi_descs->ddp_fmt.is_support = 1;
+                    p_hdmi_descs->ddp_fmt.atmos_supported = 1;
+                } else if (strstr(info, "Dobly_Digital+")) {
+                    size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_E_AC3");
+                    p_hdmi_descs->ddp_fmt.is_support = 1;
+                }
+                if (strstr(info, "ATMOS")) {
+                    size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_E_AC3_JOC");
+                }
+                if (strstr(info, "AC-3")) {
+                    size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_AC3");
+                    p_hdmi_descs->dd_fmt.is_support = 1;
+                }
+                if (strstr(info, "DTS-HD")) {
+                    size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DTS|AUDIO_FORMAT_DTS_HD");
+                    p_hdmi_descs->dts_fmt.is_support = 1;
+                } else if (strstr(info, "DTS")) {
+                    size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DTS");
+                    p_hdmi_descs->dts_fmt.is_support = 1;
+                }
+                if (strstr(info, "MAT")) {
+                    char *dep = strstr(info, "DepVaule");
+                    int val = 0;
+                    if (dep) {
+                        sscanf(dep + 9, "%x", &val);
+                    }
+                    if (val & 1) {
+                        size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_MAT|AUDIO_FORMAT_DOLBY_TRUEHD");
+                        p_hdmi_descs->mat_fmt.is_support = 1;
+                        p_hdmi_descs->mat_fmt.atmos_supported = 1;
+                    } else {
+                        size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DOLBY_TRUEHD");
+                        p_hdmi_descs->mat_fmt.is_support = 1;
+                    }
+                }
+                info = strtok_r(NULL, "\n", &save_ptr);
             }
         }
         /*check the channel cap */
