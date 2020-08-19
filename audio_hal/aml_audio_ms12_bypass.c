@@ -96,29 +96,29 @@ static struct bypass_frame_item * modify_bypass_frame(struct bypass_frame_item *
 
 int aml_ms12_bypass_open(void **pphandle)
 {
-    struct aml_ms12_bypass_handle *bypass_hanlde = NULL;
+    struct aml_ms12_bypass_handle *bypass_handle = NULL;
 
-    bypass_hanlde = (struct aml_ms12_bypass_handle *)calloc(1, sizeof(struct aml_ms12_bypass_handle));
-    if (bypass_hanlde == NULL) {
+    bypass_handle = (struct aml_ms12_bypass_handle *)calloc(1, sizeof(struct aml_ms12_bypass_handle));
+    if (bypass_handle == NULL) {
         ALOGE("%s handle error", __func__);
         goto error;
     }
 
-    bypass_hanlde->buf_size  = BYPASS_MS12_MAX_FRAME_SIZE;
-    bypass_hanlde->buf  = calloc(1, BYPASS_MS12_MAX_FRAME_SIZE);
-    if (bypass_hanlde->buf == NULL) {
+    bypass_handle->buf_size  = BYPASS_MS12_MAX_FRAME_SIZE;
+    bypass_handle->buf  = calloc(1, BYPASS_MS12_MAX_FRAME_SIZE);
+    if (bypass_handle->buf == NULL) {
         ALOGE("%s data buffer error", __func__);
         goto error;
     }
-    bypass_hanlde->data_offset = 0;
-    list_init(&bypass_hanlde->frame_list);
-    pthread_mutex_init(&bypass_hanlde->list_lock, NULL);
-    *pphandle = bypass_hanlde;
-    ALOGI("%s exit =%p", __func__, bypass_hanlde);
+    bypass_handle->data_offset = 0;
+    list_init(&bypass_handle->frame_list);
+    pthread_mutex_init(&bypass_handle->list_lock, NULL);
+    *pphandle = bypass_handle;
+    ALOGI("%s exit =%p", __func__, bypass_handle);
     return 0;
 error:
-    if (bypass_hanlde) {
-        free(bypass_hanlde);
+    if (bypass_handle) {
+        free(bypass_handle);
     }
     *pphandle = NULL;
     ALOGE("%s error", __func__);
@@ -128,24 +128,24 @@ error:
 
 int aml_ms12_bypass_close(void *phandle)
 {
-    struct aml_ms12_bypass_handle *bypass_hanlde = (struct aml_ms12_bypass_handle *)phandle;
+    struct aml_ms12_bypass_handle *bypass_handle = (struct aml_ms12_bypass_handle *)phandle;
     struct bypass_frame_item *frame_item = NULL;
     struct listnode *item;
 
-    if (bypass_hanlde) {
-        pthread_mutex_lock(&bypass_hanlde->list_lock);
-        while (!list_empty(&bypass_hanlde->frame_list)) {
-            item = list_head(&bypass_hanlde->frame_list);
+    if (bypass_handle) {
+        pthread_mutex_lock(&bypass_handle->list_lock);
+        while (!list_empty(&bypass_handle->frame_list)) {
+            item = list_head(&bypass_handle->frame_list);
             frame_item = node_to_item(item, struct bypass_frame_item, list);
             list_remove(item);
             delete_bypass_frame(frame_item);
         }
-        pthread_mutex_unlock(&bypass_hanlde->list_lock);
+        pthread_mutex_unlock(&bypass_handle->list_lock);
 
-        if (bypass_hanlde->buf) {
-            free(bypass_hanlde->buf);
+        if (bypass_handle->buf) {
+            free(bypass_handle->buf);
         }
-        free(bypass_hanlde);
+        free(bypass_handle);
     }
     ALOGI("%s exit", __func__);
     return 0;
@@ -153,22 +153,22 @@ int aml_ms12_bypass_close(void *phandle)
 
 int aml_ms12_bypass_reset(void *phandle)
 {
-    struct aml_ms12_bypass_handle *bypass_hanlde = (struct aml_ms12_bypass_handle *)phandle;
+    struct aml_ms12_bypass_handle *bypass_handle = (struct aml_ms12_bypass_handle *)phandle;
     struct bypass_frame_item *frame_item = NULL;
     struct listnode *item = NULL;
     uint32_t frame_no = 0;
 
-    if (bypass_hanlde) {
-        pthread_mutex_lock(&bypass_hanlde->list_lock);
-        while (!list_empty(&bypass_hanlde->frame_list)) {
-            item = list_head(&bypass_hanlde->frame_list);
+    if (bypass_handle) {
+        pthread_mutex_lock(&bypass_handle->list_lock);
+        while (!list_empty(&bypass_handle->frame_list)) {
+            item = list_head(&bypass_handle->frame_list);
             frame_item = node_to_item(item, struct bypass_frame_item, list);
             list_remove(item);
             delete_bypass_frame(frame_item);
             frame_no++;
         }
-        pthread_mutex_unlock(&bypass_hanlde->list_lock);
-        bypass_hanlde->data_offset = 0;
+        pthread_mutex_unlock(&bypass_handle->list_lock);
+        bypass_handle->data_offset = 0;
     }
     ALOGI("%s exit release frame number=%d", __FUNCTION__, frame_no);
     return 0;
@@ -181,8 +181,8 @@ int aml_ms12_bypass_checkin_data(void *phandle, const void *buffer, int32_t numB
     struct bypass_frame_item * last_frame = NULL;
     struct listnode *item = NULL;
     bool need_new_frame = true;
-    struct aml_ms12_bypass_handle *bypass_hanlde = (struct aml_ms12_bypass_handle *)phandle;
-    if ((bypass_hanlde == NULL) ||
+    struct aml_ms12_bypass_handle *bypass_handle = (struct aml_ms12_bypass_handle *)phandle;
+    if ((bypass_handle == NULL) ||
         (buffer == NULL)        ||
         (numBytes == 0)         ||
         (data_info == NULL)) {
@@ -190,17 +190,18 @@ int aml_ms12_bypass_checkin_data(void *phandle, const void *buffer, int32_t numB
         return -1;
     }
     ALOGV("frame info rate=%d dependency=%d numblks=%d", data_info->samplerate, data_info->dependency_frame, data_info->numblks);
-    pthread_mutex_lock(&bypass_hanlde->list_lock);
+    pthread_mutex_lock(&bypass_handle->list_lock);
     if (!data_info->dependency_frame) {
-        if (!list_empty(&bypass_hanlde->frame_list)) {
-            item      = list_tail(&bypass_hanlde->frame_list);
+        if (!list_empty(&bypass_handle->frame_list)) {
+            item      = list_tail(&bypass_handle->frame_list);
             last_frame = node_to_item(item, struct bypass_frame_item, list);
+
             /*add this buffer to last frame*/
             if (last_frame->numblks < DDP_FRAME_BLK_NUM) {
                 modify_bypass_frame(last_frame, buffer, numBytes);
-                last_frame->offset_end   = bypass_hanlde->data_offset + numBytes;
+                last_frame->offset_end   = bypass_handle->data_offset + numBytes;
                 last_frame->numblks     += data_info->numblks;
-                bypass_hanlde->data_offset += numBytes;
+                bypass_handle->data_offset += numBytes;
                 need_new_frame = false;
             }
         }
@@ -208,26 +209,26 @@ int aml_ms12_bypass_checkin_data(void *phandle, const void *buffer, int32_t numB
         {
             new_frame = new_bypass_frame(buffer, numBytes, data_info);
             if (new_frame) {
-                new_frame->offset_start = bypass_hanlde->data_offset;
-                new_frame->offset_end   = bypass_hanlde->data_offset + numBytes;
+                new_frame->offset_start = bypass_handle->data_offset;
+                new_frame->offset_end   = bypass_handle->data_offset + numBytes;
                 new_frame->numblks      = data_info->numblks;
-                list_add_tail(&bypass_hanlde->frame_list, &new_frame->list);
-                bypass_hanlde->data_offset += numBytes;
+                list_add_tail(&bypass_handle->frame_list, &new_frame->list);
+                bypass_handle->data_offset += numBytes;
             } else {
                 ret = -1;
             }
         }
     } else {
-        if (!list_empty(&bypass_hanlde->frame_list)) {
-            item      = list_tail(&bypass_hanlde->frame_list);
+        if (!list_empty(&bypass_handle->frame_list)) {
+            item      = list_tail(&bypass_handle->frame_list);
             new_frame = node_to_item(item, struct bypass_frame_item, list);
             modify_bypass_frame(new_frame, buffer, numBytes);
-            new_frame->offset_end   = bypass_hanlde->data_offset + numBytes;
+            new_frame->offset_end   = bypass_handle->data_offset + numBytes;
             new_frame->numblks      = data_info->numblks;
-            bypass_hanlde->data_offset += numBytes;
+            bypass_handle->data_offset += numBytes;
         }
     }
-    pthread_mutex_unlock(&bypass_hanlde->list_lock);
+    pthread_mutex_unlock(&bypass_handle->list_lock);
 
     if (new_frame) {
         ALOGV("check in bypass frame start=%lld end=%lld size=%d depedency=%d", new_frame->offset_start, new_frame->offset_end, numBytes, new_frame->info.dependency_frame);
@@ -238,48 +239,52 @@ int aml_ms12_bypass_checkin_data(void *phandle, const void *buffer, int32_t numB
 
 int aml_ms12_bypass_checkout_data(void *phandle, void **output_buf, int32_t *out_size, uint64_t offset, struct bypass_frame_info *frame_info)
 {
-    struct aml_ms12_bypass_handle *bypass_hanlde = (struct aml_ms12_bypass_handle *)phandle;
+    struct aml_ms12_bypass_handle *bypass_handle = (struct aml_ms12_bypass_handle *)phandle;
     struct bypass_frame_item *frame_item = NULL;
-    struct listnode *item = NULL;
+    struct listnode *item = NULL, *n;
     uint32_t frame_size = 0;
     bool find_frame = false;
-    if (bypass_hanlde == NULL) {
+    if (bypass_handle == NULL) {
         return -1;
     }
+    *out_size = 0;
     ALOGV("check out bypass data =%lld", offset);
-    pthread_mutex_lock(&bypass_hanlde->list_lock);
-    list_for_each(item, &bypass_hanlde->frame_list) {
+    pthread_mutex_lock(&bypass_handle->list_lock);
+    list_for_each_safe(item, n, &bypass_handle->frame_list) {
         frame_item = node_to_item(item, struct bypass_frame_item, list);
-        if ((frame_item->offset_start <= offset) && (offset <= frame_item->offset_end)) {
+        // LINUX change
+        // send all frames before/include the offset
+        if (frame_item->offset_start <= offset) {
             /*find the offset frame*/
             frame_size = frame_item->frame_size;
             ALOGV("offset=%lld frame size=%d start=%lld end=%lld frame dependency=%d cnt=%d numblks=%d", offset, frame_size, frame_item->offset_start, frame_item->offset_end, frame_item->info.dependency_frame, frame_item->frame_cnt, frame_item->numblks);
-            if (frame_size > bypass_hanlde->buf_size) {
-                bypass_hanlde->buf = realloc(bypass_hanlde->buf, frame_size);
-                if (bypass_hanlde->buf == NULL) {
+            if (frame_size + *out_size > bypass_handle->buf_size) {
+                bypass_handle->buf = realloc(bypass_handle->buf, frame_size + *out_size);
+                if (bypass_handle->buf == NULL) {
                     ALOGE("%s realloc buf failed =%d", __FUNCTION__, frame_size);
                     goto error;
                 }
-                bypass_hanlde->buf_size = frame_size;
+                bypass_handle->buf_size = frame_size + *out_size;
             }
-            memcpy(bypass_hanlde->buf, frame_item->frame_buf, frame_size);
+            memcpy(bypass_handle->buf + *out_size, frame_item->frame_buf, frame_size);
             memcpy(frame_info, &frame_item->info, sizeof(struct bypass_frame_info));
 
-            *output_buf = bypass_hanlde->buf;
-            *out_size   = frame_size;
+            *output_buf = bypass_handle->buf;
+            *out_size  += frame_size;
             find_frame = true;
             list_remove(&frame_item->list);
             delete_bypass_frame(frame_item);
+        } else {
             break;
         }
     }
 
     if (find_frame) {
-        pthread_mutex_unlock(&bypass_hanlde->list_lock);
+        pthread_mutex_unlock(&bypass_handle->list_lock);
         return 0;
     }
 error:
-    pthread_mutex_unlock(&bypass_hanlde->list_lock);
+    pthread_mutex_unlock(&bypass_handle->list_lock);
     *output_buf = NULL;
     *out_size   = 0;
     return -1;
