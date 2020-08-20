@@ -594,6 +594,7 @@ struct aml_audio_device {
 
     /* master volume */
     float master_volume;
+    bool master_mute;
 };
 
 struct meta_data {

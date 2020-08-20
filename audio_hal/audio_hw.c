@@ -1801,8 +1801,8 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
     }
     out->volume_l_org = left;
     out->volume_r_org = right;
-    out->volume_l = left * adev->master_volume;
-    out->volume_r = right * adev->master_volume;
+    out->volume_l = (adev->master_mute) ? 0.0f : left * adev->master_volume;
+    out->volume_r = (adev->master_mute) ? 0.0f : right * adev->master_volume;
 
     /*
      *The Dolby format(dd/ddp/ac4/true-hd/mat) and direct&UI-PCM(stereo or multi PCM)
@@ -4918,8 +4918,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->flags = flags;
     out->volume_l_org = 1.0;
     out->volume_r_org = 1.0;
-    out->volume_l = adev->master_volume;
-    out->volume_r = adev->master_volume;
+    out->volume_l = (adev->master_mute) ? 0.0f : adev->master_volume;
+    out->volume_r = (adev->master_mute) ? 0.0f : adev->master_volume;
     out->dev = adev;
     out->standby = true;
     out->frame_write_sum = 0;
@@ -6749,14 +6749,9 @@ static int adev_set_voice_volume (struct audio_hw_device *dev __unused, float vo
     return 0;
 }
 
-static int adev_set_master_volume (struct audio_hw_device *dev, float volume)
+static void _update_volumes_all_stream_l(struct aml_audio_device *adev)
 {
-    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
     int i;
-
-    pthread_mutex_lock(&adev->lock);
-
-    adev->master_volume = volume;
 
     for (i = 0; i < STREAM_USECASE_MAX; i++) {
         struct aml_stream_out *aml_out = adev->active_outputs[i];
@@ -6765,26 +6760,66 @@ static int adev_set_master_volume (struct audio_hw_device *dev, float volume)
             out_set_volume(out, aml_out->volume_l_org, aml_out->volume_r_org);
         }
     }
+}
+
+
+static int adev_set_master_volume (struct audio_hw_device *dev, float volume)
+{
+    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
+    int i;
+
+    if ((volume > 1.0) || (volume < 0.0)) {
+        return -EINVAL;
+    }
+
+    pthread_mutex_lock(&adev->lock);
+
+    adev->master_volume = volume;
+
+    if (volume > 0.0) {
+         adev->master_mute = false;
+    }
+
+    _update_volumes_all_stream_l(adev);
 
     pthread_mutex_unlock(&adev->lock);
 
     return 0;
 }
 
-static int adev_get_master_volume (struct audio_hw_device *dev __unused,
-                                   float *volume __unused)
+static int adev_get_master_volume (struct audio_hw_device *dev,
+                                   float *volume)
 {
-    return -ENOSYS;
+    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
+
+    *volume = adev->master_volume;
+    return 0;
 }
 
-static int adev_set_master_mute (struct audio_hw_device *dev __unused, bool muted __unused)
+static int adev_set_master_mute (struct audio_hw_device *dev, bool muted)
 {
-    return -ENOSYS;
+    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
+
+    ALOGI("adev_set_master_mute %d", muted);
+
+    // TODO: for passthrough, need control port mute instead of volume settings
+    if (muted != adev->master_mute) {
+        adev->master_mute = muted;
+
+        pthread_mutex_lock(&adev->lock);
+        _update_volumes_all_stream_l(adev);
+        pthread_mutex_unlock(&adev->lock);
+    }
+
+    return 0;
 }
 
-static int adev_get_master_mute (struct audio_hw_device *dev __unused, bool *muted __unused)
+static int adev_get_master_mute (struct audio_hw_device *dev, bool *muted)
 {
-    return -ENOSYS;
+    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
+
+    *muted = adev->master_mute;
+    return 0;
 }
 static int adev_set_mode (struct audio_hw_device *dev, audio_mode_t mode)
 {
