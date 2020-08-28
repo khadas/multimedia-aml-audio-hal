@@ -113,11 +113,11 @@ target_include_directories(audio_hal PRIVATE
 	./amlogic_AQ_tools/ini
 	./libms12v2/include)
 
-target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations)
+target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DAML_EQ_DRC -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations)
 
 target_link_libraries(audio_hal
-#	audioprocessing spdifenc ms12v2 ${PREBUILD_STATIC_LIBS}
-	audioprocessing spdifenc ms12v2
+	audioprocessing spdifenc ms12v2 ${PREBUILD_STATIC_LIBS}
+#	audioprocessing spdifenc ms12v2
     ${DTV_LIBS} -lcutils -lamaudioutils -ltinyalsa -lamavutils -llog -lexpat -lpthread -ldl -lstdc++ -Wl,-z,defs)
 
 install(TARGETS audio_hal
@@ -125,4 +125,7 @@ install(TARGETS audio_hal
 
 install(FILES audio_hal/mixer_paths.xml
 	DESTINATION /etc)
+
+install(PROGRAMS amlogic_AQ_tools/Amlogic_DRC_Param_Generator amlogic_AQ_tools/Amlogic_EQ_Param_Generator
+	DESTINATION /usr/bin)
 
