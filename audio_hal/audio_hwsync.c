@@ -333,7 +333,8 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     uint32_t pts32;
     char tempbuf[128];
     int vframe_ready_cnt = 0;
-    int delay_count = 0;
+    // LINUX change
+    // int delay_count = 0;
 
     if (p_hwsync == NULL) {
         return -1;
@@ -347,6 +348,9 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     pts32 = (uint32_t)pts;
     p_hwsync->first_apts_flag = true;
     p_hwsync->first_apts = pts;
+
+    // LINUX change
+#if 0
     while (delay_count < 10) {
         vframe_ready_cnt = get_sysfs_int("/sys/class/video/vframe_ready_cnt");
         ALOGV("/sys/class/video/vframe_ready_cnt is %d", vframe_ready_cnt);
@@ -358,11 +362,13 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
         break;
     }
     ALOGI("wait video ready cnt =%d", delay_count);
+#endif
     if (aml_hwsync_set_tsync_start_pts(pts32) < 0)
         return -EINVAL;
     p_hwsync->aout->tsync_status = TSYNC_STATUS_RUNNING;
     return 0;
 }
+
 /*
 @offset :ms12 real costed offset
 @p_adjust_ms: a/v adjust ms.if return a minus,means
@@ -454,6 +460,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
         aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);
     } else  if (p_hwsync->first_apts_flag) {
+        uint32_t apts_save = apts;
         if (apts >= latency_pts) {
             apts -= latency_pts;
         } else {
@@ -465,7 +472,8 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             gap = get_pts_gap(pcr, apts);
             gap_ms = gap / 90;
             if (debug_enable) {
-                ALOGI("%s pcr 0x%x,apts 0x%x,gap 0x%x,gap duration %d ms", __func__, pcr, apts, gap, gap_ms);
+                ALOGI("%s pcr 0x%x,apts 0x%x,gap 0x%x,gap duration %d ms, offset %d, apts_lookup=%d, latency=%d",
+                      __func__, pcr, apts, gap, gap_ms, offset, apts_save / 90, latency_pts / 90);
             }
 
             if (gap > APTS_DISCONTINUE_THRESHOLD_MIN && gap < APTS_DISCONTINUE_THRESHOLD_MAX) {
