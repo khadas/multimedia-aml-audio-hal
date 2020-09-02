@@ -173,6 +173,7 @@ void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out
     pthread_mutex_init(&p_hwsync->lock, NULL);
     p_hwsync->payload_offset = 0;
     p_hwsync->aout = out;
+    p_hwsync->eos = false;
     if (p_hwsync->tsync_fd < 0) {
         fd = open(TSYNC_PCRSCR, O_RDONLY);
         p_hwsync->tsync_fd = fd;
@@ -264,6 +265,10 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
                 p_hwsync->body_align_cnt = 0; //  alisan zz
                 p_hwsync->hw_sync_header_cnt = 0; //8.1
                 pts = hwsync_header_get_pts(&p_hwsync->hw_sync_header[0]);
+                if (pts == HWSYNC_PTS_EOS) {
+                    p_hwsync->eos = true;
+                    continue;
+                }
                 pts = pts * 90 / 1000000;
                 time_diff = get_pts_gap(pts, p_hwsync->last_apts_from_header) / 90;
                 if (adev->debug_flag > 8) {
@@ -460,6 +465,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
         aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);
     } else  if (p_hwsync->first_apts_flag) {
+        struct aml_audio_device *adev = p_hwsync->aout->dev;
         uint32_t apts_save = apts;
         if (apts >= latency_pts) {
             apts -= latency_pts;
@@ -467,6 +473,11 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             ALOGE("wrong PTS =0x%x delay pts=0x%x",apts, latency_pts);
             return 0;
         }
+
+        if (p_hwsync->eos && (eDolbyMS12Lib == adev->dolby_lib_type) && continous_mode(adev)) {
+            return 0;
+        }
+
         ret = aml_audio_hwsync_get_pcr(p_hwsync, &pcr);
         if (ret == 0) {
             gap = get_pts_gap(pcr, apts);

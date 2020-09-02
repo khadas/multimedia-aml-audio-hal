@@ -20,6 +20,7 @@
 #define _AUDIO_HWSYNC_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #define TSYNC_FIRSTAPTS "/sys/class/tsync/firstapts"
 #define TSYNC_FIRSTVPTS "/sys/class/tsync/firstvpts"
@@ -50,6 +51,8 @@
 #define HWSYNC_APTS_NUM     512
 /*6 ch 16 bit  he-aac  size  6*2*2048 */
 #define  HWSYNC_MAX_BODY_SIZE  (6*2*2048)
+
+#define HWSYNC_PTS_EOS UINT64_MAX
 
 enum hwsync_status {
     CONTINUATION,  // good sync condition
@@ -89,6 +92,7 @@ typedef struct  audio_hwsync {
     struct aml_stream_out  *aout;
     int tsync_fd;
     int version_num;
+    bool eos;
 } audio_hwsync_t;
 static inline bool hwsync_header_valid(uint8_t *header)
 {
