@@ -10911,6 +10911,12 @@ void *audio_patch_input_threadloop(void *data)
                     }
                 }
 #endif
+
+                /* only accept MAT input when in MS12 TV tuning mode */
+                if (aml_dev->ms12_tv_tuning && (cur_aformat != AUDIO_FORMAT_MAT)) {
+                    continue;
+                }
+
                 if (get_buffer_write_space(ringbuffer) >= bytes_avail) {
                     retry = 0;
                     ret = ring_buffer_write(ringbuffer,
@@ -13000,6 +13006,9 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 #ifdef PDM_MIC_CHANNELS
     init_mic_desc(adev);
 #endif
+
+    adev->ms12_tv_tuning = getprop_bool("media.audiohal.ms12_tv_tuning");
+
     // adev->debug_flag is set in hw_write()
     // however, sometimes function didn't goto hw_write() before encounting error.
     // set debug_flag here to see more debug log when debugging.

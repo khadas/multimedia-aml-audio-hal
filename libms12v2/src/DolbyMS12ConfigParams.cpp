@@ -160,6 +160,7 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     , mOTTSoundInputEnable(false)
     , mIsLegecyDDPOut(false)
     , mDolbyInputCMDMask(0)
+    , mTvTuning(false)
 {
     ALOGD("+%s() mAudioOutFlags %d mAudioStreamOutFormat %#x mHasAssociateInput %d mHasSystemInput %d AppInput %d\n",
           __FUNCTION__, mAudioOutFlags, mAudioStreamOutFormat, mHasAssociateInput, mHasSystemInput, mHasAppInput);
@@ -257,6 +258,26 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
 {
     ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
     mDolbyInputCMDMask = 0;
+
+    if (mTvTuning) {
+        sprintf(ConfigParams[*row_index], "%s", "-im");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MAT_FILE_NAME);
+        (*row_index)++;
+        mMainFlags = true;
+        mAppSoundFlags = false;
+        mSystemSoundFlags = false;
+        setInputCMDMask("-immat");
+
+        sprintf(ConfigParams[*row_index], "-tv_tuning");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "-o_dap_speaker");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_DAP_FILE_NAME);
+        (*row_index)++;
+
+        return 0;
+    }
 
     if (mActivateOTTSignal == false) {
         if (mHasAssociateInput == false) {
@@ -1534,14 +1555,16 @@ char **DolbyMS12ConfigParams::GetDolbyMS12ConfigParams(int *argc)
         char params_bin[] = "ms12_exec";
         sprintf(mConfigParams[mParamNum++], "%s", params_bin);
         SetInputOutputFileName(mConfigParams, &mParamNum);
-        SetFunctionalSwitches(mConfigParams, &mParamNum);
-        SetAc4Switches(mConfigParams, &mParamNum);
-        SetPCMSwitches(mConfigParams, &mParamNum);
-        SetHEAACSwitches(mConfigParams, &mParamNum);
-        SetOTTProcessingGraphSwitches(mConfigParams, &mParamNum);
-        if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_DAP) {
-            SetDAPDeviceSwitches(mConfigParams, &mParamNum, 0);
-            SetDAPContentSwitches(mConfigParams, &mParamNum);
+        if (!mTvTuning) {
+            SetFunctionalSwitches(mConfigParams, &mParamNum);
+            SetAc4Switches(mConfigParams, &mParamNum);
+            SetPCMSwitches(mConfigParams, &mParamNum);
+            SetHEAACSwitches(mConfigParams, &mParamNum);
+            SetOTTProcessingGraphSwitches(mConfigParams, &mParamNum);
+            if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_DAP) {
+                SetDAPDeviceSwitches(mConfigParams, &mParamNum, 0);
+                SetDAPContentSwitches(mConfigParams, &mParamNum);
+            }
         }
         *argc = mParamNum;
         ALOGV("%s() line %d argc %d\n", __FUNCTION__, __LINE__, *argc);

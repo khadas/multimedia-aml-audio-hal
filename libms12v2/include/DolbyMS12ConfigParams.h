@@ -563,6 +563,10 @@ public:
             return false;
     }
 
+    virtual void setTvTuning(bool enable)
+    {
+        mTvTuning = enable;
+    }
 
     //*End||Add the APT to set the params*//
 
@@ -737,6 +741,7 @@ private:
     };//System sound mixer gain values for System Sounds input
     bool mIsLegecyDDPOut;
     int mDolbyInputCMDMask;
+    bool mTvTuning;
 }; //class DolbyMS12ConfigParams
 
 

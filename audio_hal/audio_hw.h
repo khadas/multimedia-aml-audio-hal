@@ -595,6 +595,9 @@ struct aml_audio_device {
     /* master volume */
     float master_volume;
     bool master_mute;
+
+    /* TV tuning switch */
+    bool ms12_tv_tuning;
 };
 
 struct meta_data {

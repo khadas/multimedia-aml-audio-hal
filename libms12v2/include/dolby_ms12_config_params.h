@@ -92,6 +92,13 @@ void dolby_ms12_config_params_set_channel_mask_system(audio_channel_mask_t mask)
  */
 void dolby_ms12_config_params_set_channel_mask_ui(audio_channel_mask_t mask);
 
+/**
+ * @brief Set TV tuning mode
+ *
+ * @enable TV tuning mode enable
+ */
+void dolby_ms12_config_params_set_tv_tuning(bool enable);
+
 // /*config params begin*/
 // /**/
 // int dolby_ms12_config_params_set_input_output_file_name(char **ConfigParams, int *row_index);

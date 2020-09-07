@@ -266,6 +266,8 @@ int get_the_dolby_ms12_prepared(
     pthread_mutex_lock(&ms12->lock);
     ALOGI("++%s(), locked", __FUNCTION__);
     set_audio_system_format(AUDIO_FORMAT_PCM_16_BIT);
+    /* set MS12 TV tuning mode */
+    dolby_ms12_config_params_set_tv_tuning(adev->ms12_tv_tuning);
     /*
     when HDMITX send pause frame,we treated as INVALID format.
     for MS12,we treat it as LPCM and mute the frame

@@ -169,6 +169,15 @@ extern "C" void dolby_ms12_config_params_set_channel_mask_ui(int mask)
     }
 }
 
+extern "C" void dolby_ms12_config_params_set_tv_tuning(bool enable)
+{
+    ALOGV("%s() %d\n", __FUNCTION__, enable);
+    android::DolbyMS12ConfigParams *config_param = getInstance();
+    if (config_param) {
+        config_param->setTvTuning(enable);
+    }
+}
+
 /*config params begin*/
 /**/
 extern "C" int dolby_ms12_config_params_set_input_output_file_name(char **ConfigParams, int *row_index)
