@@ -5054,7 +5054,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out_standby_new(&stream->common);
     }
 
-    if ((eDolbyMS12Lib == adev->dolby_lib_type) && (is_dolby_format || is_direct_pcm)) {
+    if ((eDolbyMS12Lib == adev->dolby_lib_type) && (is_dolby_format || is_direct_pcm) && !adev->continuous_audio_mode) {
         if (out->volume_l != 1.0) {
             /*
              *The Dolby format(dd/ddp/ac4/true-hd/mat) and direct&UI-PCM(stereo or multi PCM)

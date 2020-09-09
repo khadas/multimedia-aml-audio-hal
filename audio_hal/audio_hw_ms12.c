@@ -421,6 +421,13 @@ int get_the_dolby_ms12_prepared(
     }
     ms12->sys_audio_base_pos = adev->sys_audio_frame_written;
     ALOGI("set ms12 sys pos =%lld", ms12->sys_audio_base_pos);
+
+    /* set up initial volume if it's compressed format or direct PCM */
+    if (is_dolby_ms12_support_compression_format(input_format) ||
+        is_direct_stream_and_pcm_format(aml_out)) {
+        dolby_ms12_set_main_volume(aml_out->volume_l);
+    }
+
     aml_ac3_parser_open(&ms12->ac3_parser_handle);
     aml_ms12_bypass_open(&ms12->ms12_bypass_handle);
     ring_buffer_init(&ms12->spdif_ring_buffer, ms12->dolby_ms12_out_max_size);
