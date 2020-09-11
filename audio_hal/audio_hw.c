@@ -9954,6 +9954,13 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
                 if (adev->ms12.hdmi_format != adev->hdmi_format) {
                     ALOGI("%s(), swithing digital format from %d --> %d", __func__, adev->ms12.hdmi_format, adev->hdmi_format);
                     need_reconfig_output = true;
+                    // LINUX change
+                    // on Linux, MS12 is configured to have a single digital output only to avoid
+                    // high CPU loading. When hdmi_format changes, adev->sink_format and adev->
+                    // optical format may change too which requires a relaunch of MS12 pipeline
+                    // to configure MS12's output format.
+                    need_reset_decoder = true;
+
                     adev->ms12.hdmi_format = adev->hdmi_format;
                 }
                 if (need_reconfig_output) {
@@ -11678,6 +11685,16 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                     outport = OUTPORT_SPEAKER;
                     ALOGI("%s() mix->device patch: speaker and HDMI_ARC co-exist case, output=SPEAKER", __func__);
                 }
+            }
+        }
+
+        // LINUX change
+        // The application layer may only set to use AUDIO_DEVICE_OUT_SPEAKER,
+        // force to use OUTPORT_HDMI_ARC when ARC/eARC is connected to match the log in output_config()
+        if ((num_sinks == 1) && (sink_config[0].ext.device.type == AUDIO_DEVICE_OUT_SPEAKER)) {
+            if (aml_dev->bHDMIARCon) {
+                outport = OUTPORT_HDMI_ARC;
+                ALOGI("%s() mix->device patch: force patch sink to OUTPORT_HDMI_ARC for AUDIO_DEVICE_OUT_SPEAKER", __func__);
             }
         }
 
