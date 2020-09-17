@@ -642,17 +642,20 @@ int dtv_patch_cmd_is_empty(void)
     return 0;
 }
 
-static int dtv_patch_buffer_info(void *args, BUFFER_INFO_E info_flag)
+static int dtv_patch_status_info(void *args, INFO_TYPE_E info_flag)
 {
-    int left = 0;
+    int ret = 0;
     struct aml_audio_patch *patch = (struct aml_audio_patch *)args;
+    struct audio_hw_device *dev = patch->dev;
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *)dev;
     ring_buffer_t *ringbuffer = &(patch->aml_ringbuffer);
-    if (info_flag == BUFFER_SPACE) {
-        left = get_buffer_write_space(ringbuffer);
-    } else if (info_flag == BUFFER_LEVEL) {
-        left = get_buffer_read_space(ringbuffer);
-    }
-    return left;
+    if (info_flag == BUFFER_SPACE)
+        ret = get_buffer_write_space(ringbuffer);
+    else if (info_flag == BUFFER_LEVEL)
+        ret = get_buffer_read_space(ringbuffer);
+    else if (info_flag == AD_MIXING_LEVLE)
+        ret = aml_dev->mixing_level;
+    return ret;
 }
 
 static int dtv_patch_audio_info(void *args, unsigned char ori_channum, unsigned char lfepresent)
@@ -2169,7 +2172,7 @@ void dtv_avsync_process(struct aml_audio_patch* patch, struct aml_stream_out* st
     dtv_audio_gap_monitor(patch);
 }
 
-static int dtv_patch_pcm_wirte(unsigned char *pcm_data, int size,
+static int dtv_patch_pcm_write(unsigned char *pcm_data, int size,
                                int symbolrate, int channel, void *args)
 {
     struct aml_audio_patch *patch = (struct aml_audio_patch *)args;
@@ -3065,8 +3068,8 @@ static void *audio_dtv_patch_process_threadloop(void *data)
         switch (patch->dtv_decoder_state) {
         case AUDIO_DTV_PATCH_DECODER_STATE_INIT: {
             ALOGI("++%s live now  open the audio decoder now !\n", __FUNCTION__);
-            dtv_patch_input_open(&adec_handle, dtv_patch_pcm_wirte,
-                                 dtv_patch_buffer_info,
+            dtv_patch_input_open(&adec_handle, dtv_patch_pcm_write,
+                                 dtv_patch_status_info,
                                  dtv_patch_audio_info, patch);
             patch->dtv_decoder_state = AUDIO_DTV_PATCH_DECODER_STATE_START;
         }

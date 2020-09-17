@@ -20,13 +20,14 @@ target_include_directories(spdifenc PRIVATE
 
 target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations)
 
-option(USE_DTV "Compile with DTV option" OFF)
+option(USE_DTV "Compile with DTV option" ON)
 
 if(USE_DTV)
     list(APPEND DTV_FILES audio_hal/audio_dtv_ad.c)
     list(APPEND DTV_FILES audio_hal/audio_hw_dtv.c)
     list(APPEND DTV_INC $ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/include/aml_dvb/am_adp)
     list(APPEND DTV_LIBS -L$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/lib/aml_libs_nf -lamadec -lam_adp )
+    add_definitions(-DUSE_DTV)
 endif()
 
 #############################################
