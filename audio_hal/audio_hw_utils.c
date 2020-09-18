@@ -1070,7 +1070,7 @@ int cpy_16bit_data_with_gain(int16_t *dst, int16_t *src, int size_in_bytes, floa
     return 0;
 }
 
-static inline uint64_t timespec_ns(struct timespec tspec)
+static uint64_t timespec_ns(struct timespec tspec)
 {
     return ((uint64_t)tspec.tv_sec * 1000000000 + tspec.tv_nsec);
 }
@@ -1292,4 +1292,93 @@ int aml_audio_get_video_latency(void)
     latency_ms = get_sysfs_int("/sys/class/video/video_display_latency");
     latency_ms = latency_ms/1000000;
     return latency_ms;
+}
+
+struct pcm_config update_earc_out_config(struct pcm_config *config)
+{
+    struct pcm_config earc_config;
+    memset(&earc_config, 0, sizeof(struct pcm_config));
+    earc_config.channels = 2;
+    earc_config.rate = config->rate;
+    earc_config.period_size = config->period_size;
+    earc_config.period_count = config->period_count;
+    earc_config.start_threshold = config->start_threshold;
+    earc_config.format = config->format;
+    return earc_config;
+}
+
+int continous_mode(struct aml_audio_device *adev)
+{
+    return adev->continuous_audio_mode;
+}
+
+bool direct_continous(struct audio_stream_out *stream)
+{
+    struct aml_stream_out *out = (struct aml_stream_out *)stream;
+    struct aml_audio_device *adev = out->dev;
+    if ((out->flags & AUDIO_OUTPUT_FLAG_DIRECT) && adev->continuous_audio_mode) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool primary_continous(struct audio_stream_out *stream)
+{
+    struct aml_stream_out *out = (struct aml_stream_out *)stream;
+    struct aml_audio_device *adev = out->dev;
+    if ((out->flags & AUDIO_OUTPUT_FLAG_PRIMARY) && adev->continuous_audio_mode) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/* called when adev locked */
+int dolby_stream_active(struct aml_audio_device *adev)
+{
+    int i = 0;
+    int is_dolby = 0;
+    struct aml_stream_out *out = NULL;
+    for (i = 0 ; i < STREAM_USECASE_MAX; i++) {
+        out = adev->active_outputs[i];
+        if (out && (out->hal_internal_format == AUDIO_FORMAT_AC3
+            || out->hal_internal_format == AUDIO_FORMAT_E_AC3
+            || out->hal_internal_format == AUDIO_FORMAT_DOLBY_TRUEHD
+            || out->hal_internal_format == AUDIO_FORMAT_AC4
+            || out->hal_internal_format == AUDIO_FORMAT_MAT)) {
+            is_dolby = 1;
+            break;
+        }
+    }
+    return is_dolby;
+}
+
+/* called when adev locked */
+int hwsync_lpcm_active(struct aml_audio_device *adev)
+{
+    int i = 0;
+    int is_hwsync_lpcm = 0;
+    struct aml_stream_out *out = NULL;
+    for (i = 0 ; i < STREAM_USECASE_MAX; i++) {
+        out = adev->active_outputs[i];
+        if (out && audio_is_linear_pcm(out->hal_internal_format) && (out->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC)) {
+            is_hwsync_lpcm = 1;
+            break;
+        }
+    }
+    return is_hwsync_lpcm;
+}
+
+struct aml_stream_out *direct_active(struct aml_audio_device *adev)
+{
+    int i = 0;
+    struct aml_stream_out *out = NULL;
+    for (i = 0 ; i < STREAM_USECASE_MAX; i++) {
+        out = adev->active_outputs[i];
+        if (out && (out->flags & AUDIO_OUTPUT_FLAG_DIRECT)) {
+            return out;
+        }
+    }
+    return NULL;
 }

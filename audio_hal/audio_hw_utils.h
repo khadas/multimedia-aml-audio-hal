@@ -87,4 +87,12 @@ void aml_audio_set_cpu23_affinity();
 
 int aml_audio_get_ms12_passthrough_latency(struct audio_stream_out *stream);
 int aml_audio_get_atmos_hdmi_latency_offset(audio_format_t fmt, int bypass);
+
+struct pcm_config update_earc_out_config(struct pcm_config *config);
+int continous_mode(struct aml_audio_device *adev);
+bool direct_continous(struct audio_stream_out *stream);
+bool primary_continous(struct audio_stream_out *stream);
+int dolby_stream_active(struct aml_audio_device *adev);
+int hwsync_lpcm_active(struct aml_audio_device *adev);
+struct aml_stream_out *direct_active(struct aml_audio_device *adev);
 #endif

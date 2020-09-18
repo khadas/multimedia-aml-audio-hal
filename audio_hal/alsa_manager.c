@@ -24,6 +24,7 @@
 #include <tinyalsa/asoundlib.h>
 
 #include "audio_hw.h"
+#include "audio_hw_utils.h"
 #include "alsa_manager.h"
 #include "audio_hw_utils.h"
 #include "alsa_device_parser.h"
