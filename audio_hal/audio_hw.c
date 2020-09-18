@@ -74,7 +74,9 @@
 #include "alsa_config_parameters.h"
 #include "spdif_encoder_api.h"
 #include "aml_avsync_tuning.h"
+#ifdef AML_EQ_DRC
 #include "aml_ng.h"
+#endif
 #include "aml_audio_timer.h"
 #ifdef USE_DTV
 // for dtv playback

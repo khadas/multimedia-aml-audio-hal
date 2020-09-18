@@ -29,6 +29,8 @@ if(USE_DTV)
     list(APPEND DTV_LIBS -L$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/lib/aml_libs_nf -lamadec -lam_adp )
 endif()
 
+option(USE_EQ_DRC "Compile with EQ/DRC" OFF)
+
 #############################################
 # libaudio_hal
 #############################################
@@ -71,10 +73,6 @@ add_library(audio_hal SHARED
 	audio_hal/hw_avsync_callbacks.c
 	audio_hal/spdif_encoder_api.c
 	audio_hal/sub_mixing_factory.c
-	amlogic_AQ_tools/audio_eq_drc_compensation.c
-	amlogic_AQ_tools/audio_eq_drc_parser.c
-	amlogic_AQ_tools/ini/dictionary.c
-	amlogic_AQ_tools/ini/iniparser.c
 	utils/ac3_parser_utils.c
 	utils/alsa_device_parser.c
 	utils/aml_alsa_mixer.c
@@ -105,20 +103,33 @@ set_target_properties(audio_hal PROPERTIES
 	SOVERSION 1)
 
 target_include_directories(audio_hal PRIVATE
-    ${DTV_INC}
 	./include
 	./include/utils
-	./include/amlogic_AQ_tools
-	./amlogic_AQ_tools
-	./amlogic_AQ_tools/ini
 	./libms12v2/include)
 
-target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DAML_EQ_DRC -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations)
+target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations)
 
 target_link_libraries(audio_hal
 	audioprocessing spdifenc ms12v2 ${PREBUILD_STATIC_LIBS}
-#	audioprocessing spdifenc ms12v2
-    ${DTV_LIBS} -lcutils -lamaudioutils -ltinyalsa -lamavutils -llog -lexpat -lpthread -ldl -lstdc++ -Wl,-z,defs)
+	-lcutils -lamaudioutils -ltinyalsa -llog -lexpat -lpthread -ldl -lstdc++ -Wl,-z,defs)
+
+if(USE_EQ_DRC)
+	target_include_directories(audio_hal PRIVATE
+		./include/amlogic_AQ_tools
+		./amlogic_AQ_tools
+		./amlogic_AQ_tools/ini)
+	target_compile_options(audio_hal PRIVATE -DAML_EQ_DRC)
+	add_library(audio_hal SHARED
+		amlogic_AQ_tools/audio_eq_drc_compensation.c
+		amlogic_AQ_tools/audio_eq_drc_parser.c
+		amlogic_AQ_tools/ini/dictionary.c
+		amlogic_AQ_tools/ini/iniparser.c)
+endif()
+
+if(USE_DTV)
+	target_include_directories(audio_hal PRIVATE ${DTV_INC})
+	target_link_libraries(audio_hal ${DTV_LIBS} -lamavutils)
+endif()
 
 install(TARGETS audio_hal
 	LIBRARY DESTINATION "lib")

@@ -36,8 +36,10 @@
 #include <hardware/hardware.h>
 #include <system/audio.h>
 #include <audio_utils/channels.h>
+#ifdef AML_EQ_DRC
 #include "aml_DRC_param_gen.h"
 #include "aml_EQ_param_gen.h"
+#endif
 
 #if ANDROID_PLATFORM_SDK_VERSION >= 25 //8.0
 #include <system/audio-base.h>
