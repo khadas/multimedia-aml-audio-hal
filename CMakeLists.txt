@@ -20,17 +20,25 @@ target_include_directories(spdifenc PRIVATE
 
 target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations)
 
-option(USE_DTV "Compile with DTV option" ON)
+option(USE_DTV "Compile with DTV option" OFF)
 
 if(USE_DTV)
     list(APPEND DTV_FILES audio_hal/audio_dtv_ad.c)
     list(APPEND DTV_FILES audio_hal/audio_hw_dtv.c)
     list(APPEND DTV_INC $ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/include/aml_dvb/am_adp)
-    list(APPEND DTV_LIBS -L$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/lib/aml_libs_nf -lamadec -lam_adp )
+    list(APPEND DTV_LIBS -L$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/lib/aml_libs_nf -lamadec_hal -lam_adp )
     add_definitions(-DUSE_DTV)
 endif()
 
 option(USE_EQ_DRC "Compile with EQ/DRC" OFF)
+
+if(USE_EQ_DRC)
+	list(APPEND EQ_DRC_FILES
+		amlogic_AQ_tools/audio_eq_drc_compensation.c
+		amlogic_AQ_tools/audio_eq_drc_parser.c
+		amlogic_AQ_tools/ini/dictionary.c
+		amlogic_AQ_tools/ini/iniparser.c)
+endif()
 
 #############################################
 # libaudio_hal
@@ -90,6 +98,7 @@ add_library(audio_hal SHARED
 	utils/aml_configs/aml_conf_parser.c
         utils/earc_utils.c
     ${DTV_FILES}
+    ${EQ_DRC_FILES}
 )
 
 add_definitions(-DNDEBUG -DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
@@ -120,11 +129,6 @@ if(USE_EQ_DRC)
 		./amlogic_AQ_tools
 		./amlogic_AQ_tools/ini)
 	target_compile_options(audio_hal PRIVATE -DAML_EQ_DRC)
-	add_library(audio_hal SHARED
-		amlogic_AQ_tools/audio_eq_drc_compensation.c
-		amlogic_AQ_tools/audio_eq_drc_parser.c
-		amlogic_AQ_tools/ini/dictionary.c
-		amlogic_AQ_tools/ini/iniparser.c)
 endif()
 
 if(USE_DTV)

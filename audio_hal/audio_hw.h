@@ -591,6 +591,7 @@ struct aml_audio_device {
     uint32_t       spdif_out_rate;
     int   dap_bypass_enable;
     float dap_bypassgain;
+    int ad_start_enable;
 
     /* master volume */
     float master_volume;
@@ -847,5 +848,6 @@ int start_ease_out(struct aml_audio_device *adev);
 enum hwsync_status check_hwsync_status (uint apts_gap);
 void config_output(struct audio_stream_out *stream,bool reset_decoder);
 bool is_bypass_dolbyms12(struct audio_stream_out *stream);
+int out_standby_direct (struct audio_stream *stream);
 
 #endif
