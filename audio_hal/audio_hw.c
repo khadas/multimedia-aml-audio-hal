@@ -5362,7 +5362,7 @@ static int aml_audio_output_routing(struct audio_hw_device *dev,
         case OUTPORT_HDMI_ARC:
             audio_route_apply_path(aml_dev->ar, "hdmi_arc_off");
             aml_dev->bHDMIARCon = 0;
-            aml_dev->arc_hdmi_updated = 0;
+            aml_dev->arc_hdmi_updated = 1;
             break;
         case OUTPORT_HEADPHONE:
             audio_route_apply_path(aml_dev->ar, "headphone_off");
@@ -5514,7 +5514,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         if (val & AUDIO_DEVICE_OUT_HDMI_ARC) {
             adev->bHDMIConnected = 0;
             adev->bHDMIARCon = 0;
-            adev->arc_hdmi_updated = 0;
+            adev->arc_hdmi_updated = 1;
             ALOGI("bHDMIConnected: %d\n", val);
         }/* else if (val & AUDIO_DEVICE_OUT_ALL_A2DP) {
             adev->a2dp_updated = 1;
@@ -9161,7 +9161,10 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         in order to get a low cpu loading, we enabled less ms12 modules in each
         hdmi in user case, we need reset the pipeline to get proper one.
         */
-        need_reset_decoder =digital_input_src ? true: false;
+        //LINUX change, on Linux ARC is single output, always reset MS12 when
+        //ARC connection changes
+        //need_reset_decoder =digital_input_src ? true: false;
+        need_reset_decoder = true;
         adev->arc_hdmi_updated = 0;
     }
 
@@ -9937,6 +9940,9 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
                     adev->arc_hdmi_updated = 0;
                     adev->a2dp_updated = 0;
                     need_reconfig_output = true;
+                    // LINUX change
+                    // when arc connection status changed, always reset MS12
+                    need_reset_decoder = true;
                     ALOGI("%s() HDMI ARC EndPoint or a2dp changing status, need reconfig Dolby MS12\n", __func__);
                 }
 

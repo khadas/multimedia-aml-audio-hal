@@ -548,7 +548,11 @@ write:
         }
     }
 
-    if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm && (adev->optical_format == out_format)) {
+    //if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm && (adev->optical_format == out_format)) {
+    if (SUPPORT_EARC_OUT_HW && (adev->active_outport == OUTPORT_HDMI_ARC) && aml_out->earc_pcm && (adev->optical_format == out_format)) {
+        if (!adev->bHDMIConnected) {
+            memset(buffer, 0, bytes);
+        }
         ret = pcm_write(aml_out->earc_pcm, buffer, bytes);
         if (ret < 0) {
             ALOGE("%s write failed,aml_out->earc_pcm handle:%p, ret:%#x, err info:%s",

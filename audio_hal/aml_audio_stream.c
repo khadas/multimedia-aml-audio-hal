@@ -225,8 +225,11 @@ void get_sink_format (struct audio_stream_out *stream)
 #if 1
     /* use single output for HDMI_ARC */
     if ((adev->active_outport == OUTPORT_HDMI_ARC) &&
-        adev->bHDMIConnected)
+        adev->bHDMIConnected) {
+        ALOGI("%s OUTPORT_HDMI_ARC select single output 0x%x",
+              __FUNCTION__, adev->optical_format);
         adev->sink_format = adev->optical_format;
+    }
 #endif
 
     ALOGI("%s sink_format %#x optical_format %#x,soure fmt %#x stream device %d\n",
