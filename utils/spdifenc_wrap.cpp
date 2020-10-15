@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <sound/asound.h>
 #include <cutils/log.h>
 #include <system/audio.h>
