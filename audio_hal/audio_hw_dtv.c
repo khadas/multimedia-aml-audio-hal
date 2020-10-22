@@ -3441,6 +3441,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     patch->output_thread_exit = 0;
     patch->input_thread_exit = 0;
     aml_dev->audio_patch = patch;
+    aml_dev->continuous_audio_mode = 0;
     pthread_mutex_init(&patch->mutex, NULL);
     pthread_cond_init(&patch->cond, NULL);
     pthread_mutex_init(&patch->dtv_input_mutex, NULL);
@@ -3528,6 +3529,7 @@ int release_dtv_patch_l(struct aml_audio_device *aml_dev)
     ring_buffer_release(&(patch->aml_ringbuffer));
     free(patch);
     aml_dev->audio_patch = NULL;
+    aml_dev->continuous_audio_mode = aml_dev->continuous_audio_mode_default;
     dtv_check_audio_reset(aml_dev);
     ALOGI("--%s", __FUNCTION__);
     //pthread_mutex_unlock(&aml_dev->patch_lock);
