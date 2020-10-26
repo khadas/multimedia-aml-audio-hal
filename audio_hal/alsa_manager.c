@@ -362,6 +362,7 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
     int need_drop_inject = 0;
     int64_t pretime = 0;
     unsigned char*audio_data = (unsigned char*)buffer;
+    bool raw_for_arc = false;
 
     switch (out_format) {
     case AUDIO_FORMAT_E_AC3:
@@ -548,27 +549,65 @@ write:
         }
     }
 
-    //if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm && (adev->optical_format == out_format)) {
-    if (SUPPORT_EARC_OUT_HW && (adev->active_outport == OUTPORT_HDMI_ARC) && aml_out->earc_pcm && (adev->optical_format == out_format)) {
+    /*
+     * when MS12 is enabled, all digital output for non-arc output
+     * goes to separate aml_audio_spdif_output API in ms12 output routine.
+     * only ARC output for non-pcm still go through here.
+     * 1. Data arrive here could be (8 channel PCM 32 bits), or
+     * 1+2. non-PCM output for ARC only with 8ch PCM, or
+     * 3. digital output when MS12 does not exist
+     * For #1:
+     * if optical_format is PCM also, then write PCM to both I2S and ARC device
+     *    ARC PCM output will be from last 2 channel PCM from input 8 channel
+     * For #1+#2:
+     * if optical_format is non-PCM, then only write PCM to I2S
+     *    and write non-PCM to ARC device
+     * For #3:
+     * write non-pcm output to original digital output and ARC device
+     */
+    if (SUPPORT_EARC_OUT_HW && aml_out->earc_pcm && (adev->optical_format == out_format)) {
         if (!adev->bHDMIConnected) {
             memset(buffer, 0, bytes);
         }
-        ret = pcm_write(aml_out->earc_pcm, buffer, bytes);
-        if (ret < 0) {
-            ALOGE("%s write failed,aml_out->earc_pcm handle:%p, ret:%#x, err info:%s",
-                    __func__, aml_out->earc_pcm, ret, strerror(errno));
+
+        raw_for_arc = !(audio_is_linear_pcm(out_format));
+
+        if ((config->channels == 2) || raw_for_arc) {
+            ret = pcm_write(aml_out->earc_pcm, buffer, bytes);
+            if (ret < 0) {
+                ALOGE("%s write failed,aml_out->earc_pcm handle:%p, ret:%#x, err info:%s",
+                      __func__, aml_out->earc_pcm, ret, strerror(errno));
+            }
+        } else if (config->channels == 8) {
+            // extract 2ch from 8ch 32 bit packed PCM output to ARC/eARC output
+            int *ps32SpdifTempBuffer = (int *)adev->spdif_output_buf;
+            int *src = (int *)buffer;
+            int frame_count = bytes / 8 / sizeof(int);
+            int i;
+            for (i = 0; i < frame_count; i++) {
+                ps32SpdifTempBuffer[2 *i]     = src[8 * i + 6];
+                ps32SpdifTempBuffer[2 *i + 1] = src[8 * i + 7];
+            }
+            ret = pcm_write(aml_out->earc_pcm, ps32SpdifTempBuffer, bytes / 4);
+            if (ret < 0) {
+                ALOGE("%s write failed,aml_out->earc_pcm handle:%p, ret:%#x, err info:%s",
+                     __func__, aml_out->earc_pcm, ret, strerror(errno));
+            }
         }
-    } else {
-        if (adev->raw_to_pcm_flag) {
-            pcm_stop(aml_out->pcm);
-            adev->raw_to_pcm_flag = false;
-            ALOGI("raw to lpcm switch %s\n",__func__);
-        }
+    }
+
+    if (adev->raw_to_pcm_flag) {
+        pcm_stop(aml_out->pcm);
+        adev->raw_to_pcm_flag = false;
+        ALOGI("raw to lpcm switch %s\n",__func__);
+    }
+
+    if (!raw_for_arc) {
         ret = pcm_write(aml_out->pcm, buffer, bytes);
         if (ret < 0) {
-        ALOGE("%s write failed,pcm handle %p %s, stream %p, %s",
-            __func__, aml_out->pcm, pcm_get_error(aml_out->pcm),
-            aml_out, usecase2Str(aml_out->usecase));
+            ALOGE("%s write failed,pcm handle %p %s, stream %p, %s",
+                __func__, aml_out->pcm, pcm_get_error(aml_out->pcm),
+                aml_out, usecase2Str(aml_out->usecase));
         }
     }
 

@@ -384,6 +384,7 @@ struct mic_in_desc {
 
 #define MAX_STREAM_NUM   5
 #define HDMI_ARC_MAX_FORMAT  20
+
 struct aml_audio_device {
     struct audio_hw_device hw_device;
     /* see note below on mutex acquisition order */
@@ -590,6 +591,7 @@ struct aml_audio_device {
     audio_format_t spdif_out_format;
     uint32_t       spdif_out_rate;
     int   dap_bypass_enable;
+    int   dap_output_channels;
     float dap_bypassgain;
     int ad_start_enable;
 

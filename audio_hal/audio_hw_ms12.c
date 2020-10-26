@@ -152,7 +152,7 @@ bool is_ms12_out_ddp_5_1_suitable(bool is_ddp_atmos)
 /*
  *@brief get ms12 output configure mask
  */
-static int get_ms12_output_mask(audio_format_t sink_format,audio_format_t  optical_format,bool is_arc)
+static int get_ms12_output_mask(audio_format_t sink_format, audio_format_t optical_format)
 {
     int  output_config;
     if (sink_format == AUDIO_FORMAT_E_AC3)
@@ -167,15 +167,17 @@ static int get_ms12_output_mask(audio_format_t sink_format,audio_format_t  optic
         output_config = MS12_OUTPUT_MASK_DDP | MS12_OUTPUT_MASK_SPEAKER;
     else if (sink_format == AUDIO_FORMAT_PCM_16_BIT && optical_format == AUDIO_FORMAT_MAT)
         output_config = MS12_OUTPUT_MASK_MAT | MS12_OUTPUT_MASK_SPEAKER;
-    else if (is_arc)
-        output_config = MS12_OUTPUT_MASK_STEREO;
     else
         output_config = MS12_OUTPUT_MASK_SPEAKER | MS12_OUTPUT_MASK_STEREO;
+
+    /* enable downmix output for headphone always-on */
+    output_config |= MS12_OUTPUT_MASK_STEREO;
+
     return output_config;
 }
 
-
-static void update_ms12_atmos_info(struct dolby_ms12_desc *ms12) {
+static void update_ms12_atmos_info(struct dolby_ms12_desc *ms12)
+{
     int is_atmos = 0;
 
     is_atmos = (dolby_ms12_get_input_atmos_info() == 1);
@@ -386,7 +388,12 @@ int get_the_dolby_ms12_prepared(
 #else
     // LINUX Change
     // Currently we only enable max one PCM and one bitstream (DD/DDP/MAT) output to save on CPU loading
-    int output_config = get_ms12_output_mask(adev->sink_format, adev->optical_format,adev->active_outport == OUTPORT_HDMI_ARC);
+    int output_config = get_ms12_output_mask(adev->sink_format, adev->optical_format);
+
+    if (adev->active_outport == OUTPORT_HDMI_ARC) {
+        /* when ARC/eARC is running, disable DAP for CPU loading */
+        output_config &= ~MS12_OUTPUT_MASK_SPEAKER;
+    }
 #endif
 
     aml_ms12_config(ms12, input_format, input_channel_mask, input_sample_rate,output_config);
@@ -1237,7 +1244,12 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12
 
         }
         after_time = aml_audio_get_systime();
-    } else if (adev->active_outport == OUTPORT_HDMI_ARC || adev->dap_bypass_enable) {
+    } else if (!(ms12->output_config & MS12_OUTPUT_MASK_SPEAKER) || adev->dap_bypass_enable) {
+        /* MS12 does not have DAP output, it can happen when
+         * MS12 does not have DAP tuning file installed (dap_bypass_enable is true) or
+         * DAP is disabled (MS12_OUTPUT_MASK_SPEAKER is not set when configure MS12),
+         * such as to save CPU loading when ARC/eARC is ON.
+         */
         if (ms12_info->pcm_type == NORMAL_LPCM) {
             if (get_buffer_write_space (&ms12->spdif_ring_buffer) >= (int) size) {
                 ring_buffer_write(&ms12->spdif_ring_buffer, buffer, size, UNCOVER_WRITE);
@@ -1251,7 +1263,7 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12
         }
     } else if (!adev->dap_bypass_enable) {
         if (ms12_info->pcm_type == NORMAL_LPCM) {
-           /*will process spdif_ring_buf in audio_hal_data_prossing */
+            /* will process spdif_ring_buf in audio_hal_data_processing with DAP_LPCM */
             if (get_buffer_write_space (&ms12->spdif_ring_buffer) >= (int) size) {
                 ring_buffer_write(&ms12->spdif_ring_buffer, buffer, size, UNCOVER_WRITE);
             }

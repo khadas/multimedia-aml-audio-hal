@@ -219,3 +219,30 @@ int aml_ms12_update_runtime_params_lite(struct dolby_ms12_desc *ms12_desc)
     return ret;
 }
 #endif
+
+#define TUNING_FILE_MAGIC (0x2086)
+int aml_ms12_get_dap_output_channel_num(const char *tuning_file)
+{
+    int r = 0;
+    unsigned short header[6];
+    FILE *fp = fopen(tuning_file, "r");
+    if (fp) {
+        int len = fread(header, 1, sizeof(header), fp);
+        if (len != sizeof(header)) {
+            return r;
+        }
+
+        if (header[0] != TUNING_FILE_MAGIC) {
+            return r;
+        }
+
+        /* note: the offset need match tuning file parsing logic in MS12 SDK,
+         * which may change between MS12 versions
+         */ 
+        r = header[5];
+        ALOGI("DAP tuning file: %d output channels", r);
+    }
+
+    return r;
+}
+ 

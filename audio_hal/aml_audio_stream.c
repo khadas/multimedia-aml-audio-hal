@@ -222,7 +222,7 @@ void get_sink_format (struct audio_stream_out *stream)
     adev->sink_format = sink_audio_format;
     adev->optical_format = optical_audio_format;
 
-#if 1
+#if 0
     /* use single output for HDMI_ARC */
     if ((adev->active_outport == OUTPORT_HDMI_ARC) &&
         adev->bHDMIConnected) {

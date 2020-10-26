@@ -6487,6 +6487,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         return 0;
     }
 
+#if 0
     ret = str_parms_get_str(parms, "bypass_dap", value, sizeof(value));
     if (ret >= 0) {
         if (access(MS12_DAP_TUNING_PATH, F_OK) == 0) {
@@ -6495,6 +6496,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         ALOGD("dap_bypass_enable is %d and dap_bypassgain is %f",adev->dap_bypass_enable, adev->dap_bypassgain);
         goto exit;
     }
+#endif
 
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         ret = str_parms_get_str(parms, "ms12_runtime", value, sizeof(value));
@@ -7896,11 +7898,17 @@ ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream,
             }
 #endif
 
-            /* SPDIF keep the max volume 1.0 */
-            for (i = 0; i < out_frames; i++) {
-                ps32SpdifTempBuffer[2 * i]      = tmp_buffer[2 * i] << 16;
-                ps32SpdifTempBuffer[2 * i + 1]  = tmp_buffer[2 * i + 1] << 16;
+            /* apply volume for spk/hp, SPDIF/HDMI keep the max volume */
+            gain_speaker *= (adev->sink_gain[OUTPORT_SPEAKER]);
+            gain_speaker *= aml_out->volume_l;
+            apply_volume_16to32(gain_speaker * adev->dap_bypassgain, effect_tmp_buf, spk_tmp_buf, bytes);
+
+            /* SPDIF with source_gain*/
+            if (get_buffer_read_space(&adev->ms12.spdif_ring_buffer) >= (int)out_frames * 4) {
+                ring_buffer_read(&adev->ms12.spdif_ring_buffer, (unsigned char *)tmp_buffer, out_frames * 4);
+                apply_volume_16to32(1.0, tmp_buffer, ps32SpdifTempBuffer, out_frames * 4);
             }
+
 #ifdef ADD_AUDIO_DELAY_INTERFACE
             aml_audio_delay_process(AML_DELAY_OUTPORT_SPEAKER, effect_tmp_buf,
                                 bytes, AUDIO_FORMAT_PCM_16_BIT, nchannels);
@@ -7911,11 +7919,6 @@ ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream,
                 }
             }
 #endif
-
-            /* apply volume for spk/hp, SPDIF/HDMI keep the max volume */
-            gain_speaker *= (adev->sink_gain[OUTPORT_SPEAKER]);
-            gain_speaker *= aml_out->volume_l;
-            apply_volume_16to32(gain_speaker, effect_tmp_buf, spk_tmp_buf, bytes);
 
             /* nchannels 32 bit --> 8 channel 32 bit mapping */
             if (aml_out->tmp_buffer_8ch_size < out_frames * 32) {
@@ -7932,11 +7935,23 @@ ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream,
             }
 
             for (i = 0; i < out_frames; i++) {
+                /* tmp_buffer_8ch [0-(nchannels-1)] for spk
+                 * tmp_buffer_8ch [4-5] for spdif (when possible)
+                 * tmp_buffer_8ch [6-7] for headphone (when possible)
+                 */
                 for (j = 0; j < nchannels; j++) {
                     aml_out->tmp_buffer_8ch[8 * i + j] = (int32_t)spk_tmp_buf[nchannels * i + j];
                 }
-                for(j = nchannels; j < 8; j++) {
+                for(j = nchannels; j < 4; j++) {
                     aml_out->tmp_buffer_8ch[8 * i + j] = 0;
+                }
+                if (nchannels <= 4) {
+                    aml_out->tmp_buffer_8ch[8 * i + 4] = ps32SpdifTempBuffer[2 * i];
+                    aml_out->tmp_buffer_8ch[8 * i + 5] = ps32SpdifTempBuffer[2 * i + 1];
+                }
+                if (nchannels <= 6) {
+                    aml_out->tmp_buffer_8ch[8 * i + 6] = (int32_t)tmp_buffer[2 * i] << 16;
+                    aml_out->tmp_buffer_8ch[8 * i + 7] = (int32_t)tmp_buffer[2 * i + 1] << 16;
                 }
             }
 
@@ -8178,10 +8193,19 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                 }
             }
 
+#if 0
+            /* to support single PCM to multi-device such as ARC & headphone, comment
+             * out following ARC processing condition to always return 8ch and split
+             * to multi-device under alsa writing.
+             */
             if (SUPPORT_EARC_OUT_HW && adev->bHDMIConnected && aml_out->earc_pcm /* && adev->bHDMIARCon */ && audio_is_linear_pcm(adev->optical_format)) {
                 apply_volume_16to32(1.0, tmp_buffer, spk_tmp_buf, bytes);
                 *output_buffer = (void *) spk_tmp_buf;
                 *output_buffer_bytes = bytes * 2;
+#else
+            if (0) {
+
+#endif
             } else {
                  /* apply volume for spk/hp, SPDIF/HDMI keep the max volume */
                 if (adev->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
@@ -8200,8 +8224,8 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     if (eDolbyMS12Lib == adev->dolby_lib_type) {
                         /* SPDIF with source_gain*/
                         if (get_buffer_read_space(&adev->ms12.spdif_ring_buffer) >= (int)bytes) {
-                            ring_buffer_read(&adev->ms12.spdif_ring_buffer, (unsigned char*)adev->ms12.lpcm_temp_buffer, bytes);
-                            apply_volume_16to32(source_gain, (int16_t *)adev->ms12.lpcm_temp_buffer, ps32SpdifTempBuffer, bytes);
+                            ring_buffer_read(&adev->ms12.spdif_ring_buffer, (unsigned char*)tmp_buffer, bytes);
+                            apply_volume_16to32(source_gain, tmp_buffer, ps32SpdifTempBuffer, bytes);
                         }
                     }
                 }
@@ -8230,24 +8254,47 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                 }
 
                 if (alsa_device_is_auge()) {
-                    for (i = 0; i < out_frames; i++) {
-                        aml_out->tmp_buffer_8ch[8 * i + 0] = (int32_t)spk_tmp_buf[2 * i];
-                        aml_out->tmp_buffer_8ch[8 * i + 1] = (int32_t)spk_tmp_buf[2 * i + 1];
-                        aml_out->tmp_buffer_8ch[8 * i + 2] = (int32_t)spk_tmp_buf[2 * i];
-                        aml_out->tmp_buffer_8ch[8 * i + 3] = (int32_t)spk_tmp_buf[2 * i + 1];
-                        aml_out->tmp_buffer_8ch[8 * i + 4] = (int32_t)spk_tmp_buf[2 * i];
-                        aml_out->tmp_buffer_8ch[8 * i + 5] = (int32_t)spk_tmp_buf[2 * i + 1];
-                        aml_out->tmp_buffer_8ch[8 * i + 6] = (int32_t)spk_tmp_buf[2 * i];
-                        aml_out->tmp_buffer_8ch[8 * i + 7] = (int32_t)spk_tmp_buf[2 * i + 1];
+                    if (adev->dap_output_channels > 2) {
+                        /* 2ch downmix with DAP channel > 2 only may happen when ARC/eARC is ON
+                         * and DAP is disabled for saving CPU loading,
+                         * when this happens, we use a layout matching multichannel processing
+                         * tmp_buffer_8ch [0-(nchannels-1)] for spk
+                         * tmp_buffer_8ch [4-5] for spdif (when possible)
+                         * tmp_buffer_8ch [6-7] for headphone (when possible)
+                         */
+                        for (i = 0; i < out_frames; i++) {
+                            for (j = 0; j < adev->dap_output_channels; j++) {
+                                aml_out->tmp_buffer_8ch[8 * i + j] = 0; // mute speaker output
+                            }
+                            if (adev->dap_output_channels <= 4) {
+                                aml_out->tmp_buffer_8ch[8 * i + 4] = ps32SpdifTempBuffer[2 * i];
+                                aml_out->tmp_buffer_8ch[8 * i + 5] = ps32SpdifTempBuffer[2 * i + 1];
+                            }
+                            if (adev->dap_output_channels <= 6) {
+                                aml_out->tmp_buffer_8ch[8 * i + 6] = (int32_t)tmp_buffer[2 * i] << 16;
+                                aml_out->tmp_buffer_8ch[8 * i + 7] = (int32_t)tmp_buffer[2 * i + 1] << 16;
+                            }
+                        }
+                    } else {
+                        for (i = 0; i < out_frames; i++) {
+                            /* tmp_buffer_8ch [0-1] for spk, [2-3], [4-5][6-7] for headphone */
+                            aml_out->tmp_buffer_8ch[8 * i + 0] = (int32_t)spk_tmp_buf[2 * i];
+                            aml_out->tmp_buffer_8ch[8 * i + 1] = (int32_t)spk_tmp_buf[2 * i + 1];
+                            aml_out->tmp_buffer_8ch[8 * i + 2] = ps32SpdifTempBuffer[2 * i];
+                            aml_out->tmp_buffer_8ch[8 * i + 3] = ps32SpdifTempBuffer[2 * i + 1] << 16;
+                            aml_out->tmp_buffer_8ch[8 * i + 4] = ps32SpdifTempBuffer[2 * i];
+                            aml_out->tmp_buffer_8ch[8 * i + 5] = ps32SpdifTempBuffer[2 * i + 1] << 16;
+                            aml_out->tmp_buffer_8ch[8 * i + 6] = (int32_t)tmp_buffer[2 * i] << 16;
+                            aml_out->tmp_buffer_8ch[8 * i + 7] = (int32_t)tmp_buffer[2 * i + 1] << 16;
+                        }
                     }
                 } else {
                     for (i = 0; i < out_frames; i++) {
+                        /* tmp_buffer_8ch [0-1] for headphone, [2-3] for spk, [4-5] for spdif */
                         aml_out->tmp_buffer_8ch[8 * i + 0] = (int32_t)tmp_buffer[2 * i] << 16;
                         aml_out->tmp_buffer_8ch[8 * i + 1] = (int32_t)tmp_buffer[2 * i + 1] << 16;
-                        //aml_out->tmp_buffer_8ch[8 * i + 2] = (int32_t)spk_tmp_buf[2 * i];
-                        //aml_out->tmp_buffer_8ch[8 * i + 3] = (int32_t)spk_tmp_buf[2 * i + 1];
-                        aml_out->tmp_buffer_8ch[8 * i + 2] = (int32_t)tmp_buffer[2 * i] << 16;
-                        aml_out->tmp_buffer_8ch[8 * i + 3] = (int32_t)tmp_buffer[2 * i + 1] << 16;
+                        aml_out->tmp_buffer_8ch[8 * i + 2] = (int32_t)spk_tmp_buf[2 * i];
+                        aml_out->tmp_buffer_8ch[8 * i + 3] = (int32_t)spk_tmp_buf[2 * i + 1];
                         aml_out->tmp_buffer_8ch[8 * i + 4] = (int32_t)tmp_buffer[2 * i] << 16;
                         aml_out->tmp_buffer_8ch[8 * i + 5] = (int32_t)tmp_buffer[2 * i + 1] << 16;
                         aml_out->tmp_buffer_8ch[8 * i + 6] = 0;
@@ -12818,7 +12865,8 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->hw_device.dump = adev_dump;
     adev->active_outport = -1;
     adev->virtualx_mulch = true;
-    adev->dap_bypass_enable = (access(MS12_DAP_TUNING_PATH, F_OK) == 0) ? 0 : 1;
+    adev->dap_output_channels = aml_ms12_get_dap_output_channel_num(MS12_DAP_TUNING_PATH);
+    adev->dap_bypass_enable = (adev->dap_output_channels) ? 0 : 1;
     adev->dap_bypassgain = 1.0;
     adev->hdmi_format = AUTO;
     card = alsa_device_get_card_index();

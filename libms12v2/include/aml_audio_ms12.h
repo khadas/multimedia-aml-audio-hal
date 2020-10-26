@@ -155,6 +155,8 @@ int aml_ms12_update_runtime_params_direct(struct dolby_ms12_desc *ms12_desc
 int aml_ms12_update_runtime_params_lite(struct dolby_ms12_desc *ms12_desc);
 #endif
 
+int aml_ms12_get_dap_output_channel_num(const char *tuning_file);
+
 int aml_ms12_lib_preload();
 
 int aml_ms12_lib_release();
