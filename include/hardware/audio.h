@@ -746,8 +746,10 @@ struct audio_hw_device {
                            struct audio_microphone_characteristic_t *mic_array,
                            size_t *mic_count);
 
-    /** This method dumps the state of the audio hardware */
-    int (*dump)(const struct audio_hw_device *dev, int fd);
+    /** This method dumps the state of the audio hardware. The caller is responsible
+     * for freeing the memory for it using free().
+     */
+    char * (*dump)(const struct audio_hw_device *dev, int fd);
 
     /**
      * set the audio mute status for all audio activities.  If any value other

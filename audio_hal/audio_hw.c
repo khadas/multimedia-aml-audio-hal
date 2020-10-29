@@ -12129,8 +12129,9 @@ static int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd)
     int ms12_latency_pipeline = MS12_PIPELINE_LATENCY;
     int ms12_latency_dap = MS12_DAP_LATENCY;
     int ms12_latency_encoder = MS12_ENCODER_LATENCY;
+    int ms12_main_avail;
 
-    dprintf(fd, "-------------[AML_HAL] audio Latency--------------------------\n");
+    dprintf(fd, "------[AML_HAL] audio Latency------\n");
 
     frame_size = CHANNEL_CNT * audio_bytes_per_sample(AUDIO_FORMAT_PCM_16_BIT);
     if (patch) {
@@ -12159,8 +12160,10 @@ static int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd)
         aml_dev->ms12.dolby_ms12_enable &&
         aml_dev->ms12_out) {
         audio_format_t format = aml_dev->ms12_out->hal_internal_format;
-        int dolby_main_avail = dolby_ms12_get_main_buffer_avail(NULL);
+        ms12_main_avail = dolby_ms12_get_main_buffer_avail(NULL);
 
+#if 0
+        // TODO, convert ms12 input buffer level to duration
         if (dolby_main_avail > 0) {
             ms12_ltcy = dolby_main_avail / frame_size / SAMPLE_RATE_MS;
             if (format == AUDIO_FORMAT_E_AC3) {
@@ -12169,12 +12172,13 @@ static int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd)
                 ms12_ltcy /= MAT_MULTIPLIER;
             }
         }
+#endif
 
         ms12_ltcy += ms12_latency_pipeline;
 
         if ((format & AUDIO_FORMAT_MAIN_MASK) != AUDIO_FORMAT_PCM)
             ms12_ltcy += ms12_latency_decoder;
-        if (aml_dev->ms12_out->device == PORT_I2S) {
+        if ((aml_dev->ms12_out->device == PORT_I2S) && (aml_dev->dap_output_channels)) {
             ms12_ltcy += ms12_latency_dap;
         } else if ((aml_dev->optical_format == AUDIO_FORMAT_AC3) ||
                    (aml_dev->optical_format == AUDIO_FORMAT_E_AC3)) {
@@ -12231,7 +12235,8 @@ static int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd)
 
         dprintf(fd, "[AML_HAL]      audio patch latency         : %6d ms\n", rbuf_ltcy);
         dprintf(fd, "[AML_HAL]      audio spk tuning latency    : %6d ms\n", spk_tuning_ltcy);
-        dprintf(fd, "[AML_HAL]      MS12 buffer latency         : %6d ms\n", ms12_ltcy);
+        dprintf(fd, "[AML_HAL]      MS12 main input buffering   : %6d bytes\n", ms12_main_avail);
+        dprintf(fd, "[AML_HAL]      MS12 pipeline latency       : %6d ms\n", ms12_ltcy);
         dprintf(fd, "[AML_HAL]      alsa hw i2s latency         : %6d ms\n", alsa_out_i2s_ltcy);
         dprintf(fd, "[AML_HAL]      alsa hw spdif latency       : %6d ms\n", alsa_out_spdif_ltcy);
         dprintf(fd, "[AML_HAL]      alsa in hw latency          : %6d ms\n\n", alsa_in_ltcy);
@@ -12255,7 +12260,8 @@ static int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd)
         }
         out_path_ltcy += ms12_ltcy;
 
-        dprintf(fd, "[AML_HAL]      MS12 buffer latency         : %6d ms\n", ms12_ltcy);
+        dprintf(fd, "[AML_HAL]      MS12 main input buffering   : %6d bytes\n", ms12_main_avail);
+        dprintf(fd, "[AML_HAL]      MS12 pipeline latency       : %6d ms\n", ms12_ltcy);
         dprintf(fd, "[AML_HAL]      alsa hw i2s latency         : %6d ms\n", alsa_out_i2s_ltcy);
         dprintf(fd, "[AML_HAL]      alsa hw spdif latency       : %6d ms\n", alsa_out_spdif_ltcy);
         dprintf(fd, "[AML_HAL]      audio total latency         : %6d ms\n", out_path_ltcy);
@@ -12268,10 +12274,10 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
     struct aml_audio_patch *pstPatch = aml_dev->audio_patch;
 
     if (NULL == pstPatch) {
-        dprintf(fd, "-------------[AML_HAL] audio patch [not create]-----------\n");
+        dprintf(fd, "------[AML_HAL] audio patch [not created]------\n");
         return;
     }
-    dprintf(fd, "-------------[AML_HAL] audio patch [%p]---------------\n", pstPatch);
+    dprintf(fd, "------[AML_HAL] audio patch [%p]------\n", pstPatch);
 
     if (pstPatch->aml_ringbuffer.size != 0) {
         uint32_t u32FreeBuffer = get_buffer_write_space(&pstPatch->aml_ringbuffer);
@@ -12309,17 +12315,28 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
     }
 }
 
-static int adev_dump(const audio_hw_device_t *device, int fd)
+// LINUX Change
+// Return heap allocated string instead of fd
+static char *adev_dump(const audio_hw_device_t *device, int fd)
 {
     struct aml_audio_device* aml_dev = (struct aml_audio_device*)device;
     const int kNumRetries = 5;
     const int kSleepTimeMS = 100;
     int retry = kNumRetries;
+    char *ret;
+    int size;
 
     // refresh debug_flag status
     aml_dev->debug_flag = aml_audio_get_debug_flag();
 
-    dprintf(fd, "\n----------------------------[AML_HAL] primary audio hal[dev:%p]----------------------------\n", aml_dev);
+    // LINUX Change
+    fd = open("/tmp/haldump", O_RDWR | O_CREAT);
+    if (fd < 0) {
+        ALOGE("Cannot access /tmp for dump");
+        return NULL;
+    }
+
+    dprintf(fd, "\n------[AML_HAL] primary audio hal[dev:%p]-------\n", aml_dev);
     while (retry > 0 && pthread_mutex_trylock(&aml_dev->lock) != 0) {
         usleep(kSleepTimeMS * 1000);
         retry--;
@@ -12349,7 +12366,17 @@ static int adev_dump(const audio_hw_device_t *device, int fd)
     if (aml_dev->useSubMix) {
         subMixingDump(fd, aml_dev);
     }
-    return 0;
+
+    size = lseek(fd, 0, SEEK_CUR);
+    ret = calloc(size + 1, 1);
+    if (ret) {
+        lseek(fd, 0, SEEK_SET);
+        read(fd, ret, size);
+    }
+    close(fd);
+    unlink("/tmp/haldump");
+
+    return ret;
 }
 
 static int adev_close(hw_device_t *device)
