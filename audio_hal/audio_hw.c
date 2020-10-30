@@ -12178,7 +12178,7 @@ static int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd)
 
         if ((format & AUDIO_FORMAT_MAIN_MASK) != AUDIO_FORMAT_PCM)
             ms12_ltcy += ms12_latency_decoder;
-        if ((aml_dev->ms12_out->device == PORT_I2S) && (aml_dev->dap_output_channels)) {
+        if ((aml_dev->ms12_out->device == PORT_I2S) && (!aml_dev->dap_bypass_enable)) {
             ms12_ltcy += ms12_latency_dap;
         } else if ((aml_dev->optical_format == AUDIO_FORMAT_AC3) ||
                    (aml_dev->optical_format == AUDIO_FORMAT_E_AC3)) {
