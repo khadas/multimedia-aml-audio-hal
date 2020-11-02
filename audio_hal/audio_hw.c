@@ -67,6 +67,7 @@
 #include "spdif_encoder_api.h"
 #include "audio_hw_utils.h"
 #include "audio_hw_profile.h"
+#include "audio_effect_if.h"
 #include "aml_dump_debug.h"
 #include "alsa_manager.h"
 #include "alsa_device_parser.h"
@@ -12389,6 +12390,7 @@ static int adev_close(hw_device_t *device)
         pthread_mutex_unlock(&adev->lock);
         return 0;
     }
+    audio_effect_unload_interface(&(adev->hw_device));
     unload_ddp_decoder_lib();
     if (eDolbyMS12Lib == adev->dolby_lib_type_last) {
         aml_ms12_lib_release();
@@ -12743,6 +12745,8 @@ int init_mic_desc(struct aml_audio_device *adev)
 static int adev_open(const hw_module_t* module, const char* name, hw_device_t** device)
 {
     static struct aml_audio_device *adev;
+    audio_effect_t *audio_effect;
+
     if (adev != NULL && adev->count > 0) {
         ALOGI("adev exsits ,reuse");
         pthread_mutex_lock(&adev->lock);
@@ -12861,6 +12865,13 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         ret = -EINVAL;
         goto err_adev;
     }
+
+    audio_effect_load_interface(&(adev->hw_device), &audio_effect);
+#ifdef __LP64__
+    adev->hw_device.common.reserved[0] = (uint64_t)audio_effect;
+#else
+    adev->hw_device.common.reserved[0] = (uint32_t)audio_effect;
+#endif
 
     atomic_set(&adev->next_unique_ID, 1);
     list_init(&adev->patch_list);
