@@ -42,12 +42,12 @@ int earctx_fetch_latency(struct mixer * pMixer)
 	return mixer_get_int(pMixer, AML_MIXER_ID_EARCTX_LATENCY);
 }
 
-static void earc_cds_conf_to_str(char *earc_cds, char *cds_str)
+static void earc_cds_conf_to_str(char *earc_cds, char *cds_str, int hex)
 {
 	char *cds_blocks;
 	char *audio_blocks;
 	char cds_blockid;
-	int blen = 0, dlen = 0, i, j, n = 0, m;
+	int blen = 0, dlen = 0, i, j, n = 0, m, index = 0;
 
 	if (!cds_str || !earc_cds)
 		return;
@@ -68,8 +68,13 @@ static void earc_cds_conf_to_str(char *earc_cds, char *cds_str)
 				dlen = audio_blocks[j] & 0x1f; /* length of audio data block */
 				ALOGV("%s, dlen:%d\n", __FUNCTION__, dlen);
 
-				for (m = 0; m < dlen; m ++)
-					sprintf(cds_str, "%s%02x", cds_str, audio_blocks[1 + j + m]);
+				for (m = 0; m < dlen; m ++) {
+					if (hex) {
+						cds_str[index++] = audio_blocks[1 + j + m];
+					} else {
+						sprintf(cds_str, "%s%02x", cds_str, audio_blocks[1 + j + m]);
+					}
+				}
 
 				n += dlen;
 				j += dlen + 1;
@@ -146,7 +151,7 @@ int earcrx_fetch_cds(struct mixer *pMixer, char *cds_str)
 
 	mixer_get_array(pMixer, AML_MIXER_ID_EARCRX_CDS, earc_cds, CDS_MAX);
 
-	earc_cds_conf_to_str(earc_cds, cds_str);
+	earc_cds_conf_to_str(earc_cds, cds_str, 0);
 
 	return 0;
 }
@@ -155,13 +160,13 @@ int earcrx_fetch_cds(struct mixer *pMixer, char *cds_str)
  * fetch CDS from eARC_RX, and will update CDS to EDID
  * cds_str: CTA short audio descriptor
  */
-int earctx_fetch_cds(struct mixer *pMixer, char *cds_str)
+int earctx_fetch_cds(struct mixer *pMixer, char *cds_str, int hex)
 {
 	char earc_cds[CDS_MAX] = {0};
 
 	mixer_get_array(pMixer, AML_MIXER_ID_EARCTX_CDS, earc_cds, CDS_MAX);
 
-	earc_cds_conf_to_str(earc_cds, cds_str);
+	earc_cds_conf_to_str(earc_cds, cds_str, hex);
 
 	return 0;
 }

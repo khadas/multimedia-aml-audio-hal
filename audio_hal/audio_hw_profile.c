@@ -32,7 +32,9 @@
 #include <system/audio.h>
 #include <hardware/audio.h>
 
+#include "audio_hw.h"
 #include "audio_hw_utils.h"
+#include "earc_utils.h"
 #include "alsa_device_parser.h"
 #define SOUND_CARDS_PATH "/proc/asound/cards"
 #define SOUND_PCM_PATH  "/proc/asound/pcm"
@@ -63,6 +65,46 @@ int get_external_card(int type)
         card_num++;
     }
     return ret;
+}
+
+void get_earc_sink_cap(struct aml_mixer_handle *amixer, struct aml_arc_hdmi_desc *p_descs)
+{
+    unsigned char sad[256] = {0};
+    int i = 0;
+    struct mixer *pMixer = amixer->pMixer;
+
+    earctx_fetch_cds(pMixer, sad, 1);
+
+    while ((i + 2) < sizeof(sad)) {
+        if (!sad[i]) {
+            break;
+        }
+
+        /* 1st byte of 3-bytes audio descriptor
+         * bit [2:0] : channel num
+         * bit [6:3] : audio coding type
+         */
+        switch ((sad[i] >> 3) & 0xf) {
+            case _AC3:
+                p_descs->dd_fmt.is_support = 1;
+                break;
+            case _DTS:
+                p_descs->dts_fmt.is_support = 1;
+                break;
+            case _DDP:
+                p_descs->ddp_fmt.is_support = 1;
+                p_descs->ddp_fmt.atmos_supported = sad[i + 2] & 1;
+                break;
+            case _MAT:
+                p_descs->mat_fmt.is_support = 1;
+                p_descs->mat_fmt.atmos_supported = sad[i + 2] & 1;
+                break;
+            default:
+                ALOGI("earc sad format %x ignored", sad[i]);
+                break;
+        }
+        i += 3;
+    }
 }
 
 /*

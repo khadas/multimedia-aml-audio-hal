@@ -31,31 +31,52 @@
 /*
  *@brief get sink capability
  */
-static audio_format_t get_sink_capability (struct audio_stream_out *stream)
+void get_sink_capability(struct aml_audio_device *adev, struct aml_arc_hdmi_desc *p_desc)
 {
-    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
-    struct aml_audio_device *adev = aml_out->dev;
-    struct aml_arc_hdmi_desc *hdmi_desc = &adev->hdmi_descs;
-    audio_format_t sink_capability = AUDIO_FORMAT_PCM_16_BIT;
-    char *cap = (char *) get_hdmi_sink_cap(AUDIO_PARAMETER_STREAM_SUP_FORMATS, 0, &(adev->hdmi_descs));
-
-    if (cap) {
-        if (hdmi_desc->mat_fmt.is_support && hdmi_desc->mat_fmt.atmos_supported) {
-            /* only use MAT output if sink support MAT 2.x (atmos_supported) */
-            sink_capability = AUDIO_FORMAT_MAT;
-        } else if (hdmi_desc->ddp_fmt.is_support) {
-            sink_capability = AUDIO_FORMAT_E_AC3;
-        } else if (hdmi_desc->dd_fmt.is_support) {
-            sink_capability = AUDIO_FORMAT_AC3;
+    if (adev->active_outport == OUTPORT_HDMI_ARC) {
+        /* when output port is ARC/eARC, get earc audio cap from earc CDS, or
+         * use audio caps from CEC set from set_ARC_format parameter (in adev->hdmi_descs).
+         */
+        if (aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE) == ATTEND_TYPE_EARC) {
+            ALOGI("Getting sink capbility from eARC sink");
+            get_earc_sink_cap(&adev->alsa_mixer, p_desc);
+        } else {
+            ALOGI("Getting sink capbility from ARC sink (CEC)");
+            *p_desc = adev->arc_descs;
         }
+    } else if (adev->hdmitx_audio) {
+        /* when product has HDMI TX audio (OTT type), get sink cap from HDMI port */
+        ALOGI("Getting sink capbility from HDMI sink");
+        char *cap = (char *) get_hdmi_sink_cap(AUDIO_PARAMETER_STREAM_SUP_FORMATS, 0, &adev->hdmi_descs);
 
-        free(cap);
+        if (cap) {
+            *p_desc = adev->hdmi_descs;
+            free(cap);
+        }
+    }
+}
+
+static audio_format_t get_sink_max_cap(struct aml_audio_device *adev)
+{
+    struct aml_arc_hdmi_desc desc = {0};
+    struct aml_arc_hdmi_desc *p_desc = &desc;
+    audio_format_t sink_capability;
+
+    get_sink_capability(adev, p_desc);
+
+    if (p_desc->mat_fmt.is_support && p_desc->mat_fmt.atmos_supported) {
+        /* only use MAT output if sink support MAT 2.x (atmos_supported) */
+        sink_capability = AUDIO_FORMAT_MAT;
+    } else if (p_desc->ddp_fmt.is_support) {
+        sink_capability = AUDIO_FORMAT_E_AC3;
+    } else if (p_desc->dd_fmt.is_support) {
+        sink_capability = AUDIO_FORMAT_AC3;
     }
 
-    ALOGI ("%s dd support %d ddp support %d mat 2.x support %d\n", __FUNCTION__,
-        hdmi_desc->dd_fmt.is_support,
-        hdmi_desc->ddp_fmt.is_support,
-        hdmi_desc->mat_fmt.atmos_supported);
+    ALOGI ("%s output sink dd support %d ddp support %d mat 2.x support %d\n", __FUNCTION__,
+        p_desc->dd_fmt.is_support,
+        p_desc->ddp_fmt.is_support,
+        p_desc->mat_fmt.atmos_supported);
 
     return sink_capability;
 }
@@ -68,7 +89,7 @@ bool is_sink_support_dolby_passthrough(audio_format_t sink_capability)
 }
 
 /*
- *@brief get sink format by logic min(source format / digital format / sink capability)
+ *@brief get stream sink format by logic min(source format / digital format / sink capability)
  * For Speaker/Headphone output, sink format keep PCM-16bits
  * For optical output, min(dd, source format, digital format)
  * For HDMI_ARC output
@@ -92,7 +113,7 @@ void get_sink_format (struct audio_stream_out *stream)
 
     adev = aml_out->dev;
     hdmi_format = adev->hdmi_format;
-    sink_capability = get_sink_capability(stream);
+    sink_capability = get_sink_max_cap(adev);
     source_format = aml_out->hal_internal_format;
 
     if (aml_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {

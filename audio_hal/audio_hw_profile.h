@@ -22,6 +22,7 @@
 int get_external_card(int type);
 char*  get_hdmi_sink_cap(const char *keys,audio_format_t format,struct aml_arc_hdmi_desc *p_hdmi_descs);
 char*  get_hdmi_arc_cap(unsigned *ad, int maxsize, const char *keys);
+void get_earc_sink_cap(struct aml_mixer_handle *amixer, struct aml_arc_hdmi_desc *p_descs);
 char *strdup_hdmi_arc_cap_default(const char *keys, audio_format_t format);
 char *strdup_a2dp_cap_default(const char *keys, audio_format_t format);
 #endif

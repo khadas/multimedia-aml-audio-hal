@@ -252,6 +252,8 @@ int get_the_dolby_ms12_prepared(
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     struct aml_stream_out *out;
+    struct aml_arc_hdmi_desc descs = {0};
+    bool is_atmos_supported = false;
     int ret = 0;
     // LINUX change
     // Linux does not use sysfs to get drc settings
@@ -330,7 +332,8 @@ int get_the_dolby_ms12_prepared(
      */
     // LINUX change
 #if 1
-    bool is_atmos_supported = is_platform_supported_ddp_atmos(adev->hdmi_descs.ddp_fmt.atmos_supported, adev->active_outport);
+    get_sink_capability(adev, &descs);
+    is_atmos_supported = is_platform_supported_ddp_atmos(descs.ddp_fmt.atmos_supported, adev->active_outport);
     set_ms12_out_ddp_5_1(input_format, is_atmos_supported);
 #else
     // set -legacy_ddplus_out option based on Atmos capbility on sink side

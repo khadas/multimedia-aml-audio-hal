@@ -5085,7 +5085,9 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
      * such as switch from DDP-AVR to ATMOS-AVR
      * then, next stream is new built, this setting is available.
      */
-    bool is_atmos_supported = is_platform_supported_ddp_atmos(adev->hdmi_descs.ddp_fmt.atmos_supported, adev->active_outport);
+    struct aml_arc_hdmi_desc descs = {0};
+    get_sink_capability(adev, &descs);
+    bool is_atmos_supported = is_platform_supported_ddp_atmos(descs.ddp_fmt.atmos_supported, adev->active_outport);
     if ((out->hal_internal_format == AUDIO_FORMAT_AC4) ||
         !is_ms12_out_ddp_5_1_suitable(is_atmos_supported)) {
         if (adev->continuous_audio_mode) {
@@ -5227,7 +5229,7 @@ static void dump_format_desc (struct format_desc *desc)
 static int set_arc_format(struct audio_hw_device *dev, char *value, size_t len)
 {
     struct aml_audio_device *adev = (struct aml_audio_device *) dev;
-    struct aml_arc_hdmi_desc *hdmi_desc = &adev->hdmi_descs;
+    struct aml_arc_hdmi_desc *desc = &adev->arc_descs;
     struct format_desc *fmt_desc = NULL;
     char *pt = NULL, *tmp = NULL;
     int i = 0, val = 0;
@@ -5244,22 +5246,22 @@ static int set_arc_format(struct audio_hw_device *dev, char *value, size_t len)
         case 0:
             format = val;
             if (val == _AC3) {
-                fmt_desc = &hdmi_desc->dd_fmt;
+                fmt_desc = &desc->dd_fmt;
                 fmt_desc->fmt = val;
             } else if (val == _DDP) {
-                fmt_desc = &hdmi_desc->ddp_fmt;
+                fmt_desc = &desc->ddp_fmt;
                 fmt_desc->fmt = val;
             } else if (val == _MAT) {
-                fmt_desc = &hdmi_desc->mat_fmt;
+                fmt_desc = &desc->mat_fmt;
                 fmt_desc->fmt = val;
             } else if (val == _LPCM) {
-                fmt_desc = &hdmi_desc->pcm_fmt;
+                fmt_desc = &desc->pcm_fmt;
                 fmt_desc->fmt = val;
             } else if (val == _DTS) {
-                fmt_desc = &hdmi_desc->dts_fmt;
+                fmt_desc = &desc->dts_fmt;
                 fmt_desc->fmt = val;
             } else if (val == _DTSHD) {
-                fmt_desc = &hdmi_desc->dtshd_fmt;
+                fmt_desc = &desc->dtshd_fmt;
                 fmt_desc->fmt = val;
             } else {
                 ALOGE ("unsupport fmt %d", val);
@@ -5614,7 +5616,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         }
 
         if (adev->disable_pcm_mixing == 1 ||
-            adev->hdmi_descs.ddp_fmt.atmos_supported == 0) {
+            hdmi_desc->ddp_fmt.atmos_supported == 0) {
             if (hdmi_desc->default_edid == true)
                 update_edid(adev, false);
         } else {
@@ -6679,7 +6681,7 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         struct mixer *pMixer = amixer->pMixer;
         char cds[256] = {0};
 
-        earctx_fetch_cds(pMixer, cds);
+        earctx_fetch_cds(pMixer, cds, 0);
         return strdup(cds);
     }
     else if (strstr(keys, "eARC_RX CDS")) {
@@ -8277,13 +8279,13 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                         }
                     } else {
                         for (i = 0; i < out_frames; i++) {
-                            /* tmp_buffer_8ch [0-1] for spk, [2-3], [4-5][6-7] for headphone */
+                            /* tmp_buffer_8ch [0-1] for spk, [2-3] for spdif, [4-5][6-7] for headphone */
                             aml_out->tmp_buffer_8ch[8 * i + 0] = (int32_t)spk_tmp_buf[2 * i];
                             aml_out->tmp_buffer_8ch[8 * i + 1] = (int32_t)spk_tmp_buf[2 * i + 1];
                             aml_out->tmp_buffer_8ch[8 * i + 2] = ps32SpdifTempBuffer[2 * i];
-                            aml_out->tmp_buffer_8ch[8 * i + 3] = ps32SpdifTempBuffer[2 * i + 1] << 16;
-                            aml_out->tmp_buffer_8ch[8 * i + 4] = ps32SpdifTempBuffer[2 * i];
-                            aml_out->tmp_buffer_8ch[8 * i + 5] = ps32SpdifTempBuffer[2 * i + 1] << 16;
+                            aml_out->tmp_buffer_8ch[8 * i + 3] = ps32SpdifTempBuffer[2 * i + 1];
+                            aml_out->tmp_buffer_8ch[8 * i + 4] = (int32_t)tmp_buffer[2 * i] << 16;
+                            aml_out->tmp_buffer_8ch[8 * i + 5] = (int32_t)tmp_buffer[2 * i + 1] << 16;
                             aml_out->tmp_buffer_8ch[8 * i + 6] = (int32_t)tmp_buffer[2 * i] << 16;
                             aml_out->tmp_buffer_8ch[8 * i + 7] = (int32_t)tmp_buffer[2 * i + 1] << 16;
                         }
@@ -8904,12 +8906,13 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
             case BYPASS:
                 //STB case
                 if (!adev->is_TV) {
-                    char *cap = NULL;
-                    cap = (char *) get_hdmi_sink_cap (AUDIO_PARAMETER_STREAM_SUP_FORMATS,0,&(adev->hdmi_descs));
-                    if (cap && mystrstr(cap, "AUDIO_FORMAT_E_AC3")) {
+                    struct aml_arc_hdmi_desc descs = {0};
+                    get_sink_capability(adev, &descs);
+
+                    if (descs.ddp_fmt.is_support) {
                         ddp_dec->digital_raw = 2;
                         adev->dcvlib_bypass_enable = 1;
-                    } else if (cap && mystrstr(cap, "AUDIO_FORMAT_AC3")) {
+                    } else if (descs.dd_fmt.is_support) {
                         if (aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3) {
                             adev->dcvlib_bypass_enable = 0;
                             ddp_dec->digital_raw = 1;
@@ -8924,14 +8927,14 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
                         adev->dcvlib_bypass_enable = 0;
                         ddp_dec->digital_raw = 0;
                     }
-                    if (cap) {
-                        free(cap);
-                    }
                 } else {
-                    if (adev->hdmi_descs.ddp_fmt.is_support) {
+                    struct aml_arc_hdmi_desc descs = {0};
+                    get_sink_capability(adev, &descs);
+
+                    if (descs.ddp_fmt.is_support) {
                         adev->dcvlib_bypass_enable = 1;
                         ddp_dec->digital_raw = 2;
-                    } else if (adev->hdmi_descs.dd_fmt.is_support) {
+                    } else if (descs.dd_fmt.is_support) {
                         if (aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3) {
                             adev->dcvlib_bypass_enable = 0;
                             ddp_dec->digital_raw = 1;
@@ -12345,10 +12348,11 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
     dprintf(fd, "[AML_HAL]      active Outport: %s\n", outport2String(aml_dev->active_outport));
     dprintf(fd, "[AML_HAL]      sink format: %#x\n", aml_dev->sink_format);
     if (aml_dev->active_outport == OUTPORT_HDMI_ARC) {
-        struct aml_arc_hdmi_desc *hdmi_desc = &aml_dev->hdmi_descs;
-        bool dd_is_support = hdmi_desc->dd_fmt.is_support;
-        bool ddp_is_support = hdmi_desc->ddp_fmt.is_support;
-        bool mat_is_support = hdmi_desc->mat_fmt.is_support;
+        struct aml_arc_hdmi_desc descs = {0};
+        get_sink_capability(aml_dev, &descs);
+        bool dd_is_support = descs.dd_fmt.is_support;
+        bool ddp_is_support = descs.ddp_fmt.is_support;
+        bool mat_is_support = descs.mat_fmt.is_support;
 
         dprintf(fd, "[AML_HAL]     -dd: %d, ddp: %d, mat: %d\n",
                 dd_is_support, ddp_is_support, mat_is_support);
@@ -12869,6 +12873,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->dap_bypass_enable = (adev->dap_output_channels) ? 0 : 1;
     adev->dap_bypassgain = 1.0;
     adev->hdmi_format = AUTO;
+    adev->hdmitx_audio = !(access(SYS_NODE_HDMIRX0, F_OK) == 0);
     card = alsa_device_get_card_index();
     if ((card < 0) || (card > 7)) {
         ALOGE("error to get audio card");

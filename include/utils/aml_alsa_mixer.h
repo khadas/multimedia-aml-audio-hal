@@ -215,6 +215,7 @@ int aml_mixer_ctrl_get_count(struct aml_mixer_handle *mixer_handle, int mixer_id
  **/
 int aml_mixer_ctrl_get_int(struct aml_mixer_handle *mixer_handle, int mixer_id);
 int aml_mixer_ctrl_get_enum_str_to_int(struct aml_mixer_handle *mixer_handle, int mixer_id, int *ret);
+int aml_mixer_ctrl_get_array(struct aml_mixer_handle *mixer_handle, int mixer_id, void *array, int count);
 
 // or
 #if 0

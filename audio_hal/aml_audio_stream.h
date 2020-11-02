@@ -359,7 +359,12 @@ stream_usecase_t convert_usecase_mask_to_stream_usecase(usecase_mask_t mask);
  *      3.digital format is auto, sink format is min (source format, digital format)
  */
 void get_sink_format(struct audio_stream_out *stream);
-
+/*
+ *@brief get sink capbility according to current active output port
+ * If ARC/eARC is active then return ARC/eARC audio capbilities.
+ * If there is no ARC output then check HDMI output (for OTT).
+ */
+void get_sink_capability(struct aml_audio_device *adev, struct aml_arc_hdmi_desc *p_desc);
 /*@brief check the hdmi rx audio stability by HW register */
 bool is_hdmi_in_stable_hw(struct audio_stream_in *stream);
 /*@brief check the hdmix rx audio format stability by SW parser */

@@ -122,6 +122,7 @@ static unsigned int DEFAULT_OUT_SAMPLING_RATE = 48000;
 
 #define SYS_NODE_EARC_RX           "/sys/class/extcon/earcrx/state"
 #define SYS_NODE_EARC_TX           "/sys/class/extcon/earctx/state"
+#define SYS_NODE_HDMIRX0           "/sys/class/hdmirx/hdmirx0"
 
 #define MS12_DAP_TUNING_PATH       "/vendor/etc/ms12_tuning.dat"
 
@@ -426,6 +427,7 @@ struct aml_audio_device {
     bool parental_control_av_mute;
     int routing;
     struct audio_config output_config;
+    struct aml_arc_hdmi_desc arc_descs;
     struct aml_arc_hdmi_desc hdmi_descs;
     int arc_hdmi_updated;
     int a2dp_updated;
@@ -601,6 +603,8 @@ struct aml_audio_device {
 
     /* TV tuning switch */
     bool ms12_tv_tuning;
+
+    bool hdmitx_audio;
 };
 
 struct meta_data {
