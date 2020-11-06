@@ -60,7 +60,7 @@ static audio_format_t get_sink_max_cap(struct aml_audio_device *adev)
 {
     struct aml_arc_hdmi_desc desc = {0};
     struct aml_arc_hdmi_desc *p_desc = &desc;
-    audio_format_t sink_capability;
+    audio_format_t sink_capability = AUDIO_FORMAT_PCM_16_BIT;
 
     get_sink_capability(adev, p_desc);
 
