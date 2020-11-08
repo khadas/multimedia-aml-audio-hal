@@ -8613,7 +8613,7 @@ ssize_t hw_write (struct audio_stream_out *stream
                 }
             } else {
                 // write_frames = aml_out->input_bytes_size / aml_out->ddp_frame_size * 32 * 48;
-                if (is_bypass_dolbyms12(stream)) {
+                if (is_bypass_dolbyms12(stream) || (!adev->ms12.dolby_ms12_enable)) {
                     //EAC3 IEC61937 size=4*6144bytes, same as PCM(6144bytes=1536*2ch*2bytes_per_sample)
                     //every 24kbytes coulc cost 32ms to output.
                     write_frames = aml_out->frame_write_sum;
@@ -10549,6 +10549,7 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
     if (aml_getprop_bool("media.audio.hal.debug")) {
         aml_out->debug_stream = 1;
     }
+
     ALOGD("-%s: out %p: usecase:%s card:%d alsa devices:%d", __func__,
         aml_out, usecase2Str(aml_out->usecase), aml_out->card, aml_out->device);
 

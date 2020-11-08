@@ -178,6 +178,11 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
             device_index = alsa_device_update_pcm_index(device, PLAYBACK);
         }
 
+        if (device == DIGITAL_DEVICE) {
+            config->channels = 2;
+            config->format = PCM_FORMAT_S16_LE;
+        }
+
         ALOGI("%s, audio open card(%d), device(%d)", __func__, card, device_index);
         ALOGI("ALSA open configs: channels %d format %d period_count %d period_size %d rate %d",
               config->channels, config->format, config->period_count, config->period_size, config->rate);
