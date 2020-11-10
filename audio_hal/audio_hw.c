@@ -6778,12 +6778,17 @@ static int adev_set_master_volume (struct audio_hw_device *dev, float volume)
         return -EINVAL;
     }
 
+    /* when master volume is not changed, do not trigger unmute */
+    if (adev->master_volume == volume) {
+        return 0;
+    }
+
     pthread_mutex_lock(&adev->lock);
 
     adev->master_volume = volume;
 
     if (volume > 0.0) {
-         adev->master_mute = false;
+        adev->master_mute = false;
     }
 
     _update_volumes_all_stream_l(adev);
