@@ -8232,9 +8232,10 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                         /* SPDIF with source_gain*/
                         if (get_buffer_read_space(&adev->ms12.spdif_ring_buffer) >= (int)bytes) {
                             ring_buffer_read(&adev->ms12.spdif_ring_buffer, (unsigned char*)tmp_buffer, bytes);
-                            apply_volume_16to32(source_gain, tmp_buffer, ps32SpdifTempBuffer, bytes);
                         }
                     }
+
+                    apply_volume_16to32(source_gain, tmp_buffer, ps32SpdifTempBuffer, bytes);
                 }
 
 #ifdef ADD_AUDIO_DELAY_INTERFACE
