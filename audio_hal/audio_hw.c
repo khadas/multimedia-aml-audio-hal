@@ -5590,6 +5590,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     //add for fireos7 tv of audio output format setting
     //"digital_output_format=pcm"
     //"digital_output_format=dd"
+    //"digital_output_format=ddp"
     //"digital_output_format=auto"
     //"digital_output_format=bypass", the same as "disable_pcm_mixing"
     ret = str_parms_get_str(parms, "digital_output_format", value, sizeof(value));
@@ -5599,6 +5600,10 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             adev->hdmi_format = PCM;
             adev->disable_pcm_mixing = 0;
             ALOGI("digital_output_format is PCM\n");
+        } else if (strcmp(value, "ddp") == 0) {
+            adev->hdmi_format = DDP;
+            adev->disable_pcm_mixing = 0;
+            ALOGI("digital_output_format is DDP\n");
         } else if (strcmp(value, "dd") == 0) {
             adev->hdmi_format = DD;
             adev->disable_pcm_mixing = 0;
@@ -6555,6 +6560,8 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
             return strdup ("digital_output_format=pcm");
         } else if (adev->hdmi_format == DD) {
             return strdup ("digital_output_format=dd");
+        } else if (adev->hdmi_format == DDP) {
+            return strdup ("digital_output_format=ddp");
         } else if (adev->hdmi_format == AUTO) {
             return strdup ("digital_output_format=auto");
         } else if (adev->hdmi_format == BYPASS) {
@@ -8902,6 +8909,7 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
                 adev->dcvlib_bypass_enable = 0;
                 break;
             case DD:
+            case DDP:
                 ddp_dec->digital_raw = 1;
                 //STB case
                 if (!adev->is_TV) {

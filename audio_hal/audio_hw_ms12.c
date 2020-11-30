@@ -1235,8 +1235,9 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12
                 ALOGI("hdmi format=%d bypass =%d size=%d",adev->hdmi_format, ms12->is_bypass_ms12, out_size);
             }
             if (out_size != 0) {
-                if (adev->active_outport == OUTPORT_HDMI_ARC) {
-                    if (audio_hal_data_processing((struct audio_stream_out *)aml_out, buffer, size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
+                if (SUPPORT_EARC_OUT_HW && adev->active_outport == OUTPORT_HDMI_ARC) {
+                    if (adev->bHDMIARCon &&
+                        audio_hal_data_processing((struct audio_stream_out *)aml_out, buffer, size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
                         ret = hw_write((struct audio_stream_out *)aml_out, output_buffer, output_buffer_bytes, output_format);
                     }
                 } else {

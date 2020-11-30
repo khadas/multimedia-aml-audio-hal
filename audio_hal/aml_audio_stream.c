@@ -224,6 +224,9 @@ void get_sink_format (struct audio_stream_out *stream)
     case DD:
         optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_DTS;
         break;
+    case DDP:
+        optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_E_AC3 : AUDIO_FORMAT_DTS;
+        break;
     case BYPASS:
         sink_audio_format = min(sink_capability,source_format);
         optical_audio_format = sink_audio_format;

@@ -933,6 +933,7 @@ void dca_decoder_config(struct audio_stream_out *stream, bool *dtscd_flag)
             adev->dtslib_bypass_enable = 0;
             break;
         case DD:
+        case DDP:
             dts_dec->digital_raw = 1;
             //STB case
             if (!adev->is_TV) {
@@ -942,7 +943,7 @@ void dca_decoder_config(struct audio_stream_out *stream, bool *dtscd_flag)
                 set_stream_dual_output(stream, true);
                 adev->dtslib_bypass_enable = 0;
             }
-            adev->optical_format = AUDIO_FORMAT_AC3;
+            adev->optical_format = (adev->hdmi_format == DD) ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_E_AC3;
             break;
         case AUTO:
         case BYPASS:

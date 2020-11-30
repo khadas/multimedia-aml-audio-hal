@@ -65,7 +65,8 @@ enum digital_format {
     PCM = 0,
     DD = 4,
     AUTO = 5,
-    BYPASS = 6
+    BYPASS = 6,
+    DDP = 7
 };
 
 /**\brief Audio output mode*/
