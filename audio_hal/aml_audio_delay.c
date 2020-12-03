@@ -26,21 +26,22 @@
 
 #define ALIGN(size, align) ((size + align - 1) & (~(align - 1)))
 
-
 static aml_audio_delay_st g_stAudioDelay[AML_DELAY_BUTT];
 static int g_stAudioInputDelay[AML_DELAY_INPUT_MAX] = {0, 0, 0, 0, 0};
-static const int g_u32DelayMaxDefault[AML_DELAY_BUTT] = {1000, 1000, 1000, 1000};
+static const int g_u32DelayMaxDefault[AML_DELAY_BUTT] = {250, 250, 250, 250};
 static bool g_bAudioDelayInit = false;
 static aml_audio_delay_input_type_e g_delay_input_type = AML_DELAY_INPUT_DEFAULT;
 
 int aml_audio_delay_init()
 {
     int i;
+    int s32BfferSize = 0;
+    unsigned int u32ChannelCnt;
+
     memset(&g_stAudioDelay, 0, sizeof(aml_audio_delay_st)*AML_DELAY_BUTT);
 
     for (i=0; i<AML_DELAY_BUTT; i++) {
-        int s32BfferSize = 0;
-        unsigned int u32ChannelCnt = 2;
+        u32ChannelCnt = 2;
         if ((AML_DELAY_OUTPORT_ALL == i) || (AML_DELAY_OUTPORT_SPEAKER == i)) {
             /*calculate the max size for 8ch */
             u32ChannelCnt = 8;
