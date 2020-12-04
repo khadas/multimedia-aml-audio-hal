@@ -1243,6 +1243,8 @@ void aml_tinymix_set_spdif_format(audio_format_t output_format,struct aml_stream
         // for BOX with ms12 continous mode, need DDP output
         if ((eDolbyMS12Lib == aml_dev->dolby_lib_type) && aml_dev->continuous_audio_mode && !aml_dev->is_TV) {
             // do nothing
+        } else if ((eDolbyMS12Lib == aml_dev->dolby_lib_type) && !aml_dev->hdmitx_audio && !SUPPORT_EARC_OUT_HW) {
+            // for TV, when DDP goes to SPDIF-A for ARC output, do nothing
         } else {
             spdif_mute = 1;
         }
