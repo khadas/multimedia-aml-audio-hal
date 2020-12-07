@@ -81,6 +81,7 @@ int aml_audio_get_video_latency(void);
 int aml_set_thread_priority(char *pName, pthread_t threadId);
 
 void aml_tinymix_set_spdif_format(audio_format_t output_format,  struct aml_stream_out *stream);
+void aml_tinymix_set_spdifb_format(audio_format_t output_format,  struct aml_stream_out *stream);
 
 void aml_audio_set_cpu23_affinity();
 

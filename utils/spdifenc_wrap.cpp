@@ -31,6 +31,7 @@
 #include <tinyalsa/asoundlib.h>
 #include <cutils/properties.h>
 #include <string.h>
+#include <map>
 
 #ifndef PCM_STATE_SETUP
 #define PCM_STATE_SETUP 1
@@ -151,7 +152,6 @@ public:
             }
         }
 
-
         ret = pcm_write(pcm_handle, buffer, bytes);
         if (ret)
             return ret;
@@ -196,39 +196,62 @@ private:
     audio_format_t mFormat;
     bool mFirstFrameMuted;
 };
-static MySPDIFEncoder *myencoder = NULL;
-extern "C" int spdifenc_init(struct pcm *mypcm, audio_format_t format)
+
+static std::map<audio_format_t, MySPDIFEncoder *> myencoders;
+
+extern "C" void *spdifenc_init(struct pcm *mypcm, audio_format_t format)
 {
-    if (myencoder) {
-        delete myencoder;
-        myencoder = NULL;
+    if (myencoders[format]) {
+        delete myencoders[format];
+        myencoders[format] = NULL;
     }
-    myencoder = new MySPDIFEncoder(mypcm, format);
-    if (myencoder == NULL) {
-        ALOGE("init SPDIFEncoder failed \n");
-        return  -1;
+
+    myencoders[format] = new MySPDIFEncoder(mypcm, format);
+    if (myencoders[format] == NULL) {
+        ALOGE("init SPDIFEncoder failed, format 0x%x\n", format);
+        return NULL;
     }
     ALOGI("init SPDIFEncoder done\n");
-    return 0;
+    return myencoders[format];
 }
-extern "C" int  spdifenc_write(const void *buffer, size_t numBytes)
+
+extern "C" void *spdifenc_get(audio_format_t format)
 {
+    return myencoders[format];
+}
+
+extern "C" int  spdifenc_write(void *enc, const void *buffer, size_t numBytes)
+{
+    MySPDIFEncoder *myencoder = (MySPDIFEncoder *)enc;
+    if (!myencoder) {
+        return 0;
+    }
     return myencoder->write(buffer, numBytes);
 }
-extern "C" uint64_t  spdifenc_get_total()
+
+extern "C" uint64_t  spdifenc_get_total(void *enc)
 {
+    MySPDIFEncoder *myencoder = (MySPDIFEncoder *)enc;
+    if (!myencoder) {
+        return 0;
+    }
     return myencoder->total_bytes();
 }
-extern "C" int spdifenc_set_mute(bool mute)
+
+extern "C" int spdifenc_set_mute(void *enc, bool mute)
 {
+    MySPDIFEncoder *myencoder = (MySPDIFEncoder *)enc;
+
     if (myencoder)
         return myencoder->setMute(mute);
     else
         return -1;
 }
 
-extern "C" audio_format_t  spdifenc_get_format(void)
+extern "C" audio_format_t  spdifenc_get_format(void *enc)
 {
+    MySPDIFEncoder *myencoder = (MySPDIFEncoder *)enc;
+
     if (myencoder)
         return myencoder->getformat();
     else

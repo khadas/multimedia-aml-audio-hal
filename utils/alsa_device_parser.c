@@ -54,6 +54,7 @@
 #define ALSAPORT_TDM              "alsaPORT-tdm"
 #define ALSAPORT_PDM              "alsaPORT-pdm"
 #define ALSAPORT_SPDIF            "alsaPORT-spdif"
+#define ALSAPORT_SPDIF_B          "alsaPORT-spdifb"
 #define ALSAPORT_SPDIFB2HDMI      "alsaPORT-spdifb2hdmi"
 #define ALSAPORT_I2S2HDMI         "alsaPORT-i2s2hdmi"    /* virtual link */
 #define ALSAPORT_TV               "alsaPORT-tv"          /* Now for TV input */
@@ -85,6 +86,7 @@ struct alsa_info {
 	struct AudioDeviceDescriptor *tdm_descrpt;
 	struct AudioDeviceDescriptor *pdm_descrpt;
 	struct AudioDeviceDescriptor *spdif_descrpt;
+	struct AudioDeviceDescriptor *spdif_b_descrpt;
 	struct AudioDeviceDescriptor *spdifb2hdmi_descrpt;
 	struct AudioDeviceDescriptor *i2s2hdmi_descrpt;
 	struct AudioDeviceDescriptor *tvin_descrpt;
@@ -228,6 +230,8 @@ void alsa_device_parser_pcm_string(struct alsa_info *p_info, char *InputBuffer)
 					p_info->pdm_descrpt = mAudioDeviceDescriptor;
 				else if (!strncmp(PortName, ALSAPORT_SPDIF, strlen(ALSAPORT_SPDIF)) && !p_info->spdif_descrpt)
 					p_info->spdif_descrpt = mAudioDeviceDescriptor;
+				else if (!strncmp(PortName, ALSAPORT_SPDIF_B, strlen(ALSAPORT_SPDIF_B)) && !p_info->spdif_b_descrpt)
+					p_info->spdif_b_descrpt = mAudioDeviceDescriptor;
 				else if (!strncmp(PortName, ALSAPORT_SPDIFB2HDMI, strlen(ALSAPORT_SPDIFB2HDMI)))
 					p_info->spdifb2hdmi_descrpt = mAudioDeviceDescriptor;
 				else if (!strncmp(PortName, ALSAPORT_I2S2HDMI, strlen(ALSAPORT_I2S2HDMI)))
@@ -315,6 +319,9 @@ int alsa_device_update_pcm_index(int alsaPORT, int stream)
 		break;
 	case PORT_SPDIF:
 		pADD = p_info->spdif_descrpt;
+		break;
+	case PORT_SPDIF_B:
+		pADD = p_info->spdif_b_descrpt;
 		break;
 	case PORT_PCM:
 		pADD = p_info->pcm_descrpt;

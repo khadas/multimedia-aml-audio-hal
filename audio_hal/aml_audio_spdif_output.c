@@ -40,6 +40,13 @@ void  aml_audio_spdif_output_stop(struct audio_stream_out *stream)
         aml_dev->dual_spdifenc_inited = 0;
         ALOGI("%s done,pcm handle %p \n", __func__, pcm);
     }
+
+    pcm = aml_dev->pcm_handle[DIGITAL_SPDIF_DEVICE];
+    if (pcm) {
+        pcm_close(pcm);
+        aml_tinymix_set_spdifb_format(AUDIO_FORMAT_PCM_16_BIT, aml_out);
+        aml_dev->pcm_handle[DIGITAL_SPDIF_DEVICE] = NULL;
+    }
 }
 
 int  aml_audio_spdif_output_start(struct audio_stream_out *stream, audio_format_t output_format)
@@ -84,8 +91,7 @@ int  aml_audio_spdif_output_start(struct audio_stream_out *stream, audio_format_
         }
         aml_tinymix_set_spdif_format(output_format, aml_out);
         pthread_mutex_lock(&aml_dev->alsa_pcm_lock);
-        unsigned int port = PORT_SPDIF;
-        port = alsa_device_update_pcm_index(port, PLAYBACK);
+        unsigned int port = alsa_device_update_pcm_index(PORT_SPDIF, PLAYBACK);
         pcm = pcm_open(aml_out->card, port, PCM_OUT, &config);
         if (!pcm_is_ready(pcm)) {
             ALOGE("%s() cannot open pcm_out: %s,card %d,device %d", __func__, pcm_get_error(pcm), aml_out->card, DIGITAL_DEVICE);
@@ -99,6 +105,32 @@ int  aml_audio_spdif_output_start(struct audio_stream_out *stream, audio_format_
         aml_dev->spdif_out_rate             = config.rate;
         pthread_mutex_unlock(&aml_dev->alsa_pcm_lock);
 
+        /* for second digital output with DD on SPDIF port from SPDIF_B interface */
+        if (aml_dev->spdif_on && aml_dev->ms12.dolby_ms12_enable && !is_bypass_dolbyms12(stream) && (output_format == AUDIO_FORMAT_E_AC3)) {
+            struct dolby_ms12_desc *ms12 = &(aml_dev->ms12);
+            get_hardware_config_parameters(
+                &(config)
+                , AUDIO_FORMAT_AC3
+                , audio_channel_count_from_out_mask(ms12->output_channelmask)
+                , ms12->output_samplerate
+                , aml_out->is_tv_platform
+                , continous_mode(aml_dev));
+            aml_tinymix_set_spdifb_format(AUDIO_FORMAT_AC3, aml_out);
+            pthread_mutex_lock(&aml_dev->alsa_pcm_lock);
+            port = alsa_device_update_pcm_index(PORT_SPDIF_B, PLAYBACK);
+            if (port >= 0) {
+                pcm = pcm_open(aml_out->card, port, PCM_OUT, &config);
+                if (!pcm_is_ready(pcm)) {
+                    ALOGE("%s() cannot open pcm_out: %s,card %d,device %d", __func__, pcm_get_error(pcm), aml_out->card, DIGITAL_SPDIF_DEVICE);
+                    pcm_close(pcm);
+                    pthread_mutex_unlock(&aml_dev->alsa_pcm_lock);
+                    return -ENOENT;
+                }
+                ALOGI("%s open  output pcm handle %p,port %d", __func__, pcm, port);
+                aml_dev->pcm_handle[DIGITAL_SPDIF_DEVICE] = pcm;
+            }
+            pthread_mutex_unlock(&aml_dev->alsa_pcm_lock);
+        }
     }
 
     return 0;
@@ -165,15 +197,19 @@ ssize_t aml_audio_spdif_output(struct audio_stream_out *stream,
     if (aml_dev->patch_src == SRC_DTV && aml_dev->parental_control_av_mute) {
         memset(buffer, 0x0, byte);
     }
-    if (spdifenc_get_format() != output_format) {
+    if (aml_dev->pcm_format[DIGITAL_DEVICE] != aml_dev->optical_format) {
         need_reinit_encoder = true;
         if (pcm) {
             pcm_close(pcm);
             aml_dev->pcm_handle[DIGITAL_DEVICE] = NULL;
             pcm = NULL;
         }
+        if (aml_dev->pcm_handle[DIGITAL_SPDIF_DEVICE]) {
+            pcm_close(aml_dev->pcm_handle[DIGITAL_SPDIF_DEVICE]);
+            aml_dev->pcm_handle[DIGITAL_SPDIF_DEVICE] = NULL;
+        }
         aml_dev->dual_spdifenc_inited = 0;
-        ALOGI("%s ,format change from 0x%x to 0x%x,need reinit spdif encoder and alsa\n", __func__, spdifenc_get_format(), output_format);
+        ALOGI("%s ,format change from 0x%x to 0x%x,need reinit spdif encoder and alsa\n", __func__, aml_dev->pcm_format[DIGITAL_DEVICE], output_format);
     }
     if (!pcm) {
         ret = aml_audio_spdif_output_start(stream, output_format);
@@ -181,6 +217,7 @@ ssize_t aml_audio_spdif_output(struct audio_stream_out *stream,
             return ret;
         }
         pcm = aml_dev->pcm_handle[DIGITAL_DEVICE];
+        aml_dev->pcm_format[DIGITAL_DEVICE] = output_format;
     }
 
     if (eDolbyDcvLib == aml_dev->dolby_lib_type) {
@@ -210,14 +247,26 @@ ssize_t aml_audio_spdif_output(struct audio_stream_out *stream,
                 }
             }
 
-            int init_ret = spdifenc_init(pcm, output_format);
-            if (init_ret == 0) {
+            void *spdifenc = spdifenc_init(pcm, output_format);
+            if (spdifenc) {
                 aml_dev->dual_spdifenc_inited = 1;
                 aml_tinymix_set_spdif_format(output_format, aml_out);
-                spdifenc_set_mute(aml_out->offload_mute);
+                spdifenc_set_mute(spdifenc, aml_out->offload_mute);
                 //ALOGI("%s tinymix AML_MIXER_ID_SPDIF_FORMAT %d\n", __FUNCTION__, AML_DOLBY_DIGITAL);
             }
+
+            /* create 2nd instance of SPDIF encoder for DD output on SPDIF port with SPDIF_B port */
+            if ((output_format == AUDIO_FORMAT_E_AC3) && aml_dev->pcm_handle[DIGITAL_SPDIF_DEVICE]) {
+                ALOGI("spdifenc_init AUDIO_FORMAT_AC3 for spdif");
+                spdifenc = spdifenc_init(aml_dev->pcm_handle[DIGITAL_SPDIF_DEVICE], AUDIO_FORMAT_AC3);
+                if (spdifenc) {
+                    aml_tinymix_set_spdifb_format(AUDIO_FORMAT_AC3, aml_out);
+                    spdifenc_set_mute(spdifenc, aml_out->offload_mute);
+                }
+            }
         }
+
+#if 0
         {
             struct snd_pcm_status status;
             pcm_ioctl(pcm, SNDRV_PCM_IOCTL_STATUS, &status);
@@ -225,7 +274,10 @@ ssize_t aml_audio_spdif_output(struct audio_stream_out *stream,
                 ALOGW("%s alsa underrun", __func__);
             }
         }
-        ret = spdifenc_write(buffer, byte);
+#endif
+
+        ret = spdifenc_write(spdifenc_get(output_format), buffer, byte);
+
         ALOGV("%s(), spdif write bytes = %d", __func__, ret);
     }
     return ret;

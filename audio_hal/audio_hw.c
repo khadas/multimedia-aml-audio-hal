@@ -900,8 +900,8 @@ static int start_output_stream_direct (struct aml_stream_out *out)
            }
 
         } else {
-            spdifenc_init(out->pcm, out->hal_internal_format);
-            spdifenc_set_mute(out->offload_mute);
+            void *spdifenc = spdifenc_init(out->pcm, out->hal_internal_format);
+            spdifenc_set_mute(spdifenc, out->offload_mute);
             out->spdif_enc_init_frame_write_sum = out->frame_write_sum;
         }
     }
@@ -1792,13 +1792,14 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
 
     /* for not use ms12 case, we can use spdif enc mute, other wise ms12 can handle it*/
     if (is_dolby_format && (eDolbyDcvLib == adev->dolby_lib_type || is_bypass_dolbyms12(stream) || adev->hdmi_format == BYPASS)) {
+        void *spdifenc = spdifenc_get(out->hal_internal_format);
         if (out->volume_l < FLOAT_ZERO && left > FLOAT_ZERO) {
             ALOGI("set offload mute: false");
-            spdifenc_set_mute(false);
+            spdifenc_set_mute(spdifenc, false);
             out->offload_mute = false;
         } else if (out->volume_l > FLOAT_ZERO && left < FLOAT_ZERO) {
             ALOGI("set offload mute: true");
-            spdifenc_set_mute(true);
+            spdifenc_set_mute(spdifenc, true);
             out->offload_mute = true;
         }
     }
@@ -3023,8 +3024,8 @@ static ssize_t out_write_direct(struct audio_stream_out *stream, const void* buf
                     ALOGI("dcv_decoder_init_patch return :%d,is 61937 %d", status, ddp_dec->is_iec61937);
                }
             } else {
-                spdifenc_init(out->pcm, out->hal_internal_format);
-                spdifenc_set_mute(out->offload_mute);
+                void *spdif_enc = spdifenc_init(out->pcm, out->hal_internal_format);
+                spdifenc_set_mute(spdif_enc, out->offload_mute);
                 out->spdif_enc_init_frame_write_sum = out->frame_write_sum;
             }
         }
@@ -3222,20 +3223,21 @@ rewrite:
 
          } else if (out->codec_type  > 0) {
             // compressed audio DD/DD+
-            bytes = spdifenc_write ( (void *) buf, out_frames * frame_size);
+            void *spdifenc = spdifenc_get(out->hal_internal_format);
+            bytes = spdifenc_write (spdifenc, (void *) buf, out_frames * frame_size);
             //need return actual size of this burst write
             if (out->hw_sync_mode == 1) {
                 bytes = hwsync_cost_bytes;
             }
             //ALOGV ("spdifenc_write return %zu\n", bytes);
             if (out->codec_type == TYPE_EAC3) {
-                out->frame_write_sum = spdifenc_get_total() / 16 + out->spdif_enc_init_frame_write_sum;
+                out->frame_write_sum = spdifenc_get_total(spdifenc) / 16 + out->spdif_enc_init_frame_write_sum;
             } else {
-                out->frame_write_sum = spdifenc_get_total() / 4 + out->spdif_enc_init_frame_write_sum;
+                out->frame_write_sum = spdifenc_get_total(spdifenc) / 4 + out->spdif_enc_init_frame_write_sum;
             }
             //ALOGV ("out %p, after out->frame_write_sum %"PRId64"\n", out, out->frame_write_sum);
             ALOGV("---after out->frame_write_sum %"PRId64",spdifenc total %lld\n",
-                out->frame_write_sum, spdifenc_get_total() / 16);
+                out->frame_write_sum, spdifenc_get_total(spdifenc) / 16);
         }
         goto exit;
     }
@@ -5068,7 +5070,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
             dolby_ms12_set_main_volume(1.0);
             if (out->offload_mute) {
                 out->offload_mute = false;
-                spdifenc_set_mute(false);
+                spdifenc_set_mute(spdifenc_get(out->hal_internal_format), false);
             }
         }
     }
@@ -5548,6 +5550,10 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             adev->out_device |= val;
             ALOGI("adev_set_parameters a2dp connect: %x, device=%x\n", val, adev->out_device);
         }*/
+        if (val & AUDIO_DEVICE_OUT_SPDIF) {
+            /* use SPDIF connect to control whether an always-on spdif output is needed */
+            adev->spdif_on = true;
+        }
         goto exit;
     }
 
@@ -9013,6 +9019,12 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
                             adev->pcm_handle[DIGITAL_DEVICE] = NULL;
                             set_stream_dual_output(stream, false);
                             aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+
+                            if (adev->pcm_handle[DIGITAL_SPDIF_DEVICE]) {
+                                pcm_close(adev->pcm_handle[DIGITAL_SPDIF_DEVICE]);
+                                adev->pcm_handle[DIGITAL_SPDIF_DEVICE] = NULL;
+                                aml_tinymix_set_spdifb_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+                            }
                         }
                     }
                     ALOGI("dcv_decoder_release_patch release");

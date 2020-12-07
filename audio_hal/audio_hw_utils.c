@@ -1276,6 +1276,30 @@ void aml_tinymix_set_spdif_format(audio_format_t output_format,struct aml_stream
           __FUNCTION__, aml_spdif_format, spdif_mute);
 }
 
+void aml_tinymix_set_spdifb_format(audio_format_t output_format,struct aml_stream_out *stream)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *aml_dev = aml_out->dev;
+    int aml_spdif_format = AML_STEREO_PCM;
+    int spdif_mute = 0;
+    if (output_format == AUDIO_FORMAT_AC3) {
+        aml_spdif_format = AML_DOLBY_DIGITAL;
+    } else if (output_format == AUDIO_FORMAT_DTS) {
+        aml_spdif_format = AML_DTS;
+#ifdef ENABLE_DTV_PATCH
+        audio_set_spdif_clock(stream, AML_DTS);
+#endif
+    } else {
+        aml_spdif_format = AML_STEREO_PCM;
+#ifdef ENABLE_DTV_PATCH
+        audio_set_spdif_clock(stream, AML_STEREO_PCM);
+#endif
+    }
+    aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_B_FORMAT, aml_spdif_format);
+    aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_B_MUTE, 0);
+    ALOGI("%s tinymix AML_MIXER_ID_SPDIF_B_FORMAT %d,spdif mute %d",
+          __FUNCTION__, aml_spdif_format, spdif_mute);
+}
 
 void aml_audio_set_cpu23_affinity()
 {

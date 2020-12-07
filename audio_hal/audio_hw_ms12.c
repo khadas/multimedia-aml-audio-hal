@@ -152,7 +152,7 @@ bool is_ms12_out_ddp_5_1_suitable(bool is_ddp_atmos)
 /*
  *@brief get ms12 output configure mask
  */
-static int get_ms12_output_mask(audio_format_t sink_format, audio_format_t optical_format)
+static int get_ms12_output_mask(audio_format_t sink_format, audio_format_t optical_format, bool spdif_on)
 {
     int  output_config;
     if (sink_format == AUDIO_FORMAT_E_AC3)
@@ -172,6 +172,10 @@ static int get_ms12_output_mask(audio_format_t sink_format, audio_format_t optic
 
     /* enable downmix output for headphone always-on */
     output_config |= MS12_OUTPUT_MASK_STEREO;
+
+    if (spdif_on && (output_config & (MS12_OUTPUT_MASK_DDP))) {
+        output_config |= MS12_OUTPUT_MASK_DD;
+    }
 
     return output_config;
 }
@@ -391,7 +395,7 @@ int get_the_dolby_ms12_prepared(
 #else
     // LINUX Change
     // Currently we only enable max one PCM and one bitstream (DD/DDP/MAT) output to save on CPU loading
-    int output_config = get_ms12_output_mask(adev->sink_format, adev->optical_format);
+    int output_config = get_ms12_output_mask(adev->sink_format, adev->optical_format, adev->spdif_on);
 
     if (adev->active_outport == OUTPORT_HDMI_ARC) {
         /* when ARC/eARC is running, disable DAP for CPU loading */
@@ -1235,6 +1239,7 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12
                 ALOGI("hdmi format=%d bypass =%d size=%d",adev->hdmi_format, ms12->is_bypass_ms12, out_size);
             }
             if (out_size != 0) {
+                /* TM2 with dedicated eARC port */
                 if (SUPPORT_EARC_OUT_HW && adev->active_outport == OUTPORT_HDMI_ARC) {
                     if (adev->bHDMIARCon &&
                         audio_hal_data_processing((struct audio_stream_out *)aml_out, buffer, size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
@@ -1246,6 +1251,9 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12
                 dump_ms12_output_data(buffer, size, MS12_OUTPUT_BITSTREAM_FILE);
             }
 
+        } else if (adev->spdif_on && (output_format == AUDIO_FORMAT_AC3)) {
+            /* a secondary DD output which may happen for spdif output when main digital output is DDP for HDMI/ARC */
+            ret = aml_audio_spdif_output(stream_out, buffer, size, output_format);
         }
         after_time = aml_audio_get_systime();
     } else if (!(ms12->output_config & MS12_OUTPUT_MASK_SPEAKER) || adev->dap_bypass_enable) {
@@ -1331,6 +1339,10 @@ static void *dolby_ms12_threadloop(void *data)
             pcm_close(pcm);
             adev->pcm_handle[DIGITAL_DEVICE] = NULL;
             aml_out->dual_output_flag = 0;
+            if (adev->pcm_handle[DIGITAL_SPDIF_DEVICE]) {
+                pcm_close(adev->pcm_handle[DIGITAL_SPDIF_DEVICE]);
+                adev->pcm_handle[DIGITAL_SPDIF_DEVICE] = NULL;
+            }
         }
         pthread_mutex_unlock(&adev->alsa_pcm_lock);
         release_audio_stream((struct audio_stream_out *)aml_out);

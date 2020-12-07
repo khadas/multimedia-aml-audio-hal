@@ -21,11 +21,12 @@
 //extern "C" {
 //#endif
 
-int spdifenc_init(struct pcm *mypcm, audio_format_t format);
-int spdifenc_write(const void *buffer, size_t numBytes);
-uint64_t  spdifenc_get_total(void);
-int spdifenc_set_mute(bool mute);
-audio_format_t  spdifenc_get_format(void);
+void *spdifenc_init(struct pcm *mypcm, audio_format_t format);
+void *spdifenc_get(audio_format_t format);
+int spdifenc_write(void *enc, const void *buffer, size_t numBytes);
+uint64_t  spdifenc_get_total(void *enc);
+int spdifenc_set_mute(void *enc, bool mute);
+audio_format_t  spdifenc_get_format(void *enc);
 
 //#ifdef __cplusplus
 //}

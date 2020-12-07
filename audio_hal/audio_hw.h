@@ -323,6 +323,7 @@ typedef enum stream_usecase {
 typedef enum alsa_device {
     I2S_DEVICE = 0,
     DIGITAL_DEVICE,
+    DIGITAL_SPDIF_DEVICE,
     TDM_DEVICE,
     EARC_DEVICE,
     ALSA_DEVICE_CNT
@@ -451,6 +452,7 @@ struct aml_audio_device {
     /* Now only three pcm handle supported: I2S, SPDIF, EARC */
     pthread_mutex_t alsa_pcm_lock;
     struct pcm *pcm_handle[ALSA_DEVICE_CNT];
+    audio_format_t pcm_format[ALSA_DEVICE_CNT];
     int pcm_refs[ALSA_DEVICE_CNT];
     bool is_paused[ALSA_DEVICE_CNT];
     struct aml_hw_mixer hw_mixer;
@@ -605,6 +607,9 @@ struct aml_audio_device {
     bool ms12_tv_tuning;
 
     bool hdmitx_audio;
+
+    /* always spdif on */
+    bool spdif_on;
 };
 
 struct meta_data {

@@ -38,6 +38,7 @@ static struct aml_mixer_list gAmlMixerList[] = {
     {AML_MIXER_ID_I2S_MUTE,             "Audio i2s mute"},
     /* for spdif out status */
     {AML_MIXER_ID_SPDIF_MUTE,           "Audio spdif mute"},
+    {AML_MIXER_ID_SPDIF_B_MUTE,         "Audio spdif_b mute"},
     /* for HDMI TX status */
     {AML_MIXER_ID_HDMI_OUT_AUDIO_MUTE,  "Audio hdmi-out mute"},
     /* for HDMI ARC status */
@@ -62,6 +63,7 @@ static struct aml_mixer_list gAmlMixerList[] = {
     /* for ATV status */
     {AML_MIXER_ID_ATV_IN_AUDIO_STABLE,  "ATV audio stable"},
     {AML_MIXER_ID_SPDIF_FORMAT,         "Audio spdif format"},
+    {AML_MIXER_ID_SPDIF_B_FORMAT,       "Audio spdif_b format"},
     /* for AV status */
     {AML_MIXER_ID_AV_IN_AUDIO_STABLE,   "AV audio stable"},
     /* for Speaker master volume */
