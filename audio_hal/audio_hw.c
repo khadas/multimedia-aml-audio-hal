@@ -10935,9 +10935,12 @@ void *audio_patch_input_threadloop(void *data)
                         cur_aformat = AUDIO_FORMAT_PCM_32_BIT;
                     }
 #endif
-                    if ((current_channel != -1 && current_channel != last_channel_count) ||
+                    if ((current_channel != -1) &&
+                        (cur_audio_packet != AUDIO_PACKET_NONE) &&
+                        (cur_aformat != AUDIO_FORMAT_INVALID) &&
+                        ((current_channel != last_channel_count) ||
                         (cur_aformat != last_aformat) ||
-                        (cur_audio_packet != last_audio_packet)) {
+                        (cur_audio_packet != last_audio_packet))) {
                         int period_size = 0;
                         int buf_size = 0;
                         int nChans = current_channel;
@@ -11078,7 +11081,20 @@ void *audio_patch_input_threadloop(void *data)
             if (get_buffer_read_space(ringbuffer) >= bytes_avail) {
                 pthread_cond_signal(&patch->cond);
             }
+
             usleep(3000);
+
+            ALOGI("restart input for PCM read error %d", bytes_avail);
+            pthread_mutex_lock(&in->lock);
+            if (0 == in->standby) {
+                do_input_standby(in);
+            }
+            ret = start_input_stream(in);
+            in->standby = 0;
+            pthread_mutex_unlock(&in->lock);
+            if (ret < 0) {
+                ALOGW("start input stream failed! ret:%#x", ret);
+            }
         }
     }
 
