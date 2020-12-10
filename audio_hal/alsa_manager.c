@@ -302,6 +302,11 @@ void aml_alsa_output_close(struct audio_stream_out *stream)
             pcm_close(pcm);
             adev->pcm_handle[device] = NULL;
         }
+        pcm = adev->pcm_handle[DIGITAL_SPDIF_DEVICE];
+        if (pcm) {
+            pcm_close(pcm);
+            adev->pcm_handle[DIGITAL_SPDIF_DEVICE] = NULL;
+        }
     }
     if ((adev->continuous_audio_mode == 1) && (eDolbyMS12Lib == adev->dolby_lib_type)) {
         audio_virtual_buf_close(&aml_out->alsa_vir_buf_handle);

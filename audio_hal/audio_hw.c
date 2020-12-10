@@ -259,7 +259,6 @@ int start_ease_out(struct aml_audio_device *adev) {
 }
 static void select_output_device (struct aml_audio_device *adev);
 static void select_input_device (struct aml_audio_device *adev);
-static void select_devices (struct aml_audio_device *adev);
 static int adev_set_voice_volume (struct audio_hw_device *dev, float volume);
 static int do_input_standby (struct aml_stream_in *in);
 static int do_output_standby (struct aml_stream_out *out);
@@ -524,50 +523,6 @@ static int aml_hal_mixer_read (struct aml_hal_mixer *mixer, void *r_buf, uint si
 }
 // aml audio hal mixer code end
 
-static void select_devices (struct aml_audio_device *adev)
-{
-    ALOGD ("%s(mode=%d, out_device=%#x)", __FUNCTION__, adev->mode, adev->out_device);
-    int headset_on;
-    int headphone_on;
-    int speaker_on;
-    int hdmi_on;
-    int earpiece;
-    int mic_in;
-    int headset_mic;
-
-    headset_on = adev->out_device & AUDIO_DEVICE_OUT_WIRED_HEADSET;
-    headphone_on = adev->out_device & AUDIO_DEVICE_OUT_WIRED_HEADPHONE;
-    speaker_on = adev->out_device & AUDIO_DEVICE_OUT_SPEAKER;
-    hdmi_on = adev->out_device & AUDIO_DEVICE_OUT_AUX_DIGITAL;
-    earpiece =  adev->out_device & AUDIO_DEVICE_OUT_EARPIECE;
-    mic_in = adev->in_device & (AUDIO_DEVICE_IN_BUILTIN_MIC | AUDIO_DEVICE_IN_BACK_MIC);
-    headset_mic = adev->in_device & AUDIO_DEVICE_IN_WIRED_HEADSET;
-
-    ALOGD ("%s : hs=%d , hp=%d, sp=%d, hdmi=0x%x,earpiece=0x%x", __func__,
-             headset_on, headphone_on, speaker_on, hdmi_on, earpiece);
-    ALOGD ("%s : in_device(%#x), mic_in(%#x), headset_mic(%#x)", __func__,
-             adev->in_device, mic_in, headset_mic);
-    audio_route_reset (adev->ar);
-    if (hdmi_on) {
-        audio_route_apply_path (adev->ar, "hdmi");
-    }
-    if (headphone_on || headset_on) {
-        audio_route_apply_path (adev->ar, "headphone");
-    }
-    if (speaker_on || earpiece) {
-        audio_route_apply_path (adev->ar, "speaker");
-    }
-    if (mic_in) {
-        audio_route_apply_path (adev->ar, "main_mic");
-    }
-    if (headset_mic) {
-        audio_route_apply_path (adev->ar, "headset-mic");
-    }
-
-    audio_route_update_mixer (adev->ar);
-
-}
-
 static void select_mode (struct aml_audio_device *adev)
 {
     ALOGD ("%s(out_device=%#x)", __FUNCTION__, adev->out_device);
@@ -625,10 +580,6 @@ static int start_output_stream (struct aml_stream_out *out)
                         audio_is_linear_pcm(out->hal_internal_format) && channel_count <= 2);
     ALOGD("%s(adev->out_device=%#x, adev->mode=%d)",
             __FUNCTION__, adev->out_device, adev->mode);
-    if (adev->mode != AUDIO_MODE_IN_CALL) {
-        /* FIXME: only works if only one output can be active at a time */
-        //select_devices(adev);
-    }
     if (out->hw_sync_mode == true) {
         adev->hwsync_output = out;
 #if 0
@@ -1467,7 +1418,6 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
             }
             adev->out_device &= ~AUDIO_DEVICE_OUT_ALL;
             adev->out_device |= val;
-            //select_devices(adev);
         }
         pthread_mutex_unlock (&out->lock);
         if (force_input_standby) {
@@ -4425,6 +4375,15 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             //clock_gettime(CLOCK_MONOTONIC, &adev->mute_start_ts);
             adev->patch_start = false;
             in->mute_flag = 1;
+
+            // LINUX change.
+            // When there is no stable signal, not returning zero data
+            // since aml_alsa_input_read just error out with undefined
+            // duration, causing pipeline either starving and alsa output
+            // underrun, or input ring buffer overflow`
+            bytes = 0;
+            ret = 0;
+            goto exit;
         }
 
         if (in->mute_flag == 1) {
@@ -7301,6 +7260,7 @@ int do_output_standby_l(struct audio_stream *stream)
                 //pcm_close(pcm);
                 //adev->pcm_handle[DIGITAL_DEVICE] = NULL;
                 aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT, aml_out);
+                aml_tinymix_set_spdifb_format(AUDIO_FORMAT_PCM_16_BIT, aml_out);
                 set_stream_dual_output(out, false);
             }
         }
@@ -7343,6 +7303,11 @@ int do_output_standby_l(struct audio_stream *stream)
                         pcm_close(pcm);
                         adev->pcm_handle[DIGITAL_DEVICE] = NULL;
                         set_stream_dual_output(out, false);
+                    }
+                    pcm = adev->pcm_handle[DIGITAL_SPDIF_DEVICE];
+                    if (pcm) {
+                        pcm_close(pcm);
+                        adev->pcm_handle[DIGITAL_SPDIF_DEVICE] = NULL;
                     }
                     pthread_mutex_unlock(&adev->alsa_pcm_lock);
                     if (adev->dual_spdifenc_inited) {
@@ -8770,7 +8735,8 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
     if (adev->bHDMIConnected) {
         is_arc_connected = 1;
 
-        if (aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE) == ATTEND_TYPE_NONE) {
+        if (SUPPORT_EARC_OUT_HW &&
+            (aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE) == ATTEND_TYPE_NONE)) {
             is_arc_connected = 0;
         }
     }
@@ -8826,13 +8792,21 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
             virtualx_setparameter(adev,TRUVOLUMEINMODE,0,5);
             adev->effect_in_ch = 2;
             if (dts_dec->digital_raw > 0) {
-                struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
-                if (pcm && is_dual_output_stream(stream)) {
-                    ALOGI("%s close dual output pcm handle %p", __func__, pcm);
-                    pcm_close(pcm);
-                    adev->pcm_handle[DIGITAL_DEVICE] = NULL;
-                    set_stream_dual_output(stream, false);
-                    aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+                if (is_dual_output_stream(stream)) {
+                    struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
+                    if (pcm) {
+                        ALOGI("%s close dual output pcm handle %p", __func__, pcm);
+                        pcm_close(pcm);
+                        adev->pcm_handle[DIGITAL_DEVICE] = NULL;
+                        set_stream_dual_output(stream, false);
+                        aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+                    }
+                    pcm = adev->pcm_handle[DIGITAL_SPDIF_DEVICE];
+                    if (pcm) {
+                        pcm_close(pcm);
+                        adev->pcm_handle[DIGITAL_SPDIF_DEVICE] = NULL;
+                        aml_tinymix_set_spdifb_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+                    }
                 }
             }
             ALOGI("dca_decoder_release_patch release");
@@ -8850,6 +8824,12 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
                 adev->pcm_handle[DIGITAL_DEVICE] = NULL;
                 ALOGI("------%s close pcm handle %p", __func__, pcm);
                 aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+            }
+
+            pcm = adev->pcm_handle[DIGITAL_SPDIF_DEVICE];
+            if (pcm) {
+                pcm_close(pcm);
+                adev->pcm_handle[DIGITAL_SPDIF_DEVICE] = NULL;
             }
             update_stream_dual_output(stream);
             if (adev->dual_spdifenc_inited) {
@@ -9012,16 +8992,19 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
                                           || aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3)) {
                     dcv_decoder_release_patch(ddp_dec);
                     if (ddp_dec->digital_raw > 0) {
-                        struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
-                        if (pcm && is_dual_output_stream(stream)) {
-                            ALOGI("%s close dual output pcm handle %p", __func__, pcm);
-                            pcm_close(pcm);
-                            adev->pcm_handle[DIGITAL_DEVICE] = NULL;
-                            set_stream_dual_output(stream, false);
-                            aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+                        if (is_dual_output_stream(stream)) {
+                            struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
+                            if (pcm) {
+                                ALOGI("%s close dual output pcm handle %p", __func__, pcm);
+                                pcm_close(pcm);
+                                adev->pcm_handle[DIGITAL_DEVICE] = NULL;
+                                set_stream_dual_output(stream, false);
+                                aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+                            }
 
-                            if (adev->pcm_handle[DIGITAL_SPDIF_DEVICE]) {
-                                pcm_close(adev->pcm_handle[DIGITAL_SPDIF_DEVICE]);
+                            pcm = adev->pcm_handle[DIGITAL_SPDIF_DEVICE];
+                            if (pcm) {
+                                pcm_close(pcm);
                                 adev->pcm_handle[DIGITAL_SPDIF_DEVICE] = NULL;
                                 aml_tinymix_set_spdifb_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
                             }
@@ -9087,13 +9070,21 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
                 virtualx_setparameter(adev,TRUVOLUMEINMODE,0,5);
                 adev->effect_in_ch = 2;
                 if (dts_dec->digital_raw > 0) {
-                    struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
-                    if (pcm && is_dual_output_stream(stream)) {
-                        ALOGI("%s close dual output pcm handle %p", __func__, pcm);
-                        pcm_close(pcm);
-                        adev->pcm_handle[DIGITAL_DEVICE] = NULL;
-                        set_stream_dual_output(stream, false);
-                        aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+                    if (is_dual_output_stream(stream)) {
+                        struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
+                        if (pcm && is_dual_output_stream(stream)) {
+                            ALOGI("%s close dual output pcm handle %p", __func__, pcm);
+                            pcm_close(pcm);
+                            adev->pcm_handle[DIGITAL_DEVICE] = NULL;
+                            set_stream_dual_output(stream, false);
+                            aml_tinymix_set_spdif_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+                        }
+                        pcm = adev->pcm_handle[DIGITAL_SPDIF_DEVICE];
+                        if (pcm) {
+                            pcm_close(pcm);
+                            adev->pcm_handle[DIGITAL_SPDIF_DEVICE] = NULL;
+                            aml_tinymix_set_spdifb_format(AUDIO_FORMAT_PCM_16_BIT,aml_out);
+                        }
                     }
                 }
                 ALOGI("dca_decoder_release_patch release");
@@ -9251,7 +9242,7 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
      * when eARC is not available and return ATTEND_TYPE_NONE
      * when there is no ARC/eARC connected.
      */
-    if ((adev->bHDMIConnected) && (!adev->arc_hdmi_updated)) {
+    if ((adev->bHDMIConnected) && (!adev->arc_hdmi_updated) && SUPPORT_EARC_OUT_HW) {
         int arc_connected = aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE);
 
         if ((adev->bHDMIARCon) && (arc_connected == ATTEND_TYPE_NONE)) {
@@ -11084,16 +11075,19 @@ void *audio_patch_input_threadloop(void *data)
 
             usleep(3000);
 
-            ALOGI("restart input for PCM read error %d", bytes_avail);
-            pthread_mutex_lock(&in->lock);
-            if (0 == in->standby) {
-                do_input_standby(in);
-            }
-            ret = start_input_stream(in);
-            in->standby = 0;
-            pthread_mutex_unlock(&in->lock);
-            if (ret < 0) {
-                ALOGW("start input stream failed! ret:%#x", ret);
+            if (bytes_avail < 0) {
+                // A negative return from in_read() meaning ALSA errors
+                ALOGI("restart input for PCM read error %d", bytes_avail);
+                pthread_mutex_lock(&in->lock);
+                if (0 == in->standby) {
+                    do_input_standby(in);
+                }
+                ret = start_input_stream(in);
+                in->standby = 0;
+                pthread_mutex_unlock(&in->lock);
+                if (ret < 0) {
+                    ALOGW("start input stream failed! ret:%#x", ret);
+                }
             }
         }
     }
@@ -11769,6 +11763,10 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
 
     /* mix to device audio patch */
     if (src_config->type == AUDIO_PORT_TYPE_MIX) {
+        // LINUX change
+        // The application layer may only set to use AUDIO_DEVICE_OUT_SPEAKER,
+        // Ignore output_routing changes when setting patch
+# if 0
         if (sink_config->type != AUDIO_PORT_TYPE_DEVICE) {
             ALOGE("unsupport patch case");
             ret = -EINVAL;
@@ -11832,22 +11830,13 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
             }
         }
 
-        // LINUX change
-        // The application layer may only set to use AUDIO_DEVICE_OUT_SPEAKER,
-        // force to use OUTPORT_HDMI_ARC when ARC/eARC is connected to match the log in output_config()
-        if ((num_sinks == 1) && (sink_config[0].ext.device.type == AUDIO_DEVICE_OUT_SPEAKER)) {
-            if (aml_dev->bHDMIARCon) {
-                outport = OUTPORT_HDMI_ARC;
-                ALOGI("%s() mix->device patch: force patch sink to OUTPORT_HDMI_ARC for AUDIO_DEVICE_OUT_SPEAKER", __func__);
-            }
-        }
-
         if (outport != OUTPORT_SPDIF) {
             ret = aml_audio_output_routing(dev, outport, false);
         }
         if (ret < 0) {
             ALOGE("%s() output routing failed", __func__);
         }
+#endif
 
         aml_dev->out_device = 0;
         for (i = 0; i < num_sinks; i++) {
@@ -11955,6 +11944,10 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
 
     /*device to device audio patch. TODO: unify with the android device type*/
     if (sink_config->type == AUDIO_PORT_TYPE_DEVICE && src_config->type == AUDIO_PORT_TYPE_DEVICE) {
+        // LINUX change
+        // The application layer may only set to use AUDIO_DEVICE_OUT_SPEAKER,
+        // Ignore output_routing changes when setting patch
+#if 0
         switch (sink_config->ext.device.type) {
         case AUDIO_DEVICE_OUT_HDMI_ARC:
             outport = OUTPORT_HDMI_ARC;
@@ -12017,6 +12010,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
         if (ret < 0) {
             ALOGE("%s() output routing failed", __func__);
         }
+#endif
         aml_dev->out_device = sink_config->ext.device.type;
 
         if (sink_config->config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) {
