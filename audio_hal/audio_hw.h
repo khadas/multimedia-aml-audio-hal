@@ -586,6 +586,8 @@ struct aml_audio_device {
     int audio_discontinue;
     int no_underrun_count;
     int no_underrun_max;
+    int start_mute_flag;
+    int ad_start_enable;
     int count;/*record the number of adev_open calls*/
     /* display audio format on UI, both streaming and hdmiin*/
     audio_format_t hal_internal_format;
@@ -597,7 +599,6 @@ struct aml_audio_device {
     int   dap_bypass_enable;
     int   dap_output_channels;
     float dap_bypassgain;
-    int ad_start_enable;
 
     /* master volume */
     float master_volume;
