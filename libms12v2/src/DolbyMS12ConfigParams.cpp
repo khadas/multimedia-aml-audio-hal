@@ -662,7 +662,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
         (*row_index)++;
     }
 
-    if (!mDBGOut) {
+    if (mDBGOut) {
         sprintf(ConfigParams[*row_index], "%s", "-dbgout");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%d", mDBGOut);

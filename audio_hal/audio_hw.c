@@ -9301,7 +9301,6 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
     if (adev->out_device != aml_out->out_device) {
         ALOGI ("%s(), output routing changed, need reconfig output", __func__);
         need_reconfig_output = true;
-        need_reset_decoder = false;
         aml_out->out_device = adev->out_device;
     }
 hwsync_rewrite:

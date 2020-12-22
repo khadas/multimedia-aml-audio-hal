@@ -222,14 +222,21 @@ void get_sink_format (struct audio_stream_out *stream)
     case PCM:
         break;
     case DD:
-        optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_AC3 : AUDIO_FORMAT_DTS;
+        optical_audio_format = AUDIO_FORMAT_AC3;
         break;
     case DDP:
-        optical_audio_format = (source_format != AUDIO_FORMAT_DTS && source_format != AUDIO_FORMAT_DTS_HD) ? AUDIO_FORMAT_E_AC3 : AUDIO_FORMAT_DTS;
+        optical_audio_format = AUDIO_FORMAT_E_AC3;
         break;
     case BYPASS:
-        sink_audio_format = min(sink_capability,source_format);
-        optical_audio_format = sink_audio_format;
+        optical_audio_format = min(sink_capability, source_format);
+        // for TV with SPDIF as 2nd digital output, allow AUDIO_FORMAT_AC3
+        // for SPDIF output
+        if (!adev->hdmitx_audio && adev->spdif_on) {
+            if ((optical_audio_format == AUDIO_FORMAT_PCM_16_BIT) &&
+                (source_format == AUDIO_FORMAT_AC3)) {
+                optical_audio_format = AUDIO_FORMAT_AC3;
+            }
+        }
         break;
     case AUTO:
     default:
@@ -241,6 +248,12 @@ void get_sink_format (struct audio_stream_out *stream)
         }
         break;
     }
+
+    if ((source_format == AUDIO_FORMAT_DTS) || (source_format == AUDIO_FORMAT_DTS_HD)) {
+        optical_audio_format = AUDIO_FORMAT_DTS;
+        sink_audio_format = optical_audio_format;
+    }
+
 #endif
 
     adev->sink_format = sink_audio_format;
