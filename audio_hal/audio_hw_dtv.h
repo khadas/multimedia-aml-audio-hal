@@ -47,6 +47,7 @@
 #define ACODEC_FMT_MPEG1 26 // AFORMAT_MPEG-->mp3,AFORMAT_MPEG1-->mp1,AFROMAT_MPEG2-->mp2
 #define ACODEC_FMT_MPEG2 27
 #define ACODEC_FMT_WMAVOI 28
+#define ACODEC_FMT_AC4    29
 
 //}
 
@@ -68,6 +69,60 @@ enum {
     AUDIO_DTV_PATCH_CMD_NUM,
 };
 
+enum {
+    AUDIO_FREE = 0,
+    AUDIO_BREAK,
+    AUDIO_LOOKUP,
+    AUDIO_DROP,
+    AUDIO_RAISE,
+    AUDIO_LATENCY,
+    AUDIO_RUNNING,
+};
+
+/****below MS12 tunning is for dtv, ms*****/
+
+/*speaker raw/pcm input*/
+#define  DTV_AVSYNC_MS12_LATENCY_SPK_PCM             (50)
+#define  DTV_AVSYNC_MS12_LATENCY_SPK_RAW             (50)
+/*speaker dap enabled*/
+#define  DTV_AVSYNC_MS12_LATENCY_DOLBY_DAP           (0)
+/*atmos with arc*/
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOS           (180)
+/*ddp sink with arc*/
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOSTODDP      (100)
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_RAWTODDP        (80)
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_PCMTODDP        (80)
+/*dd sink with arc*/
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_RAWTODD         (60)
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_PCMTODD         (60)
+/*pcm sink with arc*/
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_PCM              (30)
+/*atmos passthrough with arc*/
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOS_PTH        (60)
+
+/*above default tunning value is based DENON-X2400H AVR and the sound mode is music,
+ *if the avr or mode is changed, there may be some small gaps in avsync,
+ *may set below these props to correct it*/
+
+/*speaker raw/pcm input*/
+#define  DTV_AVSYNC_MS12_LATENCY_SPK_PCM_PROPERTY    "vendor.media.audio.hal.dtv.spk.pcm"
+#define  DTV_AVSYNC_MS12_LATENCY_SPK_RAW_PROPERTY    "vendor.media.audio.hal.dtv.spk.raw"
+#define  DTV_AVSYNC_MS12_LATENCY_DOLBY_DAP_PROPERTY  "vendor.media.audio.hal.dtv.dolby.dap"
+/*atmos with arc*/
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOS_PROPERTY    "vendor.media.audio.hal.dtv.arc.atmos"
+/*ddp sink with arc*/
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOSTODDP_PROPERTY    "vendor.media.audio.hal.dtv.arc.atmostoddp"
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_RAWTODDP_PROPERTY    "vendor.media.audio.hal.dtv.arc.rawtoddp"
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_PCMTODDP_PROPERTY    "vendor.media.audio.hal.dtv.arc.pcmtoddp"
+/*dd sink with arc*/
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_RAWTODD_PROPERTY      "vendor.media.audio.hal.dtv.arc.rawtodd"
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_PCMTODD_PROPERTY      "vendor.media.audio.hal.dtv.arc.pcmtodd"
+/*pcm sink with arc*/
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_PCM_PROPERTY      "vendor.media.audio.hal.dtv.arc.pcm"
+/*atmos passthrough with arc*/
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOS_PTH_PROPERTY  "vendor.media.audio.hal.dtv.arc.pthatmos"
+/*****************end of dtv tunning*************/
+
 int create_dtv_patch(struct audio_hw_device *dev, audio_devices_t input, audio_devices_t output __unused);
 int release_dtv_patch(struct aml_audio_device *dev);
 int release_dtv_patch_l(struct aml_audio_device *dev);
@@ -76,4 +131,8 @@ int dtv_in_read(struct audio_stream_in *stream, void* buffer, size_t bytes);
 void dtv_in_write(struct audio_stream_out *stream, const void* buffer, size_t bytes);
 void save_latest_dtv_aformat(int afmt);
 int audio_set_spdif_clock(struct aml_stream_out *stream,int type);
+
+#define TSYNC_PCR_DEBUG_PTS    0x01
+#define TSYNC_PCR_DEBUG_LOOKUP 0x40
+#define TSYNC_PCR_DEBUG_AUDIO  0x20
 #endif
