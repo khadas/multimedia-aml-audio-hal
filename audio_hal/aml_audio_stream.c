@@ -256,6 +256,10 @@ void get_sink_format (struct audio_stream_out *stream)
 
 #endif
 
+    if (!audio_is_linear_pcm(source_format) && (adev->dolby_lib_type == 0)) {
+        sink_audio_format = optical_audio_format = source_format;
+    }
+
     adev->sink_format = sink_audio_format;
     adev->optical_format = optical_audio_format;
 
