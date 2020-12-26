@@ -641,7 +641,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
     }
 
     // use mHasSystemInput to replace mSystemSoundFlags instead //zz
-    if (mHasSystemInput == true) {
+    if ((mHasSystemInput == true) && (ChannelMask2ChannelConfig(mDolbyMS12OutChannelMask[MS12_INPUT_SYSTEM]) != 2)) {
         sprintf(ConfigParams[*row_index], "%s", "-chs");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%d", ChannelMask2ChannelConfig(mDolbyMS12OutChannelMask[MS12_INPUT_SYSTEM]));
@@ -704,7 +704,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
         (*row_index)++;
     }
 
-    {
+    if (mHasSystemInput && ChannelMask2LFEConfig(mDolbyMS12OutChannelMask[MS12_INPUT_SYSTEM])) {
         sprintf(ConfigParams[*row_index], "%s", "-ls");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%d", ChannelMask2LFEConfig(mDolbyMS12OutChannelMask[MS12_INPUT_SYSTEM]));
