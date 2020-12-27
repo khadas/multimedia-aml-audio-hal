@@ -118,7 +118,7 @@ target_include_directories(audio_hal PRIVATE
 	./include/utils
 	./libms12v2/include)
 
-target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations)
+target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations -funwind-tables -fasynchronous-unwind-tables)
 
 target_link_libraries(audio_hal
 	audioprocessing spdifenc ms12v2 ${PREBUILD_STATIC_LIBS}
