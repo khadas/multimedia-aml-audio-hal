@@ -55,6 +55,7 @@
 #include <spdifenc_wrap.h>
 #include <aml_android_utils.h>
 #include <aml_alsa_mixer.h>
+#include <IpcBuffer/IpcBuffer_c.h>
 
 #include "audio_format_parse.h"
 #include "SPDIFEncoderAD.h"
@@ -6445,6 +6446,38 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         return 0;
     }
 
+    ret = str_parms_get_str(parms, "cap_buffer", value, sizeof(value));
+    if (ret >= 0) {
+        int size = 0;
+        char *name = strtok(value, ",");
+        ALOGI("cap_buffer %s", value);
+        if (name) {
+            size = atoi(name + strlen(name) + 1);
+            if (size > 0) {
+                pthread_mutex_lock(&adev->cap_buffer_lock);
+                if (adev->cap_buffer) {
+                    IpcBuffer_destroy(adev->cap_buffer);
+                }
+                adev->cap_buffer = IpcBuffer_create(name, size);
+                ALOGI("IpcBuffer_created %p (%s, %d)", adev->cap_buffer, name, size);
+                pthread_mutex_unlock(&adev->cap_buffer_lock);
+                ret = 0;
+                goto exit;
+            } else if (size == 0) {
+                pthread_mutex_lock(&adev->cap_buffer_lock);
+                if (adev->cap_buffer) {
+                    IpcBuffer_destroy(adev->cap_buffer);
+                    adev->cap_buffer = NULL;
+                }
+                pthread_mutex_unlock(&adev->cap_buffer_lock);
+                ret = 0;
+                goto exit;
+            }
+        }
+        ret = -EINVAL;
+        goto exit;
+    }
+
     ret = str_parms_get_str(parms, "diaglogue_enhancement", value, sizeof(value));
     if (ret >= 0) {
         adev->ms12.ac4_de = atoi(value);
@@ -8274,6 +8307,13 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                             aml_out->tmp_buffer_8ch[8 * i + 7] = (int32_t)tmp_buffer[2 * i + 1] << 16;
                         }
                     }
+
+                    /* 2ch downmix capture */
+                    pthread_mutex_lock(&adev->cap_buffer_lock);
+                    if (adev->cap_buffer) {
+                        IpcBuffer_write(adev->cap_buffer, (const unsigned char *)tmp_buffer, out_frames * 4); 
+                    }
+                    pthread_mutex_unlock(&adev->cap_buffer_lock);
                 } else {
                     for (i = 0; i < out_frames; i++) {
                         /* tmp_buffer_8ch [0-1] for headphone, [2-3] for spk, [4-5] for spdif */
@@ -13177,6 +13217,8 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 #ifdef PDM_MIC_CHANNELS
     init_mic_desc(adev);
 #endif
+
+    pthread_mutex_init(&adev->cap_buffer_lock, NULL);
 
     adev->ms12_tv_tuning = getprop_bool("media.audiohal.ms12_tv_tuning");
 
