@@ -3153,14 +3153,19 @@ void *audio_dtv_patch_output_threadloop(void *data)
         else
             out_standby_new((struct audio_stream *)aml_out);
         pthread_mutex_lock(&aml_dev->lock);
+// LINUX change, use continous_mode for patch
+#if 0
         if (aml_dev->need_remove_conti_mode == true) {
             ALOGI("%s,conntinous mode still there,release ms12 here", __func__);
             aml_dev->need_remove_conti_mode = false;
             aml_dev->continuous_audio_mode = 0;
         }
+#endif
     } else {
         ALOGI("++%s live cant get the aml_out now!!!\n ", __FUNCTION__);
     }
+// LINUX change, use continous_mode for patch
+#if 0
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type && aml_dev->continuous_audio_mode) {
         ALOGI("In DTV exit MS12 continuous mode");
         get_dolby_ms12_cleanup(&aml_dev->ms12);
@@ -3168,6 +3173,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
         aml_dev->continuous_audio_mode = 0;
         clock_gettime(CLOCK_MONOTONIC, &aml_dev->ms12_exiting_start);
     }
+#endif
     aml_dev->mix_init_flag = false;
     pthread_mutex_unlock(&aml_dev->lock);
 #ifdef TV_AUDIO_OUTPUT

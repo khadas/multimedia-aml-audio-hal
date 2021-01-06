@@ -9227,6 +9227,8 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
     }
 #endif
 
+    // LINUX change, use continous_mode for patch
+#if 0
     // why clean up, ms12 thead will handle all?? zz
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         if (patch && continous_mode(adev)) {
@@ -9238,6 +9240,7 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
             return return_bytes;
         }
     }
+#endif
     case_cnt = popcount (adev->usecase_masks);
     if (adev->mix_init_flag == false) {
         ALOGI ("%s mix init, mask %#x",__func__,adev->usecase_masks);
@@ -12149,6 +12152,8 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
             if (inport == INPORT_TUNER) {
                 aml_dev->patch_src = SRC_ATV;
             }
+            // LINUX changes, use continuous_audio_mode=1 for patch
+#if 0
             if (inport == INPORT_HDMIIN ||
                 inport == INPORT_ARCIN  ||
                 inport == INPORT_LINEIN ||
@@ -12165,6 +12170,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                     ALOGI("enter patching mode, exit MS12 continuous mode");
                 }
             }
+#endif
             } else if ((inport == INPORT_TUNER) && (aml_dev->patch_src == SRC_DTV)) {
 #ifdef ENABLE_DTV_PATCH
              if ((aml_dev->patch_src == SRC_DTV) && aml_dev->audio_patching) {
