@@ -348,6 +348,14 @@ struct aml_audio_patch {
     bool ac3_pcm_dropping;
     int last_audio_delay;
     int a_discontinue_threshold;
+    int audio_jumped;
+    int tune_drop_state; // 1 insert, 2 drop
+    int a_retune_threshold;
+    unsigned int last_lookup_apts;
+    unsigned long long last_lookup_offset;
+    unsigned long long dtv_pcm_total;
+    struct timespec last_jumped_record;
+    struct timespec tune_drop_record;
 };
 
 struct audio_stream_out;
