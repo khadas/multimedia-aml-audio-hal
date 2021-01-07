@@ -21,6 +21,7 @@ target_include_directories(spdifenc PRIVATE
 target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations)
 
 option(USE_DTV "Compile with DTV option" OFF)
+option(USE_CAP "Support audio capture" ON)
 
 if(USE_DTV)
     list(APPEND DTV_FILES audio_hal/audio_dtv_ad.c)
@@ -103,6 +104,9 @@ add_library(audio_hal SHARED
 )
 
 add_definitions(-DNDEBUG -DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
+if(USE_CAP)
+add_definitions(-DAUDIO_CAP)
+endif()
 
 set(PREBUILD_STATIC_LIBS
 	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/lib_aml_ng.a

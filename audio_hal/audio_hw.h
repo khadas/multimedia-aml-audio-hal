@@ -612,9 +612,12 @@ struct aml_audio_device {
     /* always spdif on */
     bool spdif_on;
 
+#ifdef AUDIO_CAP
     /* CapTure IpcBuffer */
     pthread_mutex_t cap_buffer_lock;
     void *cap_buffer;
+    int cap_delay;
+#endif
 };
 
 struct meta_data {

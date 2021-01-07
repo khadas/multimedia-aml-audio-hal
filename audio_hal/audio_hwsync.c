@@ -432,7 +432,11 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             latency_frames = out_get_ms12_latency_frames(stream);
             //ALOGI("latency_frames =%d", latency_frames);
             latency_frames += aml_audio_get_ms12_tunnel_latency_offset(b_raw)*48; // add 60ms delay for ms12, 32ms pts offset, other is ms12 delay
-
+#ifdef AUDIO_CAP
+            if (adev->cap_buffer) {
+                latency_frames += adev->cap_delay * 48;
+            }
+#endif
             if ((adev->ms12.is_dolby_atmos && adev->ms12_main1_dolby_dummy == false) || adev->atoms_lock_flag) {
                 int tunnel = 1;
                 int atmos_tunning_frame = aml_audio_get_ms12_atmos_latency_offset(tunnel) * 48;
