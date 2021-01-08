@@ -8323,7 +8323,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     /* 2ch downmix capture */
                     pthread_mutex_lock(&adev->cap_buffer_lock);
                     if (adev->cap_buffer) {
-                        if (adev->audio_patch) {
+                        if ((adev->audio_patch) && (adev->patch_src != SRC_DTV)) {
                             /* capture only works for non-patch case by definition */
                             memset(tmp_buffer, 0, out_frames * 4);
                         }
