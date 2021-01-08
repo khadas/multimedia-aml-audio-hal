@@ -395,9 +395,9 @@ int unload_ddp_decoder_lib()
 int load_ddp_decoder_lib()
 {
     //int digital_raw = 1;
-    gDDPDecoderLibHandler = dlopen("/vendor/lib/libHwAudio_dcvdec.so", RTLD_NOW);
+    gDDPDecoderLibHandler = dlopen("/usr/lib/libHwAudio_dcvdec.so", RTLD_NOW);
     if (!gDDPDecoderLibHandler) {
-        ALOGE("%s, failed to open (libstagefright_soft_dcvdec.so), %s\n", __FUNCTION__, dlerror());
+        ALOGE("%s, failed to open (libHwAudio_dcvdec.so), %s\n", __FUNCTION__, dlerror());
         goto Error;
     } else {
         ALOGV("<%s::%d>--[gDDPDecoderLibHandler]", __FUNCTION__, __LINE__);
