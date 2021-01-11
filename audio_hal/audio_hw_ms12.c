@@ -824,7 +824,7 @@ MAIN_INPUT:
                 main_sample_rate = 48000;
             }
             /*we check whether there is enough space*/
-            if ((adev->continuous_audio_mode == 1) && is_dolby_ms12_support_compression_format(aml_out->hal_format))
+            if ((adev->continuous_audio_mode == 1) && is_dolby_ms12_support_compression_format(aml_out->hal_internal_format))
             {
                 int max_size = 0;
                 int main_avail = 0;
@@ -900,7 +900,8 @@ MAIN_INPUT:
                         ALOGI("%s() continuous %d input ms12 bytes %d input bytes %zu sr %d main size %d parser size %d\n\n",
                               __FUNCTION__, adev->continuous_audio_mode, dolby_ms12_input_bytes, input_bytes, ms12->config_sample_rate, main_frame_size, single_decoder_used_bytes);
                     }
-                    if (adev->continuous_audio_mode == 1) {
+
+                    if ((adev->continuous_audio_mode == 1) && !is_iec61937_format(stream)) {
                         if (aml_out->frame_deficiency >= dolby_ms12_input_bytes)
                             aml_out->frame_deficiency -= dolby_ms12_input_bytes;
                         else {
@@ -914,7 +915,10 @@ MAIN_INPUT:
                             ALOGI("%s line %d frame_deficiency %d ret dolby_ms12 input_bytes %d",
                                     __func__, __LINE__, aml_out->frame_deficiency, dolby_ms12_input_bytes);
                         }
+                    }
 
+                    // rate control when continuous_audio_mode for streaming
+                    if ((adev->continuous_audio_mode == 1) && (adev->audio_patch == 0)) {
                         //FIXME, if ddp input, the size suppose as CONTINUOUS_OUTPUT_FRAME_SIZE
                         //if pcm input, suppose 2ch/16bits/48kHz
                         //FIXME, that MAT/TrueHD input is TODO!!!
