@@ -22,12 +22,16 @@ target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations -fPIC)
 
 option(USE_DTV "Compile with DTV option" OFF)
 option(USE_CAP "Support audio capture" ON)
+option(USE_SC2 "Current platform is sc2" OFF)
 
 if(USE_DTV)
     list(APPEND DTV_FILES audio_hal/audio_dtv_ad.c)
     list(APPEND DTV_FILES audio_hal/audio_hw_dtv.c)
     list(APPEND DTV_INC $ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/include/aml_dvb/am_adp)
     list(APPEND DTV_LIBS -L$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/lib/aml_libs_nf -lamadec_hal -lam_adp )
+    list(APPEND DVB_AUDIO_INC ./dtv_audio_utils/sync)
+    list(APPEND DVB_AUDIO_LIBS -L./dtv_audio_utils -ldvbaudioutils)
+
     add_definitions(-DUSE_DTV)
 endif()
 
@@ -137,8 +141,16 @@ if(USE_EQ_DRC)
 endif()
 
 if(USE_DTV)
-	target_include_directories(audio_hal PRIVATE ${DTV_INC})
-	target_link_libraries(audio_hal ${DTV_LIBS} -lamavutils)
+	target_include_directories(audio_hal PRIVATE
+		${DTV_INC}
+		${DVB_AUDIO_INC})
+	target_link_libraries(audio_hal
+		${DTV_LIBS}
+		${DVB_AUDIO_LIBS} -lamavutils)
+endif()
+
+if(USE_SC2)
+	add_definitions(-DDVB_AUDIO_SC2)
 endif()
 
 install(TARGETS audio_hal

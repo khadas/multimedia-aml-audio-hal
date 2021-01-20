@@ -562,6 +562,8 @@ struct aml_audio_device {
     unsigned int tv_mute;
     int sub_apid;
     int sub_afmt;
+    int pid;
+    int demux_id;
     int reset_dtv_audio;
     int patch_start;
     int mute_start;

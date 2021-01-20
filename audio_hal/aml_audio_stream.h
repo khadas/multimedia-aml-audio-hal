@@ -356,6 +356,7 @@ struct aml_audio_patch {
     unsigned long long dtv_pcm_total;
     struct timespec last_jumped_record;
     struct timespec tune_drop_record;
+    int pid;
 };
 
 struct audio_stream_out;

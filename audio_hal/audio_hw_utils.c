@@ -458,6 +458,13 @@ int is_txl_chip()
     return false;
 }
 
+int is_sc2_chip()
+{
+#ifdef DVB_AUDIO_SC2
+    return true;
+#endif
+    return false;
+}
 
 /*
 convert audio formats to supported audio format

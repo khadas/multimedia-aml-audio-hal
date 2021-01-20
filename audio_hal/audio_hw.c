@@ -6280,6 +6280,21 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         ALOGI("video player sound_track mode %d ",mode );
         adev->sound_track_mode = mode;
     }
+    ret = str_parms_get_str(parms, "demux_id", value, sizeof(value));
+    if (ret > 0) {
+        unsigned int demux_id = (unsigned int)atoi(value); // zz
+        ALOGI("%s() get the audio demux_id %d\n", __func__, demux_id);
+        adev->demux_id = demux_id;
+        goto exit;
+    }
+    ret = str_parms_get_str(parms, "pid", value, sizeof(value));
+    if (ret > 0) {
+        unsigned int pid = (unsigned int)atoi(value); // zz
+        ALOGI("%s() get the audio pid %d\n", __func__, pid);
+        adev->pid = pid;
+        goto exit;
+    }
+
     ret = str_parms_get_str(parms, "fmt", value, sizeof(value));
     if (ret > 0) {
         unsigned int audio_fmt = (unsigned int)atoi(value); // zz
