@@ -34,7 +34,7 @@
 #define RET_FAIL -1
 #endif
 
-
+#define DOLBY_MS12_LIB_LOCK "/tmp/dms12.lock"
 #define DOLBY_MS12_LIB_PATH "/vendor/lib/libdolbyms12.so"
 #define DOLBY_DCV_LIB_PATH_A "/usr/lib/libHwAudio_dcvdec.so"
 
@@ -59,6 +59,10 @@ static int file_accessible(char *path)
 enum eDolbyLibType detect_dolby_lib_type(void)
 {
     void *handle;
+
+    while (access(DOLBY_MS12_LIB_LOCK, F_OK) == 0) {
+       usleep(100000);
+    }
 
     handle = dlopen(DOLBY_MS12_LIB_PATH, RTLD_NOW);
     if (handle) {
