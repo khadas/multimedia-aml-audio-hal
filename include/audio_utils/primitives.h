@@ -970,7 +970,7 @@ static inline float float_from_u4_12(uint16_t uval)
 static inline uint32_t u4_28_from_float(float f)
 {
     static const float scale = (float)(1 << 28);
-    static const float limpos = 0xffffffffUL / scale;
+    static const float limpos = 0xffffffffUL / ((float)(1 << 28));
 
     if (f <= 0.) {
         return 0;
@@ -994,7 +994,7 @@ static inline uint32_t u4_28_from_float(float f)
 static inline uint16_t u4_12_from_float(float f)
 {
     static const float scale = (float)(1 << 12);
-    static const float limpos = 0xffff / scale;
+    static const float limpos = 0xffff / ((float)(1 << 12));
 
     if (f <= 0.) {
         return 0;

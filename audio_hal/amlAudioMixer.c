@@ -471,7 +471,7 @@ static bool is_mixer_inports_ready(struct amlAudioMixer *audio_mixer)
     return (port_cnt == ready);
 }
 
-inline float get_fade_step_by_size(int fade_size, int frame_size)
+static inline float get_fade_step_by_size(int fade_size, int frame_size)
 {
     return 1.0/(fade_size/frame_size);
 }
