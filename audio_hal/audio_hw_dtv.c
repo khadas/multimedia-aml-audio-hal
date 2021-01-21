@@ -1872,15 +1872,27 @@ static void dtv_do_drop_insert_pcm_new(struct aml_audio_patch *patch, struct aud
         clock_gettime(CLOCK_MONOTONIC, &before_time);
         t1 = 0;
         while (t2 > 0 && patch->output_thread_exit == 0) {
-            usleep(5000);
+            if (eDolbyMS12Lib == aml_dev->dolby_lib_type && aml_dev->continuous_audio_mode) {
+                // ms12 audio continuous mode, use sleep((size / 192) ms) instead of one mute frame;
+                t1 = patch->out_buf_size / 192;
+                usleep(t1 * 1000);
+                patch->dtv_apts_lookup += t1 * 90;
+                t1 = 0;
+            } else {
+                usleep(5000);
+                if (patch->output_thread_exit) {
+                    patch->dtv_apts_lookup = 0;
+                    break;
+                }
+                memset(patch->out_buf, 0, patch->out_buf_size);
+                int write_len = out_write_new(stream_out, patch->out_buf, patch->out_buf_size);
+                patch->dtv_pcm_readed += write_len;
+                patch->dtv_apts_lookup += write_len / 192 * 90;
+            }
             if (patch->output_thread_exit) {
                 patch->dtv_apts_lookup = 0;
                 break;
             }
-            memset(patch->out_buf, 0, patch->out_buf_size);
-            int write_len = out_write_new(stream_out, patch->out_buf, patch->out_buf_size);
-            patch->dtv_pcm_readed += write_len;
-            patch->dtv_apts_lookup += write_len / 192 * 90;
             t2--;
             cur_pts = patch->last_apts;
             get_sysfs_uint(TSYNC_PCRSCR, &cur_pcr);
@@ -1898,7 +1910,9 @@ static void dtv_do_drop_insert_pcm_new(struct aml_audio_patch *patch, struct aud
                 patch->dtv_apts_lookup = 0;
                 break;
             }
-            ALOGI("dtv_do_insert mute used_ms = %d, diff %d\n", used_ms, patch->dtv_apts_lookup / 90);
+            if (get_tsync_pcr_debug()) {
+                ALOGI("dtv_do_insert mute used_ms = %d, diff %d\n", used_ms, patch->dtv_apts_lookup / 90);
+            }
             used_ms = calc_time_interval_us(&before_time, &after_time) / 1000;
             if (used_ms > DTV_AUDIO_MUTE_PRIOD_HTRESHOLD / 90) {
                 ALOGI("write cost over %d ms, break\n", used_ms);
@@ -2005,17 +2019,30 @@ static void dtv_do_drop_insert_ac3_new(struct aml_audio_patch *patch, struct aud
         clock_gettime(CLOCK_MONOTONIC, &before_time);
         t1 = 0;
         while (t1 == 0 && t2 > 0 && patch->output_thread_exit == 0) {
-            usleep(5000);
+            if (eDolbyMS12Lib == aml_dev->dolby_lib_type && aml_dev->continuous_audio_mode) {
+                // ms12 audio continuous mode, use sleep(4 * 8 ms) instead of one mute frame;
+                while (t1++ < 4 && patch->output_thread_exit == 0) {
+                    usleep(8 * 1000);
+                    patch->dtv_apts_lookup += 8 * 90;
+                }
+                t1 = 0;
+            } else {
+                usleep(5000);
+                if (patch->output_thread_exit) {
+                    patch->dtv_apts_lookup = 0;
+                    break;
+                }
+                //if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
+                //    t1 = dolby_ms12_output_insert_oneframe(stream_out);
+                //} else {
+                t1 = dtv_write_mute_frame(patch, stream_out);
+                //}
+                patch->dtv_apts_lookup += 32 * 90;
+            }
             if (patch->output_thread_exit) {
                 patch->dtv_apts_lookup = 0;
                 break;
             }
-            //if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
-            //    t1 = dolby_ms12_output_insert_oneframe(stream_out);
-            //} else {
-            t1 = dtv_write_mute_frame(patch, stream_out);
-            //}
-            patch->dtv_apts_lookup += 32 * 90;
             cur_pts = patch->last_apts;
             get_sysfs_uint(TSYNC_PCRSCR, &cur_pcr);
             ap_diff = cur_pts - cur_pcr;
@@ -2033,7 +2060,9 @@ static void dtv_do_drop_insert_ac3_new(struct aml_audio_patch *patch, struct aud
                 patch->dtv_apts_lookup = 0;
                 break;
             }
-            ALOGI("dtv_do_insert mute used_ms = %d, diff %d\n", used_ms, patch->dtv_apts_lookup / 90);
+            if (get_tsync_pcr_debug()) {
+                ALOGI("dtv_do_insert mute used_ms = %d, diff %d\n", used_ms, patch->dtv_apts_lookup / 90);
+            }
             used_ms = calc_time_interval_us(&before_time, &after_time) / 1000;
             if (used_ms > DTV_AUDIO_MUTE_PRIOD_HTRESHOLD / 90) {
                 ALOGI("mute cost over %d ms, break\n", used_ms);
