@@ -18,7 +18,7 @@ target_include_directories(spdifenc PRIVATE
 	./include
 	./include/utils)
 
-target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations)
+target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations -fPIC)
 
 option(USE_DTV "Compile with DTV option" OFF)
 option(USE_CAP "Support audio capture" ON)
@@ -122,7 +122,7 @@ target_include_directories(audio_hal PRIVATE
 	./include/utils
 	./libms12v2/include)
 
-target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations -funwind-tables -fasynchronous-unwind-tables)
+target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations -funwind-tables -fasynchronous-unwind-tables -fPIC)
 
 target_link_libraries(audio_hal
 	audioprocessing spdifenc ms12v2 ${PREBUILD_STATIC_LIBS}

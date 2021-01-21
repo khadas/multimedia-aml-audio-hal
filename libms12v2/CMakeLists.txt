@@ -15,6 +15,8 @@ add_library(ms12v2 SHARED
 	src/DolbyMS12Status.cpp
 )
 
+target_compile_options(ms12v2 PRIVATE -fPIC)
+
 add_definitions(-DNDEBUG -DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
 
 set_target_properties(ms12v2 PROPERTIES

@@ -8,6 +8,8 @@ add_library(audioprocessing STATIC
 	AudioResamplerDyn.cpp
 )
 
+target_compile_options(audioprocessing PRIVATE -fPIC)
+
 target_include_directories(audioprocessing PRIVATE
 	${PROJECT_SOURCE_DIR}/audio_hal
         ${PROJECT_SOURCE_DIR}/include
