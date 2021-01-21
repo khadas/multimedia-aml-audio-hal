@@ -611,6 +611,7 @@ struct aml_audio_device {
 
     /* always spdif on */
     bool spdif_on;
+    bool spdif_force_mute;
 
 #ifdef AUDIO_CAP
     /* CapTure IpcBuffer */

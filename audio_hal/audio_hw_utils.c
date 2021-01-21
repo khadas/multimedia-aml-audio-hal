@@ -1271,7 +1271,9 @@ void aml_tinymix_set_spdif_format(audio_format_t output_format,struct aml_stream
     }
     aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_FORMAT, aml_spdif_format);
     aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_EARC_AUDIO_TYPE, _earc_coding_type_mapping(aml_spdif_format));
-    aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_MUTE, spdif_mute);
+    if ((!aml_dev->spdif_force_mute) || (spdif_mute)) {
+        aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_MUTE, spdif_mute);
+    }
     ALOGI("%s tinymix AML_MIXER_ID_SPDIF_FORMAT %d,spdif mute %d",
           __FUNCTION__, aml_spdif_format, spdif_mute);
 }

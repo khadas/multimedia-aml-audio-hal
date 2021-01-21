@@ -1232,7 +1232,9 @@ static int do_output_standby_direct (struct aml_stream_out *out)
     }
     out->pause_status = false;
     set_codec_type (TYPE_PCM);
-    aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_MUTE, 0);
+    if (!adev->spdif_force_mute) {
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_MUTE, 0);
+    }
     /* clear the hdmitx channel config to default */
     if (out->multich == 6) {
         sysfs_set_sysfs_str ("/sys/class/amhdmitx/amhdmitx0/aud_output_chs", "0:0");
@@ -1289,7 +1291,9 @@ int out_standby_direct (struct audio_stream *stream)
     }
     out->pause_status = false;
     set_codec_type (TYPE_PCM);
-    aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_MUTE, 0);
+    if (!adev->spdif_force_mute) {
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_MUTE, 0);
+    }
 
     if (out->need_convert) {
         ALOGI("need_convert release %d ",__LINE__);
@@ -5468,6 +5472,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
 
     ret = str_parms_get_int(parms, "Audio spdif mute", &val);
     if (ret >= 0) {
+        adev->spdif_force_mute = val;
         aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_MUTE, val);
         ALOGI("audio spdif out status: %d\n", val);
         goto exit;
