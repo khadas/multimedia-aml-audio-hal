@@ -8670,7 +8670,7 @@ ssize_t hw_write (struct audio_stream_out *stream
             }
         }
     } else {
-        if (eDolbyMS12Lib == adev->dolby_lib_type) {
+        if ((eDolbyMS12Lib == adev->dolby_lib_type) && (aml_out->hal_internal_format != AUDIO_FORMAT_INVALID)) {
             if (!audio_is_linear_pcm(aml_out->hal_internal_format)) {
                 /*use the pcm which is gennerated by udc, to get the total frame by nbytes/nbtyes_per_sample
                  *Please be careful about the aml_out->continuous_audio_offset;*/
