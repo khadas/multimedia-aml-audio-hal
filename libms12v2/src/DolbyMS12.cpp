@@ -71,6 +71,7 @@ int (*FuncDolbyMS12GetAudioInfo)(struct aml_audio_info *);
 void (*FuncDolbyMS12SetDebugLevel)(int);
 unsigned long long (*FuncDolbyMS12GetNBytesConsumedSysSound)(void);
 int (*FuncDolbyMS12GetTotalNFramesDelay)(void *);
+int (*FuncDolbyMS12GetMainUnderrun)();
 
 DolbyMS12::DolbyMS12() :
     mDolbyMS12LibHanle(NULL)
@@ -276,6 +277,11 @@ int DolbyMS12::GetLibHandle(void)
         ALOGW("%s, dlsym get_ms12_total_delay fail, ingore it as version difference\n", __FUNCTION__);
     }
 
+    FuncDolbyMS12GetMainUnderrun = (int (*)())dlsym(mDolbyMS12LibHanle, "get_main_underrun");
+    if (!FuncDolbyMS12GetMainUnderrun) {
+        ALOGW("%s, dlsym FuncDolbyMS12GetMainUnderrun failed\n", __FUNCTION__);
+    }
+
     ALOGD("-%s() line %d get libdolbyms12 success!", __FUNCTION__, __LINE__);
     return 0;
 
@@ -317,6 +323,7 @@ void DolbyMS12::ReleaseLibHandle(void)
     FuncDolbyMS12SetDebugLevel = NULL;
     FuncDolbyMS12GetNBytesConsumedSysSound = NULL;
     FuncDolbyMS12GetTotalNFramesDelay = NULL;
+    FuncDolbyMS12GetMainUnderrun = NULL;
 
     if (mDolbyMS12LibHanle != NULL) {
         dlclose(mDolbyMS12LibHanle);
@@ -655,6 +662,20 @@ int DolbyMS12::DolbyMS12GetGain(int idx)
     }
 
     ret = (*FuncDolbyMS12GetGain)(idx);
+    ALOGV("-%s() ret %d", __FUNCTION__, ret);
+    return ret;
+}
+
+int DolbyMS12::DolbyMS12GetMainUnderrun()
+{
+    int ret = 0;
+    ALOGV("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12GetMainUnderrun) {
+        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
+        return ret;
+    }
+
+    ret = (*FuncDolbyMS12GetMainUnderrun)();
     ALOGV("-%s() ret %d", __FUNCTION__, ret);
     return ret;
 }

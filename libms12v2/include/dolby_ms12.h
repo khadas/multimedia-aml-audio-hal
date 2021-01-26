@@ -224,6 +224,10 @@ void dolby_ms12_set_main_dummy(int type, int dummy);
 
 int dolby_ms12_get_gain(int idx);
 
+/*@@
+ *  @brief get main input underrun status
+ */
+int dolby_ms12_get_main_underrun();
 
 /*@@
     @brief get dolby atmos info
