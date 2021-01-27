@@ -345,9 +345,9 @@ static int aml_dev_avsync_diff_in_path(struct aml_audio_patch *patch, int *av_di
 
     altcy = aml_dev_sample_audio_path_latency(aml_dev);
 
-    if (patch->input_src == AUDIO_DEVICE_IN_LINE) {
+    /*if (patch->input_src == AUDIO_DEVICE_IN_LINE) {
         src_diff_err = -30;
-    }
+    }*/
     *av_diff = altcy - vltcy + src_diff_err;
 
     ALOGV("  altcy: %dms, vltcy: %dms, av_diff: %dms\n\n", altcy, vltcy, *av_diff);
