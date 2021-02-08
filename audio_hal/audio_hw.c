@@ -319,6 +319,8 @@ static RECORDING_DEVICE recording_device = RECORDING_DEVICE_OTHER;
 
 static bool is_high_rate_pcm(struct audio_stream_out *stream);
 
+static bool is_disable_ms12_continuous(struct audio_stream_out *stream);
+
 static inline short CLIP (int r)
 {
     return (r >  0x7fff) ? 0x7fff :
@@ -8920,6 +8922,17 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
             pthread_mutex_unlock(&adev->alsa_pcm_lock);
             //FIXME. also need check the sample rate and channel num.
             audio_format_t aformat = aml_out->hal_internal_format;
+
+            // need check whether continuous mode need be disabled again here
+            // because the original checking in out_write_new() may be
+            // run with an initial hal_internal_format (PCM) for patch input
+            if (continous_mode(adev) && is_disable_ms12_continuous(stream)) {
+                adev->delay_disable_continuous = 0;
+                adev->continuous_audio_mode = 0;
+                aml_out->restore_continuous = true;
+                ALOGI("[%s], disable continous mode.", __FUNCTION__);
+            }
+
             if (continous_mode(adev) && !dolby_stream_active(adev)) {
                 /*dummy we support it is  DD+*/
                 aformat = AUDIO_FORMAT_E_AC3;
@@ -13170,6 +13183,13 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         aml_ms12_lib_preload();
     }
     adev->atoms_lock_flag = false;
+
+    /* TODO: move ARC/eARC and HDMI RX edid reporting to audio control service */
+    /* enable Atmos audio cap reporting in HDMI RX's EDID when MS12 exists. */
+    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+        ALOGI("Enable HDMI RX's Atmos support with MS12");
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_HDMI_ATMOS_EDID, 1);
+    }
 
     if (eDolbyDcvLib == adev->dolby_lib_type) {
         memset(&adev->ddp, 0, sizeof(struct dolby_ddp_dec));
