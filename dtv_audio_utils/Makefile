@@ -29,7 +29,7 @@ TARGET=libdvbaudioutils.so
 
 INSTALL_DIR=${LIB_DIR}
 
-CFLAGS += -shared -lpthread -lm -lrt
+CFLAGS += -shared -lpthread -lm -lrt -llog -lcutils
 
 TOPDIR=$(shell pwd)
 SRC?=$(TOPDIR)
@@ -47,13 +47,15 @@ CFLAGS+=-I$(SRC)/dmxwrap -I$(SRC)/include -I$(SRC)/utils -I$(SRC)/dmxwrap/HwDemu
 all: $(TARGET)
 
 $(TARGET): $(TARGET_OBJS)
-	$(CXX) -o $@ $^ -shared -fPIC
+	$(CXX) -o $@ $^ -shared -fPIC $(CFLAGS)
 
 install:
 	-install -m 555 ${TARGET} $(INSTALL_DIR)
 	-install -m 555 $(TARGET) $(TARGET_DIR)/usr/lib
-	cp -rf $(SRC)/include/*  $(HEADERS_DIR)/
-
+	install -d  $(HEADERS_DIR)/audio_read_api
+	install -d  $(HEADERS_DIR)/sync
+	cp -rf $(SRC)/audio_read_api/*.h  $(HEADERS_DIR)/
+	cp -rf $(SRC)/sync/*.h  $(HEADERS_DIR)/
 force:
 
 clean:
