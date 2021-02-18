@@ -337,6 +337,17 @@ extern "C" int dolby_ms12_get_gain(int idx)
     }
 }
 
+extern "C" int dolby_ms12_get_main_underrun()
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetMainUnderrun();
+    } else {
+        return -1;
+    }
+}
+
 extern "C" void dolby_ms12_get_pcm_output_size(unsigned long long *all_output_size, unsigned long long *ms12_generate_zero_size)
 {
     ALOGV("%s()\n", __FUNCTION__);

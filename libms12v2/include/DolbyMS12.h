@@ -137,6 +137,8 @@ public:
 
     virtual int     DolbyMS12GetGain(int);
 
+    virtual int     DolbyMS12GetMainUnderrun();
+
     virtual int     DolbyMS12SetMainVolume(float volume);
     virtual int     DolbyMS12GetInputISDolbyAtmos();
 
