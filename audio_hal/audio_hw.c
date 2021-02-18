@@ -1746,8 +1746,8 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
     bool is_dolby_format = is_dolby_ms12_support_compression_format(out->hal_internal_format);
     bool is_direct_pcm = is_direct_stream_and_pcm_format(out);
 
-    ALOGI("%s(), stream(%p), left:%f right:%f, continous_mode(%d), hal_internal_format:%x, is dolby %d is direct pcm %d\n",
-        __func__, stream, left, right, continous_mode(adev), out->hal_internal_format, is_dolby_format, is_direct_pcm);
+    ALOGI("%s(), stream(%p), left:%f right:%f, master:%f, continous_mode(%d), hal_internal_format:%x, is dolby %d is direct pcm %d\n",
+        __func__, stream, left, right, adev->master_volume, continous_mode(adev), out->hal_internal_format, is_dolby_format, is_direct_pcm);
 
     /* for not use ms12 case, we can use spdif enc mute, other wise ms12 can handle it*/
     if (is_dolby_format && (eDolbyDcvLib == adev->dolby_lib_type || is_bypass_dolbyms12(stream) || adev->hdmi_format == BYPASS)) {
@@ -1777,6 +1777,7 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
         if (out->volume_l != out->volume_r) {
             ALOGW("%s, left:%f right:%f NOT match", __FUNCTION__, left, right);
         }
+        ALOGI("dolby_ms12_set_main_volume %f", out->volume_l);
         dolby_ms12_set_main_volume(out->volume_l);
     }
     return 0;
@@ -6833,6 +6834,8 @@ static int adev_set_master_volume (struct audio_hw_device *dev, float volume)
         adev->master_mute = false;
     }
 
+    ALOGI("adev_set_master_volume %f, master_mute = %d", adev->master_volume, adev->master_mute);
+
     _update_volumes_all_stream_l(adev);
 
     pthread_mutex_unlock(&adev->lock);
@@ -7955,7 +7958,6 @@ ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream,
 
             /* apply volume for spk/hp, SPDIF/HDMI keep the max volume */
             gain_speaker *= (adev->sink_gain[OUTPORT_SPEAKER]);
-            gain_speaker *= aml_out->volume_l;
             apply_volume_16to32(gain_speaker * adev->dap_bypassgain, effect_tmp_buf, spk_tmp_buf, bytes);
 
             /* SPDIF with source_gain*/
@@ -8027,7 +8029,6 @@ ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream,
 #endif
             *output_buffer = (void *) buffer;
             *output_buffer_bytes = bytes;
-            gain_speaker *= aml_out->volume_l;
             apply_volume(gain_speaker, *output_buffer, sizeof(uint16_t), bytes);
         }
     }
@@ -8110,7 +8111,9 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             *output_buffer_bytes = bytes;
         } else {
             float gain_speaker = adev->sink_gain[OUTPORT_SPEAKER];
-            gain_speaker *= aml_out->volume_l;
+            if (aml_out != adev->ms12_out) {
+                gain_speaker *= aml_out->volume_l;
+            }
             apply_volume(gain_speaker, tmp_buffer, sizeof(uint32_t), bytes);
 
             /* 2 ch 32 bit --> 8 ch 32 bit mapping, need 8X size of input buffer size */
@@ -8274,7 +8277,9 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     }
                 } else {
                     gain_speaker *= (adev->sink_gain[OUTPORT_SPEAKER]);
-                    gain_speaker *= aml_out->volume_l;
+                    if (aml_out != adev->ms12_out) {
+                        gain_speaker *= aml_out->volume_l;
+                    }
                     apply_volume_16to32(gain_speaker * source_gain * adev->dap_bypassgain, effect_tmp_buf, spk_tmp_buf, bytes);
                     if (eDolbyMS12Lib == adev->dolby_lib_type) {
                         /* SPDIF with source_gain*/
