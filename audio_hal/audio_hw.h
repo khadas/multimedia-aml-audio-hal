@@ -54,6 +54,11 @@
 #include "aml_audio_delay.h"
 #endif
 
+#ifdef USE_MSYNC
+#include <aml_avsync.h>
+#include <aml_avsync_log.h>
+#endif
+
 #ifndef PCM_STATE_SETUP
 #define PCM_STATE_SETUP 1
 #endif
@@ -765,6 +770,13 @@ struct aml_stream_out {
     struct timespec  last_timestamp_reported;
     bool continuous_mode_check;
     void * ac4_parser_handle;
+#ifdef USE_MSYNC
+    /* msync session */
+    void *msync_session;
+    pthread_mutex_t msync_mutex;
+    pthread_cond_t msync_cond;
+    bool msync_start;
+#endif
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);

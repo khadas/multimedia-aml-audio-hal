@@ -1602,12 +1602,32 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
     ret = str_parms_get_str (parms, "hw_av_sync", value, sizeof (value) );
     if (ret >= 0) {
         int hw_sync_id = atoi(value);
+#ifdef USE_MSYNC
+        void *msync_session;
+        unsigned char sync_enable = 0;
+
+        if (out->msync_session) {
+            ALOGW("hw_av_sync id set w/o release previous session.");
+            av_sync_destroy(out->msync_session);
+            out->msync_session = NULL;
+        }
+
+        msync_session = av_sync_attach(hw_sync_id, AV_SYNC_TYPE_AUDIO);
+        if (!msync_session) {
+            ALOGE("Cannot attach hw_sync_id %d", hw_sync_id);
+            ret = -EINVAL;
+            goto exit;
+        }
+        ALOGI("av_sync_attach success %p", msync_session);
+        sync_enable = 1;
+#else
         unsigned char sync_enable = (hw_sync_id == 12345678) ? 1 : 0;
         audio_hwsync_t *hw_sync = out->hwsync;
+#endif
         ALOGI("(%p)set hw_sync_id %d,%s hw sync mode\n",
                out, hw_sync_id, sync_enable ? "enable" : "disable");
         out->hw_sync_mode = sync_enable;
-        hw_sync->first_apts_flag = false;
+        out->hwsync->first_apts_flag = false;
         pthread_mutex_lock (&adev->lock);
         pthread_mutex_lock (&out->lock);
         out->frame_write_sum = 0;
@@ -1620,6 +1640,11 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         if (sync_enable) {
             ALOGI ("init hal mixer when hwsync\n");
             aml_hal_mixer_init (&adev->hal_mixer);
+#ifdef USE_MSYNC
+            out->msync_session = msync_session;
+            pthread_mutex_init(&out->msync_mutex, NULL);
+            pthread_cond_init(&out->msync_cond, NULL);
+#endif
         }
         pthread_mutex_unlock (&out->lock);
         pthread_mutex_unlock (&adev->lock);
@@ -1884,10 +1909,19 @@ static int out_pause (struct audio_stream_out *stream)
 
 exit1:
     out->pause_status = true;
+
+#ifdef USE_MSYNC
+    if (out->msync_session) {
+        av_sync_pause(out->msync_session, true);
+    }
+#endif
+
 exit:
     if (out->hw_sync_mode) {
         ALOGI("%s set AUDIO_PAUSE when tunnel mode\n",__func__);
+#ifndef USE_MSYNC
         sysfs_set_sysfs_str (TSYNC_EVENT, "AUDIO_PAUSE");
+#endif
         out->tsync_status = TSYNC_STATUS_PAUSED;
     }
     pthread_mutex_unlock (&adev->lock);
@@ -1945,14 +1979,25 @@ static int out_resume (struct audio_stream_out *stream)
         ALOGI ("init hal mixer when hwsync resume\n");
         adev->hwsync_output = out;
         aml_hal_mixer_init(&adev->hal_mixer);
+#ifndef USE_MSYNC
         sysfs_set_sysfs_str(TSYNC_EVENT, "AUDIO_RESUME");
+#endif
         out->tsync_status = TSYNC_STATUS_RUNNING;
     }
     out->pause_status = false;
+
+#ifdef USE_MSYNC
+    if (out->msync_session) {
+        av_sync_pause(out->msync_session, false);
+    }
+#endif
+
 exit:
     if (out->hw_sync_mode) {
         ALOGI("%s set AUDIO_RESUME when tunnel mode\n",__func__);
+#ifndef USE_MSYNC
         sysfs_set_sysfs_str (TSYNC_EVENT, "AUDIO_RESUME");
+#endif
         out->tsync_status = TSYNC_STATUS_RUNNING;
     }
     pthread_mutex_unlock (&adev->lock);
@@ -1985,6 +2030,12 @@ static int out_pause_new (struct audio_stream_out *stream)
         goto exit;
     }
 
+#ifdef USE_MSYNC
+    if (aml_out->msync_session) {
+        av_sync_pause(aml_out->msync_session, true);
+    }
+#endif
+
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
         if (aml_dev->continuous_audio_mode == 1) {
             if ((aml_dev->ms12.dolby_ms12_enable == true) && (aml_dev->ms12.is_continuous_paused == false)) {
@@ -2016,7 +2067,9 @@ exit:
 
     if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_PAUSED) {
         usleep(150 * 1000);
+#ifndef USE_MSYNC
         sysfs_set_sysfs_str(TSYNC_EVENT, "AUDIO_PAUSE");
+#endif
         aml_out->tsync_status = TSYNC_STATUS_PAUSED;
     }
 
@@ -2049,6 +2102,13 @@ static int out_resume_new (struct audio_stream_out *stream)
         ret = 3;
         goto exit;
     }
+
+#ifdef USE_MSYNC
+        if (aml_out->msync_session) {
+            av_sync_pause(aml_out->msync_session, false);
+        }
+#endif
+
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
         if (aml_dev->continuous_audio_mode == 1) {
             if ((aml_dev->ms12.dolby_ms12_enable == true) && (aml_dev->ms12.is_continuous_paused == true)) {
@@ -2067,7 +2127,9 @@ static int out_resume_new (struct audio_stream_out *stream)
     }
     aml_out->pause_status = false;
     if (aml_out->hw_sync_mode) {
+#ifndef USE_MSYNC
         sysfs_set_sysfs_str(TSYNC_EVENT, "AUDIO_RESUME");
+#endif
         aml_out->tsync_status = TSYNC_STATUS_RUNNING;
     }
 
@@ -2091,6 +2153,13 @@ static int out_flush_new (struct audio_stream_out *stream)
     out->skip_frame = 0;
     out->pause_status = false;
     out->input_bytes_size = 0;
+
+#ifdef USE_MSYNC
+    if (out->msync_session) {
+        av_sync_destroy(out->msync_session);
+        out->msync_session = NULL;
+    }
+#endif
 
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         if (out->hw_sync_mode) {
@@ -5080,6 +5149,13 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     virtualx_setparameter(adev,TRUVOLUMEINMODE,0,5);
     adev->effect_in_ch = 2;
 
+#ifdef USE_MSYNC
+    if (out->msync_session) {
+        /* unblock feeding thread just in case */
+        aml_audio_hwsync_msync_unblock_start(out);
+    }
+#endif
+
     if (adev->useSubMix) {
         if (out->usecase == STREAM_PCM_NORMAL || out->usecase == STREAM_PCM_HWSYNC)
             out_standby_subMixingPCM(&stream->common);
@@ -5146,6 +5222,13 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         aml_audio_hwsync_release(out->hwsync);
         free(out->hwsync);
     }
+
+#ifdef USE_MSYNC
+    if (out->msync_session) {
+        av_sync_destroy(out->msync_session);
+        out->msync_session = NULL;
+    }
+#endif
 
     if (out->resample_handle) {
         aml_audio_resample_close(out->resample_handle);
@@ -7656,11 +7739,15 @@ int do_output_standby_l(struct audio_stream *stream)
     aml_out->pause_status = false;//clear pause status
     if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_STOP) {
         ALOGI("%s set AUDIO_PAUSE\n",__func__);
+#ifndef USE_MSYNC
         sysfs_set_sysfs_str (TSYNC_EVENT, "AUDIO_PAUSE");
+#endif
         aml_out->tsync_status = TSYNC_STATUS_PAUSED;
 
         ALOGI("%s set AUDIO_STOP\n",__func__);
+#ifndef USE_MSYNC
         sysfs_set_sysfs_str (TSYNC_EVENT, "AUDIO_STOP");
+#endif
         aml_out->tsync_status = TSYNC_STATUS_STOP;
     }
     return 0;
@@ -8727,7 +8814,12 @@ ssize_t hw_write (struct audio_stream_out *stream
             // some times "aml_out->hwsync->aout == NULL"
             // one case is no main audio playing, only aux audio playing (Netflix main screen)
             // in this case dolby_ms12_get_consumed_payload() always return 0, no AV sync can be done zzz
+#ifdef USE_MSYNC
+            // when msync is used, first apts handling is performed in mixer_main_buffer_write
+            if ((aml_out->hwsync->aout) && (aml_out->hwsync->first_apts_flag)) {
+#else
             if (aml_out->hwsync->aout) {
+#endif
                 if (is_bypass_dolbyms12(stream))
                     aml_audio_hwsync_audio_process(aml_out->hwsync, aml_out->hwsync->payload_offset, &adjust_ms);
                 else {
@@ -9645,6 +9737,15 @@ hwsync_rewrite:
                 // missing code with aml_audio_hwsync_checkin_apts, need to add for netflix tunnel mode. zzz
                 aml_audio_hwsync_checkin_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, cur_pts);
                 aml_out->hwsync->payload_offset += outsize;
+#ifdef USE_MSYNC
+                // when msync is used, the original first apts->audio start logic from legacy amaster tsync
+                // implementation in hw_write() is moved to this place when main input samples are injected
+                // because the sync policy return from msync side may need block when audio starts to play.
+                if (aml_out->hwsync->first_apts_flag == false) {
+                    // may be blocked by msync_cond for initial playback timing control
+                    aml_audio_hwsync_audio_process(aml_out->hwsync, 0, NULL);
+                }
+#endif
             } else {
                 // if we got the frame body,which means we get a complete frame.
                 //we take this frame pts as the first apts.
@@ -9652,6 +9753,7 @@ hwsync_rewrite:
                 if (hw_sync->first_apts_flag == false) {
                     aml_audio_hwsync_set_first_pts(aml_out->hwsync, cur_pts);
                 } else {
+#ifndef USE_MSYNC
                     uint64_t apts;
                     uint32_t apts32;
                     uint pcr = 0;
@@ -9707,6 +9809,15 @@ hwsync_rewrite:
                             }
                         }
                     }
+#else /* USE_MSYNC */
+                    if (aml_out->msync_session) {
+                        struct audio_policy policy;
+                        uint64_t latency = out_get_latency(stream) * 90;
+                        uint32_t apts32 = (cur_pts - latency) & 0xffffffff;
+                        av_sync_audio_render(aml_out->msync_session, apts32, &policy);
+                        /* TODO: for non-amaster mode, handle sync policy on audio side */
+                    }
+#endif /* USE_MSYNC */
                 }
             }
         }
@@ -10956,12 +11067,17 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
             }
         }
     }
+
     if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_STOP) {
         ALOGI("%s set AUDIO_PAUSE when close stream\n",__func__);
+#ifndef USE_MSYNC
         sysfs_set_sysfs_str (TSYNC_EVENT, "AUDIO_PAUSE");
+#endif
 
         ALOGI("%s set AUDIO_STOP when close stream\n",__func__);
+#ifndef USE_MSYNC
         sysfs_set_sysfs_str (TSYNC_EVENT, "AUDIO_STOP");
+#endif
         aml_out->tsync_status = TSYNC_STATUS_STOP;
     }
 

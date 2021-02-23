@@ -26,6 +26,7 @@ option(USE_SC2 "Current platform is sc2" OFF)
 option(USE_CAP_MUTE_HDMI "Support audio capture mute for HDMI INPUT" ON)
 option(USE_APP_MIXING "Support appsound mixing" ON)
 option(USE_DIAG_LOG "Support diagnostic logging for RDK" OFF)
+option(USE_MSYNC "Support avsync with aml-avsync" ON)
 
 if(USE_DTV)
     list(APPEND DTV_FILES audio_hal/audio_dtv_ad.c)
@@ -44,6 +45,10 @@ endif()
 
 if(USE_DIAG_LOG)
 add_definitions(-DDIAG_LOG)
+endif()
+
+if(USE_MSYNC)
+add_definitions(-DUSE_MSYNC)
 endif()
 
 option(USE_EQ_DRC "Compile with EQ/DRC" OFF)
@@ -162,6 +167,10 @@ if(USE_DTV)
 	target_link_libraries(audio_hal
 		${DTV_LIBS}
 		${DVB_AUDIO_LIBS} -lamavutils)
+endif()
+
+if(USE_MSYNC)
+	target_link_libraries(audio_hal -lamlavsync)
 endif()
 
 if(USE_SC2)
