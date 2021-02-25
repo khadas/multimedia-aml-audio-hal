@@ -24,6 +24,7 @@ option(USE_DTV "Compile with DTV option" OFF)
 option(USE_CAP "Support audio capture" ON)
 option(USE_SC2 "Current platform is sc2" OFF)
 option(USE_CAP_MUTE_HDMI "Support audio capture mute for HDMI INPUT" ON)
+option(USE_APP_MIXING "Support appsound mixing" ON)
 
 if(USE_DTV)
     list(APPEND DTV_FILES audio_hal/audio_dtv_ad.c)
@@ -34,6 +35,10 @@ if(USE_DTV)
     list(APPEND DVB_AUDIO_LIBS -L./dtv_audio_utils -ldvbaudioutils)
 
     add_definitions(-DUSE_DTV)
+endif()
+
+if(USE_APP_MIXING)
+add_definitions(-DUSE_APP_MIXING)
 endif()
 
 option(USE_EQ_DRC "Compile with EQ/DRC" OFF)
