@@ -374,6 +374,14 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     return 0;
 }
 
+static inline uint32_t abs32(int32_t a)
+{
+    return ((a) < 0 ? -(a) : (a));
+}
+
+#define pts_gap(a, b)   abs32(((int)(a) - (int)(b)))
+#define pts_bigger(a, b) ((int)(a) > (int)(b))
+
 /*
 @offset :ms12 real costed offset
 @p_adjust_ms: a/v adjust ms.if return a minus,means
@@ -464,19 +472,14 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         ALOGE("%s lookup failed", __func__);
         return 0;
     }
-    if (p_hwsync->first_apts_flag == false && offset > 0 && (apts >= latency_pts)) {
+    if (p_hwsync->first_apts_flag == false && offset > 0) {
         ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
         ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
         aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);
     } else  if (p_hwsync->first_apts_flag) {
         struct aml_audio_device *adev = p_hwsync->aout->dev;
         uint32_t apts_save = apts;
-        if (apts >= latency_pts) {
-            apts -= latency_pts;
-        } else {
-            ALOGE("wrong PTS =0x%x delay pts=0x%x",apts, latency_pts);
-            return 0;
-        }
+        apts -= latency_pts;
 
         if (p_hwsync->eos && (eDolbyMS12Lib == adev->dolby_lib_type) && continous_mode(adev)) {
             return 0;
@@ -484,7 +487,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
 
         ret = aml_audio_hwsync_get_pcr(p_hwsync, &pcr);
         if (ret == 0) {
-            gap = get_pts_gap(pcr, apts);
+            gap = pts_gap(pcr, apts);
             gap_ms = gap / 90;
             if (debug_enable) {
                 ALOGI("%s pcr 0x%x,apts 0x%x,gap 0x%x,gap duration %d ms, offset %d, apts_lookup=%d, latency=%d",
@@ -492,7 +495,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             }
 
             if (gap > APTS_DISCONTINUE_THRESHOLD_MIN && gap < APTS_DISCONTINUE_THRESHOLD_MAX) {
-                if (apts > pcr) {
+                if (pts_bigger(apts, pcr)) {
                     /*during video stop, pcr has been reset by video
                       we need ignore such pcr value*/
                     if (pcr != 0) {
