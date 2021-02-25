@@ -134,6 +134,10 @@ static void check_skip_frames(struct aml_audio_device *aml_dev)
     snd_pcm_sframes_t frames = 0;
     struct pcm *pcm_handle = aml_dev->pcm_handle[I2S_DEVICE];
 
+    if (continous_mode(aml_dev)) {
+        return;
+    }
+
     if (pcm_handle && patch && patch->need_do_avsync == true && patch->is_avsync_start == false) {
         if (pcm_ioctl(pcm_handle, SNDRV_PCM_IOCTL_DELAY, &frames) >= 0) {
             int alsa_out_i2s_ltcy = frames / SAMPLE_RATE_MS;
