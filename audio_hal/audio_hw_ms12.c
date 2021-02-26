@@ -1297,6 +1297,20 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12
             }
         }
     }
+
+    if (((ms12->output_config & (MS12_OUTPUT_MASK_DD | MS12_OUTPUT_MASK_DDP | MS12_OUTPUT_MASK_MAT)) == 0) &&
+        (aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3 ||
+         aml_out->hal_internal_format == AUDIO_FORMAT_AC3)) {
+        /* when there is no compressed output from MS12, need consume bypass checkin data */
+        void *output_buf = NULL;
+        int32_t out_size = 0;
+        struct bypass_frame_info frame_info = { 0 };
+        uint64_t consume_offset = dolby_ms12_get_decoder_n_bytes_consumed(adev->ms12.dolby_ms12_ptr, aml_out->hal_internal_format, MAIN_INPUT_STREAM);
+        if (consume_offset) {
+            aml_ms12_bypass_checkout_data(ms12->ms12_bypass_handle, &output_buf, &out_size, consume_offset, &frame_info);
+        }
+    }
+
     return ret;
 }
 #endif
