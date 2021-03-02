@@ -12560,7 +12560,7 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     aml_dev->debug_flag = aml_audio_get_debug_flag();
 
     // LINUX Change
-    fd = open("/tmp/haldump", O_RDWR | O_CREAT);
+    fd = open("/tmp/haldump", O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
     if (fd < 0) {
         ALOGE("Cannot access /tmp for dump");
         return NULL;
