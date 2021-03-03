@@ -8354,10 +8354,12 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     /* 2ch downmix capture */
                     pthread_mutex_lock(&adev->cap_buffer_lock);
                     if (adev->cap_buffer) {
+#ifdef AUDIO_CAP_MUTE_HDMI
                         if ((adev->audio_patch) && (adev->patch_src != SRC_DTV)) {
                             /* capture only works for non-patch case by definition */
                             memset(tmp_buffer, 0, out_frames * 4);
                         }
+#endif
                         IpcBuffer_write(adev->cap_buffer, (const unsigned char *)tmp_buffer, out_frames * 4); 
                     }
                     pthread_mutex_unlock(&adev->cap_buffer_lock);
