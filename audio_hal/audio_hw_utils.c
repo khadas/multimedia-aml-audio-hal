@@ -48,7 +48,11 @@
 #include "audio_a2dp_hw.h"
 #include "aml_audio_avsync_table.h"
 #include "dolby_lib_api.h"
+#ifdef USE_DTV
+// for dtv playback
 #include "audio_hw_dtv.h"
+#define ENABLE_DTV_PATCH
+#endif
 
 
 #ifdef LOG_NDEBUG_FUNCTION
