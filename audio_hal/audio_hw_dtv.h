@@ -51,7 +51,7 @@
 
 //}
 #define DTV_AUDIO_JUMPED_DEFAULT_THRESHOLD   (400)  //ms
-#define DTV_AUDIO_RETUNE_DEFAULT_THRESHOLD   (300)  //ms
+#define DTV_AUDIO_RETUNE_DEFAULT_THRESHOLD   (200)  //ms
 #define DTV_AUDIO_DROP_HOLD_LEAST_MS         (32 * 4) //ms
 #define DTV_AV_DISCONTINUE_THREDHOLD         (3000 * 90)
 #define DTV_PCRSCR_DEFAULT_LATENCY           (1000 * 90)
@@ -97,15 +97,15 @@ enum {
 
 /*speaker raw/pcm input*/
 #define  DTV_AVSYNC_MS12_LATENCY_SPK_PCM             (50)
-#define  DTV_AVSYNC_MS12_LATENCY_SPK_RAW             (50)
+#define  DTV_AVSYNC_MS12_LATENCY_SPK_RAW             (50 + 60)
 /*speaker dap enabled*/
 #define  DTV_AVSYNC_MS12_LATENCY_DOLBY_DAP           (0)
 /*atmos with arc*/
 #define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOS           (180)
 /*ddp sink with arc*/
-#define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOSTODDP      (100)
-#define  DTV_AVSYNC_MS12_LATENCY_ARC_RAWTODDP        (80)
-#define  DTV_AVSYNC_MS12_LATENCY_ARC_PCMTODDP        (80)
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOSTODDP      (100 + 180)
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_RAWTODDP        (80 + 180)
+#define  DTV_AVSYNC_MS12_LATENCY_ARC_PCMTODDP        (80 + 180)
 /*dd sink with arc*/
 #define  DTV_AVSYNC_MS12_LATENCY_ARC_RAWTODD         (60)
 #define  DTV_AVSYNC_MS12_LATENCY_ARC_PCMTODD         (60)
@@ -113,6 +113,8 @@ enum {
 #define  DTV_AVSYNC_MS12_LATENCY_ARC_PCM              (30)
 /*atmos passthrough with arc*/
 #define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOS_PTH        (60)
+/*pcm sink with audiocap*/
+#define  DTV_AVSYNC_MS12_LATENCY_AUDIOCAP              (210)
 
 /*above default tunning value is based DENON-X2400H AVR and the sound mode is music,
  *if the avr or mode is changed, there may be some small gaps in avsync,
@@ -135,6 +137,8 @@ enum {
 #define  DTV_AVSYNC_MS12_LATENCY_ARC_PCM_PROPERTY      "vendor.media.audio.hal.dtv.arc.pcm"
 /*atmos passthrough with arc*/
 #define  DTV_AVSYNC_MS12_LATENCY_ARC_ATMOS_PTH_PROPERTY  "vendor.media.audio.hal.dtv.arc.pthatmos"
+/*pcm sink with audiocap*/
+#define  DTV_AVSYNC_MS12_LATENCY_AUDIOCAP_PROPERTY      "vendor.media.audio.hal.dtv.audiocap.pcm"
 /*****************end of dtv tunning*************/
 
 int create_dtv_patch(struct audio_hw_device *dev, audio_devices_t input, audio_devices_t output __unused);
@@ -149,4 +153,5 @@ int audio_set_spdif_clock(struct aml_stream_out *stream,int type);
 #define TSYNC_PCR_DEBUG_PTS    0x01
 #define TSYNC_PCR_DEBUG_LOOKUP 0x40
 #define TSYNC_PCR_DEBUG_AUDIO  0x20
+#define TSYNC_PCR_DEBUG_LATENCY   0x80
 #endif
