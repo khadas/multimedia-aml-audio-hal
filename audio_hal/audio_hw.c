@@ -6135,6 +6135,12 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+    ret = str_parms_get_int(parms, "hal_param_arc_delay_time_ms", &val);
+    if (ret >= 0) {
+        aml_audio_delay_set_time(AML_DELAY_OUTPORT_ARC, val);
+        goto exit;
+    }
+
     ret = str_parms_get_int(parms, "delay_time", &val);
     if (ret >= 0) {
         aml_audio_delay_set_time(AML_DELAY_OUTPORT_ALL, val);
@@ -6810,6 +6816,12 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
             return strdup(temp_buf);
         }
     }
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+    else if (strstr(keys, "hal_param_arc_delay_time_ms")) {
+        sprintf(temp_buf, "hal_param_arc_delay_time_ms=%d", aml_audio_delay_get_time(AML_DELAY_OUTPORT_ARC));
+        return strdup(temp_buf);
+    }
+#endif
     return strdup("");
 }
 

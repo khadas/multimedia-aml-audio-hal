@@ -101,6 +101,19 @@ int aml_audio_delay_set_time(aml_audio_delay_type_e enAudioDelayType, int s32Del
     return 0;
 }
 
+int aml_audio_delay_get_time(aml_audio_delay_type_e enAudioDelayType)
+{
+    int delay = 0;
+
+    if ((g_bAudioDelayInit) &&
+        (enAudioDelayType >= AML_DELAY_OUTPORT_SPEAKER) &&
+        (enAudioDelayType < AML_DELAY_BUTT)) {
+        delay = g_stAudioDelay[enAudioDelayType].delay_time;
+    }
+
+    return delay;
+}
+
 int aml_audio_delay_input_set_time(aml_audio_delay_input_type_e enAudioDelayType, int s32DelayTimeMs)
 {
     if (!g_bAudioDelayInit) {
@@ -250,6 +263,10 @@ int aml_audio_delay_input_process(void *pData, int s32Size,
         return -1;
     }
 
+    if (!s32Size) {
+        return 0;
+    }
+
     u32OneMsSize = _get_delay_ms_size(enFormat, nChannel, nsampleRate, nSampleSize);
 
     return _delay_process(AML_DELAY_INPORT_ALL, u32OneMsSize, pData, s32Size);
@@ -268,6 +285,11 @@ int aml_audio_delay_process(aml_audio_delay_type_e enAudioDelayType, void *pData
         ALOGW("[%s:%d] audio delay not initialized", __func__, __LINE__);
         return -1;
     }
+
+    if (!s32Size) {
+        return 0;
+    }
+
     if (enAudioDelayType < AML_DELAY_OUTPORT_SPEAKER || enAudioDelayType >= AML_DELAY_BUTT) {
         ALOGW("[%s:%d] delay type:%d invalid, min:%d, max:%d",
             __func__, __LINE__, enAudioDelayType, AML_DELAY_OUTPORT_SPEAKER, AML_DELAY_BUTT-1);
@@ -284,6 +306,9 @@ int aml_audio_delay_process(aml_audio_delay_type_e enAudioDelayType, void *pData
         } else {
             u32OneMsSize = _get_delay_ms_size(AUDIO_FORMAT_PCM, 2, 48000, 4); // 48k * 2ch * 4Byte [Notes: alsa only support 32bit(4Byte)]
         }
+    } else if (AML_DELAY_OUTPORT_ARC == enAudioDelayType) {
+        /* for PCM, ARC output is 32 bits (extracted from 8ch 32bit output) */
+        u32OneMsSize = _get_delay_ms_size(enFormat, nChannel, 48000, 4);
     }
 
     return _delay_process(enAudioDelayType, u32OneMsSize, pData, s32Size);

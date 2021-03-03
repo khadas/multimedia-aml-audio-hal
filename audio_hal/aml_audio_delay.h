@@ -30,9 +30,10 @@ typedef struct AML_AUDIO_DELAY {
 typedef enum AML_AUDIO_DELAY_TYPE {
     AML_DELAY_OUTPORT_SPEAKER           = 0,
     AML_DELAY_OUTPORT_SPDIF             = 1,
-    AML_DELAY_OUTPORT_ALL               = 2,
-    AML_DELAY_INPORT_ALL                = 3,
-    AML_DELAY_BUTT                      = 4,
+    AML_DELAY_OUTPORT_ARC               = 2,
+    AML_DELAY_OUTPORT_ALL               = 3,
+    AML_DELAY_INPORT_ALL                = 4,
+    AML_DELAY_BUTT                      = 5,
 } aml_audio_delay_type_e;
 
 typedef enum AML_AUDIO_INPUT_DELAY_TYPE {
@@ -47,6 +48,7 @@ typedef enum AML_AUDIO_INPUT_DELAY_TYPE {
 int aml_audio_delay_init();
 int aml_audio_delay_deinit();
 int aml_audio_delay_set_time(aml_audio_delay_type_e enAudioDelayType, int s32DelayTimeMs);
+int aml_audio_delay_get_time(aml_audio_delay_type_e enAudioDelayType);
 int aml_audio_delay_input_set_time(aml_audio_delay_input_type_e enAudioInputDelayType, int s32DelayTimeMs);
 int aml_audio_delay_input_set_type(aml_audio_delay_input_type_e enAudioDelayType);
 int aml_audio_delay_input_get_ms();

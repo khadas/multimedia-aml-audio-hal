@@ -32,6 +32,9 @@
 #include "aml_audio_stream.h"
 #include "audio_virtual_buf.h"
 #include "alsa_config_parameters.h"
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+#include "aml_audio_delay.h"
+#endif
 #define AML_ZERO_ADD_MIN_SIZE 1024
 
 #define AUDIO_EAC3_FRAME_SIZE 16
@@ -583,6 +586,9 @@ write:
         raw_for_arc = !(audio_is_linear_pcm(out_format));
 
         if ((config->channels == 2) || raw_for_arc) {
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+            aml_audio_delay_process(AML_DELAY_OUTPORT_ARC, buffer, bytes, out_format, 2);
+#endif
             ret = pcm_write(aml_out->earc_pcm, buffer, bytes);
             if (ret < 0) {
                 if (aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE) != ATTEND_TYPE_NONE)
@@ -599,6 +605,9 @@ write:
                 ps32SpdifTempBuffer[2 *i]     = src[8 * i + 6];
                 ps32SpdifTempBuffer[2 *i + 1] = src[8 * i + 7];
             }
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+            aml_audio_delay_process(AML_DELAY_OUTPORT_ARC, ps32SpdifTempBuffer, bytes / 4, AUDIO_FORMAT_PCM_32_BIT, 2);
+#endif
             ret = pcm_write(aml_out->earc_pcm, ps32SpdifTempBuffer, bytes / 4);
             if (ret < 0) {
                 if (aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE) != ATTEND_TYPE_NONE)
