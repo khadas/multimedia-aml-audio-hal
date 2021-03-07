@@ -6512,6 +6512,31 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     }
 #endif
 
+    ret = str_parms_get_str(parms, "setenv", value, sizeof(value));
+    if (ret >= 0) {
+        char *var = strtok(value, ",");
+        if (var) {
+            char *val = var + strlen(var) + 1;
+            if (strlen(val) > 0) {
+                if ((setenv(var, val, 1)) == 0) {
+                    ALOGI("setenv %s=%s success", var, val);
+                    ret = 0;
+                    goto exit;
+                } else {
+                    ALOGE("setenv %s=%s failed", var, val);
+                    ret = -EINVAL;
+                    goto exit;
+                }
+            } else {
+                unsetenv(var);
+                ALOGI("env %s unset", var);
+            }
+        } else {
+            ret = -EINVAL;
+            goto exit;
+        }
+    }
+
     ret = str_parms_get_str(parms, "diaglogue_enhancement", value, sizeof(value));
     if (ret >= 0) {
         adev->ms12.ac4_de = atoi(value);
