@@ -889,6 +889,7 @@ MAIN_INPUT:
             dolby_ms12_enable_debug();
 
             if (adev->continuous_audio_mode == 0) {
+                ms12->underrun_cnt = dolby_ms12_get_main_underrun();
                 dolby_ms12_scheduler_run(ms12->dolby_ms12_ptr);
             }
 
@@ -1339,6 +1340,7 @@ static void *dolby_ms12_threadloop(void *data)
     while ((ms12->dolby_ms12_thread_exit == false) && (ms12->dolby_ms12_enable)) {
         ALOGV("%s() goto dolby_ms12_scheduler_run", __FUNCTION__);
         if (ms12->dolby_ms12_ptr) {
+            ms12->underrun_cnt = dolby_ms12_get_main_underrun();
             dolby_ms12_scheduler_run(ms12->dolby_ms12_ptr);
         } else {
             ALOGE("%s() ms12->dolby_ms12_ptr is NULL, fatal error!", __FUNCTION__);

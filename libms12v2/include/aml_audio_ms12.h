@@ -106,6 +106,7 @@ struct dolby_ms12_desc {
     void * ms12_bypass_handle;
     bool   is_bypass_ms12;
     int    atmos_info_change_cnt;
+    int    underrun_cnt;
 };
 
 /*

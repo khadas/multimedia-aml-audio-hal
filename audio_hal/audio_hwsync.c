@@ -505,12 +505,27 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                         ALOGE("pcr has been reset\n");
                     }
                 } else {
-                    ALOGI("tsync -> reset pcrscr 0x%x -> 0x%x, %s big,diff %"PRIx64" ms",
-                          pcr, apts, apts > pcr ? "apts" : "pcr", get_pts_gap(apts, pcr) / 90);
-                    sprintf(tempbuf, "0x%x", apts);
-                    int ret_val = sysfs_set_sysfs_str(TSYNC_APTS, tempbuf);
-                    if (ret_val == -1) {
-                        ALOGE("unable to open file %s,err: %s", TSYNC_APTS, strerror(errno));
+                    if (adev->continuous_audio_mode && eDolbyMS12Lib == adev->dolby_lib_type) {
+                        /* when MS12 main pipeline gets underrun, the output latency does not reflect the real
+                         * latency since muting frame can be inserted by MS12 when continuous output mode is
+                         * enabled, so only reset APTS when PCR exceeds last checkin PTS in such case.
+                         */
+                        if (adev->ms12.underrun_cnt != dolby_ms12_get_main_underrun()) {
+                            gap = pts_gap(pcr, apts_save);
+                            if (pts_bigger(pcr, apts_save)) {
+                                sprintf(tempbuf, "0x%x", apts_save);
+                                sysfs_set_sysfs_str(TSYNC_APTS, tempbuf);
+                                ALOGI("tsync -> reset pcrscr 0x%x -> 0x%x", pcr, apts_save);
+                            }
+                        }
+                    } else {
+                        ALOGI("tsync -> reset pcrscr 0x%x -> 0x%x, %s big,diff %"PRIx64" ms",
+                              pcr, apts, apts > pcr ? "apts" : "pcr", get_pts_gap(apts, pcr) / 90);
+                        sprintf(tempbuf, "0x%x", apts);
+                        int ret_val = sysfs_set_sysfs_str(TSYNC_APTS, tempbuf);
+                        if (ret_val == -1) {
+                            ALOGE("unable to open file %s,err: %s", TSYNC_APTS, strerror(errno));
+                        }
                     }
                 }
             } else if (gap > APTS_DISCONTINUE_THRESHOLD_MAX) {
