@@ -7437,6 +7437,7 @@ int do_output_standby_l(struct audio_stream *stream)
                         ALOGI("%s,release ms12 here", __func__);
                         get_dolby_ms12_cleanup(&adev->ms12);
                         //ALOGI("[%s:%d] get_dolby_ms12_cleanup\n", __FUNCTION__, __LINE__);
+                        dolby_ms12_set_pause_flag(false);
                         adev->ms12.is_continuous_paused = false;
                         adev->need_remove_conti_mode = false;
                         adev->continuous_audio_mode = 0;
@@ -8997,6 +8998,7 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
                 dolby_ms12_set_dolby_main1_as_dummy_file(aformat != AUDIO_FORMAT_AC4);
             }
             ring_buffer_reset(&adev->spk_tuning_rbuf);
+            dolby_ms12_set_pause_flag(false);
             adev->ms12.is_continuous_paused = false;
             ret = get_the_dolby_ms12_prepared(aml_out, aformat,
                 aml_out->hal_channel_mask,
