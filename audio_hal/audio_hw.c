@@ -6615,7 +6615,8 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         if (strlen(parm) > 0)
             aml_ms12_update_runtime_params(&(adev->ms12), parm);
         pthread_mutex_unlock(&adev->lock);
-        return 0;
+        ret = 0;
+        goto exit;
     }
 
 #if 0
@@ -6628,6 +6629,54 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 #endif
+
+    ret = str_parms_get_str(parms, "prim_mixgain", value, sizeof(value));
+    if (ret >= 0) {
+        char parm[12] = "";
+        int gain = atoi(value);
+        if ((gain <= 0) && (gain >= -96)) {
+            sprintf(parm, "-sys_prim_mixgain %d,200,0", gain);
+            pthread_mutex_lock(&adev->lock);
+            aml_ms12_update_runtime_params(&(adev->ms12), parm);
+            pthread_mutex_unlock(&adev->lock);
+            ret = 0;
+            goto exit;
+        }
+        ret = -EINVAL;
+        goto exit;
+    }
+
+    ret = str_parms_get_str(parms, "apps_mixgain", value, sizeof(value));
+    if (ret >= 0) {
+        char parm[12] = "";
+        int gain = atoi(value);
+        if ((gain <= 0) && (gain >= -96)) {
+            sprintf(parm, "-sys_apps_mixgain %d,200,0", gain);
+            pthread_mutex_lock(&adev->lock);
+            aml_ms12_update_runtime_params(&(adev->ms12), parm);
+            pthread_mutex_unlock(&adev->lock);
+            ret = 0;
+            goto exit;
+        }
+        ret = -EINVAL;
+        goto exit;
+    }
+
+    ret = str_parms_get_str(parms, "syss_mixgain", value, sizeof(value));
+    if (ret >= 0) {
+        char parm[12] = "";
+        int gain = atoi(value);
+        if ((gain <= 0) && (gain >= -96)) {
+            sprintf(parm, "-sys_syss_mixgain %d,200,0", gain);
+            pthread_mutex_lock(&adev->lock);
+            aml_ms12_update_runtime_params(&(adev->ms12), parm);
+            pthread_mutex_unlock(&adev->lock);
+            ret = 0;
+            goto exit;
+        }
+        ret = -EINVAL;
+        goto exit;
+    }
 
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         ret = str_parms_get_str(parms, "ms12_runtime", value, sizeof(value));
