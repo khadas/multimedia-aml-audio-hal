@@ -4910,6 +4910,24 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     }
 #endif
 
+    /* LINUX change: use AUDIO_OUTPUT_FLAG_MMAP_NOIRQ flag for third app stream mixing */
+#ifdef USE_APP_MIXING
+    if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
+        /* some sanity check */
+        if (flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
+            ALOGE("%s: APP mixng should not comes with HWSYNC flag", __func__);
+            ret = -EINVAL;
+            goto err;
+        }
+
+        if (eDolbyMS12Lib != adev->dolby_lib_type) {
+            ALOGE("%s: APP mixng support requires MS12", __func__);
+            ret = -EINVAL;
+            goto err;
+        }
+    }
+#endif
+
     //aml_audio_hwsync_init(out->hwsync,out);
     /* FIXME: when we support multiple output devices, we will want to
      * do the following:
@@ -9355,8 +9373,13 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         }
         pthread_mutex_unlock(&adev->lock);
     }
+
+#ifdef USE_APP_MIXING
+    if (case_cnt > 3) {
+#else
     if (case_cnt > 2) {
-        ALOGE ("%s usemask %x,we do not support two direct stream output at the same time.TO CHECK CODE FLOW!!!!!!",
+#endif
+        ALOGE ("%s usemask %x,we do not support three direct stream output at the same time.TO CHECK CODE FLOW!!!!!!",
                 __func__,adev->usecase_masks);
         return return_bytes;
     }
@@ -10483,6 +10506,11 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
             //ALOGE("%s(),2 mixer_aux_buffer_write !", __FUNCTION__);
             //FIXEME if need config ms12 here if neeeded.
 #ifdef ENABLE_MMAP
+        } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
+            aml_out->write = mixer_app_buffer_write;
+            //ALOGI("[%s:%d], mixer_app_buffer_write !", __func__, __LINE__);
+#endif
+#ifdef USE_APP_MIXING
         } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             aml_out->write = mixer_app_buffer_write;
             //ALOGI("[%s:%d], mixer_app_buffer_write !", __func__, __LINE__);

@@ -1069,7 +1069,6 @@ int dolby_ms12_app_process(
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     audio_channel_mask_t mixer_default_channelmask = AUDIO_CHANNEL_OUT_STEREO;
-    int mixer_default_samplerate = 48000;
     int dolby_ms12_input_bytes = 0;
     int ms12_output_size = 0;
     int ret = 0;
@@ -1087,7 +1086,7 @@ int dolby_ms12_app_process(
                 , bytes
                 , AUDIO_FORMAT_PCM_16_BIT
                 , audio_channel_count_from_out_mask(mixer_default_channelmask)
-                , mixer_default_samplerate);
+                , aml_out->hal_rate);
         if (dolby_ms12_input_bytes > 0) {
             *use_size = dolby_ms12_input_bytes;
             ret = 0;
