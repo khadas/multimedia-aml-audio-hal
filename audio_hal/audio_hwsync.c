@@ -403,6 +403,9 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     uint32_t latency_pts = 0;
     struct aml_stream_out  *out;
     int b_raw = 0;
+#ifdef DIAG_LOG
+    uint32_t a2a_pts;
+#endif
 
     // add protection to avoid NULL pointer.
     if (p_hwsync == NULL) {
@@ -432,6 +435,10 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
 
     ret = aml_audio_hwsync_lookup_apts(p_hwsync, offset, &apts);
 
+#ifdef DIAG_LOG
+    a2a_pts = apts;
+#endif
+
     /*get MS12 pipe line delay + alsa delay*/
     stream = (struct audio_stream_out *)p_hwsync->aout;
     if (stream) {
@@ -440,6 +447,10 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             latency_frames = out_get_ms12_latency_frames(stream);
             //ALOGI("latency_frames =%d", latency_frames);
             latency_frames += aml_audio_get_ms12_tunnel_latency_offset(b_raw)*48; // add 60ms delay for ms12, 32ms pts offset, other is ms12 delay
+#ifdef DIAG_LOG
+            a2a_pts -= latency_frames / 48 * 90;
+#endif
+
 #ifdef AUDIO_CAP
             if (adev->cap_buffer) {
                 latency_frames += adev->cap_delay * 48;
@@ -472,6 +483,11 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         ALOGE("%s lookup failed", __func__);
         return 0;
     }
+
+#ifdef DIAG_LOG
+    adev->a2a_pts = a2a_pts;
+#endif
+
     if (p_hwsync->first_apts_flag == false && offset > 0) {
         ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
         ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);

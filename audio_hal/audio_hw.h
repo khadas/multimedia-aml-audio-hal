@@ -621,6 +621,13 @@ struct aml_audio_device {
     void *cap_buffer;
     int cap_delay;
 #endif
+
+#ifdef DIAG_LOG
+    FILE *diag_log_fd;
+    char diag_log_path[256];
+    uint32_t a2a_pts;
+    uint32_t a2a_pts_log;
+#endif
 };
 
 struct meta_data {

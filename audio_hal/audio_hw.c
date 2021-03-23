@@ -327,6 +327,49 @@ static inline short CLIP (int r)
            (r < -0x8000) ? -0x8000 :
            r;
 }
+
+#ifdef DIAG_LOG
+void diag_log(struct aml_audio_device *adev, const char *msg)
+{
+    char *log_path;
+    struct timespec ts;
+
+    if (adev->a2a_pts_log == adev->a2a_pts) {
+        return;
+    }
+
+    log_path = getenv("AV_PROGRESSION");
+    if (!log_path) {
+        if (adev->diag_log_fd) {
+            fclose(adev->diag_log_fd);
+            adev->diag_log_fd = NULL;
+            adev->diag_log_path[0] = 0;
+        }
+        return;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+
+    if (strcmp(log_path, "1") == 0) {
+        adev->a2a_pts_log = adev->a2a_pts;
+        fprintf(stderr, "[%6lu.%06lu](AtoA, %08x)\n", ts.tv_sec, ts.tv_nsec/1000, adev->a2a_pts);
+    } else {
+        if (adev->diag_log_fd && strcmp(log_path, adev->diag_log_path)) {
+            fclose(adev->diag_log_fd);
+            adev->diag_log_fd = NULL;
+        }
+        if (!adev->diag_log_fd) {
+            strncpy(adev->diag_log_path, log_path, sizeof(adev->diag_log_path) - 1);
+            adev->diag_log_fd = fopen(adev->diag_log_path, "a+");
+        }
+        if (adev->diag_log_fd) {
+            adev->a2a_pts_log = adev->a2a_pts;
+            fprintf(adev->diag_log_fd, "[%6lu.%06lu](AtoA, %08x)%s\n", ts.tv_sec, ts.tv_nsec/1000, adev->a2a_pts, msg);
+        }
+    }
+}
+#endif
+
 static void continuous_stream_do_standby(struct aml_audio_device *adev)
 {
     struct aml_stream_out *aml_direct_out = NULL;
@@ -8629,6 +8672,12 @@ ssize_t hw_write (struct audio_stream_out *stream
             //ALOGW("aml_audio_delay_process skip, ret:%#x", ret);
         }
 #endif
+
+#ifdef DIAG_LOG
+        if ((aml_out->usecase == STREAM_PCM_HWSYNC || aml_out->usecase == STREAM_RAW_HWSYNC) && (adjust_ms > 0)) {
+            diag_log(adev, "Warning - delay added");
+        }
+#endif
         ret = insert_silence_data(stream, buffer, bytes, adjust_ms, output_format);
         if (ret < 0) {
             ALOGE("insert_silence_data occur error, ret:%#x", ret);
@@ -8665,6 +8714,12 @@ ssize_t hw_write (struct audio_stream_out *stream
                 } else
 #endif
                 {
+#ifdef DIAG_LOG
+                    if ((aml_out->usecase == STREAM_PCM_HWSYNC || aml_out->usecase == STREAM_RAW_HWSYNC) &&
+                        (adev->usecase_masks & (STREAM_PCM_HWSYNC | STREAM_RAW_HWSYNC))) {
+                        diag_log(adev, "");
+                    }
+#endif
                     ret = aml_alsa_output_write(stream, (void *) buffer, bytes, output_format);
                 }
             }
@@ -12738,6 +12793,12 @@ static int adev_close(hw_device_t *device)
         free(adev->mic_desc);
 #endif
     pthread_mutex_unlock(&adev->lock);
+
+#ifdef DIAG_LOG
+    if (adev->diag_log_fd) {
+        fclose(adev->diag_log_fd);
+    }
+#endif
     free(device);
     aml_audio_debug_malloc_close();
     return 0;

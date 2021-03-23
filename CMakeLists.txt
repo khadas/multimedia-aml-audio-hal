@@ -25,6 +25,7 @@ option(USE_CAP "Support audio capture" ON)
 option(USE_SC2 "Current platform is sc2" OFF)
 option(USE_CAP_MUTE_HDMI "Support audio capture mute for HDMI INPUT" ON)
 option(USE_APP_MIXING "Support appsound mixing" ON)
+option(USE_DIAG_LOG "Support diagnostic logging for RDK" OFF)
 
 if(USE_DTV)
     list(APPEND DTV_FILES audio_hal/audio_dtv_ad.c)
@@ -39,6 +40,10 @@ endif()
 
 if(USE_APP_MIXING)
 add_definitions(-DUSE_APP_MIXING)
+endif()
+
+if(USE_DIAG_LOG)
+add_definitions(-DDIAG_LOG)
 endif()
 
 option(USE_EQ_DRC "Compile with EQ/DRC" OFF)
