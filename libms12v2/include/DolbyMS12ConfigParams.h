@@ -262,8 +262,8 @@ public:
     {
         if (mixergain) {
             memcpy(&mMain1MixGain, mixergain, sizeof(MixGain));
-            if (mMain1MixGain.target < -96) {
-                mMain1MixGain.target = -96;
+            if (mMain1MixGain.target < -12288) {
+                mMain1MixGain.target = -12288;
             }
             ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mMain1MixGain.target, mMain1MixGain.duration, mMain1MixGain.shape);
         }
@@ -272,18 +272,28 @@ public:
     {
         if (mixergain) {
             memcpy(&mMain2MixGain, mixergain, sizeof(MixGain));
-            if (mMain2MixGain.target < -96) {
-                mMain2MixGain.target = -96;
+            if (mMain2MixGain.target < -12288) {
+                mMain2MixGain.target = -12288;
             }
             ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mMain2MixGain.target, mMain2MixGain.duration, mMain2MixGain.shape);
+        }
+    }
+    virtual void setInputMixerGainValuesForUIInput(MixGain *mixergain)
+    {
+        if (mixergain) {
+            memcpy(&mUIMixGain, mixergain, sizeof(MixGain));
+            if (mUIMixGain.target < -12288) {
+                mUIMixGain.target = -12288;
+            }
+            ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mUIMixGain.target, mUIMixGain.duration, mUIMixGain.shape);
         }
     }
     virtual void setSystemSoundMixerGainValuesForPrimaryInput(MixGain *mixergain)
     {
         if (mixergain) {
             memcpy(&mSysPrimMixGain, mixergain, sizeof(MixGain));
-            if (mSysPrimMixGain.target < -96) {
-                mSysPrimMixGain.target = -96;
+            if (mSysPrimMixGain.target < -12288) {
+                mSysPrimMixGain.target = -12288;
             }
             ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mSysPrimMixGain.target, mSysPrimMixGain.duration, mSysPrimMixGain.shape);
         }
@@ -291,19 +301,19 @@ public:
     virtual void setSystemSoundMixerGainValuesForAppSoundsInput(MixGain *mixergain)
     {
         if (mixergain) {
-            memcpy(&mSysApppsMixGain, mixergain, sizeof(MixGain));
-            if (mSysApppsMixGain.target < -96) {
-                mSysApppsMixGain.target = -96;
+            memcpy(&mSysAppsMixGain, mixergain, sizeof(MixGain));
+            if (mSysAppsMixGain.target < -12288) {
+                mSysAppsMixGain.target = -12288;
             }
-            ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mSysApppsMixGain.target, mSysApppsMixGain.duration, mSysApppsMixGain.shape);
+            ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mSysAppsMixGain.target, mSysAppsMixGain.duration, mSysAppsMixGain.shape);
         }
     }
     virtual void setSystemSoundMixerGainValuesForSystemSoundsInput(MixGain *mixergain)
     {
         if (mixergain) {
             memcpy(&mSysSyssMixGain, mixergain, sizeof(MixGain));
-            if (mSysSyssMixGain.target < -96) {
-                mSysSyssMixGain.target = -96;
+            if (mSysSyssMixGain.target < -12288) {
+                mSysSyssMixGain.target = -12288;
             }
             ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mSysSyssMixGain.target, mSysSyssMixGain.duration, mSysSyssMixGain.shape);
         }
@@ -456,11 +466,11 @@ public:
     virtual void setInputMixerGainValuesForOTTSoundsInput(MixGain *mixergain)
     {
         if (mixergain) {
-            memcpy(&mOTTMixGain, mixergain, sizeof(MixGain));
-            if (mOTTMixGain.target < -96) {
-                mOTTMixGain.target = -96;
+            memcpy(&mUIMixGain, mixergain, sizeof(MixGain));
+            if (mUIMixGain.target < -12288) {
+                mUIMixGain.target = -12288;
             }
-            ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mOTTMixGain.target, mOTTMixGain.duration, mOTTMixGain.shape);
+            ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mUIMixGain.target, mUIMixGain.duration, mUIMixGain.shape);
         }
     }
 
@@ -633,21 +643,26 @@ private:
         .duration = 0,
         .shape = 0,
     };//Input mixer gain values for 2nd Main program input
+    MixGain mUIMixGain = {
+        .target = 0,
+        .duration = 0,
+        .shape = 0,
+    };//System sound mixer gain values for primary input (Input/AD mixer output)
     MixGain mSysPrimMixGain = {
         .target = 0,
         .duration = 0,
         .shape = 0,
     };//System sound mixer gain values for primary input (Input/AD mixer output)
-    MixGain mSysApppsMixGain = {
-        .target = 0,
-        .duration = 0,
-        .shape = 0,
-    };//System sound mixer gain values for Application Sounds input
     MixGain mSysSyssMixGain = {
         .target = 0,
         .duration = 0,
         .shape = 0,
     };//System sound mixer gain values for System Sounds input
+    MixGain mSysAppsMixGain = {
+        .target = 0,
+        .duration = 0,
+        .shape = 0,
+    };//System sound mixer gain values for Application Sounds input
 
     //DDPLUS SWITCHES
 
@@ -734,11 +749,6 @@ private:
     bool mMain1IsDummy;
     bool mOTTSoundInputEnable;
 
-    MixGain mOTTMixGain = {
-        .target = 0,
-        .duration = 0,
-        .shape = 0,
-    };//System sound mixer gain values for System Sounds input
     bool mIsLegecyDDPOut;
     int mDolbyInputCMDMask;
     bool mTvTuning;

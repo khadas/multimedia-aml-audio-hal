@@ -667,7 +667,7 @@ private:
         .target = 0,
         .duration = 0,
         .shape = 0,
-    };//System sound mixer gain values for System Sounds input
+    };//System sound mixer gain values for UI Sounds input
 }; //class DolbyMS12ConfigParams
 
 

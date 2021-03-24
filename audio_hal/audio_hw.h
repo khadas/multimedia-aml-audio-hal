@@ -387,6 +387,12 @@ struct mic_in_desc {
 #define MAX_STREAM_NUM   5
 #define HDMI_ARC_MAX_FORMAT  20
 
+enum {
+    EASE_SETTING_INIT    = 0,
+    EASE_SETTING_START   = 1,
+    EASE_SETTING_PENDING = 2
+};
+
 struct aml_audio_device {
     struct audio_hw_device hw_device;
     /* see note below on mutex acquisition order */
@@ -616,7 +622,7 @@ struct aml_audio_device {
     bool spdif_force_mute;
 
 #ifdef AUDIO_CAP
-    /* CapTure IpcBuffer */
+    /* Capture IpcBuffer */
     pthread_mutex_t cap_buffer_lock;
     void *cap_buffer;
     int cap_delay;
@@ -628,6 +634,11 @@ struct aml_audio_device {
     uint32_t a2a_pts;
     uint32_t a2a_pts_log;
 #endif
+
+    int vol_ease_setting_state;
+    int vol_ease_setting_gain;
+    int vol_ease_setting_duration;
+    int vol_ease_setting_shape;
 };
 
 struct meta_data {

@@ -444,6 +444,28 @@ int get_the_dolby_ms12_prepared(
         dolby_ms12_set_main_volume(aml_out->volume_l);
     }
 
+    /* when there is a pending volume easing, apply it after MS12 pipeline starts */
+    if (adev->vol_ease_setting_state == EASE_SETTING_PENDING) {
+        char cmd[128] = {0};
+        sprintf(cmd, "-main1_mixgain %d,%d,%d -main2_mixgain %d,%d,%d -ui_mixgain %d,%d,%d",
+            adev->vol_ease_setting_gain,
+            adev->vol_ease_setting_duration,
+            adev->vol_ease_setting_shape,
+            adev->vol_ease_setting_gain,
+            adev->vol_ease_setting_duration,
+            adev->vol_ease_setting_shape,
+            adev->vol_ease_setting_gain,
+            adev->vol_ease_setting_duration,
+            adev->vol_ease_setting_shape);
+        aml_ms12_update_runtime_params(ms12, cmd);
+        adev->vol_ease_setting_state = EASE_SETTING_INIT;
+        ALOGI("vol_ease: apply pending %d %d %d, reset to EASE_SETTING_INIT",
+            adev->vol_ease_setting_gain, adev->vol_ease_setting_duration, adev->vol_ease_setting_duration);
+    } else if (adev->vol_ease_setting_state == EASE_SETTING_START) {
+        /* when MS12 starts, the first easing settings are applied and need clear EASE_SETTING_START state */
+        adev->vol_ease_setting_state = EASE_SETTING_INIT;
+    }
+
     aml_ac3_parser_open(&ms12->ac3_parser_handle);
     aml_ms12_bypass_open(&ms12->ms12_bypass_handle);
     ring_buffer_init(&ms12->spdif_ring_buffer, ms12->dolby_ms12_out_max_size);
@@ -1162,7 +1184,7 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12)
 /*
  *@brief set dolby ms12 primary gain
  */
-int set_dolby_ms12_primary_input_db_gain(struct dolby_ms12_desc *ms12, int db_gain , int duration)
+int set_dolby_ms12_primary_input_db_gain(struct dolby_ms12_desc *ms12, int db_gain , int duration, int shape)
 {
     MixGain gain;
     int ret = 0;
@@ -1172,7 +1194,7 @@ int set_dolby_ms12_primary_input_db_gain(struct dolby_ms12_desc *ms12, int db_ga
 
     gain.target = db_gain;
     gain.duration = duration;
-    gain.shape = 0;
+    gain.shape = shape;
     dolby_ms12_set_system_sound_mixer_gain_values_for_primary_input(&gain);
     //dolby_ms12_set_input_mixer_gain_values_for_main_program_input(&gain);
     //Fixme when tunnel mode is working, the Alexa start and mute the main input!
