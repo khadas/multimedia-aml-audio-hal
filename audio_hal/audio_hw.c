@@ -9301,7 +9301,10 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
                 break;
             case DD:
             case DDP:
-                ddp_dec->digital_raw = 1;
+                if (aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3)
+                    ddp_dec->digital_raw = 2;
+                else
+                    ddp_dec->digital_raw = 1;
                 //STB case
                 if (!adev->is_TV) {
                     set_stream_dual_output(stream, false);

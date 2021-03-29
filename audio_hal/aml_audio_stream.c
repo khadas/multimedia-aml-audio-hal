@@ -213,19 +213,22 @@ void get_sink_format (struct audio_stream_out *stream)
     }
 #else
 
-    if (eDolbyMS12Lib != adev->dolby_lib_type) {
-        /* if MS12 library does not exist, then output format is same as BYPASS case */
-        hdmi_format = BYPASS;
-    }
-
     switch (hdmi_format) {
     case PCM:
         break;
     case DD:
-        optical_audio_format = AUDIO_FORMAT_AC3;
+        if (eDolbyMS12Lib == adev->dolby_lib_type) {
+            optical_audio_format = AUDIO_FORMAT_AC3;
+        } else {
+            optical_audio_format = source_format;
+        }
         break;
     case DDP:
-        optical_audio_format = AUDIO_FORMAT_E_AC3;
+        if (eDolbyMS12Lib == adev->dolby_lib_type) {
+            optical_audio_format = AUDIO_FORMAT_E_AC3;
+        } else {
+            optical_audio_format = source_format;
+        }
         break;
     case BYPASS:
         optical_audio_format = min(sink_capability, source_format);
