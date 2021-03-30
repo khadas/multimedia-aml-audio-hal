@@ -43,6 +43,7 @@ struct dolby_ddp_dec {
     unsigned char *resample_outbuf;
     ring_buffer_t output_ring_buf;
     int is_dolby_atmos;
+    int requested_rate;
 };
 
 

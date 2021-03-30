@@ -894,6 +894,7 @@ static int start_output_stream_direct (struct aml_stream_out *out)
             ddp_dec->digital_raw = 1;
             if (ddp_dec->status != 1) {
                 int status = dcv_decoder_init_patch(ddp_dec);
+                ddp_dec->requested_rate = out->config.rate;
                 ddp_dec->nIsEc3 = 1;
                 ALOGI("dcv_decoder_init_patch return :%d,is 61937 %d", status, ddp_dec->is_iec61937);
            }
@@ -3092,6 +3093,7 @@ static ssize_t out_write_direct(struct audio_stream_out *stream, const void* buf
                 ddp_dec->digital_raw = 1;
                 if (ddp_dec->status != 1) {
                     int status = dcv_decoder_init_patch(ddp_dec);
+                    ddp_dec->requested_rate = out->config.rate;
                     ddp_dec->nIsEc3 = 1;
                     ALOGI("dcv_decoder_init_patch return :%d,is 61937 %d", status, ddp_dec->is_iec61937);
                }
@@ -9377,6 +9379,7 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
                 if (ddp_dec->status != 1 && (aml_out->hal_internal_format == AUDIO_FORMAT_AC3
                                           || aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3)) {
                     int status = dcv_decoder_init_patch(ddp_dec);
+                    ddp_dec->requested_rate = aml_out->config.rate;
                     if (aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3) {
                         ddp_dec->nIsEc3 = 1;
                     } else if (aml_out->hal_internal_format == AUDIO_FORMAT_AC3) {
@@ -9446,6 +9449,7 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
             if (dts_dec->status != 1 && (aml_out->hal_internal_format == AUDIO_FORMAT_DTS
                                          || aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD)) {
                 int status = dca_decoder_init_patch(dts_dec);
+                dts_dec->requested_rate = aml_out->config.rate;
                 if (adev->virtualx_mulch) {
                     virtualx_setparameter(adev,0,0,2);
                     virtualx_setparameter(adev,VIRTUALXINMODE,1,5);

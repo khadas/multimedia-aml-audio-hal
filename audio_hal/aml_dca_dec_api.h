@@ -43,7 +43,7 @@ struct dca_dts_dec {
     struct pcm_info pcm_out_info;
     aml_audio_resample_t *resample_handle;
     ring_buffer_t output_ring_buf;
-
+    int requested_rate;
 };
 
 int dca_decode_init(struct aml_audio_parser *parser);

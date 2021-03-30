@@ -507,7 +507,7 @@ int dca_decoder_process_patch(struct dca_dts_dec *dts_dec, unsigned char*buffer,
         memmove(dts_dec->inbuf, read_pointer + used_size, dts_dec->remain_size);
     }
 
-    if (dts_dec->outlen_pcm > 0 && dts_dec->pcm_out_info.sample_rate > 0 && dts_dec->pcm_out_info.sample_rate != 48000) {
+    if (dts_dec->outlen_pcm > 0 && dts_dec->pcm_out_info.sample_rate > 0 && dts_dec->pcm_out_info.sample_rate != dts_dec->requested_rate) {
         if (dts_dec->resample_handle) {
             if (dts_dec->pcm_out_info.sample_rate != (int)dts_dec->resample_handle->resample_config.input_sr) {
                 audio_resample_config_t resample_config;

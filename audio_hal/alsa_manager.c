@@ -116,7 +116,7 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
     } else if (eDolbyDcvLib == adev->dolby_lib_type) {
         if (is_dual_output_stream(stream) && adev->optical_format != AUDIO_FORMAT_PCM_16_BIT) {
             device = I2S_DEVICE;
-            config->rate = MM_FULL_POWER_SAMPLING_RATE;
+            //config->rate = MM_FULL_POWER_SAMPLING_RATE;
         } else if (adev->sink_format != AUDIO_FORMAT_PCM_16_BIT &&
                    aml_out->hal_format != AUDIO_FORMAT_PCM_16_BIT) {
             memset(&config_raw, 0, sizeof(struct pcm_config));

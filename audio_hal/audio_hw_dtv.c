@@ -3883,6 +3883,7 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                 } else if (patch->dtv_aformat == ACODEC_FMT_DTS) {
                     patch->aformat = AUDIO_FORMAT_DTS;
                     dca_decoder_init_patch(dts_dec);
+                    dts_dec->requested_rate = 48000;
                     dts_dec->is_dtv = true;
                     patch->decoder_offset = 0;
                     patch->first_apts_lookup_over = 0;

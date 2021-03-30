@@ -971,7 +971,7 @@ int dcv_decoder_process_patch(struct dolby_ddp_dec *ddp_dec, unsigned char*buffe
         //ALOGI("ddp_dec->pcm_out_info.lorocmixlev:%d ddp_dec->pcm_out_info.lorosurmixlev:%d ",ddp_dec->pcm_out_info.lorocmixlev,ddp_dec->pcm_out_info.lorosurmixlev);
     }
 
-    if (ddp_dec->outlen_pcm > 0 && ddp_dec->pcm_out_info.sample_rate > 0 && ddp_dec->pcm_out_info.sample_rate != 48000) {
+    if (ddp_dec->outlen_pcm > 0 && ddp_dec->pcm_out_info.sample_rate > 0 && ddp_dec->pcm_out_info.sample_rate != ddp_dec->requested_rate) {
         if ((int)ddp_dec->aml_resample.input_sr != ddp_dec->pcm_out_info.sample_rate) {
             ALOGI("init resampler from %d to 48000!\n", ddp_dec->pcm_out_info.sample_rate);
             ddp_dec->aml_resample.input_sr = ddp_dec->pcm_out_info.sample_rate;
