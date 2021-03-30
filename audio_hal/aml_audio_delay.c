@@ -28,7 +28,7 @@
 
 static aml_audio_delay_st g_stAudioDelay[AML_DELAY_BUTT];
 static int g_stAudioInputDelay[AML_DELAY_INPUT_MAX] = {0, 0, 0, 0, 0};
-static const int g_u32DelayMaxDefault[AML_DELAY_BUTT] = {250, 250, 250, 250};
+static const int g_u32DelayMaxDefault[AML_DELAY_BUTT] = {250, 250, 250, 250, 250};
 static bool g_bAudioDelayInit = false;
 static aml_audio_delay_input_type_e g_delay_input_type = AML_DELAY_INPUT_DEFAULT;
 
