@@ -313,7 +313,7 @@ static int Get_Parameters(void *buf, int *sample_rate, int *frame_size, int *ChN
     if ((pdata[0] == 0x0b) && (pdata[1] == 0x77)) {
         int i;
         uint8_t tmp;
-        for (i = 0; (i + 1) < PTR_HEAD_SIZE; i += 2) {
+        for (i = 0; i < PTR_HEAD_SIZE; i += 2) {
             tmp = pdata[i];
             pdata[i] = pdata[i + 1];
             pdata[i + 1] = tmp;
@@ -849,35 +849,37 @@ int dcv_decoder_process_patch(struct dolby_ddp_dec *ddp_dec, unsigned char*buffe
     memcpy((char *)ddp_dec->inbuf + ddp_dec->remain_size, (char *)buffer, bytes);
     ddp_dec->remain_size += bytes;
     total_size = ddp_dec->remain_size;
-    read_pointer = ddp_dec->inbuf;
-    ddp_dec->outlen_pcm = 0;
+
     pthread_mutex_lock(&ddp_dec->lock);
+    while (ddp_dec->remain_size > 16)  {
+        read_pointer = ddp_dec->inbuf;
+        ddp_dec->outlen_pcm = 0;
 
-    //check the sync word of dolby frames
-    if (ddp_dec->is_iec61937 == false) {
-        while (ddp_dec->remain_size > 16) {
-            if ((read_pointer[0] == 0x0b && read_pointer[1] == 0x77) || \
-                (read_pointer[0] == 0x77 && read_pointer[1] == 0x0b)) {
-                Get_Parameters(read_pointer, &mSample_rate, &mFrame_size, &mChNum,&is_eac3);
-                if ((mFrame_size == 0) || (mFrame_size < PTR_HEAD_SIZE) || \
-                    (mChNum == 0) || (mSample_rate == 0)) {
-                } else {
-                    in_sync = 1;
-                    break;
+        //check the sync word of dolby frames
+        if (ddp_dec->is_iec61937 == false) {
+            while (ddp_dec->remain_size > 16) {
+                if ((read_pointer[0] == 0x0b && read_pointer[1] == 0x77) || \
+                    (read_pointer[0] == 0x77 && read_pointer[1] == 0x0b)) {
+                    Get_Parameters(read_pointer, &mSample_rate, &mFrame_size, &mChNum,&is_eac3);
+                    if ((mFrame_size == 0) || (mFrame_size < PTR_HEAD_SIZE) || \
+                        (mChNum == 0) || (mSample_rate == 0)) {
+                    } else {
+                        in_sync = 1;
+                        break;
+                    }
                 }
+                ddp_dec->remain_size--;
+                read_pointer++;
             }
-            ddp_dec->remain_size--;
-            read_pointer++;
-        }
-    } else {
-        //if the dolby audio is contained in 61937 format. for perfermance issue,
-        //re-check the PaPbPcPd
-        //TODO, we need improve the perfermance issue from the whole pipeline,such
-        //as read/write burst size optimization(DD/6144,DD+ 24576..) as some
+        } else {
+            //if the dolby audio is contained in 61937 format. for perfermance issue,
+            //re-check the PaPbPcPd
+            //TODO, we need improve the perfermance issue from the whole pipeline,such
+            //as read/write burst size optimization(DD/6144,DD+ 24576..) as some
 
-    while (ddp_dec->remain_size > 16) {
-        if ((read_pointer[i + 0] == 0x72 && read_pointer[i + 1] == 0xf8 && read_pointer[i + 2] == 0x1f && read_pointer[i + 3] == 0x4e)||
-               (read_pointer[i + 0] == 0x4e && read_pointer[i + 1] == 0x1f && read_pointer[i + 2] == 0xf8 && read_pointer[i + 3] == 0x72)) {
+            while (ddp_dec->remain_size > 16) {
+                if ((read_pointer[0] == 0x72 && read_pointer[1] == 0xf8 && read_pointer[2] == 0x1f && read_pointer[3] == 0x4e)||
+                       (read_pointer[0] == 0x4e && read_pointer[1] == 0x1f && read_pointer[2] == 0xf8 && read_pointer[3] == 0x72)) {
                     unsigned int pcpd = *(uint32_t*)(read_pointer  + 4);
                     int pc = (pcpd & 0x1f);
                     int  payload_size ;
@@ -890,45 +892,45 @@ int dcv_decoder_process_patch(struct dolby_ddp_dec *ddp_dec, unsigned char*buffe
                         in_sync = 1;
                         break;
                     }
+                }
+                ddp_dec->remain_size--;
+                read_pointer++;
             }
-            ddp_dec->remain_size--;
-            read_pointer++;
+            read_offset = 8;
         }
-        read_offset = 8;
-    }
-    ddp_dec->curFrmSize = mFrame_size;
-    ALOGV("remain %d, frame size %d,in sync %d\n", ddp_dec->remain_size, mFrame_size, in_sync);
+        ddp_dec->curFrmSize = mFrame_size;
+        ALOGV("remain %d, frame size %d,in sync %d\n", ddp_dec->remain_size, mFrame_size, in_sync);
 
-    //we do not have one complete dolby frames.we need cache the
-    //data and combine with the next input data.
-    if (ddp_dec->remain_size < mFrame_size || in_sync == 0) {
-        //ALOGI("remain %d,frame size %d, read more\n",remain_size,mFrame_size);
-        memcpy(ddp_dec->inbuf, read_pointer, ddp_dec->remain_size);
-        goto EXIT;
+        //we do not have one complete dolby frames.we need cache the
+        //data and combine with the next input data.
+        if (ddp_dec->remain_size < mFrame_size || in_sync == 0) {
+            //ALOGI("remain %d,frame size %d, read more\n",remain_size,mFrame_size);
+            memcpy(ddp_dec->inbuf, read_pointer, ddp_dec->remain_size);
+            goto EXIT;
 
-    }
-
-    read_pointer += read_offset;
-    ddp_dec->remain_size -= read_offset;
-    //ALOGI("frame size %d,remain %d\n",mFrame_size,remain_size);
-    //do the endian conversion
-    if (read_pointer[0] == 0x77 && read_pointer[1] == 0x0b) {
-        for (i = 0; i < mFrame_size / 2; i++) {
-            temp = read_pointer[2 * i + 1];
-            read_pointer[2 * i + 1] = read_pointer[2 * i];
-            read_pointer[2 * i] = temp;
         }
-    }
 
-    ddp_dec->outlen_pcm =  0;
-    ddp_dec->outlen_raw = 0;
-    used_size = 0;
+        read_pointer += read_offset;
+        ddp_dec->remain_size -= read_offset;
+        //ALOGI("frame size %d,remain %d\n",mFrame_size,remain_size);
+        //do the endian conversion
+        if (read_pointer[0] == 0x77 && read_pointer[1] == 0x0b) {
+            for (i = 0; i < mFrame_size / 2; i++) {
+                temp = read_pointer[2 * i + 1];
+                read_pointer[2 * i + 1] = read_pointer[2 * i];
+                read_pointer[2 * i] = temp;
+            }
+        }
 
-    while (mFrame_size > 0) {
-        outPCMLen = 0;
-        outRAWLen = 0;
-        int current_size = 0;
-        current_size = dcv_decode_process((unsigned char*)read_pointer + used_size,
+        ddp_dec->outlen_pcm =  0;
+        ddp_dec->outlen_raw = 0;
+        used_size = 0;
+
+        while (mFrame_size > 0) {
+            outPCMLen = 0;
+            outRAWLen = 0;
+            int current_size = 0;
+            current_size = dcv_decode_process((unsigned char*)read_pointer + used_size,
                                              mFrame_size,
                                              (unsigned char *)ddp_dec->outbuf + ddp_dec->outlen_pcm,
                                              &outPCMLen,
@@ -936,78 +938,81 @@ int dcv_decoder_process_patch(struct dolby_ddp_dec *ddp_dec, unsigned char*buffe
                                              &outRAWLen,
                                              ddp_dec->nIsEc3,
                                              &ddp_dec->pcm_out_info);
-        ddp_dec->is_dolby_atmos = ddp_dec->pcm_out_info.is_dolby_atmos;
-        used_size += current_size;
-        ddp_dec->outlen_pcm += outPCMLen;
-        ddp_dec->outlen_raw += outRAWLen;
-        if (used_size > 0)
+            ddp_dec->is_dolby_atmos = ddp_dec->pcm_out_info.is_dolby_atmos;
+            used_size += current_size;
+            ddp_dec->outlen_pcm += outPCMLen;
+            ddp_dec->outlen_raw += outRAWLen;
+            if (used_size > 0)
             mFrame_size -= current_size;
-    }
-    if (used_size > 0) {
-        ddp_dec->remain_size -= used_size;
-        memcpy(ddp_dec->inbuf, read_pointer + used_size, ddp_dec->remain_size);
-    }
+        }
+        if (used_size > 0) {
+            ddp_dec->remain_size -= used_size;
+            memcpy(ddp_dec->inbuf, read_pointer + used_size, ddp_dec->remain_size);
+        }
 
 #if 0
-    if (getprop_bool("media.audio_hal.ddp.outdump")) {
-        FILE *fp1 = fopen("/data/tmp/audio_decode.raw", "a+");
-        if (fp1) {
-            int flen = fwrite((char *)ddp_dec->outbuf, 1, ddp_dec->outlen_pcm, fp1);
-            fclose(fp1);
-        } else {
-            ALOGD("could not open files!");
-        }
-    }
-#endif
-    if (ddp_dec->outlen_pcm > 0) {
-        if (ddp_dec->pcm_out_info.lorocmixlev < 0 && ddp_dec->pcm_out_info.lorocmixlev > 9) {
-           ALOGI("invalid lorocmixlev:%d force to default",ddp_dec->pcm_out_info.lorocmixlev);
-           ddp_dec->pcm_out_info.lorocmixlev = 4;
-        }
-        if (ddp_dec->pcm_out_info.lorosurmixlev < 3 && ddp_dec->pcm_out_info.lorosurmixlev > 9) {
-           ALOGI("invalid lorosurmixlev:%d force to default ",ddp_dec->pcm_out_info.lorosurmixlev);
-           ddp_dec->pcm_out_info.lorosurmixlev = 4;
-        }
-        //ALOGI("ddp_dec->pcm_out_info.lorocmixlev:%d ddp_dec->pcm_out_info.lorosurmixlev:%d ",ddp_dec->pcm_out_info.lorocmixlev,ddp_dec->pcm_out_info.lorosurmixlev);
-    }
-
-    if (ddp_dec->outlen_pcm > 0 && ddp_dec->pcm_out_info.sample_rate > 0 && ddp_dec->pcm_out_info.sample_rate != ddp_dec->requested_rate) {
-        if ((int)ddp_dec->aml_resample.input_sr != ddp_dec->pcm_out_info.sample_rate) {
-            ALOGI("init resampler from %d to 48000!\n", ddp_dec->pcm_out_info.sample_rate);
-            ddp_dec->aml_resample.input_sr = ddp_dec->pcm_out_info.sample_rate;
-            ddp_dec->aml_resample.output_sr = 48000;
-            ddp_dec->aml_resample.channels = ddp_dec->pcm_out_info.channel_num;
-            resampler_init (&ddp_dec->aml_resample);
-            /*max buffer from 32K to 48K*/
-            if (!ddp_dec->resample_outbuf) {
-                ddp_dec->resample_outbuf = (unsigned char*) malloc (MAX_DDP_BUFFER_SIZE *3/2);
-                if (!ddp_dec->resample_outbuf) {
-                    ALOGE ("malloc buffer failed\n");
-                    ret = -1;
-                    goto EXIT;
-                }
+        if (getprop_bool("media.audio_hal.ddp.outdump")) {
+            FILE *fp1 = fopen("/data/tmp/audio_decode.raw", "a+");
+            if (fp1) {
+                int flen = fwrite((char *)ddp_dec->outbuf, 1, ddp_dec->outlen_pcm, fp1);
+                fclose(fp1);
+            } else {
+                ALOGD("could not open files!");
             }
         }
-        int out_frame = ddp_dec->outlen_pcm >> 2;
-        out_frame = resample_process (&ddp_dec->aml_resample, out_frame,
-                (int16_t *) ddp_dec->outbuf, (int16_t *) ddp_dec->resample_outbuf);
-        ddp_dec->outlen_pcm = out_frame << 2;
-        ddp_dec->outlen_pcm = aml_downmix6to2(ddp_dec->outbuf,ddp_dec->outlen_pcm,ddp_dec->pcm_out_info);
-        if (get_buffer_write_space(&ddp_dec->output_ring_buf) > ddp_dec->outlen_pcm) {
-            ring_buffer_write(&ddp_dec->output_ring_buf, ddp_dec->resample_outbuf,
-                    ddp_dec->outlen_pcm, UNCOVER_WRITE);
-            ALOGV("mFrame_size:%d, outlen_pcm:%d, ret = %d\n", mFrame_size , ddp_dec->outlen_pcm, used_size);
-        } else {
-            ALOGI("Lost data, outlen_pcm:%d\n", ddp_dec->outlen_pcm);
+#endif
+        if (ddp_dec->outlen_pcm > 0) {
+            if (ddp_dec->pcm_out_info.lorocmixlev < 0 && ddp_dec->pcm_out_info.lorocmixlev > 9) {
+                ALOGI("invalid lorocmixlev:%d force to default",ddp_dec->pcm_out_info.lorocmixlev);
+                ddp_dec->pcm_out_info.lorocmixlev = 4;
+            }
+            if (ddp_dec->pcm_out_info.lorosurmixlev < 3 && ddp_dec->pcm_out_info.lorosurmixlev > 9) {
+                ALOGI("invalid lorosurmixlev:%d force to default ",ddp_dec->pcm_out_info.lorosurmixlev);
+                ddp_dec->pcm_out_info.lorosurmixlev = 4;
+            }
+            //ALOGI("ddp_dec->pcm_out_info.lorocmixlev:%d ddp_dec->pcm_out_info.lorosurmixlev:%d ",ddp_dec->pcm_out_info.lorocmixlev,ddp_dec->pcm_out_info.lorosurmixlev);
         }
 
-    } else if (ddp_dec->outlen_pcm > 0) {
-        ddp_dec->outlen_pcm = aml_downmix6to2(ddp_dec->outbuf,ddp_dec->outlen_pcm,ddp_dec->pcm_out_info);
-        if (get_buffer_write_space(&ddp_dec->output_ring_buf) > ddp_dec->outlen_pcm) {
-            ring_buffer_write(&ddp_dec->output_ring_buf, ddp_dec->outbuf,
-                    ddp_dec->outlen_pcm, UNCOVER_WRITE);
-            ALOGV("mFrame_size:%d, outlen_pcm:%d, ret = %d\n", mFrame_size, ddp_dec->outlen_pcm, used_size);
+        if (ddp_dec->outlen_pcm > 0 && ddp_dec->pcm_out_info.sample_rate > 0 && ddp_dec->pcm_out_info.sample_rate != ddp_dec->requested_rate) {
+            if ((int)ddp_dec->aml_resample.input_sr != ddp_dec->pcm_out_info.sample_rate) {
+                ALOGI("init resampler from %d to 48000!\n", ddp_dec->pcm_out_info.sample_rate);
+                ddp_dec->aml_resample.input_sr = ddp_dec->pcm_out_info.sample_rate;
+                ddp_dec->aml_resample.output_sr = 48000;
+                ddp_dec->aml_resample.channels = ddp_dec->pcm_out_info.channel_num;
+                resampler_init (&ddp_dec->aml_resample);
+                /*max buffer from 32K to 48K*/
+                if (!ddp_dec->resample_outbuf) {
+                    ddp_dec->resample_outbuf = (unsigned char*) malloc (MAX_DDP_BUFFER_SIZE *3/2);
+                    if (!ddp_dec->resample_outbuf) {
+                        ALOGE ("malloc buffer failed\n");
+                        ret = -1;
+                        goto EXIT;
+                    }
+                }
+            }
+            int out_frame = ddp_dec->outlen_pcm >> 2;
+            out_frame = resample_process (&ddp_dec->aml_resample, out_frame,
+                    (int16_t *) ddp_dec->outbuf, (int16_t *) ddp_dec->resample_outbuf);
+            ddp_dec->outlen_pcm = out_frame << 2;
+            ddp_dec->outlen_pcm = aml_downmix6to2(ddp_dec->outbuf,ddp_dec->outlen_pcm,ddp_dec->pcm_out_info);
+            if (get_buffer_write_space(&ddp_dec->output_ring_buf) > ddp_dec->outlen_pcm) {
+                ring_buffer_write(&ddp_dec->output_ring_buf, ddp_dec->resample_outbuf,
+                        ddp_dec->outlen_pcm, UNCOVER_WRITE);
+                ALOGV("mFrame_size:%d, outlen_pcm:%d, ret = %d\n", mFrame_size , ddp_dec->outlen_pcm, used_size);
+            } else {
+                ALOGI("Lost data, outlen_pcm:%d\n", ddp_dec->outlen_pcm);
+            }
+
+        } else if (ddp_dec->outlen_pcm > 0) {
+            ddp_dec->outlen_pcm = aml_downmix6to2(ddp_dec->outbuf,ddp_dec->outlen_pcm,ddp_dec->pcm_out_info);
+            if (get_buffer_write_space(&ddp_dec->output_ring_buf) > ddp_dec->outlen_pcm) {
+                ring_buffer_write(&ddp_dec->output_ring_buf, ddp_dec->outbuf,
+                        ddp_dec->outlen_pcm, UNCOVER_WRITE);
+                ALOGV("mFrame_size:%d, outlen_pcm:%d, ret = %d\n", mFrame_size, ddp_dec->outlen_pcm, used_size);
+            }
         }
+        in_sync = 0;
+        read_offset = 0;
     }
     pthread_mutex_unlock(&ddp_dec->lock);
     return 0;
