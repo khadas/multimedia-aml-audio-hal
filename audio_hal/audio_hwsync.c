@@ -35,7 +35,6 @@
 #include "audio_hw.h"
 #include "dolby_lib_api.h"
 
-
 void aml_hwsync_set_tsync_pause(void)
 {
     ALOGI("%s(), send pause event", __func__);
@@ -157,6 +156,7 @@ static int aml_audio_hwsync_get_pcr(audio_hwsync_t *p_hwsync, uint *value)
     *value = val;
     return 0;
 }
+
 void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out)
 {
     int fd = -1;
@@ -180,6 +180,9 @@ void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out
         ALOGI("%s open tsync fd %d", __func__, fd);
     }
     out->tsync_status = TSYNC_STATUS_INIT;
+#ifdef USE_MSYNC
+    out->msync_start = false;
+#endif
     ALOGI("%s done", __func__);
     return;
 }
@@ -333,6 +336,23 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
     return in_bytes - remain;
 }
 
+#ifdef USE_MSYNC
+void aml_audio_hwsync_msync_unblock_start(struct aml_stream_out *out)
+{
+    pthread_mutex_lock(&out->msync_mutex);
+    out->msync_start = true;
+    pthread_cond_signal(&out->msync_cond);
+    pthread_mutex_unlock(&out->msync_mutex);
+}
+
+static int aml_audio_hwsync_msync_callback(void *priv, avs_ascb_reason reason)
+{
+    ALOGI("msync_callback reason %d", reason);
+    aml_audio_hwsync_msync_unblock_start((struct aml_stream_out *)priv);
+    return 0;
+}
+#endif
+
 int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
 {
     uint32_t pts32;
@@ -349,6 +369,8 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
         ALOGE("APTS exeed the 32bit range!");
         return -1;
     }
+
+ALOGI("aml_audio_hwsync_set_first_pts msync_session=%p", p_hwsync->aout->msync_session);
 
     pts32 = (uint32_t)pts;
     p_hwsync->first_apts_flag = true;
@@ -368,8 +390,22 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     }
     ALOGI("wait video ready cnt =%d", delay_count);
 #endif
+
+#ifndef USE_MSYNC
     if (aml_hwsync_set_tsync_start_pts(pts32) < 0)
         return -EINVAL;
+#else
+    if (p_hwsync->aout->msync_session) {
+       if (av_sync_audio_start(p_hwsync->aout->msync_session, pts32, 0,
+             aml_audio_hwsync_msync_callback, p_hwsync->aout) == AV_SYNC_ASTART_ASYNC) {
+           pthread_mutex_lock(&p_hwsync->aout->msync_mutex);
+           while (!p_hwsync->aout->msync_start) {
+               pthread_cond_wait(&p_hwsync->aout->msync_cond, &p_hwsync->aout->msync_mutex);
+           }
+           pthread_mutex_unlock(&p_hwsync->aout->msync_mutex);
+       }
+    }
+#endif
     p_hwsync->aout->tsync_status = TSYNC_STATUS_RUNNING;
     return 0;
 }
@@ -391,7 +427,6 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
 {
     uint32_t apts = 0;
     int ret = 0;
-    *p_adjust_ms = 0;
     uint pcr = 0;
     uint gap = 0;
     int gap_ms = 0;
@@ -407,11 +442,14 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     uint32_t a2a_pts;
 #endif
 
+    if (p_adjust_ms) *p_adjust_ms = 0;
+
     // add protection to avoid NULL pointer.
     if (p_hwsync == NULL) {
         ALOGE("%s,p_hwsync == NULL", __func__);
         return 0;
     }
+
     out = p_hwsync->aout;
 
     if (p_hwsync->aout == NULL) {
@@ -488,7 +526,11 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     adev->a2a_pts = a2a_pts;
 #endif
 
+#ifndef USE_MSYNC
     if (p_hwsync->first_apts_flag == false && offset > 0) {
+#else
+    if (p_hwsync->first_apts_flag == false) {
+#endif
         ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
         ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
         aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);
@@ -501,6 +543,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             return 0;
         }
 
+#ifndef USE_MSYNC
         ret = aml_audio_hwsync_get_pcr(p_hwsync, &pcr);
         if (ret == 0) {
             gap = pts_gap(pcr, apts);
@@ -514,7 +557,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                 if (pts_bigger(apts, pcr)) {
                     /*during video stop, pcr has been reset by video
                       we need ignore such pcr value*/
-                    if (pcr != 0) {
+                    if ((pcr != 0) && p_adjust_ms) {
                         *p_adjust_ms = gap_ms;
                         ALOGE("%s *p_adjust_ms %d\n", __func__, *p_adjust_ms);
                     } else {
@@ -549,6 +592,24 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                       __func__, apts, pcr);
             }
         }
+#else /* USE_MSYNC */
+        if (out->msync_session) {
+            struct audio_policy policy;
+
+            av_sync_audio_render(out->msync_session, apts, &policy);
+
+            if (debug_enable) {
+                uint32_t pcr;
+                av_sync_get_clock(out->msync_session, &pcr);
+                gap = get_pts_gap(pcr, apts);
+                gap_ms = gap / 90;
+                ALOGI("%s pcr 0x%x, apts 0x%x, gap %d ms, offset %d, apts_lookup=%d, latency=%d",
+                    __func__, pcr, apts, gap, gap_ms, offset, apts_save / 90, latency_pts / 90);
+            }
+
+            /* TODO: handles policy for non-amaster */
+        }
+#endif /* USE_MSYNC */
     }
 
     return ret;
