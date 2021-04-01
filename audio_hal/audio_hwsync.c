@@ -369,9 +369,9 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
         ALOGE("APTS exeed the 32bit range!");
         return -1;
     }
-
+#ifdef USE_MSYNC
 ALOGI("aml_audio_hwsync_set_first_pts msync_session=%p", p_hwsync->aout->msync_session);
-
+#endif
     pts32 = (uint32_t)pts;
     p_hwsync->first_apts_flag = true;
     p_hwsync->first_apts = pts;
