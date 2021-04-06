@@ -73,6 +73,9 @@ unsigned long long (*FuncDolbyMS12GetNBytesConsumedSysSound)(void);
 int (*FuncDolbyMS12GetTotalNFramesDelay)(void *);
 int (*FuncDolbyMS12GetMainUnderrun)();
 
+void (*FuncDolbyMS12ResetPtsGap)(void);
+int (*FuncDolbyMS12SetPtsGap)(unsigned long long offset, int pts_duration);
+
 DolbyMS12::DolbyMS12() :
     mDolbyMS12LibHanle(NULL)
 {
@@ -280,6 +283,16 @@ int DolbyMS12::GetLibHandle(void)
     FuncDolbyMS12GetMainUnderrun = (int (*)())dlsym(mDolbyMS12LibHanle, "get_main_underrun");
     if (!FuncDolbyMS12GetMainUnderrun) {
         ALOGW("%s, dlsym FuncDolbyMS12GetMainUnderrun failed\n", __FUNCTION__);
+    }
+
+    FuncDolbyMS12ResetPtsGap = (void (*)(void))  dlsym(mDolbyMS12LibHanle, "ms12_reset_pts_gap");
+    if (!FuncDolbyMS12ResetPtsGap) {
+        ALOGW("%s, dlsym FuncDolbyMS12ResetPtsGap fail\n", __FUNCTION__);
+    }
+
+    FuncDolbyMS12SetPtsGap= (int (*)(unsigned long long, int))  dlsym(mDolbyMS12LibHanle, "ms12_set_pts_gap");
+    if (!FuncDolbyMS12SetPtsGap) {
+        ALOGW("%s, dlsym FuncDolbyMS12SetPtsGap fail\n", __FUNCTION__);
     }
 
     ALOGD("-%s() line %d get libdolbyms12 success!", __FUNCTION__, __LINE__);
@@ -829,6 +842,31 @@ int DolbyMS12::DolbyMS12GetTotalNFramesDelay(void *ms12_pointer)
     return ret;
 }
 
+void DolbyMS12::DolbyMS12ResetPtsGap()
+{
+    ALOGV("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12ResetPtsGap) {
+        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
+        return;
+    }
+
+    (*FuncDolbyMS12ResetPtsGap)();
+    ALOGV("-%s()", __FUNCTION__);
+}
+
+int DolbyMS12::DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration)
+{
+    int ret = -1;
+    ALOGV("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12SetPtsGap) {
+        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
+        return ret;
+    }
+
+    ret = (*FuncDolbyMS12SetPtsGap)(offset, pts_duration);
+    ALOGV("-%s() ret %d", __FUNCTION__, ret);
+    return ret;
+}
 
 /*--------------------------------------------------------------------------*/
 }   // namespace android

@@ -644,6 +644,10 @@ struct aml_audio_device {
     int vol_ease_setting_gain;
     int vol_ease_setting_duration;
     int vol_ease_setting_shape;
+
+    uint64_t gap_offset;
+    uint32_t gap_pts;
+    bool gap_ignore_pts;
 };
 
 struct meta_data {

@@ -149,8 +149,10 @@ public:
     virtual unsigned long long DolbyMS12GetNBytesConsumedSysSound(void);
 
     virtual int DolbyMS12GetTotalNFramesDelay(void *);
-    // protected:
 
+    virtual void    DolbyMS12ResetPtsGap();
+
+    virtual int     DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration);
 
 private:
     // DolbyMS12(const DolbyMS12&);

@@ -464,4 +464,22 @@ extern "C" int dolby_ms12_get_total_nframes_delay(void *ms12_pointer)
     }
 }
 
+extern "C" void dolby_ms12_reset_pts_gap(void)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        dolby_ms12_instance->DolbyMS12ResetPtsGap();
+    }
+}
 
+extern "C" int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duration)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12SetPtsGap(offset, gap_duration);
+    } else {
+        return -1;
+    }
+}

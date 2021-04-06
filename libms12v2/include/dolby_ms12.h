@@ -259,9 +259,17 @@ unsigned long long dolby_ms12_get_consumed_sys_audio();
 /*@@
     @brief get the total delay(which means frame nums)
 */
-
 int dolby_ms12_get_total_nframes_delay(void *ms12_pointer);
 
+/*@@
+    @brief clear pts gap records
+*/
+void dolby_ms12_reset_pts_gap(void);
+
+/*@@
+    @brief add pts gap record
+*/
+int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duration);
 
 #ifdef __cplusplus
 }

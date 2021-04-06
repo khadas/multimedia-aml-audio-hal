@@ -1646,6 +1646,9 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
             pthread_mutex_init(&out->msync_mutex, NULL);
             pthread_cond_init(&out->msync_cond, NULL);
 #endif
+            if (eDolbyMS12Lib == adev->dolby_lib_type) {
+                adev->gap_ignore_pts = false;
+            }
         }
         pthread_mutex_unlock (&out->lock);
         pthread_mutex_unlock (&adev->lock);
@@ -2165,6 +2168,7 @@ static int out_flush_new (struct audio_stream_out *stream)
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         if (out->hw_sync_mode) {
             aml_audio_hwsync_init(out->hwsync, out);
+            dolby_ms12_reset_pts_gap();
         }
         //normal pcm(mixer thread) do not flush dolby ms12 input buffer
         if (continous_mode(adev) && (out->flags & AUDIO_OUTPUT_FLAG_DIRECT)) {
@@ -5092,6 +5096,9 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
 
     if (out->hw_sync_mode) {
         //aml_audio_hwsync_init(out->hwsync, out);
+        if (eDolbyMS12Lib == adev->dolby_lib_type) {
+            dolby_ms12_reset_pts_gap();
+        }
     }
 
     /*if tunnel mode pcm is not 48Khz, resample to 48K*/
@@ -5165,6 +5172,10 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
             out_standby_new(&stream->common);
     } else {
         out_standby_new(&stream->common);
+    }
+
+    if (out->dev_usecase_masks) {
+        adev->usecase_masks &= ~(1 << out->usecase);
     }
 
     if ((eDolbyMS12Lib == adev->dolby_lib_type) && (is_dolby_format || is_direct_pcm)) {
@@ -6665,6 +6676,21 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 #endif
+
+    ret = str_parms_get_str(parms, "pts_gap", value, sizeof(value));
+    if (ret >= 0) {
+        unsigned long long offset, duration;
+        if (sscanf(value, "%llu,%d", &offset, &duration) == 2) {
+            ALOGI("pts_gap %llu %d", offset, duration);
+            adev->gap_offset = offset;
+            adev->gap_ignore_pts = false;
+            dolby_ms12_set_pts_gap(offset, duration);
+            ret = 0;
+            goto exit;
+        }
+        ret = -EINVAL;
+        goto exit;
+    }
 
     ret = str_parms_get_str(parms, "setenv", value, sizeof(value));
     if (ret >= 0) {
