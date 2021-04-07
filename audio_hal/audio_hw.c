@@ -338,13 +338,16 @@ void diag_log(struct aml_audio_device *adev, const char *msg)
         return;
     }
 
-    log_path = getenv("AV_PROGRESSION");
+    char *path = getenv("AV_PROGRESSION");
+    log_path = malloc(128);
+    snprintf(log_path, 128, "%s.atoa", path);
     if (!log_path) {
         if (adev->diag_log_fd) {
             fclose(adev->diag_log_fd);
             adev->diag_log_fd = NULL;
             adev->diag_log_path[0] = 0;
         }
+	free(log_path);
         return;
     }
 
@@ -367,6 +370,7 @@ void diag_log(struct aml_audio_device *adev, const char *msg)
             fprintf(adev->diag_log_fd, "[%6lu.%06lu](AtoA, %08x)%s\n", ts.tv_sec, ts.tv_nsec/1000, adev->a2a_pts, msg);
         }
     }
+    free(log_path);
 }
 #endif
 
