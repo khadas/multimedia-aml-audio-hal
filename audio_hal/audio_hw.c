@@ -298,6 +298,8 @@ ssize_t out_write_new(struct audio_stream_out *stream,
                       size_t bytes);
 
 static int out_get_presentation_position (const struct audio_stream_out *stream, uint64_t *frames, struct timespec *timestamp);
+ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *buffer,
+                                 size_t bytes);
 
 int calc_time_interval_us(struct timespec *ts_start, struct timespec *ts_end);
 
@@ -2045,7 +2047,8 @@ static int out_pause_new (struct audio_stream_out *stream)
 #endif
 
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
-        if (aml_dev->continuous_audio_mode == 1) {
+        if ((aml_dev->continuous_audio_mode == 1) &&
+            (aml_out->write == mixer_main_buffer_write)) {
             if ((aml_dev->ms12.dolby_ms12_enable == true) && (aml_dev->ms12.is_continuous_paused == false)) {
                 aml_dev->ms12.is_continuous_paused = true;
                 pthread_mutex_lock(&ms12->lock);
@@ -2118,7 +2121,8 @@ static int out_resume_new (struct audio_stream_out *stream)
 #endif
 
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
-        if (aml_dev->continuous_audio_mode == 1) {
+        if ((aml_dev->continuous_audio_mode == 1) &&
+            (aml_out->write == mixer_main_buffer_write)) {
             if ((aml_dev->ms12.dolby_ms12_enable == true) && (aml_dev->ms12.is_continuous_paused == true)) {
                 aml_dev->ms12.is_continuous_paused = false;
                 pthread_mutex_lock(&ms12->lock);
