@@ -1373,7 +1373,6 @@ static void *dolby_ms12_threadloop(void *data)
     if (continous_mode(adev)) {
         pthread_mutex_lock(&adev->alsa_pcm_lock);
         aml_alsa_output_close((struct audio_stream_out*)aml_out);
-        adev->spdif_encoder_init_flag = false;
         struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
         if (aml_out->dual_output_flag && pcm) {
             ALOGI("%s close dual output pcm handle %p", __func__, pcm);

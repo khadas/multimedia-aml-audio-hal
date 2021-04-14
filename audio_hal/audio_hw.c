@@ -9243,8 +9243,11 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
             pthread_mutex_lock(&adev->lock);
             get_dolby_ms12_cleanup(&adev->ms12);
             pthread_mutex_lock(&adev->alsa_pcm_lock);
-            struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
 
+            release_spdif_encoder_output_buffer(stream);
+            adev->spdif_encoder_init_flag = false;
+
+            struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
             if (pcm) {
                 ALOGI("%s close pcm handle %p", __func__, pcm);
                 pcm_close(pcm);

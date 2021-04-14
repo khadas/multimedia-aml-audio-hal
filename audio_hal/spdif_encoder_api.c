@@ -88,6 +88,7 @@ int get_the_spdif_encoder_prepared(audio_format_t format, struct aml_stream_out 
     struct aml_audio_device *adev = aml_out->dev;
 
     if ((format == AUDIO_FORMAT_AC3) || (format == AUDIO_FORMAT_E_AC3) || (format == AUDIO_FORMAT_MAT)) {
+        release_spdif_encoder_output_buffer(aml_out);
         ret = config_spdif_encoder_output_buffer(format, adev);
         if (ret != 0) {
             ALOGE("-%s() config_spdif_encoder_output_buffer fail", __FUNCTION__);
