@@ -2179,7 +2179,7 @@ static int out_flush_new (struct audio_stream_out *stream)
             dolby_ms12_reset_pts_gap();
         }
         //normal pcm(mixer thread) do not flush dolby ms12 input buffer
-        if (continous_mode(adev) && (out->flags & AUDIO_OUTPUT_FLAG_DIRECT)) {
+        if (continous_mode(adev) && (out->flags & AUDIO_OUTPUT_FLAG_DIRECT) && !(out->flags &AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) {
             pthread_mutex_lock(&ms12->lock);
             dolby_ms12_main_flush(stream);
             pthread_mutex_unlock(&ms12->lock);
@@ -10658,7 +10658,9 @@ ssize_t mixer_app_buffer_write(struct audio_stream_out *stream, const void *buff
    size_t frame_size = audio_stream_out_frame_size(stream);
    size_t bytes_remaining = bytes;
    size_t bytes_written = 0;
-   int retry = 20;
+   bool need_reconfig_output = false;
+   bool need_reset_decoder = false;
+   int retry = 0;
 
    if (adev->debug_flag) {
        ALOGD("[%s:%d] size:%d, frame_size:%d", __func__, __LINE__, bytes, frame_size);
@@ -10674,27 +10676,67 @@ ssize_t mixer_app_buffer_write(struct audio_stream_out *stream, const void *buff
        return -1;
    }
 
-   while (bytes_remaining && adev->ms12.dolby_ms12_enable && retry > 0) {
-       size_t used_size = 0;
-       ret = dolby_ms12_app_process(stream, (char *)buffer + bytes_written, bytes_remaining, &used_size);
-       if (!ret) {
-           bytes_remaining -= used_size;
-           bytes_written += used_size;
-       }
-       retry--;
-       if (bytes_remaining) {
-           aml_audio_sleep(1000);
-       }
-   }
-   if (retry <= 10) {
-       ALOGE("[%s:%d] write retry=%d ", __func__, __LINE__, retry);
-   }
-   if (retry == 0 && bytes_remaining != 0) {
-       ALOGE("[%s:%d] write timeout 10 ms ", __func__, __LINE__);
-       bytes -= bytes_remaining;
-   }
+   /* there is only one application sound active, need configure pipeline */
+   if (!adev->ms12.dolby_ms12_enable) {
+       need_reconfig_output = true;
+       need_reset_decoder = true;
+   } else {
+       /* here to check if the audio HDMI ARC format updated. */
+       if (((adev->arc_hdmi_updated) || (adev->a2dp_updated)) && (adev->ms12.dolby_ms12_enable == true)) {
+           //? if we need protect
+           adev->arc_hdmi_updated = 0;
+           adev->a2dp_updated = 0;
+           need_reconfig_output = true;
+           // LINUX change
+           // when arc connection status changed, always reset MS12
+           need_reset_decoder = true;
+           ALOGI("%s() HDMI ARC EndPoint or a2dp changing status, need reconfig Dolby MS12\n", __func__);
+        }
 
-   return bytes;
+        /* here to check if the audio output routing changed. */
+        if ((adev->out_device != aml_out->out_device) && (adev->ms12.dolby_ms12_enable == true)) {
+            ALOGI("%s(), output routing changed from 0x%x to 0x%x,need MS12 reconfig output", __func__, aml_out->out_device, adev->out_device);
+            aml_out->out_device = adev->out_device;
+            need_reconfig_output = true;
+        }
+
+        if (adev->ms12.hdmi_format != adev->hdmi_format) {
+            ALOGI("%s(), swithing digital format from %d --> %d", __func__, adev->ms12.hdmi_format, adev->hdmi_format);
+             need_reconfig_output = true;
+             // LINUX change
+             // on Linux, MS12 is configured to have a single digital output only to avoid
+             // high CPU loading. When hdmi_format changes, adev->sink_format and adev->
+             // optical format may change too which requires a relaunch of MS12 pipeline
+             // to configure MS12's output format.
+             need_reset_decoder = true;
+
+             adev->ms12.hdmi_format = adev->hdmi_format;
+        }
+    }
+
+    if (need_reconfig_output) {
+        config_output(stream, need_reset_decoder);
+    }
+
+    if (is_bypass_dolbyms12(stream))
+        usleep(bytes * 1000000 /frame_size/out_get_sample_rate(&stream->common)*5/6);
+    else {
+        while (bytes_remaining && adev->ms12.dolby_ms12_enable && retry < 10) {
+           size_t used_size = 0;
+           ret = dolby_ms12_app_process(stream, (char *)buffer + bytes_written, bytes_remaining, &used_size);
+           if (!ret) {
+               bytes_remaining -= used_size;
+               bytes_written += used_size;
+               retry = 0;
+           }
+           retry++;
+           if (bytes_remaining) {
+               aml_audio_sleep(5000);
+           }
+        }
+    }
+
+    return bytes;
 }
 
 ssize_t process_buffer_write(struct audio_stream_out *stream,

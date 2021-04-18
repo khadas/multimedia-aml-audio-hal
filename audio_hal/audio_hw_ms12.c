@@ -57,12 +57,14 @@
   so we choose 84ms now
 */
 #define MS12_SYS_INPUT_BUF_NS  (84000000LL)
+#define MS12_APP_INPUT_BUF_NS  (84000000LL)
 
 #define NANO_SECOND_PER_SECOND 1000000000LL
 
 
 #define MS12_MAIN_BUF_INCREASE_TIME_MS (0)
 #define MS12_SYS_BUF_INCREASE_TIME_MS (1000)
+#define MS12_APP_BUF_INCREASE_TIME_MS (1000)
 #define DDPI_UDC_COMP_LINE 2
 
 
@@ -1050,7 +1052,7 @@ int dolby_ms12_system_process(
             *use_size = 0;
         }
     }
-    //((void*)buffer, *use_size, MS12_INPUT_SYS_PCM_FILE);
+    dump_ms12_output_data((void*)buffer, *use_size, MS12_INPUT_SYS_PCM_FILE);
     pthread_mutex_unlock(&ms12->lock);
 
     if (adev->continuous_audio_mode == 1) {
@@ -1091,6 +1093,7 @@ int dolby_ms12_app_process(
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     audio_channel_mask_t mixer_default_channelmask = AUDIO_CHANNEL_OUT_STEREO;
+    int mixer_default_samplerate = 48000;
     int dolby_ms12_input_bytes = 0;
     int ms12_output_size = 0;
     int ret = 0;
@@ -1111,14 +1114,26 @@ int dolby_ms12_app_process(
                 , aml_out->hal_rate);
         if (dolby_ms12_input_bytes > 0) {
             *use_size = dolby_ms12_input_bytes;
-            ret = 0;
         } else {
             *use_size = 0;
-            ret = -1;
         }
     }
     dump_ms12_output_data((void*)buffer, *use_size, MS12_INPUT_SYS_APP_FILE);
     pthread_mutex_unlock(&ms12->lock);
+
+    if (adev->continuous_audio_mode == 1) {
+        uint64_t input_ns = 0;
+        input_ns = (uint64_t)(*use_size) * NANO_SECOND_PER_SECOND / 4 / mixer_default_samplerate;
+
+        if (ms12->app_virtual_buf_handle == NULL) {
+            //aml_audio_sleep(input_ns/1000);
+            if (input_ns == 0) {
+                input_ns = (uint64_t)(bytes) * NANO_SECOND_PER_SECOND / 4 / mixer_default_samplerate;
+            }
+            audio_virtual_buf_open(&ms12->app_virtual_buf_handle, "ms12 app input", input_ns/2, MS12_APP_INPUT_BUF_NS, MS12_APP_BUF_INCREASE_TIME_MS);
+        }
+        audio_virtual_buf_process(ms12->app_virtual_buf_handle, input_ns);
+    }
 
     return ret;
 }
@@ -1165,6 +1180,7 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12)
     ms12->last_frames_postion = 0;
     audio_virtual_buf_close(&ms12->main_virtual_buf_handle);
     audio_virtual_buf_close(&ms12->system_virtual_buf_handle);
+    audio_virtual_buf_close(&ms12->app_virtual_buf_handle);
     aml_ac3_parser_close(ms12->ac3_parser_handle);
     ms12->ac3_parser_handle = NULL;
     ring_buffer_release(&ms12->spdif_ring_buffer);

@@ -84,6 +84,7 @@ struct dolby_ms12_desc {
     int bitsteam_cnt;
     void * main_virtual_buf_handle;
     void * system_virtual_buf_handle;
+    void * app_virtual_buf_handle;
     ring_buffer_t spdif_ring_buffer;
     unsigned char *lpcm_temp_buffer;
 
