@@ -613,6 +613,17 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         if (out->msync_session) {
             struct audio_policy policy;
 
+            /* when MS12 main pipeline gets underrun, the output latency does not reflect the real
+             * latency since muting frame can be inserted by MS12 when continuous output mode is
+             * enabled, so only reset APTS when PCR exceeds last checkin PTS in such case.
+             */
+            if (adev->continuous_audio_mode &&
+                eDolbyMS12Lib == adev->dolby_lib_type &&
+                (adev->ms12.underrun_cnt != dolby_ms12_get_main_underrun())) {
+                ALOGE("Use apts w/o delay deduction 0x%x to replace 0x%d due to underrun.", apts_save, apts);
+                apts = apts_save;
+            }
+
             av_sync_audio_render(out->msync_session, apts, &policy);
 
             if (debug_enable) {
