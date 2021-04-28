@@ -228,6 +228,15 @@ void set_dolby_ms12_runtime_pause(struct dolby_ms12_desc *ms12, int is_pause)
     }
 }
 
+#ifdef USE_MSYNC
+void set_dolby_ms12_runtime_sync(struct dolby_ms12_desc *ms12, int sync)
+{
+    (void)ms12;
+
+    dolby_ms12_set_sync(sync);
+}
+#endif
+
 void set_dolby_ms12_runtime_system_mixing_enable(struct dolby_ms12_desc *ms12, int system_mixing_enable)
 {
     char parm[12] = "";
@@ -865,6 +874,14 @@ MAIN_INPUT:
                         break;
                     }
                     aml_audio_sleep(5*1000);
+#ifdef USE_MSYNC
+                    /* MS12 pipeline may stop consuming data when running
+                     * mute insertion for sync control
+                     */
+                    if (aml_out->msync_action == AV_SYNC_AA_INSERT) {
+                        wait_retry = 0;
+                    } else
+#endif
                     wait_retry++;
                     /*it cost 3s*/
                     if (wait_retry >= MS12_MAIN_WRITE_RETIMES) {

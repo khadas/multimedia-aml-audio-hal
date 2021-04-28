@@ -780,6 +780,9 @@ struct aml_stream_out {
     pthread_mutex_t msync_mutex;
     pthread_cond_t msync_cond;
     bool msync_start;
+    avs_audio_action msync_action;
+    int msync_action_delta;
+    uint32_t msync_rendered_pts;
 #endif
 };
 

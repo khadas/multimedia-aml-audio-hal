@@ -2166,13 +2166,6 @@ static int out_flush_new (struct audio_stream_out *stream)
     out->pause_status = false;
     out->input_bytes_size = 0;
 
-#ifdef USE_MSYNC
-    if (out->msync_session) {
-        av_sync_destroy(out->msync_session);
-        out->msync_session = NULL;
-    }
-#endif
-
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         if (out->hw_sync_mode) {
             aml_audio_hwsync_init(out->hwsync, out);
@@ -5027,6 +5020,10 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->need_drop_size = 0;
     out->enInputPortType = AML_MIXER_INPUT_PORT_BUTT;
 
+#ifdef USE_MSYNC
+    out->msync_action = AV_SYNC_AA_RENDER;
+#endif
+
 #ifdef ENABLE_MMAP
     if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
         if ((eDolbyMS12Lib == adev->dolby_lib_type) && !adev->ms12.dolby_ms12_enable) {
@@ -7754,6 +7751,9 @@ int do_output_standby_l(struct audio_stream *stream)
                             ALOGI("%s set ott dummy", __func__);
                         }
                         set_dolby_ms12_runtime_pause(&(adev->ms12), adev->ms12.is_continuous_paused);
+#ifdef USE_MSYNC
+                        set_dolby_ms12_runtime_sync(&(adev->ms12), 0);
+#endif
                     }
                     pthread_mutex_unlock(&adev->ms12.lock);
                 }
@@ -8861,9 +8861,8 @@ ssize_t hw_write (struct audio_stream_out *stream
                 if (is_bypass_dolbyms12(stream))
                     aml_audio_hwsync_audio_process(aml_out->hwsync, aml_out->hwsync->payload_offset, &adjust_ms);
                 else {
-                    uint64_t ms12_consumed = dolby_ms12_get_decoder_n_bytes_consumed(adev->ms12.dolby_ms12_ptr, aml_out->hal_internal_format, MAIN_INPUT_STREAM);
-                    ALOGV("ms12 consumed=%lld format=0x%x", ms12_consumed, aml_out->hal_internal_format);
                     if (!audio_is_linear_pcm(aml_out->hal_internal_format)) {
+                        uint64_t ms12_consumed = dolby_ms12_get_decoder_n_bytes_consumed(adev->ms12.dolby_ms12_ptr, aml_out->hal_internal_format, MAIN_INPUT_STREAM);
                         /*if ms12 decoder doens't generate any data, we should not use the consume offset to get pts*/
                         uint64_t ms12_dec_out_nframes = dolby_ms12_get_decoder_nframes_pcm_output(adev->ms12.dolby_ms12_ptr, aml_out->hal_internal_format, MAIN_INPUT_STREAM);
                         ALOGV("ms12 decoder generate pcm =%lld", ms12_dec_out_nframes);
@@ -8871,6 +8870,7 @@ ssize_t hw_write (struct audio_stream_out *stream
                             aml_audio_hwsync_audio_process(aml_out->hwsync, ms12_consumed, &adjust_ms);
                         }
                     } else {
+                        uint64_t ms12_consumed = dolby_ms12_get_decoder_n_bytes_consumed(adev->ms12.dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE_SYSTEM, MAIN_INPUT_STREAM);
                         /* for non 48khz hwsync pcm, the pts check in is used original 44.1khz offset,
                          * but we resample it before send to ms12, so we consumed offset is 48khz,
                          * so we need convert it
@@ -9789,7 +9789,17 @@ hwsync_rewrite:
                 // because the sync policy return from msync side may need block when audio starts to play.
                 if (aml_out->hwsync->first_apts_flag == false) {
                     // may be blocked by msync_cond for initial playback timing control
+                    // the first checkin pts should be consumed by aml_audio_hwsync_audio_process for av_sync_audio_start
                     aml_audio_hwsync_audio_process(aml_out->hwsync, 0, NULL);
+
+                    // when dropping is needed at av_sync_audio_start
+                    // reset payload_offset since the data will not be
+                    // sent to MS12 pipeline. The consumed bytes number
+                    // from MS12 should match PTS checkin record from
+                    // payload_offset
+                    if (aml_out->msync_action == AV_SYNC_AA_DROP) {
+                        aml_out->hwsync->payload_offset = 0;
+                    }
                 }
 #endif
             } else {
@@ -10024,8 +10034,12 @@ hwsync_rewrite:
             pthread_mutex_unlock(&adev->lock);
             pthread_mutex_lock(&adev->trans_lock);
             ms12_out->hal_internal_format = aml_out->hal_internal_format;
-            ms12_out->hw_sync_mode = aml_out->hw_sync_mode;
             ms12_out->hwsync = aml_out->hwsync;
+            /* set ms12_out->hw_sync_mode after ms12_out->hwsync is updated,
+             * ms12 continuous output uses ms12_out->hwsync.aout to get original
+             * stream information
+             */
+            ms12_out->hw_sync_mode = aml_out->hw_sync_mode;
             get_sink_format((struct audio_stream_out *)aml_out);
             pthread_mutex_unlock(&adev->trans_lock);
             ALOGI("%s set dolby main1 dummy false", __func__);
@@ -10040,8 +10054,12 @@ hwsync_rewrite:
             pthread_mutex_unlock(&adev->lock);
             pthread_mutex_lock(&adev->trans_lock);
             ms12_out->hal_internal_format = aml_out->hal_internal_format;
-            ms12_out->hw_sync_mode = aml_out->hw_sync_mode;
             ms12_out->hwsync = aml_out->hwsync;
+            /* set ms12_out->hw_sync_mode after ms12_out->hwsync is updated,
+             * ms12 continuous output uses ms12_out->hwsync.aout to get original
+             * stream information
+             */
+            ms12_out->hw_sync_mode = aml_out->hw_sync_mode;
             pthread_mutex_unlock(&adev->trans_lock);
         }
         if (continous_mode(adev)) {
@@ -10233,6 +10251,15 @@ hwsync_rewrite:
     {
         //#ifdef DOLBY_MS12_ENABLE
         if (eDolbyMS12Lib == adev->dolby_lib_type) {
+#ifdef USE_MSYNC
+            if (!hw_sync->first_apts_flag &&
+                (aml_out->msync_action == AV_SYNC_AA_DROP)) {
+                /* start dropping */
+                ALOGI("MSYNC start dropping @0x%x, %d bytes", hw_sync->first_apts, write_bytes);
+                goto exit;
+            }
+#endif
+
             if (is_bypass_dolbyms12(stream)) {
                 if (adev->debug_flag) {
                     ALOGI("%s passthrough dolbyms12, format %#x\n", __func__, aml_out->hal_format);

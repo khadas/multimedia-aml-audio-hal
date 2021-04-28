@@ -164,6 +164,7 @@ void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out
         return;
     }
     p_hwsync->first_apts_flag = false;
+    p_hwsync->last_lookup_apts = 0xffffffff;
     p_hwsync->hw_sync_state = HW_SYNC_STATE_HEADER;
     p_hwsync->hw_sync_header_cnt = 0;
     p_hwsync->hw_sync_frame_size = 0;
@@ -371,7 +372,6 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     }
 
     pts32 = (uint32_t)pts;
-    p_hwsync->first_apts_flag = true;
     p_hwsync->first_apts = pts;
 
     // LINUX change
@@ -390,17 +390,31 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
 #endif
 
 #ifndef USE_MSYNC
+    p_hwsync->first_apts_flag = true;
+
     if (aml_hwsync_set_tsync_start_pts(pts32) < 0)
         return -EINVAL;
 #else
     if (p_hwsync->aout->msync_session) {
-       if (av_sync_audio_start(p_hwsync->aout->msync_session, pts32, 0,
-             aml_audio_hwsync_msync_callback, p_hwsync->aout) == AV_SYNC_ASTART_ASYNC) {
+       int r = av_sync_audio_start(p_hwsync->aout->msync_session, pts32, 0,
+                                   aml_audio_hwsync_msync_callback, p_hwsync->aout);
+
+       if (r == AV_SYNC_ASTART_SYNC) {
+           ALOGI("MSYNC AV_SYNC_ASTART_SYNC");
+           p_hwsync->first_apts_flag = true;
+           p_hwsync->aout->msync_action = AV_SYNC_AA_RENDER;
+       } else if (r == AV_SYNC_ASTART_ASYNC) {
            pthread_mutex_lock(&p_hwsync->aout->msync_mutex);
            while (!p_hwsync->aout->msync_start) {
                pthread_cond_wait(&p_hwsync->aout->msync_cond, &p_hwsync->aout->msync_mutex);
            }
            pthread_mutex_unlock(&p_hwsync->aout->msync_mutex);
+           ALOGI("MSYNC AV_SYNC_ASTART_ASYNC");
+           p_hwsync->first_apts_flag = true;
+           p_hwsync->aout->msync_action = AV_SYNC_AA_RENDER;
+       } else if (r == AV_SYNC_ASTART_AGAIN) {
+           ALOGI("MSYNC AV_SYNC_ASTART_AGAIN");
+           p_hwsync->aout->msync_action = AV_SYNC_AA_DROP;
        }
     }
 #endif
@@ -436,9 +450,11 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     uint32_t latency_pts = 0;
     struct aml_stream_out  *out;
     int b_raw = 0;
+    int force_action = 0;
 #ifdef DIAG_LOG
     uint32_t a2a_pts;
 #endif
+    int pts_log = aml_getprop_bool("media.audiohal.ptslog");
 
     if (p_adjust_ms) *p_adjust_ms = 0;
 
@@ -499,9 +515,15 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     if (stream) {
         if (adev && adev->continuous_audio_mode && (eDolbyMS12Lib == adev->dolby_lib_type)) {
             /*we need get the correct ms12 out pcm */
-            latency_frames = out_get_ms12_latency_frames(stream);
-            //ALOGI("latency_frames =%d", latency_frames);
-            latency_frames += aml_audio_get_ms12_tunnel_latency_offset(b_raw)*48; // add 60ms delay for ms12, 32ms pts offset, other is ms12 delay
+            latency_frames = (p_hwsync->first_apts_flag) ? out_get_ms12_latency_frames(stream) : out_get_latency_frames(adev->ms12_out); 
+
+            if (b_raw && p_hwsync->first_apts_flag) {
+                /* add MS12 latency with raw decoder latency */
+                latency_frames += aml_audio_get_ms12_tunnel_latency_offset(1) * 48;
+                /* add MS12 latency with OAR */
+                latency_frames += aml_audio_get_ms12_atmos_latency_offset(1) * 48;
+            }
+
 #ifdef DIAG_LOG
             a2a_pts -= latency_frames / 48 * 90;
 #endif
@@ -511,11 +533,6 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                 latency_frames += adev->cap_delay * 48;
             }
 #endif
-            if ((adev->ms12.is_dolby_atmos && adev->ms12_main1_dolby_dummy == false) || adev->atoms_lock_flag) {
-                int tunnel = 1;
-                int atmos_tunning_frame = aml_audio_get_ms12_atmos_latency_offset(tunnel) * 48;
-                latency_frames += atmos_tunning_frame;
-            }
             if (adev->active_outport == OUTPORT_HDMI_ARC) {
                 int arc_latency_ms = 0;
                 arc_latency_ms = aml_audio_get_hdmi_latency_offset(adev->sink_format);
@@ -532,7 +549,6 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
 
         latency_pts = latency_frames / 48 * 90;
     }
-
 
     if (ret) {
         ALOGE("%s lookup failed", __func__);
@@ -551,7 +567,16 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
         ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
         aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);
-    } else  if (p_hwsync->first_apts_flag) {
+        p_hwsync->last_lookup_apts = apts;
+
+        if (pts_log) {
+            struct timespec ts;
+            clock_gettime(CLOCK_MONOTONIC, &ts);
+            ALOGI("PTSLOG [%lld.%.9ld] AUDIO_START offset:%d, lookup_pts:%u, latency_pts:%u, apts:%d",
+                  (long long)ts.tv_sec, ts.tv_nsec,
+                  offset, apts, latency_pts, apts - latency_pts);
+        }
+    } else if (p_hwsync->first_apts_flag) {
         struct aml_audio_device *adev = p_hwsync->aout->dev;
         uint32_t apts_save = apts;
         apts -= latency_pts;
@@ -583,7 +608,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                 } else {
                     if (adev->continuous_audio_mode &&
                         eDolbyMS12Lib == adev->dolby_lib_type &&
-                        (adev->ms12.underrun_cnt != dolby_ms12_get_main_underrun())) {
+                        dolby_ms12_get_main_underrun()) {
                         /* when MS12 main pipeline gets underrun, the output latency does not reflect the real
                          * latency since muting frame can be inserted by MS12 when continuous output mode is
                          * enabled, so only reset APTS when PCR exceeds last checkin PTS in such case.
@@ -612,19 +637,83 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
 #else /* USE_MSYNC */
         if (out->msync_session) {
             struct audio_policy policy;
-
-            /* when MS12 main pipeline gets underrun, the output latency does not reflect the real
-             * latency since muting frame can be inserted by MS12 when continuous output mode is
-             * enabled, so only reset APTS when PCR exceeds last checkin PTS in such case.
-             */
             if (adev->continuous_audio_mode &&
-                eDolbyMS12Lib == adev->dolby_lib_type &&
-                (adev->ms12.underrun_cnt != dolby_ms12_get_main_underrun())) {
-                ALOGE("Use apts w/o delay deduction 0x%x to replace 0x%d due to underrun.", apts_save, apts);
-                apts = apts_save;
+                eDolbyMS12Lib == adev->dolby_lib_type) {
+               if (dolby_ms12_get_main_underrun()) {
+                    /* when MS12 main pipeline gets underrun, the output latency does not reflect the real
+                     * latency since muting frame can be inserted by MS12 when continuous output mode is
+                     * enabled, so only reset APTS when PCR exceeds last checkin PTS in such case.
+                     */
+                    ALOGE("Use apts w/o delay deduction %d to replace %d due to underrun", apts_save, apts);
+                    apts = apts_save;
+                } else if (p_hwsync->last_lookup_apts == apts_save) {
+                    /* only report audio pts when lookup_apts changes.
+                     * the output from MS12 may come in smaller resolution (such as every 256 samples than 
+                     * input like 1536 samples for Dolby, then the rendered APTS become an almost fixed number
+                     * with a small fluctuation from ALSA level at different monotonic time. To avoid such
+                     * inaccurate reporting (growing monotonic time with almost same APTS), only when lookup
+                     * PTS changed (new bit stream consumed), new rendering time is reported.
+                     * However, if MS12 pipeline is stalled because it's in INSERT mode (paused), then lookup
+                     * PTS is not changing also. MSYNC driver relies on continuous PTS rendering reporting to switch
+                     * out of INSERT mode. When this happens, a rendering time reporting is still needed.
+                     */
+                    if (out->msync_action != AV_SYNC_AA_INSERT) {
+                        /* skip reporting rendering time */
+                        return 0;
+                    }
+
+                    /* still report last rendered APTS */
+                    apts = out->msync_rendered_pts;
+                }
             }
 
+            if (pts_log) {
+                struct timespec ts;
+                clock_gettime(CLOCK_MONOTONIC, &ts);
+                ALOGI("PTSLOG [%lld.%.9ld] offset:%d, lookup_pts:%u, latency_pts:%u, apts:%d, action:%d",
+                      (long long)ts.tv_sec, ts.tv_nsec,
+                      offset, apts_save, latency_pts, apts, out->msync_action);
+            }
+
+            p_hwsync->last_lookup_apts = apts_save;
             av_sync_audio_render(out->msync_session, apts, &policy);
+            out->msync_action_delta = policy.delta;
+            out->msync_rendered_pts = apts;
+
+            force_action = aml_getprop_int("media.audiohal.action");
+            /* 0: default, no force action
+             * 1: AA_RENDER
+             * 2: AA_DROP
+             * 3: AA_INSERT
+             */
+            if (force_action) {
+                policy.action = force_action - 1;
+                if (policy.action == AV_SYNC_AA_INSERT) {
+                    out->msync_action_delta = -1;
+                } else if (policy.action == AV_SYNC_AA_DROP) {
+                    out->msync_action_delta = 1;
+                }
+            }
+
+            if (out->msync_action != policy.action) {
+                /* msync_action_delta is > 0 for AV_SYNC_AA_DROP
+                 * and MS12 "-sync <positive>" for insert
+                 */
+                if (policy.action == AV_SYNC_AA_INSERT) {
+                    set_dolby_ms12_runtime_sync(&(adev->ms12), 1);
+                    //set_dolby_ms12_runtime_pause(&(adev->ms12), 1);
+                    ALOGI("MSYNC action switched to AA_INSERT.");
+                } else if (policy.action == AV_SYNC_AA_DROP) {
+                    set_dolby_ms12_runtime_sync(&(adev->ms12), -1);
+                    //set_dolby_ms12_runtime_pause(&(adev->ms12), 0);
+                    ALOGI("MSYNC action switched to AA_DROP.");
+                } else {
+                    set_dolby_ms12_runtime_sync(&(adev->ms12), 0);
+                    //set_dolby_ms12_runtime_pause(&(adev->ms12), 0);
+                    ALOGI("MSYNC action switched to AA_RENDER.");
+                }
+                out->msync_action = policy.action;
+            }
 
             if (debug_enable) {
                 uint32_t pcr;
@@ -634,14 +723,13 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                 ALOGI("%s pcr 0x%x, apts 0x%x, gap %d ms, offset %d, apts_lookup=%d, latency=%d",
                     __func__, pcr, apts, gap, gap_ms, offset, apts_save / 90, latency_pts / 90);
             }
-
-            /* TODO: handles policy for non-amaster */
         }
 #endif /* USE_MSYNC */
     }
 
     return ret;
 }
+
 int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, unsigned apts)
 {
     int i = 0;
@@ -652,6 +740,10 @@ int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, unsig
     if (!p_hwsync) {
         ALOGE("%s null point", __func__);
         return -1;
+    }
+
+    if (aml_getprop_bool("media.audiohal.ptslog")) {
+        ALOGI("checkin_apts %d: %d", offset, apts);
     }
 
     adev = p_hwsync->aout->dev;
@@ -701,6 +793,7 @@ int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsign
     uint32_t latency_frames = 0;
     uint32_t latency_pts = 0;
     apts_tab_t *pts_tab = NULL;
+    int nearest_pts_found = 0;
     uint32_t nearest_pts = 0;
     uint32_t nearest_offset = 0;
     uint32_t min_offset = 0x7fffffff;
@@ -747,6 +840,7 @@ int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsign
             if (pts_tab[i].offset == align) {
                 *p_apts = pts_tab[i].pts;
                 nearest_offset = pts_tab[i].offset;
+                nearest_pts_found = 1;
                 ret = 0;
                 if (debug_enable) {
                     ALOGI("%s first flag %d,pts checkout done,offset %zu,align %zu,pts 0x%x",
@@ -759,6 +853,7 @@ int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsign
                     min_offset = align - pts_tab[i].offset;
                     match_index = i;
                     nearest_pts = pts_tab[i].pts;
+                    nearest_pts_found = 1;
                     nearest_offset = pts_tab[i].offset;
                 }
                 pts_tab[i].valid = 0;
@@ -766,7 +861,7 @@ int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsign
         }
     }
     if (i == HWSYNC_APTS_NUM) {
-        if (nearest_pts) {
+        if (nearest_pts_found) {
             ret = 0;
             *p_apts = nearest_pts;
             /*keep it as valid, it may be used for next lookup*/

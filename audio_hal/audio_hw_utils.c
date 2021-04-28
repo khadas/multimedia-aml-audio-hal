@@ -810,8 +810,15 @@ uint32_t out_get_latency_frames(const struct audio_stream_out *stream)
     snd_pcm_sframes_t frames = 0;
     uint32_t whole_latency_frames;
     int ret = 0;
-    int codec_type = get_codec_type(out->hal_internal_format);
+    int codec_type;
     int mul = 1;
+
+    if (!stream) {
+        return 0;
+    }
+
+    codec_type = get_codec_type(out->hal_internal_format);
+
     if (out->dual_output_flag) {
         if (out->hal_internal_format == AUDIO_FORMAT_E_AC3)
             mul = 1;

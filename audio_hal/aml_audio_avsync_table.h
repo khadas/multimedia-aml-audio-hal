@@ -28,10 +28,10 @@
 /*below MS12 tunning default value for different source and tunnel/none-tunnel*/
 #define  AVSYNC_MS12_NONTUNNEL_PCM_LATENCY               (60)
 #define  AVSYNC_MS12_NONTUNNEL_RAW_LATENCY               (40)
-#define  AVSYNC_MS12_NONTUNNEL_ATMOS_LATENCY             (20)
+#define  AVSYNC_MS12_NONTUNNEL_ATMOS_LATENCY             (32)
 #define  AVSYNC_MS12_TUNNEL_PCM_LATENCY                  (80)
 #define  AVSYNC_MS12_TUNNEL_RAW_LATENCY                  (30)
-#define  AVSYNC_MS12_TUNNEL_ATMOS_LATENCY                (20)
+#define  AVSYNC_MS12_TUNNEL_ATMOS_LATENCY                (32)
 
 /*
 below is the default value for different output format  for  HDMITX/ARC sink
