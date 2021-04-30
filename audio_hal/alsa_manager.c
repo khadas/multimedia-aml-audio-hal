@@ -589,7 +589,8 @@ write:
 #ifdef ADD_AUDIO_DELAY_INTERFACE
             aml_audio_delay_process(AML_DELAY_OUTPORT_ARC, buffer, bytes, out_format, 2);
 #endif
-            ret = pcm_write(aml_out->earc_pcm, buffer, bytes);
+
+            ret = pcm_write(adev->pcm_handle[EARC_DEVICE], buffer, bytes);
             if (ret < 0) {
                 if (aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE) != ATTEND_TYPE_NONE)
                     ALOGE("%s write failed,aml_out->earc_pcm handle:%p, ret:%#x, err info:%s",
@@ -608,7 +609,7 @@ write:
 #ifdef ADD_AUDIO_DELAY_INTERFACE
             aml_audio_delay_process(AML_DELAY_OUTPORT_ARC, ps32SpdifTempBuffer, bytes / 4, AUDIO_FORMAT_PCM_32_BIT, 2);
 #endif
-            ret = pcm_write(aml_out->earc_pcm, ps32SpdifTempBuffer, bytes / 4);
+            ret = pcm_write(adev->pcm_handle[EARC_DEVICE], ps32SpdifTempBuffer, bytes / 4);
             if (ret < 0) {
                 if (aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE) != ATTEND_TYPE_NONE)
                     ALOGE("%s write failed,aml_out->earc_pcm handle:%p, ret:%#x, err info:%s",

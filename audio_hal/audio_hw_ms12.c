@@ -614,12 +614,18 @@ int dolby_ms12_bypass_process(
     , size_t bytes) {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
-    struct dolby_ms12_desc *ms12 = &(adev->ms12);
 
     if (is_bypass_ms12(stream)) {
         /*for HDMI in IEC61937 format, we support passthrough it*/
         if (is_iec61937_format(stream)) {
-            aml_audio_spdif_output_direct(stream, (void*)buffer, bytes, aml_out->hal_internal_format);
+            /* TM2 with dedicated eARC port */
+            if (SUPPORT_EARC_OUT_HW && adev->active_outport == OUTPORT_HDMI_ARC) {
+                if (adev->bHDMIARCon) {
+                    hw_write(aml_out, buffer, bytes, aml_out->hal_internal_format);
+                }
+            } else {
+                aml_audio_spdif_output_direct(stream, (void*)buffer, bytes, aml_out->hal_internal_format);
+            }
             ALOGV("IEC61937 bypass out size=%d", bytes);
         }
     }
