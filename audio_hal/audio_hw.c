@@ -331,34 +331,43 @@ static inline short CLIP (int r)
 }
 
 #ifdef DIAG_LOG
+static void diag_log_close(struct aml_audio_device *adev)
+{
+    if (adev->diag_log_fd) {
+        fclose(adev->diag_log_fd);
+        adev->diag_log_fd = NULL;
+        adev->diag_log_path[0] = '\0';
+        ALOGD("AV_PROGRESSION log closed");
+    }
+}
+
 void diag_log(struct aml_audio_device *adev, const char *msg)
 {
-    char *log_path;
+    char *path;
+    char log_path[256];
     struct timespec ts;
 
     if (adev->a2a_pts_log == adev->a2a_pts) {
         return;
     }
 
-    char *path = getenv("AV_PROGRESSION");
-    log_path = malloc(128);
-    snprintf(log_path, 128, "%s.atoa", path);
-    if (!log_path) {
-        if (adev->diag_log_fd) {
-            fclose(adev->diag_log_fd);
-            adev->diag_log_fd = NULL;
-            adev->diag_log_path[0] = 0;
-        }
-	free(log_path);
+    pthread_mutex_lock(&adev->diag_log_lock);
+
+    path = getenv("AV_PROGRESSION");
+    if ((!path) || (path[0] == '\0')) {
+        diag_log_close(adev);
+        pthread_mutex_unlock(&adev->diag_log_lock);
         return;
     }
 
     clock_gettime(CLOCK_MONOTONIC, &ts);
 
-    if (strcmp(log_path, "1") == 0) {
+    if (strcmp(path, "1") == 0) {
         adev->a2a_pts_log = adev->a2a_pts;
-        fprintf(stderr, "[%6lu.%06lu](AtoA, %08x)\n", ts.tv_sec, ts.tv_nsec/1000, adev->a2a_pts);
+        fprintf(stderr, "[%6lu.%06lu] %u 0 A AtoA\n", ts.tv_sec, ts.tv_nsec/1000, adev->a2a_pts);
     } else {
+        snprintf(log_path, sizeof(log_path), "%s.atoa", path);
+        log_path[255] = '\0';
         if (adev->diag_log_fd && strcmp(log_path, adev->diag_log_path)) {
             fclose(adev->diag_log_fd);
             adev->diag_log_fd = NULL;
@@ -369,10 +378,12 @@ void diag_log(struct aml_audio_device *adev, const char *msg)
         }
         if (adev->diag_log_fd) {
             adev->a2a_pts_log = adev->a2a_pts;
-            fprintf(adev->diag_log_fd, "[%6lu.%06lu](AtoA, %08x)%s\n", ts.tv_sec, ts.tv_nsec/1000, adev->a2a_pts, msg);
+            fprintf(adev->diag_log_fd, "[%6lu.%06lu] %u 0 A AtoA %s\n", ts.tv_sec, ts.tv_nsec/1000, adev->a2a_pts, msg);
+            fflush(adev->diag_log_fd);
         }
     }
-    free(log_path);
+
+    pthread_mutex_unlock(&adev->diag_log_lock);
 }
 #endif
 
@@ -6718,6 +6729,15 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             } else {
                 unsetenv(var);
                 ALOGI("env %s unset", var);
+
+#ifdef DIAG_LOG
+                if (strcmp(var, "AV_PROGRESSION") == 0) {
+                    pthread_mutex_lock(&adev->diag_log_lock);
+                    diag_log_close(adev);
+                    pthread_mutex_unlock(&adev->diag_log_lock);
+                }
+#endif
+
             }
         } else {
             ret = -EINVAL;
@@ -8942,7 +8962,7 @@ ssize_t hw_write (struct audio_stream_out *stream
                 {
 #ifdef DIAG_LOG
                     if ((aml_out->usecase == STREAM_PCM_HWSYNC || aml_out->usecase == STREAM_RAW_HWSYNC) &&
-                        (adev->usecase_masks & (STREAM_PCM_HWSYNC | STREAM_RAW_HWSYNC))) {
+                        (adev->usecase_masks & ((1 << STREAM_PCM_HWSYNC) | (1 << STREAM_RAW_HWSYNC)))) {
                         diag_log(adev, "");
                     }
 #endif
@@ -13722,6 +13742,10 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 
 #ifdef AUDIO_CAP
     pthread_mutex_init(&adev->cap_buffer_lock, NULL);
+#endif
+
+#ifdef DIAG_LOG
+    pthread_mutex_init(&adev->diag_log_lock, NULL);
 #endif
 
     adev->ms12_tv_tuning = getprop_bool("media.audiohal.ms12_tv_tuning");

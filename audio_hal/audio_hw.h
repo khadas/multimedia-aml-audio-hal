@@ -634,6 +634,7 @@ struct aml_audio_device {
 #endif
 
 #ifdef DIAG_LOG
+    pthread_mutex_t diag_log_lock;
     FILE *diag_log_fd;
     char diag_log_path[256];
     uint32_t a2a_pts;
