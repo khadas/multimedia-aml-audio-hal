@@ -86,6 +86,7 @@ typedef struct  audio_hwsync {
     bool first_apts_flag;//flag to indicate set first apts
     uint64_t first_apts;
     uint64_t last_apts_from_header;
+    uint32_t last_lookup_apts;
     apts_tab_t pts_tab[HWSYNC_APTS_NUM];
     pthread_mutex_t lock;
     size_t payload_offset;

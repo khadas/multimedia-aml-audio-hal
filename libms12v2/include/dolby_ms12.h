@@ -241,6 +241,11 @@ int dolby_ms12_get_input_atmos_info();
 int dolby_ms12_set_main_volume(float volume);
 
 /*@@
+ *  @brief set the MS12 sync control
+ */
+int dolby_ms12_set_sync(int sync);
+
+/*@@
     @brief get PCM's nframes which outputed by decoder
 */
 unsigned long long dolby_ms12_get_decoder_nframes_pcm_output(void *ms12_pointer, int format, int is_main);

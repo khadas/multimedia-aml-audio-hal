@@ -154,6 +154,8 @@ public:
 
     virtual int     DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration);
 
+    virtual void    DolbyMS12SetSync(int sync);
+
 private:
     // DolbyMS12(const DolbyMS12&);
     // DolbyMS12& operator = (const DolbyMS12&);

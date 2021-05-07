@@ -33,6 +33,18 @@
 #define SYSTEM_INPUT_STREAM 0
 #define RESERVED_LENGTH 31
 
+#define AUDIO_2MAIN_MIXER_NODE           0xFF000001UL
+#define AUDIO_2MAIN_MIXER_NODE_PRIMARY   0xFF000002UL
+#define AUDIO_2MAIN_MIXER_NODE_SECONDARY 0xFF000003UL
+#define AUDIO_2MAIN_MIXER_NODE_SYSTEM    0xFF000004UL
+
+#define AUDIO_SYSTEM_MIXER_NODE          0xFF000010UL
+#define AUDIO_AD_MIXER_NODE              0xFF000020UL
+
+#define MIXER_PRIMARY_INPUT   0
+#define MIXER_SECONDARY_INPUT 1
+#define MIXER_SYSTEM_INPUT    2
+
 /*
  *@brief get dolby ms12 prepared
  */
@@ -174,6 +186,11 @@ void set_ms12_ad_mixing_level(struct dolby_ms12_desc *ms12, int mixing_level);
  *@brief set dolby ms12 pause
  */
 void set_dolby_ms12_runtime_pause(struct dolby_ms12_desc *ms12, int is_pause);
+
+/*
+ *  *@brief set dolby ms12 sync
+ *   */
+void set_dolby_ms12_runtime_sync(struct dolby_ms12_desc *ms12, int sync);
 
 /*
  *@brief set dolby ms12 system mixing enable
