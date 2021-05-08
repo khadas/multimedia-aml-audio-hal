@@ -9766,6 +9766,16 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         ALOGI ("%s(), check if the hdmi audio output format dynamic changed!\n", __func__);
     }
 
+    if ((adev->continuous_audio_mode == 1) &&
+        (eDolbyMS12Lib == adev->dolby_lib_type) &&
+        (adev->hdmi_format == BYPASS) &&
+        (ms12_out) &&
+        (ms12_out->hal_internal_format != aml_out->hal_internal_format)) {
+        need_reconfig_output = true;
+        need_reset_decoder = true;
+        ALOGI("%s(), reconfig decoder and output for changed format 0x%x->0x%x in bypass mode", __func__, ms12_out->hal_internal_format, aml_out->hal_internal_format);
+    }
+
     if (adev->a2dp_updated) {
         ALOGI ("%s(), a2dp updated, need reconfig output, %d %d", __func__, adev->out_device, aml_out->out_device);
         need_reconfig_output = true;

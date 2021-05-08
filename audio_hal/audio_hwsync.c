@@ -591,7 +591,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             gap = pts_gap(pcr, apts);
             gap_ms = gap / 90;
             if (debug_enable) {
-                ALOGI("%s pcr 0x%x,apts 0x%x,gap 0x%x,gap duration %d ms, offset %d, apts_lookup=%d, latency=%d",
+                ALOGI("%s pcr 0x%x,apts 0x%x,gap 0x%x,gap duration %d ms, offset %d, apts_lookup=%u, latency=%d",
                       __func__, pcr, apts, gap, gap_ms, offset, apts_save / 90, latency_pts / 90);
             }
 
@@ -670,9 +670,10 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             if (pts_log) {
                 struct timespec ts;
                 clock_gettime(CLOCK_MONOTONIC, &ts);
-                ALOGI("PTSLOG [%lld.%.9ld] offset:%d, lookup_pts:%u, latency_pts:%u, apts:%d, action:%d",
+                ALOGI("PTSLOG [%lld.%.9ld] injected %" PRIu64 ", offset:%d, level:%d, lookup_pts:%u, latency_pts:%u, apts:%u, action:%d",
                       (long long)ts.tv_sec, ts.tv_nsec,
-                      offset, apts_save, latency_pts, apts, out->msync_action);
+                      out->total_write_size, offset, (int)(out->total_write_size - offset),
+                      apts_save, latency_pts, apts, out->msync_action);
             }
 
             p_hwsync->last_lookup_apts = apts_save;
