@@ -11503,6 +11503,16 @@ void *audio_patch_input_threadloop(void *data)
                     cur_aformat = audio_parse_get_audio_type(patch->audio_parse_para);
                     cur_audio_packet = get_hdmiin_audio_packet(&aml_dev->alsa_mixer);
 
+                    // Add some sanity check
+                    // MAT audio is assumed with HBR only
+                    // PCM input >= 8ch is TODO
+                    if (((cur_aformat == AUDIO_FORMAT_MAT) && (cur_audio_packet != AUDIO_PACKET_HBR)) ||
+                        ((audio_is_linear_pcm(cur_aformat) && (current_channel >= 8)))) {
+                        ALOGV("HDMI in skipping format 0x%x, channel %d, packet type %d", cur_aformat, current_channel, cur_audio_packet);
+                        usleep(3000);
+                        continue;
+                    }
+
 #ifdef HDMI_ARC_PCM_32BIT_INPUT
                     if (audio_is_linear_pcm(cur_aformat)) {
                         cur_aformat = AUDIO_FORMAT_PCM_32_BIT;
