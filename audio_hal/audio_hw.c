@@ -1636,6 +1636,8 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
             ret = -EINVAL;
             goto exit;
         }
+
+        log_set_level(LOG_INFO);
         ALOGI("av_sync_attach success %p", msync_session);
         sync_enable = 1;
 #else
