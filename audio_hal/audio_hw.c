@@ -9962,6 +9962,15 @@ hwsync_rewrite:
                 audio_type_parse_t *status = patch->audio_parse_para;
                 ALOGI("%s:%d cur_aformat:0x%x, aformat:0x%x", __func__, __LINE__, cur_aformat, patch->aformat);
             }
+
+            // Add some sanity check
+            // PCM input >= 8ch is TODO
+            if ((audio_is_linear_pcm(cur_aformat)) && (audio_channel_count_from_out_mask(cur_channel_mask) >= 8)) {
+                ALOGV("%s:%d HDMI in skipping format 0x%x, mask 0x%x",
+                      __func__, __LINE__, cur_aformat, cur_channel_mask);
+                return write_bytes;
+            }
+
             if ((cur_aformat != patch->aformat) || (aml_out->hal_channel_mask != cur_channel_mask)) {
                 ALOGI ("HDMI/SPDIF input format/channel mask changed from %#x/%#x to %#x/%#x\n", patch->aformat, aml_out->hal_channel_mask, cur_aformat, cur_channel_mask);
                 patch->aformat = cur_aformat;
