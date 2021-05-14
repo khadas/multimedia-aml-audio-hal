@@ -24,7 +24,7 @@
 
 /* check avsync latency times*/
 #define AVSYNC_SAMPLE_MAX_CNT (3)
-#define AVSYNC_ALSA_OUT_MAX_LATENCY (60)
+#define AVSYNC_ALSA_OUT_MAX_LATENCY (40)
 #define AVSYNC_RINGBUFFER_MIN_LATENCY (20)
 #define AVSYNC_SKIP_CNT (10)
 
@@ -32,6 +32,11 @@
 
 struct aml_audio_patch;
 struct aml_audio_device;
+
+int aml_dev_sample_audio_path_latency(struct aml_audio_device *aml_dev);
+int aml_dev_sample_video_path_latency(void);
+int aml_dev_tune_video_path_latency(int tune_val);
+void aml_dev_patch_lower_output_latency(struct aml_audio_device *aml_dev);
 
 int aml_dev_try_avsync(struct aml_audio_patch *patch);
 int tuning_spker_latency(struct aml_audio_device *adev,

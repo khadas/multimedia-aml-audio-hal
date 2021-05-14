@@ -188,7 +188,7 @@ enum Result {
 /* each MS12 callback for ALSA output is for 256 samples ~5ms for 48k
  * 30 times -> 150ms latency for initial draining
  */
-#define PATCH_INIT_FLUSH_CNT       30
+#define PATCH_INIT_FLUSH_CNT       300
 #define PATCH_STOP_FLUSH_THRESHOLD 4096
 
 #define SYSTEM_APP_SOUND_MIXING_ON 1
