@@ -755,7 +755,18 @@ int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, unsig
     pthread_mutex_lock(&p_hwsync->lock);
     pts_tab = p_hwsync->pts_tab;
     for (i = 0; i < HWSYNC_APTS_NUM; i++) {
-        if (!pts_tab[i].valid) {
+        if (pts_tab[i].valid && (pts_tab[i].offset == offset)) {
+            /* for duplicated record, reuse previous entry.
+             * This may happen when msync returns ASYNC_AGAIN when first checkin
+             * record at offset 0 are overwritten after dropping data
+             */
+            pts_tab[i].pts = apts;
+            if (debug_enable) {
+                ALOGI("%s checkin done,offset %zu,apts 0x%x", __func__, offset, apts);
+            }
+            ret = 0;
+            break;
+        } else if (!pts_tab[i].valid) {
             pts_tab[i].pts = apts;
             pts_tab[i].offset = offset;
             pts_tab[i].valid = 1;
