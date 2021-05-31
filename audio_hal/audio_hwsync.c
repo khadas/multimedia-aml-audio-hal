@@ -642,10 +642,26 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                if (dolby_ms12_get_main_underrun()) {
                     /* when MS12 main pipeline gets underrun, the output latency does not reflect the real
                      * latency since muting frame can be inserted by MS12 when continuous output mode is
-                     * enabled, so only reset APTS when PCR exceeds last checkin PTS in such case.
+                     * enabled. Use last reported apts before underrun with monotonic time increment to
+                     * report rendring time, with an upper bound set to latest check in PTS.
+                     * Note main_underrun does not happen at the beginning before any samples
+                     * are handled by MS12 system mixer.
                      */
-                    ALOGE("Use apts w/o delay deduction %d to replace %d due to underrun", apts_save, apts);
-                    apts = apts_save;
+                    uint32_t pts_adj = apts_save;
+                    if (out->msync_rendered_ts.tv_sec) {
+                        struct timespec ts;
+                        uint32_t underrun_inc;
+                        clock_gettime(CLOCK_MONOTONIC, &ts);
+                        underrun_inc = ((ts.tv_sec * 1000000000ULL + ts.tv_nsec) -
+                                (out->msync_rendered_ts.tv_sec * 1000000000ULL + out->msync_rendered_ts.tv_nsec))
+                                / 1000000 * 90;
+                        if ((int)(underrun_inc + out->msync_rendered_pts) < apts_save) {
+                            pts_adj = underrun_inc + out->msync_rendered_pts;
+                        }
+                    }
+
+                    ALOGV("Use apts w/o delay deduction %u to replace %u due to underrun.", apts_save, pts_adj);
+                    apts = pts_adj;
                 } else if (p_hwsync->last_lookup_apts == apts_save) {
                     /* only report audio pts when lookup_apts changes.
                      * the output from MS12 may come in smaller resolution (such as every 256 samples than 
@@ -668,11 +684,15 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             }
 
             if (pts_log) {
+                int ms12_main_avail = 0, ms12_main_size = 0;
                 struct timespec ts;
                 clock_gettime(CLOCK_MONOTONIC, &ts);
-                ALOGI("PTSLOG [%lld.%.9ld] injected %" PRIu64 ", offset:%d, level:%d, lookup_pts:%u, latency_pts:%u, apts:%u, action:%d",
+                if (eDolbyMS12Lib == adev->dolby_lib_type) {
+                    ms12_main_avail = dolby_ms12_get_main_buffer_avail(&ms12_main_size);
+                }
+                ALOGI("PTSLOG [%lld.%.9ld] injected %" PRIu64 ", offset:%d, level:(%d/%d), lookup_pts:%u, latency_pts:%u, apts:%u, action:%d",
                       (long long)ts.tv_sec, ts.tv_nsec,
-                      out->total_write_size, offset, (int)(out->total_write_size - offset),
+                      out->total_write_size, offset, ms12_main_avail, ms12_main_size,
                       apts_save, latency_pts, apts, out->msync_action);
             }
 
@@ -680,6 +700,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             av_sync_audio_render(out->msync_session, apts, &policy);
             out->msync_action_delta = policy.delta;
             out->msync_rendered_pts = apts;
+            clock_gettime(CLOCK_MONOTONIC, &out->msync_rendered_ts);
 
             force_action = aml_getprop_int("media.audiohal.action");
             /* 0: default, no force action
@@ -744,7 +765,7 @@ int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, unsig
     }
 
     if (aml_getprop_bool("media.audiohal.ptslog")) {
-        ALOGI("checkin_apts %d: %d", offset, apts);
+        ALOGI("checkin_apts %d: %u", offset, apts);
     }
 
     adev = p_hwsync->aout->dev;

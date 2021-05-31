@@ -784,6 +784,7 @@ struct aml_stream_out {
     avs_audio_action msync_action;
     int msync_action_delta;
     uint32_t msync_rendered_pts;
+    struct timespec msync_rendered_ts;
 #endif
 };
 
