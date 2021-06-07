@@ -11754,7 +11754,7 @@ void *audio_patch_output_threadloop(void *data)
         pthread_mutex_unlock(&aml_out->lock);
         if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
             get_dolby_ms12_cleanup(&aml_dev->ms12);
-            adev->ms12_out = NULL;
+            aml_dev->ms12_out = NULL;
         }
         if (aml_dev->need_remove_conti_mode == true) {
             ALOGI("%s,conntinous mode still there,release ms12 here", __func__);
