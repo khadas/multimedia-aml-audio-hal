@@ -231,6 +231,7 @@ void get_sink_format (struct audio_stream_out *stream)
         }
         break;
     case BYPASS:
+#if 0
         optical_audio_format = min(sink_capability, source_format);
         // for TV with SPDIF as 2nd digital output, allow AUDIO_FORMAT_AC3
         // for SPDIF output
@@ -240,6 +241,9 @@ void get_sink_format (struct audio_stream_out *stream)
                 optical_audio_format = AUDIO_FORMAT_AC3;
             }
         }
+#else
+        optical_audio_format = source_format;
+#endif
         break;
     case AUTO:
     default:
