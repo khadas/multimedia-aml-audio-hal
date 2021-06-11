@@ -1307,7 +1307,7 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_dec_info_t *ms12
                 /* TM2 with dedicated eARC port */
                 if (SUPPORT_EARC_OUT_HW && adev->active_outport == OUTPORT_HDMI_ARC) {
                     if (adev->bHDMIARCon &&
-                        audio_hal_data_processing((struct audio_stream_out *)aml_out, output_buffer, out_size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
+                        audio_hal_data_processing((struct audio_stream_out *)aml_out, output_buf, out_size, &output_buffer, &output_buffer_bytes, output_format) == 0) {
                         ret = hw_write((struct audio_stream_out *)aml_out, output_buffer, output_buffer_bytes, output_format);
                     }
                 } else {
