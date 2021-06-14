@@ -249,7 +249,9 @@ int aml_dev_sample_audio_path_latency(struct aml_audio_device *aml_dev)
 
         ms12_ltcy += ms12_latency_pipeline;
 
-        if ((format & AUDIO_FORMAT_MAIN_MASK) != AUDIO_FORMAT_PCM)
+        if ((format == AUDIO_FORMAT_AC3) ||
+            (format == AUDIO_FORMAT_E_AC3) ||
+            (format == AUDIO_FORMAT_AC4))
             ms12_ltcy += ms12_latency_decoder;
         if (aml_dev->sink_format == AUDIO_FORMAT_PCM_16_BIT) {
             ms12_ltcy += ms12_latency_dap;
@@ -421,14 +423,28 @@ static inline void aml_dev_avsync_reset(struct aml_audio_patch *patch)
 
 void aml_dev_patch_lower_output_latency(struct aml_audio_device *aml_dev)
 {
+    /* For streaming from mixer, the ALSA latency is set to big to give
+     * more margin to application to send audio data. When switching from
+     * streaming to patch (e.g. HDMI IN), need decrease pipeline latency for
+     * non PCM/MAT input.
+     * Under continuous output mode, drain output buffer level to a certain
+     * level so thw whole pipeline is running with a consistant low level
+     * when patch starts.
+     */
     while (1) {
         snd_pcm_sframes_t frames = 0;
         struct pcm *pcm_handle;
         int r;
 
         pthread_mutex_lock(&aml_dev->patch_lock);
+        /* for PCM/MAT input, assuming MS12 has less internal latency so allow
+         * more latency on output buffer
+         */
         if ((!aml_dev->audio_patch) ||
-            !((aml_dev->patch_src == SRC_HDMIIN) || (aml_dev->patch_src == SRC_SPDIFIN) || (aml_dev->patch_src == SRC_LINEIN))) {
+            !((aml_dev->patch_src == SRC_HDMIIN) || (aml_dev->patch_src == SRC_SPDIFIN) || (aml_dev->patch_src == SRC_LINEIN)) ||
+            (aml_dev->audio_patch->aformat == AUDIO_FORMAT_MAT) ||
+            (aml_dev->audio_patch->aformat == AUDIO_FORMAT_DOLBY_TRUEHD) ||
+            audio_is_linear_pcm(aml_dev->audio_patch->aformat)) {
             pthread_mutex_unlock(&aml_dev->patch_lock);
             break;
         }
@@ -436,10 +452,11 @@ void aml_dev_patch_lower_output_latency(struct aml_audio_device *aml_dev)
 
         pthread_mutex_lock(&aml_dev->alsa_pcm_lock);
         pcm_handle = aml_dev->pcm_handle[I2S_DEVICE];
-        if (!pcm_handle) {
+        if ((!pcm_handle) || (pcm_state(pcm_handle) != SNDRV_PCM_STATE_RUNNING)) {
             pthread_mutex_unlock(&aml_dev->alsa_pcm_lock);
             break;
         }
+
         r = pcm_ioctl(pcm_handle, SNDRV_PCM_IOCTL_DELAY, &frames);
         pthread_mutex_unlock(&aml_dev->alsa_pcm_lock);
 

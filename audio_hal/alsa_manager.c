@@ -187,8 +187,8 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
         }
 
         ALOGI("%s, audio open card(%d), device(%d)", __func__, card, device_index);
-        ALOGI("ALSA open configs: channels %d format %d period_count %d period_size %d rate %d",
-              config->channels, config->format, config->period_count, config->period_size, config->rate);
+        ALOGI("ALSA open configs: channels %d format %d period_count %d period_size %d rate %d start_threshold %d",
+              config->channels, config->format, config->period_count, config->period_size, config->rate, config->start_threshold);
 #ifndef TINYALSA_VERSION
         ALOGI("ALSA open configs: threshold start %u stop %u silence %u silence_size %d avail_min %d",
               config->start_threshold, config->stop_threshold, config->silence_threshold, config->silence_size, config->avail_min);
@@ -210,12 +210,13 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
                     (adev->optical_format == AUDIO_FORMAT_MAT)) {
                     earc_config.period_size *= 4;
                 }
+                earc_config.start_threshold = earc_config.period_size * earc_config.period_count;
                 if (adev->optical_format == AUDIO_FORMAT_MAT) {
                     earc_config.rate *= 4;
                 }
             }
-            ALOGI("%s, audio open eARC device, channels %d, format %d period_count %d period_size %d rate %d",
-                  __func__, earc_config.channels, earc_config.format, earc_config.period_count, earc_config.period_size, earc_config.rate);
+            ALOGI("%s, audio open eARC device, channels %d, format %d period_count %d period_size %d rate %d start_threshold %d",
+                  __func__, earc_config.channels, earc_config.format, earc_config.period_count, earc_config.period_size, earc_config.rate, earc_config.start_threshold);
             earc_pcm = pcm_open(card, earc_port, PCM_OUT, &earc_config);
             if (!earc_pcm || !pcm_is_ready(earc_pcm)) {
                 ALOGE("%s, earc_pcm %p open [ready %d] failed", __func__,
@@ -586,10 +587,15 @@ write:
         raw_for_arc = !(audio_is_linear_pcm(out_format));
 
         if ((config->channels == 2) || raw_for_arc) {
+#if 0
+            unsigned frames = 0;
+            pcm_ioctl(adev->pcm_handle[EARC_DEVICE], SNDRV_PCM_IOCTL_DELAY, &frames);
+            ALOGI("write earc %d delay=%d", bytes, frames);
+#endif
+
 #ifdef ADD_AUDIO_DELAY_INTERFACE
             aml_audio_delay_process(AML_DELAY_OUTPORT_ARC, buffer, bytes, out_format, 2);
 #endif
-
             ret = pcm_write(adev->pcm_handle[EARC_DEVICE], buffer, bytes);
             if (ret < 0) {
                 if (aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE) != ATTEND_TYPE_NONE)

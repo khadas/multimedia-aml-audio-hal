@@ -66,7 +66,7 @@ static void get_mat_hardware_config_parameters(
     hardware_config->period_count = PLAYBACK_PERIOD_COUNT;
     //hardware_config->period_size = PERIOD_SIZE /* * 4 */;
     hardware_config->period_size = 61440 / 4; /* period_size in frame unit, MAT IEC61937 frame size (61440) bytes */
-    hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count/2;
+    hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 2;
 #ifndef TINYALSA_VERSION
     hardware_config->avail_min = 0;
 #endif
@@ -93,7 +93,7 @@ static void get_ddp_hardware_config_parameters(
         hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 2;
     } else {
         hardware_config->period_count = PLAYBACK_PERIOD_COUNT * 4;
-        hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 2;
+        hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count;
     }
 #ifndef TINYALSA_VERSION
     hardware_config->avail_min = 0;
@@ -120,7 +120,7 @@ static void get_dd_hardware_config_parameters(
         hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 2;
     } else {
         hardware_config->period_count = PLAYBACK_PERIOD_COUNT;
-        hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 2;
+        hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count;
     }
 #ifndef TINYALSA_VERSION
     hardware_config->avail_min = 0;

@@ -77,7 +77,7 @@
  * test case test4_1MeasurePeakRms(android.media.cts.VisualizerTest)
  */
 #define DEFAULT_PLAYBACK_PERIOD_SIZE 512//1024
-#define DEFAULT_CAPTURE_PERIOD_SIZE  1024
+#define DEFAULT_CAPTURE_PERIOD_SIZE  256
 #define DEFAULT_PLAYBACK_PERIOD_CNT 6
 
 //#define DEFAULT_PERIOD_SIZE 512
@@ -88,7 +88,7 @@
 /* number of periods for low power playback */
 #define PLAYBACK_PERIOD_COUNT 4
 /* number of periods for capture */
-#define CAPTURE_PERIOD_COUNT 4
+#define CAPTURE_PERIOD_COUNT 16
 
 /* minimum sleep time in out_write() when write threshold is not reached */
 #define MIN_WRITE_SLEEP_US 5000

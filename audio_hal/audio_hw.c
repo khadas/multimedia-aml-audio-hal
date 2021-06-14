@@ -149,7 +149,7 @@
 #define PLAYBACK_PERIOD_COUNT 4
 /* number of periods for capture */
 #undef CAPTURE_PERIOD_COUNT
-#define CAPTURE_PERIOD_COUNT 4
+#define CAPTURE_PERIOD_COUNT 16
 
 /* minimum sleep time in out_write() when write threshold is not reached */
 #define MIN_WRITE_SLEEP_US 5000
@@ -3792,6 +3792,8 @@ static int start_input_stream(struct aml_stream_in *in)
     /* this assumes routing is done previously */
     // LINUX Change, tinyalsa does not support return with partial written size
     //in->pcm = pcm_open(card, alsa_device, PCM_IN | PCM_NONBLOCK, &in->config);
+    ALOGI("pcm open input, ch=%d, r=%d, period=%d, period_count=%d",
+          in->config.channels, in->config.rate, in->config.period_size, in->config.period_count);
     in->pcm = pcm_open(card, alsa_device, PCM_IN, &in->config);
     if (!pcm_is_ready(in->pcm)) {
         ALOGE("%s: cannot open pcm_in driver: %s", __func__, pcm_get_error(in->pcm));
@@ -11804,7 +11806,7 @@ void *audio_patch_output_threadloop(void *data)
     }
 
     out = (struct aml_stream_out *)stream_out;
-    patch->out_buf_size = write_bytes = out->config.period_size * audio_stream_out_frame_size(&out->stream);
+    patch->out_buf_size = write_bytes = out->config.period_size * audio_stream_out_frame_size(&out->stream) / 4;
     patch->out_buf = calloc(1, patch->out_buf_size);
     if (!patch->out_buf) {
         adev_close_output_stream_new(patch->dev, &out->stream);
@@ -12044,8 +12046,15 @@ int release_patch_l(struct aml_audio_device *aml_dev)
     }
     patch->input_thread_exit = 1;
     pthread_join(patch->audio_input_threadID, NULL);
+
+    /* unlock patch_lock to avoid potential locking inside output threadloop */
+    pthread_mutex_unlock(&aml_dev->patch_lock);
+
     patch->output_thread_exit = 1;
     pthread_join(patch->audio_output_threadID, NULL);
+
+    pthread_mutex_lock(&aml_dev->patch_lock);
+
     if (IS_HDMI_IN_HW(patch->input_src) ||
             patch->input_src == AUDIO_DEVICE_IN_SPDIF)
         exit_pthread_for_audio_type_parse(patch->audio_parse_threadID,&patch->audio_parse_para);
@@ -12949,7 +12958,9 @@ static int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd)
 
         ms12_ltcy += ms12_latency_pipeline;
 
-        if ((format & AUDIO_FORMAT_MAIN_MASK) != AUDIO_FORMAT_PCM)
+        if ((format == AUDIO_FORMAT_AC3) ||
+            (format == AUDIO_FORMAT_E_AC3) ||
+            (format == AUDIO_FORMAT_AC4))
             ms12_ltcy += ms12_latency_decoder;
         if ((aml_dev->ms12_out->device == PORT_I2S) && (!aml_dev->dap_bypass_enable)) {
             ms12_ltcy += ms12_latency_dap;
@@ -13137,6 +13148,8 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
             aml_dev->hdmi_format);
     dprintf(fd, "[AML_HAL]      dolby_lib: %d\n",
             aml_dev->dolby_lib_type);
+    dprintf(fd, "[AML_HAL]      continuous output: %d\n",
+            continous_mode(aml_dev));
     if (aml_dev->useSubMix) {
         subMixingDump(fd, aml_dev);
     }
