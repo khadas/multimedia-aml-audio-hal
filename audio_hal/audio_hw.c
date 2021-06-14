@@ -7796,11 +7796,11 @@ int do_output_standby_l(struct audio_stream *stream)
         aml_audio_resample_reset(aml_out->resample_handle);
     }
 
-
     if (aml_out->is_normal_pcm) {
         set_system_app_mixing_status(aml_out, aml_out->status);
         aml_out->normal_pcm_mixing_config = false;
     }
+
     aml_out->pause_status = false;//clear pause status
     if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_STOP) {
         ALOGI("%s set AUDIO_PAUSE\n",__func__);
@@ -8934,6 +8934,7 @@ ssize_t hw_write (struct audio_stream_out *stream
         ret = insert_silence_data(stream, buffer, bytes, adjust_ms, output_format);
         if (ret < 0) {
             ALOGE("insert_silence_data occur error, ret:%#x", ret);
+            pthread_mutex_unlock(&adev->alsa_pcm_lock);
             return ret;
         }
 
@@ -8943,7 +8944,13 @@ ssize_t hw_write (struct audio_stream_out *stream
         } else 
 #endif
         {
-            if ((adev->audio_patch) && (adev->audio_patch->init_flush_count > 0)) {
+            /* make sure there is no cross lock between alsa_pcm_lock and patch_lock,
+             * patch release sequence grabs patch_lock first, then alsa_pcm_lock
+             */
+            pthread_mutex_unlock(&adev->alsa_pcm_lock);
+            pthread_mutex_lock(&adev->patch_lock);
+
+            if (!continous_mode(adev) && (adev->audio_patch) && (adev->audio_patch->init_flush_count > 0)) {
                 if (get_buffer_read_space(&adev->audio_patch->aml_ringbuffer) < PATCH_STOP_FLUSH_THRESHOLD)
                     adev->audio_patch->init_flush_count = 0;
                 else
@@ -8952,8 +8959,20 @@ ssize_t hw_write (struct audio_stream_out *stream
                 ALOGI("init_flush_count = %d, level = %d",
                        adev->audio_patch->init_flush_count,
                        get_buffer_read_space(&adev->audio_patch->aml_ringbuffer));
+
+                pthread_mutex_unlock(&adev->patch_lock);
+                pthread_mutex_lock(&adev->alsa_pcm_lock);
+
                 ret = bytes;
             } else {
+                pthread_mutex_unlock(&adev->patch_lock);
+
+                if (continous_mode(adev)) {
+                    aml_dev_patch_lower_output_latency(adev);
+                }
+
+                pthread_mutex_lock(&adev->alsa_pcm_lock);
+
                 if (aml_getprop_bool("media.audiohal.outdump")) {
                     FILE *fp1 = fopen("/data/vendor/audiohal/speaker_output.pcm", "a+");
                     if (fp1) {
@@ -9797,6 +9816,14 @@ ssize_t mixer_main_buffer_write (struct audio_stream_out *stream, const void *bu
         need_reconfig_output = true;
         aml_out->out_device = adev->out_device;
     }
+
+    if (patch && (patch->need_do_avsync == true) &&
+        (adev->patch_src == SRC_ATV || adev->patch_src == SRC_HDMIIN ||
+         adev->patch_src == SRC_LINEIN || adev->patch_src == SRC_SPDIFIN)) {
+        aml_dev_tune_video_path_latency(aml_dev_sample_audio_path_latency(adev));
+        patch->need_do_avsync = false;
+    }
+
 hwsync_rewrite:
     /* handle HWSYNC audio data*/
     if (aml_out->hw_sync_mode) {
@@ -11826,6 +11853,7 @@ void *audio_patch_output_threadloop(void *data)
                 ALOGE("%s(), ring_buffer read 0 data!", __func__);
             }
 
+#if 0
             /* avsync for dev->dev patch*/
             if (patch && (patch->need_do_avsync == true) && (patch->input_signal_stable == true) &&
                     (aml_dev->patch_src == SRC_ATV || aml_dev->patch_src == SRC_HDMIIN ||
@@ -11838,6 +11866,8 @@ void *audio_patch_output_threadloop(void *data)
                     continue;
                 }
             }
+#endif
+
 #if 0
             struct timespec before_read;
             struct timespec after_read;
@@ -11945,13 +11975,8 @@ static int create_patch_l(struct audio_hw_device *dev,
         ALOGE("%s: Create input thread failed", __func__);
         goto err_in_thread;
     }
-    ret = pthread_create(&patch->audio_output_threadID, NULL,
-                          &audio_patch_output_threadloop, patch);
-    if (ret != 0) {
-        ALOGE("%s: Create output thread failed", __func__);
-        goto err_out_thread;
-    }
 
+    /* create audio_type_parse thread before output_threadloop */
     if (IS_HDMI_IN_HW(patch->input_src) ||
             patch->input_src == AUDIO_DEVICE_IN_SPDIF) {
         //TODO add sample rate and channel information
@@ -11963,14 +11988,22 @@ static int create_patch_l(struct audio_hw_device *dev,
         }
     }
 
+    ret = pthread_create(&patch->audio_output_threadID, NULL,
+                          &audio_patch_output_threadloop, patch);
+    if (ret != 0) {
+        ALOGE("%s: Create output thread failed", __func__);
+        goto err_out_thread;
+    }
+
     aml_dev->audio_patch = patch;
     ALOGD("%s: exit", __func__);
 
     return 0;
-err_parse_thread:
-    patch->output_thread_exit = 1;
-    pthread_join(patch->audio_output_threadID, NULL);
 err_out_thread:
+    if (IS_HDMI_IN_HW(patch->input_src) ||
+            patch->input_src == AUDIO_DEVICE_IN_SPDIF)
+        exit_pthread_for_audio_type_parse(patch->audio_parse_threadID,&patch->audio_parse_para);
+err_parse_thread:
     patch->input_thread_exit = 1;
     pthread_join(patch->audio_input_threadID, NULL);
 err_in_thread:
@@ -12009,15 +12042,14 @@ int release_patch_l(struct aml_audio_device *aml_dev)
         ALOGD("%s(), no patch to release", __func__);
         goto exit;
     }
-    patch->output_thread_exit = 1;
-    patch->input_thread_exit = 1;
-    if (IS_HDMI_IN_HW(patch->input_src) ||
-            patch->input_src == AUDIO_DEVICE_IN_SPDIF)
-        exit_pthread_for_audio_type_parse(patch->audio_parse_threadID,&patch->audio_parse_para);
     patch->input_thread_exit = 1;
     pthread_join(patch->audio_input_threadID, NULL);
     patch->output_thread_exit = 1;
     pthread_join(patch->audio_output_threadID, NULL);
+    if (IS_HDMI_IN_HW(patch->input_src) ||
+            patch->input_src == AUDIO_DEVICE_IN_SPDIF)
+        exit_pthread_for_audio_type_parse(patch->audio_parse_threadID,&patch->audio_parse_para);
+
     ring_buffer_release(&patch->aml_ringbuffer);
     free(patch);
     aml_dev->audio_patch = NULL;
