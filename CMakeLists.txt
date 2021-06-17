@@ -104,6 +104,7 @@ add_library(audio_hal SHARED
 	audio_hal/hw_avsync_callbacks.c
 	audio_hal/spdif_encoder_api.c
 	audio_hal/sub_mixing_factory.c
+	audio_hal/tinyalsa_ext.c
 	audio_hal/audio_effect_if.c
 	utils/ac3_parser_utils.c
 	utils/alsa_device_parser.c

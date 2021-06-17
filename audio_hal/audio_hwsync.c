@@ -34,6 +34,7 @@
 #include "audio_hwsync.h"
 #include "audio_hw.h"
 #include "dolby_lib_api.h"
+#include "tinyalsa_ext.h"
 
 void aml_hwsync_set_tsync_pause(void)
 {
@@ -564,14 +565,16 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
 #else
     if (p_hwsync->first_apts_flag == false) {
 #endif
+        struct aml_audio_device *adev = p_hwsync->aout->dev;
         ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
         ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
         aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);
         p_hwsync->last_lookup_apts = apts;
+        adev->ms12_main_input_size = 0;
 
         if (pts_log) {
             struct timespec ts;
-            clock_gettime(CLOCK_MONOTONIC, &ts);
+            clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
             ALOGI("PTSLOG [%lld.%.9ld] AUDIO_START offset:%d, lookup_pts:%u, latency_pts:%u, apts:%d",
                   (long long)ts.tv_sec, ts.tv_nsec,
                   offset, apts, latency_pts, apts - latency_pts);
@@ -651,7 +654,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                     if (out->msync_rendered_ts.tv_sec) {
                         struct timespec ts;
                         uint32_t underrun_inc;
-                        clock_gettime(CLOCK_MONOTONIC, &ts);
+                        clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
                         underrun_inc = ((ts.tv_sec * 1000000000ULL + ts.tv_nsec) -
                                 (out->msync_rendered_ts.tv_sec * 1000000000ULL + out->msync_rendered_ts.tv_nsec))
                                 / 1000000 * 90;
@@ -684,23 +687,22 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             }
 
             if (pts_log) {
-                int ms12_main_avail = 0, ms12_main_size = 0;
-                struct timespec ts;
-                clock_gettime(CLOCK_MONOTONIC, &ts);
-                if (eDolbyMS12Lib == adev->dolby_lib_type) {
-                    ms12_main_avail = dolby_ms12_get_main_buffer_avail(&ms12_main_size);
-                }
-                ALOGI("PTSLOG [%lld.%.9ld] injected %" PRIu64 ", offset:%d, level:(%d/%d), lookup_pts:%u, latency_pts:%u, apts:%u, action:%d",
+                struct timespec ts, hw_ptr_ts = {0};
+                unsigned long hw_ptr = 0;
+                clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+                pcm_get_hw_ptr(adev->pcm_handle[I2S_DEVICE], &hw_ptr, &hw_ptr_ts);
+                ALOGI("PTSLOG [%lld.%.9ld] injected %" PRIu64 ", offset:%d, level: %" PRIu64 ", lookup_pts:%u, latency_pts:%u, apts:%u, action:%d, hw_ptr[%lld.%.9ld:%lu]",
                       (long long)ts.tv_sec, ts.tv_nsec,
-                      out->total_write_size, offset, ms12_main_avail, ms12_main_size,
-                      apts_save, latency_pts, apts, out->msync_action);
+                      out->total_write_size, offset, adev->ms12_main_input_size - offset,
+                      apts_save, latency_pts, apts, out->msync_action,
+                      (long long)hw_ptr_ts.tv_sec, hw_ptr_ts.tv_nsec, hw_ptr);
             }
 
             p_hwsync->last_lookup_apts = apts_save;
             av_sync_audio_render(out->msync_session, apts, &policy);
             out->msync_action_delta = policy.delta;
             out->msync_rendered_pts = apts;
-            clock_gettime(CLOCK_MONOTONIC, &out->msync_rendered_ts);
+            clock_gettime(CLOCK_MONOTONIC_RAW, &out->msync_rendered_ts);
 
             force_action = aml_getprop_int("media.audiohal.action");
             /* 0: default, no force action

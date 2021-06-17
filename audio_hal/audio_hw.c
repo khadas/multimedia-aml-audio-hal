@@ -10377,6 +10377,8 @@ re_write:
                     }
                     if (write_retry >= 400) {
                         ALOGE("%s main write retry time output,left %zu", __func__, write_bytes);
+                        /* adjust payload_offset when there are unwritten bytes */
+                        aml_out->hwsync->payload_offset -= write_bytes;
                         ms12_write_failed = 1;
                     }
                     goto exit;

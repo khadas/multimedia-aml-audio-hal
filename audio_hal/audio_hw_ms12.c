@@ -941,6 +941,8 @@ MAIN_INPUT:
             }
 
             if (dolby_ms12_input_bytes > 0) {
+                adev->ms12_main_input_size += dolby_ms12_input_bytes;
+
                 if (adev->dual_decoder_support == true) {
                     *use_size = dual_decoder_used_bytes;
                 } else {

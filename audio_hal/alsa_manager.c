@@ -35,6 +35,9 @@
 #ifdef ADD_AUDIO_DELAY_INTERFACE
 #include "aml_audio_delay.h"
 #endif
+#include "tinyalsa_ext.h"
+
+
 #define AML_ZERO_ADD_MIN_SIZE 1024
 
 #define AUDIO_EAC3_FRAME_SIZE 16
@@ -201,6 +204,11 @@ int aml_alsa_output_open(struct audio_stream_out *stream)
             ALOGE("%s, pcm %p open [ready %d] failed", __func__, pcm, pcm_is_ready(pcm));
             return -ENOENT;
         }
+
+        if (pcm_set_monotonic_raw(pcm) < 0) {
+            ALOGE("Failed to set monotonic_raw for timestamp!");
+        }
+
         if (SUPPORT_EARC_OUT_HW && adev->bHDMIARCon && (!aml_out->earc_pcm)) {
             int earc_port = alsa_device_update_pcm_index(PORT_EARC, PLAYBACK);
             struct pcm_config earc_config = update_earc_out_config(config);
