@@ -8887,7 +8887,7 @@ ssize_t hw_write (struct audio_stream_out *stream
 #else
             if (aml_out->hwsync->aout) {
 #endif
-                if (is_bypass_dolbyms12(stream))
+                if (is_bypass_dolbyms12(stream) && (eDolbyMS12Lib != adev->dolby_lib_type))
                     aml_audio_hwsync_audio_process(aml_out->hwsync, aml_out->hwsync->payload_offset, &adjust_ms);
                 else {
                     if (!audio_is_linear_pcm(aml_out->hal_internal_format)) {
