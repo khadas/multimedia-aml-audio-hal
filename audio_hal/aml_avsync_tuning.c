@@ -434,6 +434,7 @@ void aml_dev_patch_lower_output_latency(struct aml_audio_device *aml_dev)
     while (1) {
         snd_pcm_sframes_t frames = 0;
         struct pcm *pcm_handle;
+        struct snd_pcm_status status = {0};
         int r;
 
         pthread_mutex_lock(&aml_dev->patch_lock);
@@ -452,7 +453,11 @@ void aml_dev_patch_lower_output_latency(struct aml_audio_device *aml_dev)
 
         pthread_mutex_lock(&aml_dev->alsa_pcm_lock);
         pcm_handle = aml_dev->pcm_handle[I2S_DEVICE];
-        if ((!pcm_handle) || (pcm_state(pcm_handle) != SNDRV_PCM_STATE_RUNNING)) {
+
+        if (pcm_handle) {
+            pcm_ioctl(pcm_handle, SNDRV_PCM_IOCTL_STATUS, &status);
+        }
+        if ((!pcm_handle) || (status.state != PCM_STATE_RUNNING)) {
             pthread_mutex_unlock(&aml_dev->alsa_pcm_lock);
             break;
         }
