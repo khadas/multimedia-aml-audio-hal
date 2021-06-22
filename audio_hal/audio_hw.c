@@ -9354,7 +9354,12 @@ void config_output(struct audio_stream_out *stream,bool reset_decoder)
             ret = get_the_dolby_ms12_prepared(aml_out, aformat,
                 aml_out->hal_channel_mask,
                 aml_out->hal_rate);
-
+            /* clean hwsync pts record and start from offset 0 after
+             * ms12 pipeline restart.
+             */
+            if (aml_out->hw_sync_mode) {
+                aml_audio_hwsync_init(aml_out->hwsync, aml_out);
+            }
             /*set the volume to current one*/
             dolby_ms12_set_main_volume(aml_out->volume_l);
 
