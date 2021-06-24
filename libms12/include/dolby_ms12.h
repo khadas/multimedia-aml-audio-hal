@@ -26,8 +26,8 @@ extern "C" {
 #include <stddef.h>
 
 
-//get the handle of dlopen "/system/lib/libdolbyms12.so"
-int get_libdolbyms12_handle(void);
+//get the handle of dlopen "/odm/lib/ms12/libdolbyms12.so"
+int get_libdolbyms12_handle(char *dolby_ms12_path);
 
 //release the handle of dlopen
 int release_libdolbyms12_handle(void);
@@ -109,6 +109,13 @@ int dolby_ms12_input_system(void *dolby_mS12_pointer
                             , int audio_stream_out_channel_num
                             , int audio_stream_out_sample_rate);
 
+int dolby_ms12_input_app(void *dolby_mS12_pointer
+                            , const void *audio_stream_out_buffer
+                            , size_t audio_stream_out_buffer_size
+                            , int audio_stream_out_format
+                            , int audio_stream_out_channel_num
+                            , int audio_stream_out_sample_rate);
+
 
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
 
@@ -121,12 +128,29 @@ int dolby_ms12_input_system(void *dolby_mS12_pointer
 int dolby_ms12_register_pcm_callback(void *callback, void *priv_data);
 
 /*@@
+    @brief register the pcm callback
+
+    @void *callback //pcm callback handle
+    @void *priv_data //priv data
+*/
+int dolby_ms12_register_dap_pcm_callback(void *callback, void *priv_data);
+
+/*@@
     @brief register the bitstream callback
 
     @void *callback //bitstream callback handle
     @void *priv_data //priv data
 */
 int dolby_ms12_register_bitstream_callback(void *callback, void *priv_data);
+
+/*@@
+    @brief register the spdif bitstream callback
+
+    @void *callback //spdif bitstream callback handle
+    @void *priv_data //priv data
+*/
+int dolby_ms12_register_spdif_bitstream_callback(void *callback, void *priv_data);
+
 #else
 /*@@
     @brief Get output data
@@ -180,6 +204,9 @@ int dolby_ms12_set_quit_flag(int is_quit);
 void dolby_ms12_flush_input_buffer(void);
 
 void dolby_ms12_flush_main_input_buffer(void);
+
+void dolby_ms12_flush_app_input_buffer(void);
+
 /*@@
     @brief get the n bytes consumed of payload(OTT audio or DD/DD+ stream)
 */
@@ -220,11 +247,34 @@ void dolby_ms12_set_main_dummy(int type, int dummy);
 
 int dolby_ms12_get_gain(int idx);
 
+/*@@
+    @brief get pcm out n bytes in udc node
+*/
+unsigned long long dolby_ms12_get_n_bytes_pcmout_of_udc();
+
+/*@@
+    @brief set the main audio volume
+*/
+int dolby_ms12_set_main_volume(float volume);
 
 /*@@
     @brief get dolby atmos info
 */
 int dolby_ms12_get_input_atmos_info();
+
+/*@@
+    @brief set the sys low latency
+*/
+int dolby_ms12_set_sys_low_latency(int low_latency);
+
+unsigned long long dolby_ms12_get_consumed_sys_audio();
+
+int dolby_ms12_hwsync_init_internal(void);
+
+int dolby_ms12_hwsync_release_internal(void);
+
+int dolby_ms12_hwsync_checkin_pts_internal(int offset, int apts);
+char * dolby_ms12_get_version(void);
 
 #ifdef __cplusplus
 }

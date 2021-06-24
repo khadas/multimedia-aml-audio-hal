@@ -37,7 +37,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#undef android_errorWriteLog
+
 void linux_log_assert(const char* cond, const char* tag, const char* fmt, ...);
 int property_get(const char *key, char *value, const char *default_value);
 int android_errorWriteLog(int tag, const char* info);

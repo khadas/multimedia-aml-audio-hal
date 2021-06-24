@@ -28,6 +28,7 @@
 #include <pthread.h>
 
 #include "aml_audio_ease.h"
+#include "aml_malloc_debug.h"
 
 /*
     Robert Penner's Easing Equations v1.5  May 1, 2003
@@ -129,7 +130,7 @@ float floatEaseNext(ease_type_t ease, float t, float b, float c, float d)
 
 int aml_audio_ease_init(aml_audio_ease_t ** ppease_handle) {
     aml_audio_ease_t * ease_handle = NULL;
-    ease_handle = (aml_audio_ease_t *)calloc(1, sizeof(aml_audio_ease_t));
+    ease_handle = (aml_audio_ease_t *)aml_audio_calloc(1, sizeof(aml_audio_ease_t));
     if (ease_handle == NULL) {
         ALOGE("malloc failed\n");
         return -1;
@@ -156,7 +157,7 @@ int aml_audio_ease_close(aml_audio_ease_t * ease_handle) {
         //stop easing
         ease_handle->ease_status = Invalid;
         pthread_mutex_unlock(&ease_handle->ease_lock);
-        free(ease_handle);
+        aml_audio_free(ease_handle);
         ease_handle = NULL;
     }
     return 0;
@@ -191,18 +192,17 @@ int aml_audio_ease_config(aml_audio_ease_t * ease_handle, ease_setting_t *settin
 
 int aml_audio_ease_process(aml_audio_ease_t * ease_handle, void * in_data, size_t size) {
 
-    audio_format_t format;
-    int ch;
+    audio_format_t format = ease_handle->data_format.format;
+    int ch = ease_handle->data_format.ch;
     int nframes = 0;
 
     int i = 0, j = 0;
     float vol_delta;
 
-    if (ease_handle == NULL || in_data == NULL || ease_handle->data_format.ch == 0 || size == 0 || ease_handle->ease_status == Invalid) {
+    if (ease_handle == NULL || in_data == NULL || ch == 0 || size == 0 || ease_handle->ease_status == Invalid
+            || (format != AUDIO_FORMAT_PCM_16_BIT && format != AUDIO_FORMAT_PCM_32_BIT)) {
          return -1;
     }
-    ch = ease_handle->data_format.ch;
-    format = ease_handle->data_format.format;
     pthread_mutex_lock(&ease_handle->ease_lock);
     nframes  = size / (audio_bytes_per_sample(format) * ch);
 

@@ -19,7 +19,6 @@
 #define _HW_AVSYNC_H_
 
 #include <stdint.h>
-#include <stdbool.h>
 
 #define HW_SYNC_VERSION_SIZE 4
 #define HW_AVSYNC_HEADER_SIZE_V1 16

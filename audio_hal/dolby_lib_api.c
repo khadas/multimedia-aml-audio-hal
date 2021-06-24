@@ -23,6 +23,8 @@
 #include <sys/prctl.h>
 #include <cutils/properties.h>
 #include <dlfcn.h>
+#include <sys/stat.h>
+#include <string.h>
 
 #include "dolby_lib_api.h"
 
@@ -34,9 +36,14 @@
 #define RET_FAIL -1
 #endif
 
-#define DOLBY_MS12_LIB_LOCK "/tmp/dms12.lock"
-#define DOLBY_MS12_LIB_PATH "/vendor/lib/libdolbyms12.so"
-#define DOLBY_DCV_LIB_PATH_A "/usr/lib/libHwAudio_dcvdec.so"
+#define DOLBY_DCV_LIB_PATH_A "/odm/lib/libHwAudio_dcvdec.so"
+#define DTS_DCA_LIB_PATH_A "/odm/lib/libHwAudio_dtshd.so"
+
+#ifndef MS12_V24_ENABLE
+    #define MS12_VERSION    "1.3"
+#else
+    #define MS12_VERSION    "2.4"
+#endif
 
 
 /*
@@ -52,37 +59,197 @@ static int file_accessible(char *path)
     }
 }
 
+char * get_ms12_path (void)
+{
+    return DOLBY_MS12_LIB_PATH_A;
+
+}
+
+bool is_ms12_lib_match(void *hDolbyMS12LibHanle) {
+    bool b_match = false;
+    char * (*FunDolbMS12GetVersion)(void) = NULL;
+
+    /*get dolby version*/
+    if (hDolbyMS12LibHanle) {
+        FunDolbMS12GetVersion = (char * (*)(void)) dlsym(hDolbyMS12LibHanle, "ms12_get_version");
+        if (FunDolbMS12GetVersion) {
+            if (strstr((*FunDolbMS12GetVersion)(), MS12_VERSION) != NULL) {
+                b_match = true;
+            }
+            if (b_match == false) {
+                ALOGE("ms12 doesn't match build version =%s lib %s", MS12_VERSION, (*FunDolbMS12GetVersion)());
+            } else {
+                ALOGI("ms12 match build version =%s lib %s", MS12_VERSION, (*FunDolbMS12GetVersion)());
+            }
+        } else {
+            b_match = false;
+            ALOGE("ms12 version not found, try ddp lib");
+        }
+    }
+    return b_match;
+
+}
 
 /*
  *@brief detect_dolby_lib_type
  */
-enum eDolbyLibType detect_dolby_lib_type(void)
-{
-    void *handle;
+enum eDolbyLibType detect_dolby_lib_type(void) {
+    enum eDolbyLibType retVal = eDolbyNull;
 
-    while (access(DOLBY_MS12_LIB_LOCK, F_OK) == 0) {
-       usleep(100000);
+    void *hDolbyMS12LibHanle = NULL;
+    void *hDolbyDcvLibHanle = NULL;
+
+    // the priority would be "MS12 > DCV" lib
+    if (RET_OK == file_accessible(DOLBY_MS12_LIB_PATH_A)) {
+        retVal = eDolbyMS12Lib;
     }
 
-    handle = dlopen(DOLBY_MS12_LIB_PATH, RTLD_NOW);
-    if (handle) {
-        ALOGI("%s, FOUND libdolbyms12 lib", __FUNCTION__);
-        dlclose(handle);
-        return eDolbyMS12Lib;
+    // MS12 is first priority
+    if (eDolbyMS12Lib == retVal)
+    {
+        //try to open lib see if it's OK?
+        hDolbyMS12LibHanle = dlopen(DOLBY_MS12_LIB_PATH_A, RTLD_NOW);
+        if (hDolbyMS12LibHanle != NULL)
+        {
+            bool b_match = is_ms12_lib_match(hDolbyMS12LibHanle);
+            dlclose(hDolbyMS12LibHanle);
+            hDolbyMS12LibHanle = NULL;
+
+            /*check ms12 verson*/
+            if (b_match) {
+                ALOGI("%s,FOUND libdolbyms12 lib\n", __FUNCTION__);
+                return eDolbyMS12Lib;
+            }
+        }
+    }
+
+    // dcv is second priority
+    if (RET_OK == file_accessible(DOLBY_DCV_LIB_PATH_A)) {
+        retVal = eDolbyDcvLib;
     } else {
-        ALOGI("%s, failed to detect libdolbyms12 lib: %s", __FUNCTION__, dlerror());
+        retVal = eDolbyNull;
     }
 
-    handle = dlopen(DOLBY_DCV_LIB_PATH_A, RTLD_NOW);
-    if (handle) {
-        ALOGI("%s, FOUND libHwAudio_dcvdec lib\n", __FUNCTION__); 
-        dlclose(handle);
+    if (eDolbyDcvLib == retVal)
+    {
+        //try to open lib see if it's OK?
+        hDolbyDcvLibHanle  = dlopen(DOLBY_DCV_LIB_PATH_A, RTLD_NOW);
+    }
+
+    if (hDolbyDcvLibHanle != NULL)
+    {
+        dlclose(hDolbyDcvLibHanle);
+        hDolbyDcvLibHanle = NULL;
+        ALOGI("%s,FOUND libHwAudio_dcvdec lib\n", __FUNCTION__);
         return eDolbyDcvLib;
-    } else {
-        ALOGI("%s, failed to detect libHwAudio_dcvdec libi: %s", __FUNCTION__, dlerror());
     }
 
-    ALOGI("%s, No Dolby libs are found", __FUNCTION__);
+    ALOGE("%s, failed to FIND libdolbyms12.so and libHwAudio_dcvdec.so, %s\n", __FUNCTION__, dlerror());
     return eDolbyNull;
 }
 
+int dolby_lib_decode_enable(eDolbyLibType_t lib_type) {
+    int enable = 0;
+    if (lib_type == eDolbyMS12Lib) {
+        enable = 1;
+    } else if (lib_type == eDolbyDcvLib) {
+        unsigned int filesize = -1;
+        struct stat stat_info;
+        if (stat(DOLBY_DCV_LIB_PATH_A, &stat_info) < 0) {
+            enable = 0;
+        } else {
+            filesize = stat_info.st_size;
+            if (filesize > 500*1024) {
+                enable = 1;
+            } else {
+                enable = 0;
+            }
+        }
+    } else {
+        enable = 0;
+    }
+    return enable;
+}
+
+
+#ifndef MS12_V24_ENABLE
+typedef enum ms_dap_mode_t
+{
+    DAP_NO_PROC = 0,
+    DAP_CONTENT_PROC = 1,
+    DAP_DEVICE_PROC = 2,
+    DAP_DEVICE_CONTENT_PROC = DAP_DEVICE_PROC | DAP_CONTENT_PROC,
+    DAP_SI_PROC = 4,
+} ms_dap_mode_t;
+
+int get_ms12_dap_init_mode(bool is_tv)
+{
+    int dap_init_mode = 0;
+
+    if (is_tv) {
+        dap_init_mode = DAP_SI_PROC;
+    }
+    else {
+        dap_init_mode = DAP_NO_PROC;
+    }
+
+    return dap_init_mode;
+}
+
+bool is_ms12_tuning_dat_in_dut() //Invalid in Dolby MS12 V1.3
+{
+    return false;
+}
+#else
+
+typedef enum ms_dap_mode_t
+{
+    DAP_NO_PROC = 0,
+    DAP_CONTENT_PROC = 1,
+    DAP_CONTENT_PROC_DEVICE_PROC = 2
+} ms_dap_mode_t;
+
+int get_ms12_dap_init_mode(bool is_tv)
+{
+    int dap_init_mode = 0;
+
+    if (is_tv) {
+        dap_init_mode = DAP_CONTENT_PROC_DEVICE_PROC;
+    }
+    else {
+        dap_init_mode = DAP_NO_PROC;
+    }
+
+    return dap_init_mode;
+}
+
+bool is_ms12_tuning_dat_in_dut() //availabe in Dolby MS12 V2.4 or later
+{
+    if (file_accessible(DOLBY_TUNING_DAT) == 0)
+        return true;
+    else
+        return false;
+}
+
+#endif
+
+
+
+int dts_lib_decode_enable() {
+    int enable = 0;
+    unsigned int filesize = -1;
+    struct stat stat_info = {0};
+
+    if (stat(DTS_DCA_LIB_PATH_A, &stat_info) < 0) {
+        enable = 0;
+    } else {
+        filesize = stat_info.st_size;
+        if (filesize > 500*1024) {
+            enable = 1;
+        } else {
+            enable = 0;
+        }
+    }
+
+    return enable;
+}

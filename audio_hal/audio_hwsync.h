@@ -20,16 +20,7 @@
 #define _AUDIO_HWSYNC_H_
 
 #include <stdbool.h>
-#include <stdint.h>
 
-#define TSYNC_FIRSTAPTS "/sys/class/tsync/firstapts"
-#define TSYNC_FIRSTVPTS "/sys/class/tsync/firstvpts"
-#define TSYNC_PCRSCR    "/sys/class/tsync/pts_pcrscr"
-#define TSYNC_EVENT     "/sys/class/tsync/event"
-#define TSYNC_APTS      "/sys/class/tsync/pts_audio"
-#define TSYNC_VPTS      "/sys/class/tsync/pts_video"
-#define TSYNC_ENABLE    "/sys/class/tsync/enable"
-#define TSYNC_MODE      "/sys/class/tsync/mode"
 #define SYSTIME_CORRECTION_THRESHOLD        (90000*10/100)
 #define NSEC_PER_SECOND 1000000000ULL
 #define HW_SYNC_STATE_HEADER 0
@@ -39,20 +30,17 @@
 
 #define HW_AVSYNC_HEADER_SIZE_V1 16
 #define HW_AVSYNC_HEADER_SIZE_V2 20
-#define HW_AVSYNC_MAX_HEADER_SIZE  24
 
 
 //TODO: After precisely calc the pts, change it back to 1s
 #define APTS_DISCONTINUE_THRESHOLD          (90000/10*11)
 #define APTS_DISCONTINUE_THRESHOLD_MIN    (90000/1000*100)
 #define APTS_DISCONTINUE_THRESHOLD_MIN_35MS    (90000/1000*35)
+
 #define APTS_DISCONTINUE_THRESHOLD_MAX    (5*90000)
 
 #define HWSYNC_APTS_NUM     512
-/*6 ch 16 bit  he-aac  size  6*2*2048 */
-#define  HWSYNC_MAX_BODY_SIZE  (6*2*2048)
-
-#define HWSYNC_PTS_EOS UINT64_MAX
+#define HWSYNC_MAX_BODY_SIZE  (32768)  ///< Will do fine tune according to the bitstream.
 
 enum hwsync_status {
     CONTINUATION,  // good sync condition
@@ -74,7 +62,7 @@ typedef struct apts_tab {
 } apts_tab_t;
 
 typedef struct  audio_hwsync {
-    uint8_t hw_sync_header[HW_AVSYNC_MAX_HEADER_SIZE];
+    uint8_t hw_sync_header[HW_AVSYNC_HEADER_SIZE_V2];
     size_t hw_sync_header_cnt;
     int hw_sync_state;
     uint32_t hw_sync_body_cnt;
@@ -86,14 +74,18 @@ typedef struct  audio_hwsync {
     bool first_apts_flag;//flag to indicate set first apts
     uint64_t first_apts;
     uint64_t last_apts_from_header;
-    uint32_t last_lookup_apts;
     apts_tab_t pts_tab[HWSYNC_APTS_NUM];
     pthread_mutex_t lock;
     size_t payload_offset;
     struct aml_stream_out  *aout;
     int tsync_fd;
     int version_num;
-    bool eos;
+    bool use_mediasync;
+    void* mediasync;
+    int hwsync_id;
+    uint32_t last_output_pts;
+    struct timespec  last_timestamp;
+    bool wait_video_done;
 } audio_hwsync_t;
 static inline bool hwsync_header_valid(uint8_t *header)
 {
@@ -124,14 +116,6 @@ static inline uint32_t hwsync_header_get_size(uint8_t *header)
            ((uint32_t)header[7]);
 }
 
-static inline uint32_t hwsync_header_get_offset(uint8_t *header)
-{
-    return (((uint32_t)header[16]) << 24) |
-           (((uint32_t)header[17]) << 16) |
-           (((uint32_t)header[18]) << 8) |
-           ((uint32_t)header[19]);
-}
-
 static inline uint64_t get_pts_gap(uint64_t a, uint64_t b)
 {
     if (a >= b) {
@@ -140,14 +124,22 @@ static inline uint64_t get_pts_gap(uint64_t a, uint64_t b)
         return (b - a);
     }
 }
+void* aml_hwsync_mediasync_create();
 int aml_hwsync_open_tsync(void);
 void aml_hwsync_close_tsync(int fd);
 int aml_hwsync_get_tsync_pts_by_handle(int fd, uint32_t *pts);
-void aml_hwsync_set_tsync_pause(void);
-void aml_hwsync_set_tsync_resume(void);
-int aml_hwsync_set_tsync_start_pts(uint32_t pts);
-int aml_hwsync_get_tsync_pts(uint32_t *pts);
-int aml_hwsync_reset_tsync_pcrscr(uint32_t pts);
+void aml_hwsync_set_tsync_init(audio_hwsync_t *p_hwsync);
+int aml_hwsync_get_tsync_vpts(audio_hwsync_t *p_hwsync, uint32_t *pts);
+int aml_hwsync_get_tsync_firstvpts(audio_hwsync_t *p_hwsync, uint32_t *pts);
+void aml_hwsync_set_tsync_pause(audio_hwsync_t *p_hwsync);
+void aml_hwsync_set_tsync_resume(audio_hwsync_t *p_hwsync);
+int aml_hwsync_set_tsync_start_pts(audio_hwsync_t *p_hwsync, uint32_t pts);
+int aml_hwsync_set_tsync_start_pts64(audio_hwsync_t *p_hwsync, uint64_t pts);
+void aml_hwsync_set_tsync_stop(audio_hwsync_t *p_hwsync);
+int aml_hwsync_get_tsync_pts(audio_hwsync_t *p_hwsync, uint32_t *pts);
+int aml_hwsync_reset_tsync_pcrscr(audio_hwsync_t *p_hwsync, uint32_t pts);
+void aml_hwsync_wait_video_start(audio_hwsync_t *p_hwsync);
+void aml_hwsync_wait_video_drop(audio_hwsync_t *p_hwsync, uint32_t cur_pts);
 void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out);
 int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
         const void *in_buffer, size_t in_bytes,
@@ -155,9 +147,10 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
 int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts);
 int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, unsigned apts);
 int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsigned *p_apts);
-int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int *p_adjust_ms);
+int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int frame_len, int *p_adjust_ms);
 void aml_audio_hwsync_release(audio_hwsync_t *p_hwsync);
-#ifdef USE_MSYNC
-void aml_audio_hwsync_msync_unblock_start(struct aml_stream_out *out);
-#endif
+bool aml_audio_hwsync_get_id(audio_hwsync_t *p_hwsync, int32_t* id);
+bool aml_audio_hwsync_set_id(audio_hwsync_t *p_hwsync, uint32_t id);
+
+
 #endif

@@ -24,11 +24,12 @@
 #include <cutils/properties.h>
 
 #include "audio_eq_drc_compensation.h"
+#include "aml_volume_utils.h"
 
 #undef  LOG_TAG
 #define LOG_TAG  "audio_hw_primary"
 
-#define MODEL_SUM_DEFAULT_PATH "/vendor/etc/tvconfig/model/model_sum.ini"
+#define MODEL_SUM_DEFAULT_PATH "/mnt/vendor/odm_ext/etc/tvconfig/model/model_sum.ini"
 
 static struct audio_file_config_s dev_cfg[2] = {
     {/*amlogic inner EQ & DRC*/
@@ -40,14 +41,6 @@ static struct audio_file_config_s dev_cfg[2] = {
         "",
     }
 };
-
-static inline float DbToAmpl(float decibels)
-{
-    if (decibels <= -758) {
-        return 0.0f;
-    }
-    return exp( decibels * 0.115129f); // exp( dB * ln(10) / 20 )
-}
 
 uint32_t swapInt32(uint32_t value)
 {
@@ -65,11 +58,12 @@ int16_t swapInt16(int16_t value)
 
 static int get_model_name(char *model_name, int size)
 {
-    int ret = 0;
-    char *node = getenv("tv_model_name");
-    //ret = property_get("tv.model_name", node, "");
-    if (node == NULL) {
-        snprintf(model_name, size, "DEFAULT");
+    int ret = -1;
+    char node[PROPERTY_VALUE_MAX];
+
+    ret = property_get("vendor.tv.model_name", node, "");
+    if (ret <= 0) {
+        snprintf(model_name, size, "FHD");
         ALOGD("%s: Can't get model name! use default model_name (%s)",
             __FUNCTION__, model_name);
     } else {
@@ -301,8 +295,10 @@ static int ext_table_set(struct audio_data_s *table, int card, char *name)
     }
 
     ptr = (unsigned int *)param_buf;
-    ptr[0] = 0;
-    ptr[1] = tlv_size;
+    if (mixer_ctl_is_access_tlv_rw(ctl)) {
+        ptr[0] = 0;
+        ptr[1] = tlv_size;
+    }
 
     ALOGD("%s: param_count = %d, name = %s, tlv_header_size = %d",
             __FUNCTION__, tlv_size, name, tlv_header_size);

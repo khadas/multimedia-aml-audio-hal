@@ -18,7 +18,7 @@
 // #define LOG_NDEBUG 0
 // #define LOG_NALOGV 0
 
-#include <cutils/log.h>
+#include <utils/Log.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -46,6 +46,7 @@ DolbyMS12Status::DolbyMS12Status() :
     , mAudioMainFormat(AUDIO_FORMAT_INVALID)
     , mAudioAssociateFormat(AUDIO_FORMAT_INVALID)
     , mAudioSystemFormat(AUDIO_FORMAT_INVALID)
+    , mAudioAppFormat(AUDIO_FORMAT_INVALID)
     , mDDSupportFlag(false)
     , mDDPSupportFlag(false)
 {
@@ -106,6 +107,23 @@ audio_format_t DolbyMS12Status::getAudioSystemFormat(void)
 {
     return mAudioSystemFormat;
 }
+
+/*
+ *@brief set Audio Hal System format
+ */
+void DolbyMS12Status::setAudioAppFormat(audio_format_t format)
+{
+    mAudioAppFormat = format;
+}
+
+/*
+ *@brief get Audio Hal System format
+ */
+audio_format_t DolbyMS12Status::getAudioAppFormat(void)
+{
+    return mAudioAppFormat;
+}
+
 
 /*
  *@brief set dd support flag

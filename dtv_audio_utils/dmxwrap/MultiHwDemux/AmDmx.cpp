@@ -1,4 +1,4 @@
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #define LOG_TAG "AM_DMX_Device"
 #include <utils/Log.h>
 #include <cutils/properties.h>
@@ -88,13 +88,10 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
                 AM_DMX_Filter *filter = &(dev->filters[id]);
                 AM_DMX_DataCb cb;
                 void *data;
-
                 if (!AM_DMX_FILTER_MASK_ISSET(&mask, id))
                     continue;
-
                 if (!filter->enable || !filter->used)
                     continue;
-
                 sec_len = BUF_SIZE;
 
 #ifndef DMX_WAIT_CB
@@ -112,7 +109,7 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
                     /* 1 read header */
                     do {
                         sec_len = sizeof(struct dmx_non_sec_es_header) - read_len;
-                        ret  = dev->drv->dvb_read(dev, filter, sec_buf, &sec_len);
+                        ret  = dev->drv->dvb_read(dev, filter, sec_buf + read_len, &sec_len);
                         if (ret == AM_SUCCESS) {
                             read_len += sec_len;
                         }
@@ -121,6 +118,11 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
                     /* 2 read data */
                     header_es = (struct dmx_non_sec_es_header *)sec_buf;
                     sec_len = header_es->len;
+                    if (header_es->len < 0 ||
+                        (header_es->len > (BUF_SIZE - sizeof(struct dmx_non_sec_es_header)))) {
+                        ALOGI("data len invalid %d ", header_es->len );
+                        header_es->len = 0;
+                    }
                     read_len = 0;
                     do {
                           ret  = dev->drv->dvb_read(dev, filter, sec_buf + read_len + sizeof(struct dmx_non_sec_es_header), &sec_len);
@@ -131,8 +133,8 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
                           if (read_len < header_es->len) {
                             ALOGI("ret %d dvb_read audio len  %d frame len %d",ret, read_len ,header_es->len);
                             usleep (20000);
-                        }
-                    } while (dev->enable_thread && read_len < header_es->len);
+                          }
+                    } while (dev->enable_thread && !filter->to_be_stopped && read_len < header_es->len);
                     sec_len = sizeof(struct dmx_non_sec_es_header) + header_es->len;
 
                 }
@@ -155,14 +157,14 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
 
                 if (cb)
                 {
-                    if (id && sec)
+                    /*if (id && sec)
                     ALOGI("filter %d data callback len fd:%ld len:%d, %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
                         id, (long)filter->drv_data, sec_len,
                         sec[0], sec[1], sec[2], sec[3], sec[4],
-                        sec[5], sec[6], sec[7], sec[8], sec[9]);
+                        sec[5], sec[6], sec[7], sec[8], sec[9]);*/
                     cb(dev->mDemuxWrapper, id, sec, sec_len, data);
-                    if (id && sec)
-                        ALOGI("filter %d data callback ok", id);
+                    //if (id && sec)
+                        //ALOGI("filter %d data callback ok", id);
                 }
             }
 #if defined(DMX_WAIT_CB) || defined(DMX_SYNC)
@@ -594,6 +596,7 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_StartFilter(int fhandle)
         if (ret == AM_SUCCESS)
         {
             filter->enable = true;
+            filter->to_be_stopped = false;
         }
     }
 
@@ -616,21 +619,23 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_StopFilter(int fhandle)
     AM_ErrorCode_t ret = AM_SUCCESS;
 
     //AM_TRY(dmx_get_openned_dev(dev_no, &dev));
-
-    pthread_mutex_lock(&lock);
-
     ret = dmx_get_used_filter(fhandle, &filter);
+
+
 
     if (ret == AM_SUCCESS)
     {
+        filter->to_be_stopped = true;
         if (filter->enable)
         {
+            pthread_mutex_lock(&lock);
             dmx_wait_cb();
             ret = dmx_stop_filter(filter);
+            filter->enable = false;
+            pthread_mutex_unlock(&lock);
         }
     }
 
-    pthread_mutex_unlock(&lock);
 
     return ret;
 }

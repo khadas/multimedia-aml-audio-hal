@@ -7,7 +7,6 @@
 extern "C" {
 
 }
-
 typedef int AM_DevSource_t;
 
 /**\brief AV stream package format*/
@@ -43,6 +42,10 @@ typedef struct Am_DemuxWrapper_OpenPara
     int              cntl_fd;     /*control fd*/
     int              aud_fd;      // inject /dev/amstream_mpts or dev/amstream_mpts_schedfd  handle
     int              vid_fd;      // inject /dev/amstream_mpts or dev/amstream_mpts_schedfd  handle
+    int              aud_ad_id;    /**< Audio ad ID, -1 means no audio data*/
+    int              aud_ad_fmt;     /**< Audio AD format*/
+    int              aud_ad_fd;
+    int              security_mem_level;
     void *           dsc_fd;
     AM_AV_DrmMode_t  drm_mode;
 } Am_DemuxWrapper_OpenPara_t;
@@ -70,6 +73,7 @@ struct mEsDataInfo {
     uint8_t *data;
     int size;
     int64_t pts;
+    int used_size;
 };
 enum {
     kWhatReadVideo,
@@ -78,23 +82,27 @@ enum {
 
 class  AmDemuxWrapper {
 public:
-   AmDemuxWrapper();
-   virtual ~AmDemuxWrapper();
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperOpen(Am_DemuxWrapper_OpenPara_t *para) = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetTSSource(Am_DemuxWrapper_OpenPara_t *para,const AM_DevSource_t src) = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperStart() = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperWriteData(Am_TsPlayer_Input_buffer_t* Pdata, int *pWroteLen, uint64_t timeout) = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperReadData(int pid, mEsDataInfo **mEsdata,uint64_t timeout) = 0; //???????
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperFlushData(int pid) = 0; //???
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperPause() = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperResume() = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioParam(int aid, AM_AV_AFormat_t afmt, int security_mem_level) = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioDescParam(int aid, AM_AV_AFormat_t afmt)= 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetSubtitleParam(int sid, int stype) = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetVideoParam(int vid, AM_AV_VFormat_t vfmt) = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperGetStates (int * value , int statetype) = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperStop() = 0;
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperClose() = 0;
+   AmDemuxWrapper() {
+
+   }
+   virtual ~AmDemuxWrapper() {
+
+  }
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperOpen(Am_DemuxWrapper_OpenPara_t *para);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetTSSource(Am_DemuxWrapper_OpenPara_t *para,const AM_DevSource_t src);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperStart();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperWriteData(Am_TsPlayer_Input_buffer_t* Pdata, int *pWroteLen, uint64_t timeout);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperReadData(int pid, mEsDataInfo **mEsdata,uint64_t timeout); //???????
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperFlushData(int pid); //???
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperPause();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperResume();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioParam(int aid, AM_AV_AFormat_t afmt);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioDescParam(int aid, AM_AV_AFormat_t afmt);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetSubtitleParam(int sid, int stype);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetVideoParam(int vid, AM_AV_VFormat_t vfmt);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperGetStates (int * value , int statetype);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperStop();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperClose();
    virtual  AmDemuxWrapper* get(void) {
         return this;
    }

@@ -30,5 +30,7 @@ uint64_t aml_audio_get_systime(void);
 
 uint64_t aml_audio_get_systime_ns(void);
 
+int64_t calc_time_interval_us(struct timespec *ts_start, struct timespec *ts_end);
+
 #endif
 

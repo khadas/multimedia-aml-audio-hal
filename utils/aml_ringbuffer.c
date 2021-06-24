@@ -21,6 +21,7 @@ extern "C" {
 #include <string.h>
 #include <cutils/log.h>
 #include <aml_ringbuffer.h>
+#include "aml_malloc_debug.h"
 
 /*************************************************
 Function: get_write_space
@@ -272,6 +273,10 @@ int ring_buffer_seek(struct ring_buffer *rbuffer, int bytes)
     return seek_bytes;
 }
 
+
+
+
+
 /*************************************************
 Function: ring_buffer_init
 Description: initialize ring buffer
@@ -287,7 +292,7 @@ int ring_buffer_init(struct ring_buffer *rbuffer, int buffer_size)
     pthread_mutex_lock(&buf->lock);
 
     buf->size = buffer_size;
-    buf->start_addr = malloc(buffer_size * sizeof(unsigned char));
+    buf->start_addr = aml_audio_malloc(buffer_size * sizeof(unsigned char));
     if (buf->start_addr == NULL) {
         ALOGD("%s, Malloc android out buffer error!\n", __FUNCTION__);
         pthread_mutex_unlock(&buf->lock);
@@ -317,7 +322,7 @@ int ring_buffer_release(struct ring_buffer *rbuffer)
     pthread_mutex_lock(&buf->lock);
 
     if (buf->start_addr != NULL) {
-        free(buf->start_addr);
+        aml_audio_free(buf->start_addr);
         buf->start_addr = NULL;
     }
 
@@ -369,7 +374,7 @@ int ring_buffer_reset_size(struct ring_buffer *rbuffer, int buffer_size)
         ALOGW("resized buffer size exceed largest buffer size, max %d, cur %d\n", \
               rbuffer->size, buffer_size);
         ring_buffer_release(rbuffer);
-        //rbuffer->size = buffer_size;
+        rbuffer->size = buffer_size;
         return ring_buffer_init(rbuffer, buffer_size);
     }
 

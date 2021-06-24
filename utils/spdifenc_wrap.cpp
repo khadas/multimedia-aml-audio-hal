@@ -22,24 +22,14 @@
 #include <stdint.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sound/asound.h>
-#include <cutils/log.h>
+#include <utils/Log.h>
 #include <system/audio.h>
 #include <audio_utils/spdif/SPDIFEncoder.h>
 
 #include <tinyalsa/asoundlib.h>
 #include <cutils/properties.h>
 #include <string.h>
-#include <map>
-
-#ifndef PCM_STATE_SETUP
-#define PCM_STATE_SETUP 1
-#endif
-
-#ifndef PCM_STATE_PREPARED
-#define PCM_STATE_PREPARED 2
-#endif
 
 extern "C"
 {
@@ -121,7 +111,7 @@ public:
         char *buf = (char *)buffer;
         ALOGV("write size %zu \n", bytes);
 #if 1
-        if (getprop_bool("media.audiohal.outdump")) {
+        if (getprop_bool("vendor.media.audiohal.outdump")) {
             FILE *fp1 = fopen("/data/audio_out/hdmi_audio_out.spdif", "a+");
             if (fp1) {
                 fwrite((char *)buffer, 1, bytes, fp1);
@@ -137,7 +127,7 @@ public:
             muteFrame(buf, bytes);
         }
         if (mFirstFrameMuted == false) {
-            memset(buf, 0, bytes);
+            //memset(buf, 0, bytes);
             mFirstFrameMuted = true;
         }
         /*to avoid ca noise in Sony TV*/
@@ -151,6 +141,7 @@ public:
                 memset(buf, 0, bytes);
             }
         }
+
 
         ret = pcm_write(pcm_handle, buffer, bytes);
         if (ret)
@@ -183,10 +174,6 @@ public:
         }
         return 0;
     }
-    audio_format_t getformat()
-    {
-        return mFormat;
-    }
 protected:
     struct pcm *pcm_handle;
 private:
@@ -196,66 +183,34 @@ private:
     audio_format_t mFormat;
     bool mFirstFrameMuted;
 };
-
-static std::map<audio_format_t, MySPDIFEncoder *> myencoders;
-
-extern "C" void *spdifenc_init(struct pcm *mypcm, audio_format_t format)
+static MySPDIFEncoder *myencoder = NULL;
+extern "C" int spdifenc_init(struct pcm *mypcm, audio_format_t format)
 {
-    if (myencoders[format]) {
-        delete myencoders[format];
-        myencoders[format] = NULL;
+    if (myencoder) {
+        delete myencoder;
+        myencoder = NULL;
     }
-
-    myencoders[format] = new MySPDIFEncoder(mypcm, format);
-    if (myencoders[format] == NULL) {
-        ALOGE("init SPDIFEncoder failed, format 0x%x\n", format);
-        return NULL;
+    myencoder = new MySPDIFEncoder(mypcm, format);
+    if (myencoder == NULL) {
+        ALOGE("init SPDIFEncoder failed \n");
+        return  -1;
     }
     ALOGI("init SPDIFEncoder done\n");
-    return myencoders[format];
+    return 0;
 }
-
-extern "C" void *spdifenc_get(audio_format_t format)
+extern "C" int  spdifenc_write(const void *buffer, size_t numBytes)
 {
-    return myencoders[format];
-}
-
-extern "C" int  spdifenc_write(void *enc, const void *buffer, size_t numBytes)
-{
-    MySPDIFEncoder *myencoder = (MySPDIFEncoder *)enc;
-    if (!myencoder) {
-        return 0;
-    }
     return myencoder->write(buffer, numBytes);
 }
-
-extern "C" uint64_t  spdifenc_get_total(void *enc)
+extern "C" uint64_t  spdifenc_get_total()
 {
-    MySPDIFEncoder *myencoder = (MySPDIFEncoder *)enc;
-    if (!myencoder) {
-        return 0;
-    }
     return myencoder->total_bytes();
 }
-
-extern "C" int spdifenc_set_mute(void *enc, bool mute)
+extern "C" int spdifenc_set_mute(bool mute)
 {
-    MySPDIFEncoder *myencoder = (MySPDIFEncoder *)enc;
-
     if (myencoder)
         return myencoder->setMute(mute);
     else
         return -1;
 }
-
-extern "C" audio_format_t  spdifenc_get_format(void *enc)
-{
-    MySPDIFEncoder *myencoder = (MySPDIFEncoder *)enc;
-
-    if (myencoder)
-        return myencoder->getformat();
-    else
-        return AUDIO_FORMAT_INVALID;
-}
-
 }

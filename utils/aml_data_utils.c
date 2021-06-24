@@ -47,7 +47,6 @@
 #define AMLOGE ALOGE
 #define AMLOGD ALOGD
 #endif
-#define NAME_LEN 50
 
 static struct aml_audio_channel_name gAudioChName[] = {
 	{AML_CH_IDX_L,   "left"},
@@ -237,7 +236,7 @@ static int _save_conf_to_maps(struct aml_channel_map *maps,
 struct aml_channel_map *data_load_product_config(void)
 {
 	struct parser *gParser = NULL;
-	char   chname[NAME_LEN];
+	char   chname[50];
 	struct aml_channel_map *maps = NULL;
 	int i = 0;
 	int find_idx, invert, ditter;
@@ -260,8 +259,8 @@ struct aml_channel_map *data_load_product_config(void)
 	if (gParser != NULL) {
 		// loop of i2s channel [0, 8]
 		for (i=0; i<AML_CH_IDX_MAX; i++) {
-			strncpy(chname, aml_config_get_str(gParser, AML_SECTION_AUDIO_HAL,
-						_get_ch_conf_name(eAmlConfTypeChMap, i), NULL), NAME_LEN - 1);
+			strcpy(chname, aml_config_get_str(gParser, AML_SECTION_AUDIO_HAL,
+						_get_ch_conf_name(eAmlConfTypeChMap, i), NULL));
 			invert   = aml_config_get_int(gParser, AML_SECTION_AUDIO_HAL,
 						_get_ch_conf_name(eAmlConfTypeChInv, i), 0);
 			ditter   = aml_config_get_int(gParser, AML_SECTION_AUDIO_HAL,
@@ -378,6 +377,12 @@ static int _data_remix_center_to_lr(void *buf, size_t frames, size_t framesz, in
 		return -1;
 	}
 
+	///< TODO:
+	if (framesz != e16BitPerSample) {
+		AMLOGD("%s: only support 16bit now!\n", __func__);
+		return -1;
+	}
+
 	switch (framesz) {
 	case e16BitPerSample:
 		///< 3/0 input L_out/R_out =  = 0.707*(L/R + 0.707*C);
@@ -397,12 +402,6 @@ static int _data_remix_center_to_lr(void *buf, size_t frames, size_t framesz, in
 		break;
 	default:
 		break;
-	}
-
-	///< TODO:
-	if (framesz != e16BitPerSample) {
-		AMLOGD("%s: only support 16bit now!\n", __func__);
-		return -1;
 	}
 
 	return 0;
@@ -440,6 +439,12 @@ static int _data_remix_all_to_lr(void *buf,	size_t frames, size_t framesz, int c
 		return -1;
 	}
 
+	///< TODO:
+	if (framesz != e16BitPerSample) {
+		AMLOGD("%s: only support 16bit now!\n", __func__);
+		return -1;
+	}
+
 	switch (framesz) {
 	case e16BitPerSample:
 		for (i = 0; i < (int)frames; i++) {
@@ -464,12 +469,6 @@ static int _data_remix_all_to_lr(void *buf,	size_t frames, size_t framesz, int c
 		break;
 	default:
 		break;
-	}
-
-	///< TODO:
-	if (framesz != e16BitPerSample) {
-		AMLOGD("%s: only support 16bit now!\n", __func__);
-		return -1;
 	}
 
 	return 0;
@@ -610,8 +609,8 @@ int data_replace_lfe_data(
 	int32_t *buf_out32 = (int32_t *)out_buf;
 	int16_t *buf_in16  = (int16_t *)input_lfe_buffer;
 	int32_t *buf_in32  = (int32_t *)input_lfe_buffer;
-	int     lfe_base = 2;
-	int     lfe_cnt = 2;
+	int     lfe_base;
+	int     lfe_cnt;
 
 	//TODO:
 	if (out_channels != 6) {

@@ -17,11 +17,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <utils/Log.h>
 
 #include "audio_eq_drc_parser.h"
 #include "iniparser.h"
@@ -32,8 +32,8 @@
 #define ITEM_DEBUG
 
 #ifdef ITEM_DEBUG
-#define ITEM_LOGD(fmt, args...)    printf("%s " fmt "\n", LOG_TAG,  ##args)
-#define ITEM_LOGE(fmt, args...)    printf("%s " fmt "\n", LOG_TAG,  ##args)
+#define ITEM_LOGD(x...) ALOGD(x)
+#define ITEM_LOGE(x...) ALOGE(x)
 #else
 #define ITEM_LOGD(x...)
 #define ITEM_LOGE(x...)
@@ -43,7 +43,7 @@ static int error_callback(const char *format, ...)
 {
     va_list argptr;
     va_start(argptr, format);
-    printf(format, argptr);
+    ITEM_LOGE(format, argptr);
     va_end(argptr);
     return 0;
 }
@@ -449,7 +449,7 @@ static int parse_audio_eq_data(dictionary *pIniParser, struct audio_eq_drc_info_
             strcpy(table->section_name, buf_section_name);
             ITEM_LOGD("%s, section_name = %s\n", __FUNCTION__, table->section_name);
             parse_audio_table_data(pIniParser, table);
-            //PrintRegData(p_attr->eq.eq_byte_mode, table);
+            PrintRegData(p_attr->eq.eq_byte_mode, table);
         }
     }
 
@@ -471,7 +471,7 @@ static int parse_audio_fdrc_data(dictionary *pIniParser, struct audio_eq_drc_inf
         strcpy(table->section_name, buf_section_name);
         ITEM_LOGD("%s, section_name = %s\n", __FUNCTION__, table->section_name);
         parse_audio_table_data(pIniParser, table);
-        //PrintRegData(p_attr->fdrc.drc_byte_mode, table);
+        PrintRegData(p_attr->fdrc.drc_byte_mode, table);
     }
 
     return 0;
@@ -492,7 +492,7 @@ static int parse_audio_mdrc_data(dictionary *pIniParser, struct audio_eq_drc_inf
         strcpy(table->section_name, buf_section_name);
         ITEM_LOGD("%s, section_name = %s\n", __FUNCTION__, table->section_name);
         parse_audio_table_data(pIniParser, table);
-        //PrintRegData(p_attr->mdrc.drc_byte_mode, table);
+        PrintRegData(p_attr->mdrc.drc_byte_mode, table);
     }
 
     table = (struct audio_data_s *)calloc(1, sizeof(struct audio_data_s));
@@ -505,7 +505,7 @@ static int parse_audio_mdrc_data(dictionary *pIniParser, struct audio_eq_drc_inf
         strcpy(table->section_name, buf_section_name);
         ITEM_LOGD("%s, section_name = %s\n", __FUNCTION__, table->section_name);
         parse_audio_table_data(pIniParser, table);
-        //PrintRegData(p_attr->mdrc.drc_byte_mode, table);
+        PrintRegData(p_attr->mdrc.drc_byte_mode, table);
     }
 
     return 0;

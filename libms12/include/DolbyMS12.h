@@ -23,12 +23,22 @@
 
 #ifdef __cplusplus
 
-struct aml_audio_info{
+typedef enum  {
+    MS12_CONFIG_MAIN_VOLUME,
+    MS12_CONFIG_LOW_LATENCY,
+}ms12_config_type_t;
+
+typedef union ms12_config {
+    float main_volume;
+}ms12_config_t;
+
+
+typedef struct aml_audio_info{
     int is_dolby_atmos;
     int reserved_a;
     int reserved_b;
     int reserved_c;
-};
+}aml_audio_info_t;
 
 namespace android
 {
@@ -42,10 +52,11 @@ public:
 
     DolbyMS12();
     virtual ~DolbyMS12();
-    virtual int     GetLibHandle(void);
+    virtual int     GetLibHandle(char *dolby_ms12_path);
     virtual void    ReleaseLibHandle(void);
     virtual int     GetMS12OutputMaxSize(void);
     virtual void *  DolbyMS12Init(int configNum, char **configParams);
+    virtual char *  DolbMS12GetVersion(void);
     virtual void    DolbyMS12Release(void *dolbyMS12_pointer);
     virtual int     DolbyMS12InputMain(
         void *dolbyMS12_pointer
@@ -71,12 +82,22 @@ public:
         , int audio_stream_out_channel_num
         , int audio_stream_out_sample_rate
     );
+    virtual int     DolbyMS12InputApp(
+        void *dolbyMS12_pointer
+        , const void *audio_stream_out_buffer //ms12 input buffer
+        , size_t audio_stream_out_buffer_size //ms12 input buffer size
+        , int audio_stream_out_format
+        , int audio_stream_out_channel_num
+        , int audio_stream_out_sample_rate
+    );
 
 #ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
 
     virtual int     DolbyMS12RegisterPCMCallback(output_callback callback, void *priv_data);
-
+    virtual int     DolbyMS12RegisterDAPPCMCallback(output_callback callback, void *priv_data);
     virtual int     DolbyMS12RegisterBitstreamCallback(output_callback callback, void *priv_data);
+
+    virtual int     DolbyMS12RegisterSpdifBitstreamCallback(output_callback callback, void *priv_data);
 
 #else
 
@@ -106,6 +127,8 @@ public:
 
     virtual void    DolbyMS12FlushMainInputBuffer(void);
 
+    virtual void    DolbyMS12FlushAppInputBuffer(void);
+
     virtual void    DolbyMS12SetMainDummy(int type, int dummy);
 
     virtual unsigned long long DolbyMS12GetNBytesConsumedOfUDC(void);
@@ -122,8 +145,17 @@ public:
 
     virtual int     DolbyMS12GetGain(int);
 
+    virtual unsigned long long DolbyMS12GetNBytesPcmOutOfUDC();
+
+    virtual int     DolbyMS12SetMainVolume(float volume);
+
     virtual int     DolbyMS12GetInputISDolbyAtmos();
 
+    virtual int     DolbyMS12SetSysLowLatency(int low_latency);
+    virtual unsigned long long DolbyMS12GetNBytesConsumedSysSound(void);
+    virtual int     DolbyMS12HWSyncInit(void);
+    virtual int     DolbyMS12HWSyncRelease(void);
+    virtual int     DolbyMS12HWSyncChecinPTS(int offset, int apts);
     // protected:
 
 

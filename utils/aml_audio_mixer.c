@@ -17,7 +17,6 @@
 #define LOG_TAG "aml_audio_mixer"
 //#define LOG_NDEBUG 0
 
-#include <compiler.h>
 #include <cutils/log.h>
 #include <errno.h>
 #include <pthread.h>
@@ -175,7 +174,7 @@ int aml_start_audio_mixer (struct aml_audio_mixer *audio_mixer)
     struct ring_buf_desc *main_desc = NULL;
     int period_byte = 0;
 
-    if (audio_mixer == NULL || !aml_audio_mixer_check_status (audio_mixer) )
+    if (audio_mixer == NULL && !aml_audio_mixer_check_status (audio_mixer) )
         return -EINVAL;
 
     main_desc = &audio_mixer->main_in_buf;

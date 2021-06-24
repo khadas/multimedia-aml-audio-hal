@@ -256,7 +256,7 @@ Vector<TYPE>& Vector<TYPE>::operator = (const Vector<TYPE>& rhs) {
 
 template<class TYPE> inline
 const Vector<TYPE>& Vector<TYPE>::operator = (const Vector<TYPE>& rhs) const {
-    VectorImpl::operator = (rhs);
+    VectorImpl::operator = (static_cast<const VectorImpl&>(rhs));
     return *this;
 }
 

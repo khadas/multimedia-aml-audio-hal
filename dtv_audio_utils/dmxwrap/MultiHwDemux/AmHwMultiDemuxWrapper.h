@@ -6,6 +6,7 @@
 #include "RefBase.h"
 #include "AmDemuxWrapper.h"
 class AM_DMX_Device;
+typedef void (*AM_Audio_AD_DataCb) (const unsigned char * data, int len, void * handle);
 
 class  AmHwMultiDemuxWrapper : public AmDemuxWrapper{
 
@@ -21,11 +22,20 @@ public:
    virtual  AM_DmxErrorCode_t AmDemuxWrapperFlushData(int pid); //???
    virtual  AM_DmxErrorCode_t AmDemuxWrapperPause(void);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperResume(void);
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioParam(int aid, AM_AV_AFormat_t afmt,int security_mem_level);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioParam(int aid, AM_AV_AFormat_t afmt);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetADAudioParam(int aid, AM_AV_AFormat_t afmt);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioDescParam(int aid, AM_AV_AFormat_t afmt);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperSetSubtitleParam(int sid, int stype);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperSetVideoParam(int vid, AM_AV_VFormat_t vfmt);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperGetStates (int * value , int statetype);
+   virtual AM_DmxErrorCode_t  AmDemuxWrapperOpenAD(int aid, AM_AV_AFormat_t afmt);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperStartAD();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperStopAD();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperCloseAD() ;
+   virtual AM_DmxErrorCode_t  AmDemuxWrapperOpenMain(int aid, AM_AV_AFormat_t afmt);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperStartMain();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperStopMain();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperCloseMain() ;
    virtual  AM_DmxErrorCode_t AmDemuxWrapperStop(void);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperClose(void);
    virtual void AmDemuxSetNotify(const sp<TSPMessage> & msg);
@@ -35,8 +45,14 @@ public:
    AM_DmxErrorCode_t clearPendingEsData(List<mEsDataInfo*>& mEsDataQueue);
    TSPMutex mVideoEsDataQueueLock;
    TSPMutex mAudioEsDataQueueLock;
+   TSPMutex mAudioADEsDataQueueLock;
+   TSPMutex mDemuxHandleLock;
    List<mEsDataInfo*> mVideoEsDataQueue;
    List<mEsDataInfo*> mAudioEsDataQueue;
+   List<mEsDataInfo*> mAudioADEsDataQueue;
+   int              filering_aud_pid;
+   int              filering_aud_ad_pid;
+   int64_t          last_queue_es_apts;
  private:
    sp<AM_DMX_Device> AmDmxDevice;
    // int mEsDataInfoSize;

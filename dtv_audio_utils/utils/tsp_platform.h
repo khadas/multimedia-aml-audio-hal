@@ -9,8 +9,9 @@
 
 #ifndef DRMP_PLATFORM_H_
 #define DRMP_PLATFORM_H_
+
 #ifdef ANDROID
-#include <cutils/log.h>
+#include "log/log.h"
 #include <cutils/properties.h>
 #else
 

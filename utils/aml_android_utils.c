@@ -73,13 +73,12 @@ int aml_getprop_int(const char *path)
 */
 int aml_sysfs_get_int (const char *path)
 {
-	int val = 0, nread;
+	int val = 0;
 	int fd = open (path, O_RDONLY);
 	if (fd >= 0) {
 		char bcmd[16];
-		nread = read (fd, bcmd, sizeof (bcmd));
-		if (nread > 0)
-			val = strtol (bcmd, NULL, 10);
+		read (fd, bcmd, sizeof (bcmd));
+		val = strtol (bcmd, NULL, 10);
 		close (fd);
 	} else {
 		ALOGE("%s: open %s node failed! return 0, err: %s\n", __func__, path, strerror(errno));
@@ -90,17 +89,15 @@ int aml_sysfs_get_int (const char *path)
 
 int aml_sysfs_get_int16(const char *path,unsigned *value)
 {
-	int fd, nread;
+	int fd;
 	char valstr[64];
 	unsigned  val = 0;
 
 	fd = open(path, O_RDONLY);
 	if (fd >= 0) {
 		memset(valstr, 0, 64);
-		nread = read(fd, valstr, 64 - 1);
-		if (nread < 0)
-			nread = 0;
-		valstr[nread] = '\0';
+		read(fd, valstr, 64 - 1);
+		valstr[strlen(valstr)] = '\0';
 		close(fd);
 	} else {
 		ALOGE("%s: unable to open file %s, err: %s\n", __func__, path, strerror(errno));

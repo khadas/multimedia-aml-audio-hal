@@ -1,0 +1,70 @@
+
+
+cc_library_shared {
+    name: "libamaudioutils",
+    vendor: true,
+
+    include_dirs: [
+        "system/core/include",
+        "external/tinyalsa/include",
+        "system/media/audio_utils/include",
+        "frameworks/av/media/libaudiohal/include",
+        "frameworks/av/include",
+        "frameworks/native/libs/binder/include",
+        "system/media/audio/include",
+        "system/media/audio/include",
+    ],
+    export_include_dirs: [
+        "include",
+        "ini/include",
+    ],
+
+    srcs: [
+        "aml_buffer_provider.c",
+        "aml_dump_debug.c",
+        "aml_ringbuffer.c",
+        "aml_alsa_mixer.c",
+        "aml_android_utils.c",
+        "aml_data_utils.c",
+        "aml_configs/aml_conf_loader.c",
+        "aml_configs/aml_conf_parser.c",
+        "aml_audio_mixer.c",
+        "SPDIFEncoderAD.cpp",
+        "spdifenc_wrap.cpp",
+        "aml_volume_utils.c",
+        "ini/ini.cpp",
+        "ini/IniParser.cpp",
+        "alsa_device_parser.c",
+        "aml_hw_mixer.c",
+        "audio_data_process.c",
+        "aml_malloc_debug.c",
+        "aml_android_hidl_utils.cpp",
+    ],
+
+    header_libs: ["libhardware_headers"],
+
+    shared_libs: [
+        "libc",
+        "libcutils",
+        "libutils",
+        "liblog",
+        "libtinyalsa",
+        "libaudioutils",
+        "libdroidaudiospdif",
+        "libamlaudiohal",
+    ],
+
+
+    cflags: ["-DBUILD_IN_ANDROID",
+             "-Werror",
+             "-Wno-unused-parameter",
+             "-Wno-unused-variable",
+             "-Wno-unused-function"],
+
+    static_libs: [
+        "android.hardware.audio@6.0",
+        "android.hardware.audio.common@6.0",
+    ],
+
+
+}
