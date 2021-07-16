@@ -21,7 +21,7 @@ static int ch2_ch8_n_b16_b32(void *data_mixed, void *data_sys, size_t frames)
 {
     uint32_t *out_buf = data_mixed;
     uint16_t *in_buf = data_sys;
-    uint i = 0;
+    uint32_t i = 0;
     for (i = 0; i < frames; i++) {
         out_buf[8 * i] = in_buf[2 * i] << 16;
         out_buf[8 * i + 1] = in_buf[2 * i + 1] << 16;
@@ -112,7 +112,7 @@ int extend_channel_2_8(void *data_out, void *data_in,
     int32_t *in = (int32_t *)data_in;
     int32_t *out = (int32_t *)data_out;
     int32_t Lval = 0, Rval = 0;
-    uint i = 0 , j = 0;
+    uint32_t i = 0 , j = 0;
 
     for (i = 0; i < frames; i++) {
         Lval = *in++;
@@ -132,7 +132,7 @@ int extend_channel_5_8(void *data_out, void *data_in,
     (void) ch_cnt_in;
     int32_t *out = data_out;
     int32_t *in = data_in;
-    uint i = 0;
+    uint32_t i = 0;
     for (i = 0; i < frames; i++) {
         out[8 * i] = in[5 * i + 2];
         out[8 * i + 1] = in[5 * i + 3];

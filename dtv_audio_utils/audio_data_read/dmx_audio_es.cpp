@@ -1,7 +1,9 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "dmx_audio_es"
 #include <RefBase.h>
+#ifndef BUILD_LINUX
 #include <cutils/trace.h>
+#endif
 #include <cutils/properties.h>
 #include <AmDemuxWrapper.h>
 #include <AmHwDemuxWrapper.h>

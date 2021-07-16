@@ -207,7 +207,7 @@ int aml_hwsync_get_tsync_pts_by_handle(int fd, uint32_t *pts)
 {
     ALOGI("%s", __func__);
     char valstr[64];
-    uint val = 0;
+    uint32_t val = 0;
 
     if (!pts) {
         ALOGE("%s(), NULL pointer", __func__);
@@ -232,11 +232,11 @@ int aml_hwsync_get_tsync_pts_by_handle(int fd, uint32_t *pts)
     return 0;
 }
 
-static int aml_audio_hwsync_get_pcr(audio_hwsync_t *p_hwsync, uint *value)
+static int aml_audio_hwsync_get_pcr(audio_hwsync_t *p_hwsync, uint32_t *value)
 {
     int fd = -1;
     char valstr[64];
-    uint val = 0;
+    uint32_t val = 0;
     off_t offset;
     if (!p_hwsync) {
         ALOGE("invalid pointer %s", __func__);
@@ -490,8 +490,8 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     uint32_t apts = 0;
     int ret = 0;
     *p_adjust_ms = 0;
-    uint pcr = 0;
-    uint gap = 0;
+    uint32_t pcr = 0;
+    uint32_t gap = 0;
     int gap_ms = 0;
     int debug_enable = 0;
     char tempbuf[32] = {0};

@@ -326,10 +326,13 @@ exit:
     out->lasttimestamp.tv_nsec = out->timestamp.tv_nsec;
     if (written >= 0) {
         //TODO
+        //#ifdef ENABLE_BT_A2DP
+        #ifndef BUILD_LINUX
         if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP)
             latency_frames = mixer_get_inport_latency_frames(audio_mixer, out->inputPortID)
                     + a2dp_out_get_latency(adev) * out->hal_rate / 1000;
         else
+        #endif
             latency_frames = mixer_get_inport_latency_frames(audio_mixer, out->inputPortID)
                     + mixer_get_outport_latency_frames(audio_mixer);
         out->frame_write_sum += written / frame_size;
@@ -1263,7 +1266,8 @@ exit:
     aml_out->lasttimestamp.tv_sec = aml_out->timestamp.tv_sec;
     aml_out->lasttimestamp.tv_nsec = aml_out->timestamp.tv_nsec;
 
-
+    //#ifdef ENABLE_BT_A2DP
+    #ifndef BUILD_LINUX
     if (aml_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
         uint64_t latency_frames = mixer_get_inport_latency_frames(sm->mixerData, aml_out->inputPortID)
                 + a2dp_out_get_latency(adev) * aml_out->hal_rate / 1000;
@@ -1271,7 +1275,9 @@ exit:
             aml_out->last_frames_postion = aml_out->frame_write_sum - latency_frames;
         else
             aml_out->last_frames_postion = 0;
-    } else {
+    } else
+    #endif
+    {
         aml_out->last_frames_postion = aml_out->frame_write_sum;
     }
 
@@ -1513,10 +1519,11 @@ int out_standby_subMixingPCM(struct audio_stream *stream)
     aec_set_spk_running(adev->aec, false);
 #endif
     delete_mixer_input_port(audio_mixer, aml_out->inputPortID);
-
+//#ifdef ENABLE_BT_A2DP
+#ifndef BUILD_LINUX
     if ((aml_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) && adev->a2dp_hal)
         a2dp_out_standby(adev);
-
+#endif
     if (adev->debug_flag > 1) {
         ALOGI("-%s() ret %zd,%p %"PRIu64"\n", __func__, ret, stream, aml_out->total_write_size);
     }
@@ -1569,8 +1576,11 @@ static int out_pause_subMixingPCM(struct audio_stream_out *stream)
     send_mixer_inport_message(audio_mixer, aml_out->inputPortID, MSG_PAUSE);
 
     aml_out->pause_status = true;
+    //#ifdef ENABLE_BT_A2DP
+    #ifndef BUILD_LINUX
     if (aml_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP)
         a2dp_out_standby(aml_dev);
+    #endif
     ALOGI("-%s()", __func__);
     aml_audio_trace_int("out_pause_subMixingPCM", 0);
     return 0;

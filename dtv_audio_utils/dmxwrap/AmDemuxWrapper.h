@@ -79,7 +79,41 @@ enum {
     kWhatReadVideo,
     kWhatReadAudio,
 };
+#ifdef BUILD_LINUX
+class  AmDemuxWrapper {
+public:
+   AmDemuxWrapper();
+   virtual ~AmDemuxWrapper();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperOpen(Am_DemuxWrapper_OpenPara_t *para);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetTSSource(Am_DemuxWrapper_OpenPara_t *para,const AM_DevSource_t src);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperStart();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperWriteData(Am_TsPlayer_Input_buffer_t* Pdata, int *pWroteLen, uint64_t timeout);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperReadData(int pid, mEsDataInfo **mEsdata,uint64_t timeout); //???????
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperFlushData(int pid); //???
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperPause();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperResume();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioParam(int aid, AM_AV_AFormat_t afmt, int security_mem_level);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioDescParam(int aid, AM_AV_AFormat_t afmt);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetSubtitleParam(int sid, int stype);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetVideoParam(int vid, AM_AV_VFormat_t vfmt);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperGetStates (int * value , int statetype);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperStop();
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperClose();
+   virtual  AmDemuxWrapper* get(void) {
+        return this;
+   }
+   virtual void AmDemuxSetNotify(const sp<TSPMessage> & msg) {
+        (void) msg;
+   }
+ //  virtual sp<TSPMessage> dupNotify() const { return mNotify->dup();}
+//protected:
+  // virtual sp<TSPMessage> dupNotify() const { return mNotify->dup();}
+  // sp<TSPMessage> mNotify;
+//private:
+   // sp<TSPMessage> mNotify;
+};
 
+#else
 class  AmDemuxWrapper {
 public:
    AmDemuxWrapper() {
@@ -117,4 +151,5 @@ public:
 //private:
    // sp<TSPMessage> mNotify;
 };
+#endif
 #endif

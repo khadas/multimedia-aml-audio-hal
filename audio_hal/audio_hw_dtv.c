@@ -513,7 +513,7 @@ int dtv_patch_get_latency(struct aml_audio_device *aml_dev)
             latencyms = (patch->last_chenkin_apts - patch->cur_outapts) / 90;
         }
     } else {
-        uint lastcheckinapts = 0;
+        uint32_t lastcheckinapts = 0;
         get_sysfs_uint(TSYNC_LAST_CHECKIN_APTS, &lastcheckinapts);
         ALOGI("lastcheckinapts %d patch->cur_outapts %d", lastcheckinapts, patch->cur_outapts);
         patch->last_chenkin_apts = lastcheckinapts;

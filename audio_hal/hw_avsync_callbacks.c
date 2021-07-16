@@ -12,7 +12,7 @@
 #include "audio_hw_utils.h"
 #include "aml_malloc_debug.h"
 
-enum hwsync_status pcm_check_hwsync_status(uint apts_gap)
+enum hwsync_status pcm_check_hwsync_status(uint32_t apts_gap)
 {
     enum hwsync_status sync_status;
 

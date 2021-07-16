@@ -70,7 +70,7 @@ void aml_hw_mixer_reset(struct aml_hw_mixer *mixer)
     pthread_mutex_unlock(&mixer->lock);
 }
 
-static uint aml_hw_mixer_get_space(struct aml_hw_mixer *mixer)
+static uint32_t aml_hw_mixer_get_space(struct aml_hw_mixer *mixer)
 {
     unsigned space;
     if (mixer->wp >= mixer->rp)
@@ -233,7 +233,7 @@ int aml_hw_mixer_mixing(struct aml_hw_mixer *mixer, void *buffer, int bytes, aud
 }
 
 //need called by device mutux locked
-int aml_hw_mixer_read(struct aml_hw_mixer *mixer, void *r_buf, uint size)
+int aml_hw_mixer_read(struct aml_hw_mixer *mixer, void *r_buf, uint32_t size)
 {
     unsigned cached_size;
     unsigned read_size = size;

@@ -25,5 +25,5 @@ int on_meta_data_cbk(void *cookie,
             uint64_t offset,
             struct hw_avsync_header *header,
             int *delay_ms);
-enum hwsync_status pcm_check_hwsync_status(uint apts_gap);
+enum hwsync_status pcm_check_hwsync_status(uint32_t apts_gap);
 #endif

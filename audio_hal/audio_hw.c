@@ -72,10 +72,17 @@
 #include "audio_dtv_ad.h"
 #include "aml_audio_ease.h"
 #include "aml_audio_spdifout.h"
+#ifdef BUILD_LINUX
+#include "atomic.h"
+#endif
+//#ifdef ENABLE_MMAP
+#ifndef BUILD_LINUX
 #include "aml_mmap_audio.h"
+#endif
 // for invoke bluetooth rc hal
+#ifndef BUILD_LINUX
 #include "audio_hal_thunks.h"
-
+#endif
 #include <dolby_ms12_status.h>
 #include <SPDIFEncoderAD.h>
 #include "audio_hw_ms12.h"
@@ -92,7 +99,9 @@
 #include "aml_audio_ms12_render.h"
 #include "aml_audio_nonms12_render.h"
 
+#ifndef BUILD_LINUX
 #define ENABLE_NANO_NEW_PATH 1
+#endif
 #if ENABLE_NANO_NEW_PATH
 #include "jb_nano.h"
 #endif
@@ -161,7 +170,11 @@
 #define VX_NB_SAMPLING_RATE 8000
 #define VX_WB_SAMPLING_RATE 16000
 
+#ifdef BUILD_LINUX
+#define MIXER_XML_PATH "/etc/mixer_paths.xml"
+#else
 #define MIXER_XML_PATH "/vendor/etc/mixer_paths.xml"
+#endif
 #define DOLBY_MS12_INPUT_FORMAT_TEST
 
 #define IEC61937_PACKET_SIZE_OF_AC3                     (0x1800)
@@ -323,7 +336,7 @@ static int aml_hal_mixer_init (struct aml_hal_mixer *mixer)
     pthread_mutex_unlock (&mixer->lock);
     return 0;
 }
-static uint aml_hal_mixer_get_space (struct aml_hal_mixer *mixer)
+static uint32_t aml_hal_mixer_get_space (struct aml_hal_mixer *mixer)
 {
     unsigned space;
     if (mixer->wp >= mixer->rp) {
@@ -348,7 +361,7 @@ static int aml_hal_mixer_get_content (struct aml_hal_mixer *mixer)
 }
 //we assue the cached size is always smaller then buffer size
 //need called by device mutux locked
-static int aml_hal_mixer_write (struct aml_hal_mixer *mixer, const void *w_buf, uint size)
+static int aml_hal_mixer_write (struct aml_hal_mixer *mixer, const void *w_buf, uint32_t size)
 {
     unsigned space;
     unsigned write_size = size;
@@ -379,7 +392,7 @@ static int aml_hal_mixer_write (struct aml_hal_mixer *mixer, const void *w_buf, 
     return size;
 }
 //need called by device mutux locked
-static int aml_hal_mixer_read (struct aml_hal_mixer *mixer, void *r_buf, uint size)
+static int aml_hal_mixer_read (struct aml_hal_mixer *mixer, void *r_buf, uint32_t size)
 {
     unsigned cached_size;
     unsigned read_size = size;
@@ -867,9 +880,11 @@ static int do_output_standby (struct aml_stream_out *out)
 {
     struct aml_audio_device *adev = out->dev;
     ALOGD ("%s(%p)", __FUNCTION__, out);
+//#ifdef ENABLE_BT_A2DP
+#ifndef BUILD_LINUX
     if ((out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) && adev->a2dp_hal)
         a2dp_out_standby(adev);
-
+#endif
     if (!out->standby) {
         //commit here for hwsync/mix stream hal mixer
         //pcm_close(out->pcm);
@@ -999,7 +1014,7 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
     char *str;
     char value[32];
     int ret;
-    uint val = 0;
+    uint32_t val = 0;
     bool force_input_standby = false;
     int channel_count = popcount (out->hal_channel_mask);
     bool hwsync_lpcm = (out->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC && out->config.rate  <= 48000 &&
@@ -1666,7 +1681,7 @@ exit:
     return 0;
 }
 
-enum hwsync_status check_hwsync_status (uint apts_gap)
+enum hwsync_status check_hwsync_status (uint32_t apts_gap)
 {
     enum hwsync_status sync_status;
 
@@ -2651,10 +2666,13 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
         /*if (ng_status == NG_MUTE)
             ALOGI("noise gate is working!");*/
     }
-
+//#ifdef ENABLE_AEC_HAL
+#ifndef BUILD_LINUX
     if (in->device & AUDIO_DEVICE_IN_BUILTIN_MIC) {
         inread_proc_aec(stream, buffer, bytes);
-    } else if (!adev->audio_patching) {
+    } else
+#endif
+    if (!adev->audio_patching) {
         /* case dev->mix, set audio gain to src */
         float source_gain = aml_audio_get_s_gain_by_src(adev, adev->patch_src);
         apply_volume(source_gain * adev->src_gain[adev->active_inport], buffer, sizeof(uint16_t), bytes);
@@ -3093,7 +3111,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->need_drop_size = 0;
     out->position_update = 0;
     out->inputPortID = AML_MIXER_INPUT_PORT_BUTT;
-
+//#ifdef ENABLE_MMAP
+#ifndef BUILD_LINUX
     if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
         if ((eDolbyMS12Lib == adev->dolby_lib_type) &&
             !adev->ms12.dolby_ms12_enable &&
@@ -3102,7 +3121,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         }
         outMmapInit(out);
     }
-
+#endif
     //aml_audio_hwsync_init(out->hwsync,out);
     /* FIXME: when we support multiple output devices, we will want to
      * do the following:
@@ -3253,10 +3272,12 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out->ac3_parser_init = false;
     }
 
-
+//#ifdef ENABLE_MMAP
+#ifndef BUILD_LINUX
     if (out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
         outMmapDeInit(out);
     }
+#endif
 
     if (out->restore_hdmitx_selection) {
         /* switch back to spdifa when the dual stream is done */
@@ -3622,11 +3643,15 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 aml_audio_set_speaker_mute(adev, "false");
                 aml_audio_update_arc_status(adev, false);
             }
-        } else if (val & AUDIO_DEVICE_OUT_ALL_A2DP) {
+        }
+        //#ifdef ENABLE_BT_A2DP
+        #ifndef BUILD_LINUX
+        else if (val & AUDIO_DEVICE_OUT_ALL_A2DP) {
             adev->a2dp_updated = 1;
             adev->out_device &= (~val);
             a2dp_out_close(adev);
         }
+        #endif
         goto exit;
     }
 
@@ -3644,11 +3669,15 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 aml_audio_update_arc_status(adev, true);
             }
             update_sink_format_after_hotplug(adev);
-        } else if (val & AUDIO_DEVICE_OUT_ALL_A2DP) {
+        }
+        //#ifdef ENABLE_BT_A2DP
+        #ifndef BUILD_LINUX
+        else if (val & AUDIO_DEVICE_OUT_ALL_A2DP) {
             adev->a2dp_updated = 1;
             adev->out_device |= val;
             a2dp_out_open(adev);
         }
+        #endif
         goto exit;
     }
 
@@ -4146,12 +4175,13 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     }
 
     ret = str_parms_get_int(parms, "EQ_MODE", &val);
+    #ifdef USE_EQ_DRC
     if (ret >= 0) {
         if (eq_mode_set(&adev->eq_data, val) < 0)
             ALOGE("%s: eq_mode_set failed", __FUNCTION__);
         goto exit;
     }
-
+    #endif
     /* dvb cmd deal with start */
     {
         ret = str_parms_get_int(parms, "hal_param_dtv_patch_cmd", &val);
@@ -4827,10 +4857,16 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         in->stream.get_capture_position =  in_hbg_get_hbg_capture_position;
         in->hbg_channel = regist_callBack_stream();
         in->stream.get_active_microphones = in_get_active_microphones;
-    } else if(remoteDeviceOnline() && (config->channel_mask != BUILT_IN_MIC)) {
+    }
+    #ifndef BUILD_LINUX
+    else if(remoteDeviceOnline() && (config->channel_mask != BUILT_IN_MIC)) {
+    #endif
 #else
+    #ifndef BUILD_LINUX
     if (remoteDeviceOnline() && (config->channel_mask != BUILT_IN_MIC)) {
+    #endif
 #endif
+    #ifndef BUILD_LINUX
         in->stream.common.set_sample_rate = kehwin_in_set_sample_rate;
         in->stream.common.get_sample_rate = kehwin_in_get_sample_rate;
         in->stream.common.get_buffer_size = kehwin_in_get_buffer_size;
@@ -4850,7 +4886,9 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
 
     }
 
-    else {
+    else
+    #endif
+    {
         in->stream.common.get_sample_rate = in_get_sample_rate;
         in->stream.common.set_sample_rate = in_set_sample_rate;
         in->stream.common.get_buffer_size = in_get_buffer_size;
@@ -4882,6 +4920,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         memcpy(&in->config, &pcm_config_bt, sizeof(pcm_config_bt));
         if (adev->bt_wbs)
             in->config.rate = VX_WB_SAMPLING_RATE;
+    #ifndef BUILD_LINUX
     } else if (in->device & AUDIO_DEVICE_IN_WIRED_HEADSET) {
         //bluetooth rc voice
         // usecase for bluetooth rc audio hal
@@ -4893,6 +4932,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         }
         config->sample_rate = in->config.rate;
         config->channel_mask = AUDIO_CHANNEL_IN_MONO;
+    #endif
     } else
         memcpy(&in->config, &pcm_config_in, sizeof(pcm_config_in));
     in->config.channels = channel_count;
@@ -4986,10 +5026,12 @@ err:
 static void adev_close_input_stream(struct audio_hw_device *dev,
                                 struct audio_stream_in *stream)
 {
+#ifndef BUILD_LINUX
     if (remoteDeviceOnline()) {
         kehwin_adev_close_input_stream(dev,stream);
         return;
     }
+#endif
     struct aml_audio_device *adev = (struct aml_audio_device *)dev;
     struct aml_stream_in *in = (struct aml_stream_in *)stream;
 
@@ -4999,10 +5041,10 @@ static void adev_close_input_stream(struct audio_hw_device *dev,
 #endif
 
     in_standby(&stream->common);
-
+    #ifndef BUILD_LINUX
     if (in->device & AUDIO_DEVICE_IN_WIRED_HEADSET)
         rc_close_input_stream(in);
-
+    #endif
 #ifdef ENABLE_AEC_HAL
     if (in->device & AUDIO_DEVICE_IN_BUILTIN_MIC) {
         if (in->tmp_buffer_8ch) {
@@ -5105,7 +5147,10 @@ int do_output_standby_l(struct audio_stream *stream)
             if ((eDolbyMS12Lib == adev->dolby_lib_type) && (ms12->dolby_ms12_enable == true)) {
                 get_dolby_ms12_cleanup(&adev->ms12, false);
             }
+            //#ifdef ENABLE_BT_A2DP
+            #ifndef BUILD_LINUX
             a2dp_out_standby(adev);
+            #endif
         }
     }
 
@@ -5972,9 +6017,13 @@ ssize_t hw_write (struct audio_stream_out *stream
                     memset(buf, 0, 1024);
                     while (adjust_bytes > 0) {
                         write_size = adjust_bytes > 1024 ? 1024 : adjust_bytes;
+                        //#ifdef ENABLE_BT_A2DP
+                        #ifndef BUILD_LINUX
                         if (adev->active_outport == OUTPORT_A2DP) {
                             ret = a2dp_out_write(adev, &in_data_config, (void*)buf, write_size);
-                        } else if (is_sco_port(adev->active_outport)) {
+                        } else
+                        #endif
+                        if (is_sco_port(adev->active_outport)) {
                             ret = write_to_sco(adev, &in_data_config, buffer, bytes);
                         } else {
                             ret = aml_alsa_output_write(stream, (void*)buf, write_size);
@@ -5997,9 +6046,13 @@ ssize_t hw_write (struct audio_stream_out *stream
                 }
             }
         }
+        //#ifdef ENABLE_BT_A2DP
+        #ifndef BUILD_LINUX
         if (adev->active_outport == OUTPORT_A2DP) {
             ret = a2dp_out_write(adev, &in_data_config, buffer, bytes);
-        } else if (is_sco_port(adev->active_outport)) {
+        } else
+        #endif
+        if (is_sco_port(adev->active_outport)) {
             ret = write_to_sco(adev, &in_data_config, buffer, bytes);
         } else {
             ret = aml_alsa_output_write(stream, (void *) buffer, bytes);
@@ -6657,8 +6710,8 @@ hwsync_rewrite:
                     } else {
                         uint64_t apts;
                         uint32_t apts32;
-                        uint pcr = 0;
-                        uint apts_gap = 0;
+                        uint32_t pcr = 0;
+                        uint32_t apts_gap = 0;
                         uint64_t latency = out_get_latency (stream) * 90;
                         // check PTS discontinue, which may happen when audio track switching
                         // discontinue means PTS calculated based on first_apts and frame_write_sum
@@ -7469,10 +7522,13 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
 
             //ALOGE("%s(),2 mixer_aux_buffer_write !", __FUNCTION__);
             //FIXEME if need config ms12 here if neeeded.
+        //#ifdef ENABLE_MMAP
+        #ifndef BUILD_LINUX
         } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             aml_out->write = mixer_app_buffer_write;
             aml_out->write_func = MIXER_APP_BUFFER_WRITE;
             //ALOGI("[%s:%d], mixer_app_buffer_write !", __func__, __LINE__);
+        #endif
         } else {
             aml_out->write = mixer_main_buffer_write;
             aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
@@ -8440,7 +8496,12 @@ static struct audio_patch_set *register_audio_patch(struct audio_hw_device *dev,
     }
 
     patch_new = &patch_set_new->audio_patch;
+    #ifdef BUILD_LINUX
+    patch_handle = (audio_patch_handle_t) atomic_inc(&aml_dev->next_unique_ID);
+    #else
     patch_handle = (audio_patch_handle_t) android_atomic_inc(&aml_dev->next_unique_ID);
+    #endif
+
     *handle = patch_handle;
 
     /* init audio patch new */
@@ -8927,7 +8988,10 @@ static int adev_dump(const audio_hw_device_t *device, int fd)
 
     aml_audio_patches_dump(aml_dev, fd);
     audio_patch_dump(aml_dev, fd);
+//#ifdef ENABLE_BT_A2DP
+#ifndef BUILD_LINUX
     a2dp_hal_dump(aml_dev, fd);
+#endif
 
     return 0;
 }
@@ -8985,7 +9049,9 @@ static int adev_close(hw_device_t *device)
     if (adev->ar) {
         audio_route_free(adev->ar);
     }
+    #ifdef USE_EQ_DRC
     eq_drc_release(&adev->eq_data);
+    #endif
     close_mixer_handle(&adev->alsa_mixer);
     if (adev->aml_dtv_audio_instances) {
         aml_audio_free(adev->aml_dtv_audio_instances);
@@ -9230,7 +9296,10 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     g_adev = (void *)adev;
     pthread_mutex_unlock(&adev_mutex);
 
+//#ifdef ENABLE_AEC_HAL
+#ifndef BUILD_LINUX
     initAudio(1);  /*Judging whether it is Google's search engine*/
+#endif
     adev->hw_device.common.tag = HARDWARE_DEVICE_TAG;
     adev->hw_device.common.version = AUDIO_DEVICE_API_VERSION_3_0;
     adev->hw_device.common.module = (struct hw_module_t *)module;
@@ -9282,6 +9351,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->hi_pcm_mode = false;
 
     adev->eq_data.card = adev->card;
+    #ifdef USE_EQ_DRC
     if (eq_drc_init(&adev->eq_data) == 0) {
         ALOGI("%s() audio source gain: atv:%f, dtv:%f, hdmiin:%f, av:%f, media:%f", __func__,
            adev->eq_data.s_gain.atv, adev->eq_data.s_gain.dtv,
@@ -9296,7 +9366,16 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         ALOGI("%s() audio noise gate level: %fdB, attack_time = %dms, release_time = %dms", __func__,
               adev->aml_ng_level, adev->aml_ng_attack_time, adev->aml_ng_release_time);
     }
-
+    #else
+    adev->eq_data.s_gain.atv = 1.0;
+    adev->eq_data.s_gain.dtv = 1.0;
+    adev->eq_data.s_gain.hdmi= 1.0;
+    adev->eq_data.s_gain.av = 1.0;
+    adev->eq_data.s_gain.media = 1.0;
+    adev->eq_data.p_gain.speaker= 1.0;
+    adev->eq_data.p_gain.spdif_arc = 1.0;
+    adev->eq_data.p_gain.headphone = 1.0;
+    #endif
     ret = aml_audio_output_routing(&adev->hw_device, OUTPORT_SPEAKER, false);
     if (ret < 0) {
         ALOGE("%s() routing failed", __func__);

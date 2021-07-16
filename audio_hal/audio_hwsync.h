@@ -20,7 +20,9 @@
 #define _AUDIO_HWSYNC_H_
 
 #include <stdbool.h>
-
+#ifdef BUILD_LINUX
+#include <pthread.h>
+#endif
 #define SYSTIME_CORRECTION_THRESHOLD        (90000*10/100)
 #define NSEC_PER_SECOND 1000000000ULL
 #define HW_SYNC_STATE_HEADER 0

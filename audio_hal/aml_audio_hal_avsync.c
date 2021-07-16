@@ -782,7 +782,7 @@ static int dtv_audio_tune_check(struct aml_audio_patch *patch, int cur_pts_diff,
         return 1;
     }
     if (patch->dtv_audio_tune != AUDIO_RUNNING) {
-        uint demux_apts = 0;
+        uint32_t demux_apts = 0;
         get_sysfs_uint(TSYNC_CHECKIN_APTS, &demux_apts);
         /*if demux apts is less pcrpts, don`t tune avsync*/
         if (demux_apts && (int)demux_apts != -1 && patch->last_pcrpts > demux_apts) {
@@ -820,7 +820,7 @@ static int dtv_audio_tune_check(struct aml_audio_patch *patch, int cur_pts_diff,
                 }
                 decoder_set_latency(pts_latency);
             } else {
-                uint pcrpts = 0;
+                uint32_t pcrpts = 0;
                 origin_pts_diff = pts_diff;
                 get_sysfs_uint(TSYNC_PCRSCR, &pcrpts);
                 ALOGI("dtv_audio_tune audio_latency pts_diff %d, pcrsrc %x", pts_diff / 90, pcrpts);
@@ -1301,7 +1301,7 @@ void dtv_avsync_startplay_strategy(struct aml_audio_patch *patch)
 void dtv_avsync_process(struct aml_audio_patch* patch, struct aml_stream_out* stream_out)
 {
     unsigned long pts;
-    uint firstvpts, pcrpts;
+    uint32_t firstvpts, pcrpts;
     int ret = 0;
     char tempbuf[128] = {0};
     int audio_output_delay = 0;

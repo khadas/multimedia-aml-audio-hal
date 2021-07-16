@@ -20,7 +20,9 @@
 #include <system/audio.h>
 #include <tinyalsa/asoundlib.h>
 #include <cutils/list.h>
-
+#ifdef BUILD_LINUX
+#include <pthread.h>
+#endif
 #include "hw_avsync.h"
 #include "sub_mixing_factory.h"
 
@@ -168,7 +170,7 @@ struct input_port *new_input_port(
         bool direct_on);
 int set_inport_padding_size(struct input_port *port, size_t bytes);
 int reset_input_port(struct input_port *port);
-int resize_input_port_buffer(struct input_port *port, uint buf_size);
+int resize_input_port_buffer(struct input_port *port, uint32_t buf_size);
 int free_input_port(struct input_port *port);
 int set_port_notify_cbk(struct input_port *port,
         int (*on_notify_cbk)(void *data), void *data);

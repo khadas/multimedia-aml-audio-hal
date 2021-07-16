@@ -63,8 +63,11 @@ enum {
 #define MAX_DDP_FRAME_LENGTH 2560
 #define MAX_DDP_BUFFER_SIZE (MAX_DECODER_FRAME_LENGTH * 4 + MAX_DECODER_FRAME_LENGTH + 8)
 
-
+#ifdef BUILD_LINUX
+#define DOLBY_DCV_LIB_PATH_A "/usr/lib/libHwAudio_dcvdec.so"
+#else
 #define DOLBY_DCV_LIB_PATH_A "/odm/lib/libHwAudio_dcvdec.so"
+#endif
 
 typedef struct {
     DDPshort       *buf;

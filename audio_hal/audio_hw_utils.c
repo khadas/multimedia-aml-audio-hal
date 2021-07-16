@@ -32,16 +32,19 @@
 #include <cutils/log.h>
 #include <cutils/str_parms.h>
 #include <cutils/properties.h>
+#ifndef BUILD_LINUX
+#include <cutils/trace.h>
+#endif
 #include <linux/ioctl.h>
 #include <hardware/hardware.h>
 #include <system/audio.h>
 #include <hardware/audio.h>
 #include <sound/asound.h>
 #include <tinyalsa/asoundlib.h>
-
+#ifndef BUILD_LINUX
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 #include <cutils/trace.h>
-
+#endif
 #include "audio_hw_utils.h"
 
 #include "audio_hwsync.h"
@@ -223,11 +226,11 @@ int64_t aml_gettime(void)
     gettimeofday(&tv, NULL);
     return ((int64_t)(tv.tv_sec) * 1000000 + (int64_t)(tv.tv_usec));
 }
-int get_sysfs_uint(const char *path, uint *value)
+int get_sysfs_uint(const char *path, uint32_t *value)
 {
     int fd;
     char valstr[64];
-    uint val = 0;
+    uint32_t val = 0;
     fd = open(path, O_RDONLY);
     if (fd >= 0) {
         memset(valstr, 0, 64);
@@ -804,11 +807,12 @@ uint32_t out_get_outport_latency(const struct audio_stream_out *stream)
     struct subMixing *sm = adev->sm;
     struct amlAudioMixer *audio_mixer = sm->mixerData;
     int frames = 0, latency_ms = 0;
-
+//#ifdef ENABLE_BT_A2DP
+#ifndef BUILD_LINUX
     if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
         return a2dp_out_get_latency(adev);
     }
-
+#endif
     if (is_stream_using_mixer(out)) {
         int outport_latency_frames = mixer_get_outport_latency_frames(audio_mixer);
 
@@ -842,11 +846,12 @@ uint32_t out_get_latency_frames(const struct audio_stream_out *stream)
 
     if (is_4x_rate_fmt(afmt))
         mul = 4;
-
+//#ifdef ENABLE_BT_A2DP
+#ifndef BUILD_LINUX
     if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
         return a2dp_out_get_latency(adev) * out->hal_rate / 1000;
     }
-
+#endif
     whole_latency_frames = out->config.period_size * out->config.period_count;
     if (!out->pcm || !pcm_is_ready(out->pcm)) {
         return whole_latency_frames / mul;
@@ -870,11 +875,12 @@ uint32_t out_get_alsa_latency_frames(const struct audio_stream_out *stream)
 
     if (is_4x_rate_fmt(afmt))
         mul = 4;
-
+//#ifdef ENABLE_BT_A2DP
+#ifndef BUILD_LINUX
     if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
         return a2dp_out_get_latency(adev) * out->hal_rate / 1000;
     }
-
+#endif
     whole_latency_frames = out->config.period_size * out->config.period_count / 2;
     if (!out->pcm || !pcm_is_ready(out->pcm)) {
         return whole_latency_frames / mul;
@@ -1903,11 +1909,12 @@ int aml_audio_trace_int(char *name, int value)
 {
     int debug_level = aml_audio_trace_debug_level();
 
+    #ifndef BUILD_LINUX
     if (debug_level > 0) {
         ATRACE_INT(name, value);
     } else {
         // do nothing.
     }
-
+    #endif
     return 0;
 }

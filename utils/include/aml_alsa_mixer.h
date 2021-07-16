@@ -20,7 +20,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+#ifdef BUILD_LINUX
+#include<pthread.h>
+#endif
 /*
  *  Value of the Alsa Mixer Control Point
  **/

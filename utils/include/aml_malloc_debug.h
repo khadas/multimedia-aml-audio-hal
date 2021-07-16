@@ -18,6 +18,9 @@
 #ifndef _AML_MALLOC_DEBUG_H
 #define _AML_MALLOC_DEBUG_H
 #include <stdlib.h>
+#ifdef BUILD_LINUX
+#include <pthread.h>
+#endif
 
 enum {
     MEMINFO_SHOW_PRINT,

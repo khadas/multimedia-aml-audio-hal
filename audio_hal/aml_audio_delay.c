@@ -19,6 +19,9 @@
 
 #include <cutils/log.h>
 #include <stdlib.h>
+#ifdef BUILD_LINUX
+#include <stdbool.h>
+#endif
 #include <string.h>
 
 #include "aml_audio_delay.h"

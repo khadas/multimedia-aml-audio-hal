@@ -17,7 +17,9 @@
 
 #define LOG_TAG "audio_hw_primary"
 //#define LOG_NDEBUG 0
-
+#ifdef BUILD_LINUX
+#include "compiler.h"
+#endif
 #include <cutils/log.h>
 #include <system/audio.h>
 #include <hardware/audio.h>

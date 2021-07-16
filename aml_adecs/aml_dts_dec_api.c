@@ -38,8 +38,11 @@
 #include "aml_dts_dec_api.h"
 
 
-
+#ifdef BUILD_LINUX
+#define DOLBY_DTSHD_LIB_PATH "/vendor/lib/libHwAudio_dtshd.so"
+#else
 #define DOLBY_DTSHD_LIB_PATH     "/odm/lib/libHwAudio_dtshd.so"
+#endif
 
 #define MAX_DCA_FRAME_LENGTH 32768
 #define READ_PERIOD_LENGTH 2048 * 4

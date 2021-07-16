@@ -25,6 +25,9 @@
 #include "audio_dtv_utils.h"
 #include "aml_audio_hal_avsync.h"
 #include "aml_dtvsync.h"
+#ifdef BUILD_LINUX
+#include "compiler.h"
+#endif
 #define RAW_USECASE_MASK ((1<<STREAM_RAW_DIRECT) | (1<<STREAM_RAW_HWSYNC) | (1<<STREAM_RAW_PATCH))
 /*
  * 1.AUDIO_FORMAT_PCM_16_BIT is suitable for Speaker

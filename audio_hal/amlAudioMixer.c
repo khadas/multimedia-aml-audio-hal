@@ -403,12 +403,16 @@ static int mixer_output_write(struct amlAudioMixer *audio_mixer)
     out_port->sound_track_mode = audio_mixer->adev->sound_track_mode;
     while (is_output_data_avail(audio_mixer, port_index)) {
         // out_write_callbacks();
+//#ifdef ENABLE_BT_A2DP
+#ifndef BUILD_LINUX
         if (adev->active_outport == OUTPORT_A2DP) {
             int ret = a2dp_out_write(adev, &in_data_config, out_port->data_buf, out_port->bytes_avail);
             if (ret == 0 && count-- > 0) {
                  continue;
             }
-        } else if (is_sco_port(adev->active_outport)) {
+        } else
+#endif
+        if (is_sco_port(adev->active_outport)) {
             write_to_sco(adev, &in_data_config, out_port->data_buf, out_port->bytes_avail);
         } else {
             out_port->write(out_port, out_port->data_buf, out_port->bytes_avail);

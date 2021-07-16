@@ -19,7 +19,9 @@
 
 #include <stdbool.h>
 #include <system/audio.h>
+#ifndef BUILD_LINUX
 #include <system/audio_policy.h>
+#endif
 #include "dolby_ms12_config_parameter_struct.h"
 #include "dolby_ms12_output_mask.h"
 

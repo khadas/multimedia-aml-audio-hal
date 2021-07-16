@@ -39,9 +39,9 @@ int tuning_spker_latency(struct aml_audio_device *adev,
                          int16_t *sink_buffer, int16_t *src_buffer, size_t bytes)
 {
     ring_buffer_t *rbuf = &(adev->spk_tuning_rbuf);
-    uint latency_bytes = adev->spk_tuning_lvl;
-    uint ringbuf_lvl = 0;
-    uint ret = 0;
+    uint32_t latency_bytes = adev->spk_tuning_lvl;
+    uint32_t ringbuf_lvl = 0;
+    uint32_t ret = 0;
 
     if (!sink_buffer || !src_buffer) {
         ALOGE("%s(), NULL pointer!", __func__);
@@ -55,23 +55,23 @@ int tuning_spker_latency(struct aml_audio_device *adev,
     if (ringbuf_lvl == latency_bytes) {
         if (ringbuf_lvl >= bytes) {
             ret = ring_buffer_read(rbuf, (unsigned char*)sink_buffer, bytes);
-            if (ret != (uint)bytes) {
+            if (ret != (uint32_t)bytes) {
                 ALOGE("%s(), ringbuf read fail.", __func__);
                 goto err;
             }
             ret = ring_buffer_write(rbuf, (unsigned char*)src_buffer, bytes, UNCOVER_WRITE);
-            if (ret != (uint)bytes) {
+            if (ret != (uint32_t)bytes) {
                 ALOGE("%s(), ringbuf write fail.", __func__);
                 goto err;
             }
         } else {
             ret = ring_buffer_write(rbuf, (unsigned char*)src_buffer, bytes, UNCOVER_WRITE);
-            if (ret != (uint)bytes) {
+            if (ret != (uint32_t)bytes) {
                 ALOGE("%s(), ringbuf write fail..", __func__);
                 goto err;
             }
             ret = ring_buffer_read(rbuf, (unsigned char*)sink_buffer, bytes);
-            if (ret != (uint)bytes) {
+            if (ret != (uint32_t)bytes) {
                 ALOGE("%s(), ringbuf read fail..", __func__);
                 goto err;
             }
@@ -80,36 +80,36 @@ int tuning_spker_latency(struct aml_audio_device *adev,
         if (ringbuf_lvl + bytes < latency_bytes) {
             /* all data need to store in tmp buf */
             ret = ring_buffer_write(rbuf, (unsigned char*)src_buffer, bytes, UNCOVER_WRITE);
-            if (ret != (uint)bytes) {
+            if (ret != (uint32_t)bytes) {
                 ALOGE("%s(), ringbuf write fail...", __func__);
                 goto err;
             }
         } else {
             /* output former data, and store new */
-            uint out_bytes = ringbuf_lvl + bytes - latency_bytes;
-            uint offset = bytes - out_bytes;
+            uint32_t out_bytes = ringbuf_lvl + bytes - latency_bytes;
+            uint32_t offset = bytes - out_bytes;
 
             if (ringbuf_lvl >= out_bytes) {
                 /* first fetch data and then store the new */
                 ret = ring_buffer_read(rbuf, (unsigned char*)sink_buffer + offset, out_bytes);
-                if (ret != (uint)out_bytes) {
+                if (ret != (uint32_t)out_bytes) {
                     ALOGE("%s(), ringbuf read fail...", __func__);
                     goto err;
                 }
                 ret = ring_buffer_write(rbuf, (unsigned char*)src_buffer, bytes, UNCOVER_WRITE);
-                if (ret != (uint)bytes) {
+                if (ret != (uint32_t)bytes) {
                     ALOGE("%s(), ringbuf write fail...", __func__);
                     goto err;
                 }
             } else {
                 /* first store the data then fetch */
                 ret = ring_buffer_write(rbuf, (unsigned char*)src_buffer, bytes, UNCOVER_WRITE);
-                if (ret != (uint)bytes) {
+                if (ret != (uint32_t)bytes) {
                     ALOGE("%s(), ringbuf write fail", __func__);
                     goto err;
                 }
                 ret = ring_buffer_read(rbuf, (unsigned char*)sink_buffer + offset, out_bytes);
-                if (ret != (uint)out_bytes) {
+                if (ret != (uint32_t)out_bytes) {
                     ALOGE("%s(), ringbuf read fail....", __func__);
                     goto err;
                 }

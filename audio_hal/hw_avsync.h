@@ -47,7 +47,7 @@ typedef int (*consume_output_data_t)(void *cookie,
 struct hw_avsync_header_extractor {
     struct hw_avsync_header avsync_header;
     int8_t data[HW_AVSYNC_FRAME_SIZE];
-    uint data_size_bytes;
+    size_t data_size_bytes;
     ssize_t (*write)(struct hw_avsync_header_extractor *header_extractor,
             const void *buffer, size_t bytes);
     consume_meta_data_t consume_meta_data;

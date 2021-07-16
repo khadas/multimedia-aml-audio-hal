@@ -455,11 +455,12 @@ uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream)
     if (ms12_out == NULL) {
         return 0;
     }
-
+//#ifdef ENABLE_BT_A2DP
+#ifndef BUILD_LINUX
     if (ms12_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
         return a2dp_out_get_latency(adev) * ms12_out->hal_rate / 1000;
     }
-
+#endif
     whole_latency_frames = config->start_threshold;
     if (!ms12_out->pcm || !pcm_is_ready(ms12_out->pcm)) {
         return whole_latency_frames / mul;

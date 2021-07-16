@@ -16,7 +16,9 @@
 
 #ifndef _AML_AUDIO_MIXER_H_
 #define _AML_AUDIO_MIXER_H_
-
+#ifdef BUILD_LINUX
+#include "compiler.h"
+#endif
 #include <tinyalsa/asoundlib.h>
 #include <aml_ringbuffer.h>
 

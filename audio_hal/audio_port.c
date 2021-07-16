@@ -382,7 +382,7 @@ int reset_input_port(struct input_port *port)
     return ring_buffer_reset(port->r_buf);
 }
 
-int resize_input_port_buffer(struct input_port *port, uint buf_size)
+int resize_input_port_buffer(struct input_port *port, uint32_t buf_size)
 {
     int ret = 0;
 

@@ -951,7 +951,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
 int dsp_process_output(struct aml_audio_device *adev, void *in_buffer,
                        size_t bytes);
 int release_patch_l(struct aml_audio_device *adev);
-enum hwsync_status check_hwsync_status (uint apts_gap);
+enum hwsync_status check_hwsync_status (uint32_t apts_gap);
 void config_output(struct audio_stream_out *stream, bool reset_decoder);
 int start_ease_in(struct aml_audio_device *adev);
 int start_ease_out(struct aml_audio_device *adev);

@@ -49,7 +49,7 @@
     return pStr;
 
 int64_t aml_gettime(void);
-int get_sysfs_uint(const char *path, uint *value);
+int get_sysfs_uint(const char *path, uint32_t *value);
 int sysfs_set_sysfs_str(const char *path, const char *val);
 int set_sysfs_int(const char *path, int value);
 int get_sysfs_int(const char *path);

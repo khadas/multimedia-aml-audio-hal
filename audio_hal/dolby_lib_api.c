@@ -36,8 +36,13 @@
 #define RET_FAIL -1
 #endif
 
+#ifdef BUILD_LINUX
+#define DOLBY_DCV_LIB_PATH_A "/usr/lib/libHwAudio_dcvdec.so"
+#define DTS_DCA_LIB_PATH_A "/vendor/lib/libHwAudio_dtshd.so"
+#else
 #define DOLBY_DCV_LIB_PATH_A "/odm/lib/libHwAudio_dcvdec.so"
 #define DTS_DCA_LIB_PATH_A "/odm/lib/libHwAudio_dtshd.so"
+#endif
 
 #ifndef MS12_V24_ENABLE
     #define MS12_VERSION    "1.3"

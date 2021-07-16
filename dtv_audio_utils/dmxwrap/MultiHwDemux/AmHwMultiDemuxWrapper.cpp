@@ -6,6 +6,9 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#ifdef BUILD_LINUX
+#include <cutils/properties.h>
+#endif
 #include <AmDemuxWrapper.h>
 #include <AmHwMultiDemuxWrapper.h>
 #include <AmDmx.h>

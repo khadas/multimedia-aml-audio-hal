@@ -17,7 +17,12 @@
 #ifndef _DOLBY_LIB_API_H_
 #define _DOLBY_LIB_API_H_
 
+#ifdef BUILD_LINUX
+#include <stdbool.h>
+#define DOLBY_MS12_LIB_PATH_A "/vendor/lib/libdolbyms12.so"
+#else
 #define DOLBY_MS12_LIB_PATH_A "/odm/lib/ms12/libdolbyms12.so"
+#endif
 #define DOLBY_TUNING_DAT "/vendor/etc/ms12_tuning.dat"
 
 /** Dolby Lib Type used in Current System */

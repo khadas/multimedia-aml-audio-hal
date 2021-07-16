@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-
+#ifndef BUILD_LINUX
 #include <android/hardware/bluetooth/audio/2.0/types.h>
+#endif
 #include <hardware/audio.h>
 #include <condition_variable>
 #include <mutex>

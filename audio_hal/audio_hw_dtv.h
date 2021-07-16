@@ -80,7 +80,11 @@ enum {
     TSYNC_MODE_AMASTER,
     TSYNC_MODE_PCRMASTER,
 };
-
+#ifdef BUILD_LINUX
+#ifndef __unused
+#define __unused __attribute__((unused))
+#endif
+#endif
 int create_dtv_patch(struct audio_hw_device *dev, audio_devices_t input, audio_devices_t output __unused);
 int release_dtv_patch(struct aml_audio_device *dev);
 int release_dtv_patch_l(struct aml_audio_device *dev);
