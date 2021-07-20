@@ -17,7 +17,7 @@ add_library(ms12v2 SHARED
 
 target_compile_options(ms12v2 PRIVATE -fPIC)
 
-add_definitions(-DNDEBUG -DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK)
+add_definitions(-DNDEBUG -DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK -DUSE_MSYNC)
 
 set_target_properties(ms12v2 PROPERTIES
 	VERSION ${PROJECT_VERSION}

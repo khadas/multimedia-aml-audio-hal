@@ -76,6 +76,9 @@ typedef struct  audio_hwsync {
     bool first_apts_flag;//flag to indicate set first apts
     uint64_t first_apts;
     uint64_t last_apts_from_header;
+#ifdef USE_MSYNC
+    uint32_t last_lookup_apts;
+#endif
     apts_tab_t pts_tab[HWSYNC_APTS_NUM];
     pthread_mutex_t lock;
     size_t payload_offset;
@@ -153,6 +156,8 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
 void aml_audio_hwsync_release(audio_hwsync_t *p_hwsync);
 bool aml_audio_hwsync_get_id(audio_hwsync_t *p_hwsync, int32_t* id);
 bool aml_audio_hwsync_set_id(audio_hwsync_t *p_hwsync, uint32_t id);
-
+#ifdef USE_MSYNC
+void aml_audio_hwsync_msync_unblock_start(struct aml_stream_out *out);
+#endif
 
 #endif

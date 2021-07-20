@@ -493,4 +493,25 @@ extern "C" int dolby_ms12_hwsync_checkin_pts_internal(int offset, int apts)
         return -1;
     }
 }
+#ifdef USE_MSYNC
+extern "C" int dolby_ms12_get_main_underrun()
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetMainUnderrun();
+    } else {
+        return -1;
+    }
+}
 
+extern "C" void dolby_ms12_set_sync(int sync)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        dolby_ms12_instance->DolbyMS12SetSync(sync);
+    }
+}
+
+#endif

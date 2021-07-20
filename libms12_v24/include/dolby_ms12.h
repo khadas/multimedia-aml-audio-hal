@@ -268,7 +268,16 @@ int dolby_ms12_hwsync_init_internal(void);
 int dolby_ms12_hwsync_release_internal(void);
 
 int dolby_ms12_hwsync_checkin_pts_internal(int offset, int apts);
-
+#ifdef USE_MSYNC
+/*@@
+*  @brief get main input underrun status
+*/
+int dolby_ms12_get_main_underrun();
+/*@@
+*  @brief set the MS12 sync control
+*/
+int dolby_ms12_set_sync(int sync);
+#endif
 #ifdef __cplusplus
 }
 #endif

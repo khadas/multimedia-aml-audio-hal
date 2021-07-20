@@ -74,6 +74,10 @@ int (*FuncDolbyMS12GetTotalNFramesDelay)(void *);
 int (*FuncDolbyMS12HWSyncInit)(void);
 int (*FuncDolbyMS12HWSyncRelease)(void);
 int (*FuncDolbyMS12HWSyncCheckinPTS)(int offset, int apts);
+#ifdef USE_MSYNC
+int (*FuncDolbyMS12GetMainUnderrun)();
+void (*FuncDolbyMS12SetSync)(int);
+#endif
 
 DolbyMS12::DolbyMS12() :
     mDolbyMS12LibHanle(NULL)
@@ -298,6 +302,19 @@ int DolbyMS12::GetLibHandle(char *dolby_ms12_path)
         //goto ERROR;
     }
 
+#ifdef USE_MSYNC
+    FuncDolbyMS12GetMainUnderrun = (int (*)())dlsym(mDolbyMS12LibHanle, "get_main_underrun");
+    if (!FuncDolbyMS12GetMainUnderrun) {
+        ALOGW("%s, dlsym FuncDolbyMS12GetMainUnderrun failed\n", __FUNCTION__);
+    }
+
+    FuncDolbyMS12SetSync = (void (*)(int))dlsym(mDolbyMS12LibHanle, "ms12_set_sync");
+    if (!FuncDolbyMS12SetSync) {
+        ALOGW("%s, dlsym FuncDolbyMS12SetSync failed\n", __FUNCTION__);
+    }
+
+#endif
+
     ALOGD("-%s() line %d get libdolbyms12 success!", __FUNCTION__, __LINE__);
     return 0;
 
@@ -339,7 +356,10 @@ void DolbyMS12::ReleaseLibHandle(void)
     FuncDolbyMS12SetDebugLevel = NULL;
     FuncDolbyMS12GetNBytesConsumedSysSound = NULL;
     FuncDolbyMS12GetTotalNFramesDelay = NULL;
-
+#ifdef USE_MSYNC
+    FuncDolbyMS12GetMainUnderrun = NULL;
+    FuncDolbyMS12SetSync = NULL;
+#endif
     if (mDolbyMS12LibHanle != NULL) {
         dlclose(mDolbyMS12LibHanle);
         mDolbyMS12LibHanle = NULL;
@@ -887,7 +907,33 @@ int DolbyMS12::DolbyMS12HWSyncChecinPTS(int offset, int apts)
     return ret;
 }
 
+#ifdef USE_MSYNC
+int DolbyMS12::DolbyMS12GetMainUnderrun()
+{
+    int ret = 0;
+    ALOGV("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12GetMainUnderrun) {
+        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
+        return ret;
+    }
 
+    ret = (*FuncDolbyMS12GetMainUnderrun)();
+    ALOGV("-%s() ret %d", __FUNCTION__, ret);
+    return ret;
+}
+
+void DolbyMS12::DolbyMS12SetSync(int sync)
+{
+    ALOGV("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12SetSync) {
+        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
+        return;
+    }
+
+    (*FuncDolbyMS12SetSync)(sync);
+}
+
+#endif
 
 /*--------------------------------------------------------------------------*/
 }   // namespace android

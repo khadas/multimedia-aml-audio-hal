@@ -131,6 +131,7 @@ add_library(audio_hal SHARED
 	audio_hal/audio_mediasync_wrap.c
 	audio_hal/audio_hdmi_util.c
 	audio_hal/aml_audio_hal_avsync.c
+	audio_hal/tinyalsa_ext.c
 	utils/aml_hw_mixer.c
 	utils/alsa_device_parser.c
 	utils/aml_alsa_mixer.c
