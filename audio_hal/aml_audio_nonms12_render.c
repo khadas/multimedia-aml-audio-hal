@@ -425,7 +425,8 @@ static void dts_decoder_config_prepare(struct audio_stream_out *stream, aml_dca_
     return;
 }
 
-static void mad_decoder_config_prepare(struct audio_stream_out *stream, aml_mad_config_t * mad_config){
+static void mad_decoder_config_prepare(struct audio_stream_out *stream, aml_mad_config_t * mad_config)
+{
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     mad_config->channel    = aml_out->hal_ch;
     mad_config->samplerate = aml_out->hal_rate;
@@ -433,7 +434,8 @@ static void mad_decoder_config_prepare(struct audio_stream_out *stream, aml_mad_
     return;
 }
 
-static void faad_decoder_config_prepare(struct audio_stream_out *stream, aml_faad_config_t * faad_config){
+static void faad_decoder_config_prepare(struct audio_stream_out *stream, aml_faad_config_t * faad_config)
+{
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
 
     faad_config->channel    = aml_out->hal_ch;
@@ -456,13 +458,24 @@ static void pcm_decoder_config_prepare(struct audio_stream_out *stream, aml_pcm_
     return;
 }
 
-int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t format, aml_dec_config_t * dec_config)
+static void flac_decoder_config_prepare(struct audio_stream_out *stream, aml_flac_config_t * flac_config)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
+
+    flac_config->channel    = aml_out->hal_ch;
+    flac_config->samplerate = aml_out->hal_rate;
+    flac_config->flac_format = aml_out->hal_format;
+
+    return;
+}
+
+int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t format, aml_dec_config_t *dec_config)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
     struct aml_audio_patch *patch = adev->audio_patch;
     aml_demux_audiopara_t *demux_info = NULL;
-    if (patch ) {
+    if (patch) {
         demux_info = (aml_demux_audiopara_t *)patch->demux_info;
     }
 
@@ -501,6 +514,9 @@ int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t f
     case AUDIO_FORMAT_AAC_LATM: {
         faad_decoder_config_prepare(stream, &dec_config->faad_config);
         break;
+    }
+    case AUDIO_FORMAT_FLAC: {
+        flac_decoder_config_prepare(stream, &dec_config->flac_config);
     }
     default:
         break;

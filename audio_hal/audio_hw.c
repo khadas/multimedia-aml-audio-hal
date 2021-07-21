@@ -6414,7 +6414,6 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
                 if (ret < 0) {
                     ALOGE("aml_decoder_init failed");
                 }
-
             }
 
         }
@@ -6447,7 +6446,7 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
             if (aml_out->status == STREAM_HW_WRITING) {
                 aml_alsa_output_close(stream);
                 aml_out->status = STREAM_STANDBY;
-                aml_audio_set_spdif_format(PORT_SPDIF, AML_STEREO_PCM,aml_out);
+                aml_audio_set_spdif_format(PORT_SPDIF, AML_STEREO_PCM, aml_out);
             }
             pthread_mutex_unlock(&adev->alsa_pcm_lock);
             //FIXME. also need check the sample rate and channel num.
@@ -7210,6 +7209,8 @@ hwsync_rewrite:
 #endif
         ret = aml_audio_ms12_render(stream, write_buf, write_bytes);
     } else if (eDolbyDcvLib == adev->dolby_lib_type) {
+        ret = aml_audio_nonms12_render(stream, write_buf, write_bytes);
+    } else {
         ret = aml_audio_nonms12_render(stream, write_buf, write_bytes);
     }
 

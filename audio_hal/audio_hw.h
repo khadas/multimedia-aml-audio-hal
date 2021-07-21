@@ -712,7 +712,7 @@ struct aml_stream_out {
     bool is_sink_format_prepared;
     bool is_ms12_main_decoder;
     aml_dec_config_t  dec_config;               /*store the decode config*/
-    aml_dec_t *aml_dec;                        /*store the decoder handle*/
+    aml_dec_t *aml_dec;                         /*store the decoder handle*/
     int ad_substream_supported;
     aml_audio_resample_t *resample_handle;
     aml_audio_speed_t *speed_handle;

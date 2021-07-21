@@ -151,7 +151,7 @@ static  int load_mad_decoder_lib(struct mad_dec_t *mad_dec)
     return 0;
 }
 
-static int mad_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t * dec_config)
+static int mad_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t *dec_config)
 {
     struct mad_dec_t *mad_dec;
     aml_dec_t  *aml_dec = NULL;
@@ -160,7 +160,7 @@ static int mad_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t * dec_config
     dec_data_info_t * ad_dec_pcm_data = NULL;
 
     if (dec_config == NULL) {
-        ALOGE("AAC config is NULL\n");
+        ALOGE("mad config is NULL\n");
         return -1;
     }
     mad_config = &dec_config->mad_config;
@@ -184,7 +184,7 @@ static int mad_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t * dec_config
     aml_dec = &mad_dec->aml_dec;
 
     memcpy(&mad_dec->mad_config, mad_config, sizeof(aml_mad_config_t));
-    ALOGI("AAC format=%d samplerate =%d ch=%d\n", mad_config->mpeg_format,
+    ALOGI("MAD format=%#x samplerate =%d ch=%d\n", mad_config->mpeg_format,
           mad_config->samplerate, mad_config->channel);
 
     dec_pcm_data = &aml_dec->dec_pcm_data;

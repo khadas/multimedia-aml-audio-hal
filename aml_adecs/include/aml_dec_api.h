@@ -160,6 +160,12 @@ typedef struct aml_mad_config {
     int channel;
 } aml_mad_config_t;
 
+typedef struct aml_flac_config {
+    audio_format_t flac_format;
+    int samplerate;
+    int channel;
+} aml_flac_config_t;
+
 typedef struct aml_dec_config {
     /*config for decoder init*/
     aml_dcv_config_t dcv_config;
@@ -167,6 +173,7 @@ typedef struct aml_dec_config {
     aml_mad_config_t mad_config;
     aml_faad_config_t faad_config;
     aml_pcm_config_t pcm_config;
+    aml_flac_config_t flac_config;
 
     /*config for runtime*/
     bool ad_decoder_supported;

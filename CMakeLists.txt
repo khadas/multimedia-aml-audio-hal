@@ -78,6 +78,7 @@ add_library(audio_hal SHARED
 	aml_adecs/aml_dts_dec_api.c
 	aml_adecs/aml_mpeg_dec_api.c
 	aml_adecs/aml_pcm_dec_api.c
+	aml_adecs/aml_flac_dec_api.c
 	aml_parser/ac3_parser_utils.c
 	aml_parser/aml_ac3_parser.c
 	aml_parser/aml_audio_ac3parser.c
