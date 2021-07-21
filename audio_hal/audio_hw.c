@@ -4555,6 +4555,39 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+#ifdef BUILD_LINUX
+    ret = str_parms_get_str(parms, "setenv", value, sizeof(value));
+    if (ret >= 0) {
+        char *var = strtok(value, ",");
+        if (var) {
+            char *val = var + strlen(var) + 1;
+            if (strlen(val) > 0) {
+                if ((setenv(var, val, 1)) == 0) {
+                    ALOGI("setenv %s=%s success", var, val);
+                    ret = 0;
+                    goto exit;
+                } else {
+                    ALOGE("setenv %s=%s failed", var, val);
+                    ret = -EINVAL;
+                    goto exit;
+                }
+            } else {
+                unsetenv(var);
+                ALOGI("env %s unset", var);
+
+#ifdef DIAG_LOG
+                if (strcmp(var, "AV_PROGRESSION") == 0) {
+                    pthread_mutex_lock(&adev->diag_log_lock);
+                    diag_log_close(adev);
+                    pthread_mutex_unlock(&adev->diag_log_lock);
+                }
+#endif
+
+            }
+        }
+        goto exit;
+    }
+#endif
 exit:
     str_parms_destroy (parms);
     /* always success to pass VTS */
