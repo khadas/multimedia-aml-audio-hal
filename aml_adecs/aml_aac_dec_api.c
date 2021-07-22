@@ -25,6 +25,7 @@
 #include "aml_malloc_debug.h"
 
 #define FAAD_LIB_PATH "/vendor/lib/libfaad.so"
+#define FAAD_LIB_PATH1 "/usr/lib/libfaad.so"//Linux Platform so is in /usr/lib/
 
 #define AAC_MAX_LENGTH (1024 * 64)
 #define AAC_REMAIN_BUFFER_SIZE (4096 * 10)
@@ -109,11 +110,13 @@ static  int load_faad_decoder_lib(struct aac_dec_t *aac_dec)
     faad_decoder_operations_t *ad_faad_op = &aac_dec->ad_faad_op;
     aac_dec->pdecoder = dlopen(FAAD_LIB_PATH, RTLD_NOW);
     if (!aac_dec->pdecoder) {
-        ALOGE("%s, failed to open (libfaad.so), %s\n", __FUNCTION__, dlerror());
-        return -1;
-    } else {
-        ALOGV("<%s::%d>--[faad_op->pdecoder]", __FUNCTION__, __LINE__);
+        aac_dec->pdecoder = dlopen(FAAD_LIB_PATH1, RTLD_NOW);
+        if (!aac_dec->pdecoder) {
+            ALOGE("%s, failed to open (libfaad.so), %s\n", __FUNCTION__, dlerror());
+            return -1;
+        }
     }
+    ALOGV("<%s::%d>--[faad_op->pdecoder]", __FUNCTION__, __LINE__);
 
     faad_op->init = ad_faad_op->init = (int (*) (void *)) dlsym(aac_dec->pdecoder, "audio_dec_init");
     if (faad_op->init == NULL) {
