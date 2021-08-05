@@ -9104,7 +9104,7 @@ exit:
     return ret;
 }
 
-static int adev_dump(const audio_hw_device_t *device, int fd)
+static char *adev_dump(const audio_hw_device_t *device, int fd)
 {
     struct aml_audio_device* aml_dev = (struct aml_audio_device*)device;
 
@@ -9113,7 +9113,18 @@ static int adev_dump(const audio_hw_device_t *device, int fd)
     const int kSleepTimeMS = 100;
     int retry = kNumRetries;
     int i;
+    int size;
+    char *string = NULL;
+
     aml_dev->debug_flag = aml_audio_get_debug_flag();
+
+#ifdef BUILD_LINUX
+    fd = open("/tmp/haldump", O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+    if (fd < 0) {
+        ALOGE("Cannot access /tmp for dump");
+        return NULL;
+    }
+#endif
 
     dprintf(fd, "\n----------------------------[AML_HAL] primary audio hal[dev:%p]----------------------------\n", aml_dev);
     while (retry > 0 && pthread_mutex_trylock(&aml_dev->lock) != 0) {
@@ -9162,7 +9173,19 @@ static int adev_dump(const audio_hw_device_t *device, int fd)
     a2dp_hal_dump(aml_dev, fd);
 #endif
 
-    return 0;
+#ifdef BUILD_LINUX
+    size = lseek(fd, 0, SEEK_CUR);
+    string = calloc(size + 1, 1);
+    if (string) {
+        lseek(fd, 0, SEEK_SET);
+        read(fd, string, size);
+    }
+
+    close(fd);
+    unlink("/tmp/haldump");
+#endif
+
+    return string;
 }
 
 pthread_mutex_t adev_mutex = PTHREAD_MUTEX_INITIALIZER;

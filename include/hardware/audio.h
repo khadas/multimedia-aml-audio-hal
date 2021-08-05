@@ -792,7 +792,7 @@ struct audio_hw_device {
                            size_t *mic_count);
 
     /** This method dumps the state of the audio hardware */
-    int (*dump)(const struct audio_hw_device *dev, int fd);
+    char * (*dump)(const struct audio_hw_device *dev, int fd);
 
     /**
      * set the audio mute status for all audio activities.  If any value other
