@@ -1911,11 +1911,12 @@ void *audio_dtv_patch_output_threadloop(void *data)
     }
     aml_dev->mix_init_flag = false;
     pthread_mutex_unlock(&aml_dev->lock);
-#ifdef TV_AUDIO_OUTPUT
-    patch->output_src = AUDIO_DEVICE_OUT_SPEAKER;
-#else
-    patch->output_src = AUDIO_DEVICE_OUT_AUX_DIGITAL;
-#endif
+    if (aml_dev->is_TV) {
+        patch->output_src = AUDIO_DEVICE_OUT_SPEAKER;
+    } else {
+        patch->output_src = AUDIO_DEVICE_OUT_AUX_DIGITAL;
+    }
+
     if (aml_dev->out_device & AUDIO_DEVICE_OUT_ALL_A2DP)
         patch->output_src = aml_dev->out_device;
 
@@ -2889,11 +2890,12 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
     }
     aml_dev->mix_init_flag = false;
     pthread_mutex_unlock(&aml_dev->lock);
-#ifdef TV_AUDIO_OUTPUT
-    patch->output_src = AUDIO_DEVICE_OUT_SPEAKER;
-#else
-    patch->output_src = AUDIO_DEVICE_OUT_AUX_DIGITAL;
-#endif
+    if (aml_dev->is_TV) {
+        patch->output_src = AUDIO_DEVICE_OUT_SPEAKER;
+    } else {
+        patch->output_src = AUDIO_DEVICE_OUT_AUX_DIGITAL;
+    }
+
     if (aml_dev->out_device & AUDIO_DEVICE_OUT_ALL_A2DP)
         patch->output_src = aml_dev->out_device;
 

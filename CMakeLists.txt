@@ -135,6 +135,8 @@ add_library(audio_hal SHARED
 	audio_hal/audio_hdmi_util.c
 	audio_hal/aml_audio_hal_avsync.c
 	audio_hal/tinyalsa_ext.c
+	audio_hal/aml_config_parser.c
+	utils/cJSON/cJSON.c
 	utils/aml_hw_mixer.c
 	utils/alsa_device_parser.c
 	utils/aml_alsa_mixer.c
@@ -190,6 +192,7 @@ target_include_directories(audio_hal PRIVATE
 	./aml_parser
 	./utils/include
 	./utils/tinyalsa/include
+	./utils/cJSON
 	./libms12_v24/include
 	./amlogic_AQ_tools
 	./dtv_audio_utils/audio_read_api

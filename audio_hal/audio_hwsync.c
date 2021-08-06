@@ -698,7 +698,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         }
     } else {
 
-        ALOGE("%s,================first_apts_flag:%d, apts:%d, latency_pts:%d, offset:%d\n", __func__, p_hwsync->first_apts_flag, apts, latency_pts, offset);
+        //ALOGE("%s,================first_apts_flag:%d, apts:%d, latency_pts:%d, offset:%d\n", __func__, p_hwsync->first_apts_flag, apts, latency_pts, offset);
 #ifndef USE_MSYNC
         if (p_hwsync->first_apts_flag == false && offset > 0 && (apts >= latency_pts)) {
 #else

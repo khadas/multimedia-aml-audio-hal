@@ -956,6 +956,12 @@ ssize_t hw_write(struct audio_stream_out *stream
                     , size_t bytes
                     , audio_format_t output_format);
 
+/** API for set the config file name */
+int audio_hw_device_set_config_file(char * file_name);
+
+/** API for set the config jason */
+int audio_hw_device_set_config_jason(void *config_jason);
+
 int do_output_standby_l(struct audio_stream *stream);
 
 ssize_t out_write_new(struct audio_stream_out *stream,
