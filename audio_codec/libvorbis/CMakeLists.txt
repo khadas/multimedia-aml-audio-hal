@@ -1,0 +1,39 @@
+cmake_minimum_required(VERSION 3.8)
+
+include(GNUInstallDirs)
+
+#############################################
+# vorbis
+#############################################
+aux_source_directory(. SRC_FILES)
+aux_source_directory(./Tremolo SRC_FILES)
+message(WARNING "PROJECT_SOURCE_DIR is ${PROJECT_SOURCE_DIR}")
+message(WARNING "SRC_FILES is ${SRC_FILES}")
+
+ENABLE_LANGUAGE(C ASM)
+add_library(vorbis-aml SHARED
+    ${SRC_FILES}
+    Tremolo/bitwiseARM.s
+    Tremolo/dpen.s
+    Tremolo/floor1ARM.s
+    Tremolo/mdctARM.s
+)
+
+target_compile_options(vorbis-aml PRIVATE -Werror -Wmissing-field-initializers -Wunused-parameter -Wunused-variable -Wsign-compare)
+
+add_definitions(-DUSE_DEFAULT_STDLIB  -DUSE_VORBIS_DECODER)
+
+#set_target_properties(vorbis-aml PROPERTIES
+#    VERSION ${PROJECT_VERSION}
+#    SOVERSION 1)
+
+target_include_directories(vorbis-aml PRIVATE
+    ${PROJECT_SOURCE_DIR}/audio_codec/libvorbis
+    ${PROJECT_SOURCE_DIR}/audio_codec/libvorbis/Tremolo
+    ${PROJECT_SOURCE_DIR}/amadec)
+
+#target_link_libraries(vorbis-aml
+#    libutils libz libbinder libdl libcutils libc liblog)
+
+install(TARGETS vorbis-aml
+    LIBRARY DESTINATION "lib")
