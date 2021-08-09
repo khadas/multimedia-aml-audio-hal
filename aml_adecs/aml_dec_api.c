@@ -38,6 +38,7 @@
 #include "aml_mpeg_dec_api.h"
 #include "aml_aac_dec_api.h"
 #include "aml_flac_dec_api.h"
+#include "aml_vorbis_dec_api.h"
 #define AML_DEC_FRAGMENT_FRAMES     (512)
 #define AML_DEC_MAX_FRAMES          (AML_DEC_FRAGMENT_FRAMES * 4)
 
@@ -71,6 +72,9 @@ static aml_dec_func_t * get_decoder_function(audio_format_t format)
     }
     case AUDIO_FORMAT_FLAC: {
         return &aml_flac_func;
+    }
+    case AUDIO_FORMAT_VORBIS: {
+        return &aml_vorbis_func;
     }
     default:
         ALOGE("[%s:%d] doesn't support decoder format:%#x", __func__, __LINE__, format);

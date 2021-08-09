@@ -201,7 +201,6 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                     && is_dts_format(aml_out->hal_internal_format)
                     && dec_pcm_data->data_sr > 48000
                     && check_sink_pcm_sr_cap(adev, dec_pcm_data->data_sr)) {
-
                     dts_pcm_direct_output = true;
                 }
 
@@ -462,9 +461,20 @@ static void flac_decoder_config_prepare(struct audio_stream_out *stream, aml_fla
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
 
-    flac_config->channel    = aml_out->hal_ch;
+    flac_config->channel = aml_out->hal_ch;
     flac_config->samplerate = aml_out->hal_rate;
     flac_config->flac_format = aml_out->hal_format;
+
+    return;
+}
+
+static void vorbis_decoder_config_prepare(struct audio_stream_out *stream, aml_vorbis_config_t * vorbis_config)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
+
+    vorbis_config->channel = aml_out->hal_ch;
+    vorbis_config->samplerate = aml_out->hal_rate;
+    vorbis_config->vorbis_format = aml_out->hal_format;
 
     return;
 }
@@ -517,10 +527,14 @@ int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t f
     }
     case AUDIO_FORMAT_FLAC: {
         flac_decoder_config_prepare(stream, &dec_config->flac_config);
+        break;
+    }
+    case AUDIO_FORMAT_VORBIS: {
+        vorbis_decoder_config_prepare(stream, &dec_config->vorbis_config);
+        break;
     }
     default:
         break;
-
     }
 
     return 0;
