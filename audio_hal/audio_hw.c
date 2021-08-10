@@ -72,6 +72,8 @@
 #include "audio_dtv_ad.h"
 #include "aml_audio_ease.h"
 #include "aml_audio_spdifout.h"
+#include "aml_config_parser.h"
+
 #ifdef BUILD_LINUX
 #include "atomic.h"
 #endif
@@ -190,6 +192,10 @@
 #define DISABLE_CONTINUOUS_OUTPUT "persist.vendor.audio.continuous.disable"
 /* Maximum string length in audio hal. */
 #define AUDIO_HAL_CHAR_MAX_LEN                          (64)
+
+#define AUDIO_JASON_FILE_MAXLENGTH (256)
+static char aml_audio_jason_file[AUDIO_JASON_FILE_MAXLENGTH];
+cJSON *audio_config_jason = NULL;
 
 static const struct pcm_config pcm_config_out = {
     .channels = 2,
@@ -9449,6 +9455,25 @@ static int adev_remove_device_effect(struct audio_hw_device *dev,
 #define MAX_SPK_EXTRA_LATENCY_MS (100)
 #define DEFAULT_SPK_EXTRA_LATENCY_MS (15)
 
+#define TV_PLATFORM  "TV_Platform"
+#define STB_PLATFORM "STB_Platform"
+#define DUAL_SPDIF "Dual_Spdif_Support"
+#define FORCE_DDP "Ms12_Force_Ddp_Out"
+
+static int get_jason_int_value(cJSON * config, char* key)
+{
+    cJSON *temp = NULL;
+    int value = 0;
+    if (config) {
+        temp = cJSON_GetObjectItem(config, key);
+        aml_printf_cJSON(key, temp);
+        if (temp) {
+            value = temp->valueint;
+        }
+    }
+    return value;
+}
+
 static int adev_open(const hw_module_t* module, const char* name, hw_device_t** device)
 {
     struct aml_audio_device *adev;
@@ -9602,6 +9627,19 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     }
     memset(adev->spdif_output_buf, 0, buffer_size);
 
+    /*get audio config*/
+    cJSON *config_root = NULL;
+    /*check whether jason config is set*/
+    if (audio_config_jason) {
+        config_root = audio_config_jason;
+    } else {
+        /*check is there any confi file*/
+        config_root = aml_config_parser(aml_audio_jason_file);
+    }
+    if (config_root == NULL) {
+        ALOGE("Config file parsing error\n");
+    }
+
     /* init speaker tuning buffers */
     ret = ring_buffer_init(&(adev->spk_tuning_rbuf), spk_tuning_buf_size);
     if (ret < 0) {
@@ -9638,8 +9676,13 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->ms12_ott_enable = false;
     adev->continuous_audio_mode_default = 0;
     adev->need_remove_conti_mode = false;
+#ifdef BUILD_LINUX
+    adev->dual_spdif_support = get_jason_int_value(config_root,DUAL_SPDIF);
+    adev->ms12_force_ddp_out = get_jason_int_value(config_root,FORCE_DDP);
+#else
     adev->dual_spdif_support = property_get_bool("ro.vendor.platform.is.dualspdif", false);
     adev->ms12_force_ddp_out = property_get_bool("ro.vendor.platform.is.forceddp", false);
+#endif
     adev->spdif_enable = true;
 
     /*for ms12 case, we set default continuous mode*/
@@ -9698,6 +9741,28 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     startReceiveAudioData();
 #endif
 /*[SEI-zhaopf-2018-10-29] add for HBG remote audio support } */
+#ifdef BUILD_LINUX
+    adev->is_TV = get_jason_int_value(config_root,TV_PLATFORM);
+    if (adev->is_TV ) {
+        adev->default_alsa_ch =  aml_audio_get_default_alsa_output_ch();
+        /*Now SoundBar type is depending on TV audio as only tv support multi-channel LPCM output*/
+        adev->is_SBR = aml_audio_check_sbr_product();
+        ALOGI("%s(), TV platform,soundbar platform %d", __func__,adev->is_SBR);
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+        ret = aml_audio_delay_init();
+        if (ret < 0) {
+            ALOGE("[%s:%d] aml_audio_delay_init fail", __func__, __LINE__);
+            goto err;
+        }
+#endif
+    } else {
+        /* for stb/ott, fixed 2 channels speaker output for alsa*/
+        adev->default_alsa_ch = 2;
+        adev->is_STB = get_jason_int_value(config_root,STB_PLATFORM);
+        ALOGI("%s(), OTT platform", __func__);
+    }
+
+#else
 #if defined(TV_AUDIO_OUTPUT)
     adev->is_TV = true;
     adev->default_alsa_ch =  aml_audio_get_default_alsa_output_ch();
@@ -9717,7 +9782,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->is_STB = property_get_bool("ro.vendor.platform.is.stb", false);
     ALOGI("%s(), OTT platform", __func__);
 #endif
-
+#endif
 
 #ifdef ENABLE_AEC_APP
     pthread_mutex_lock(&adev->lock);
@@ -9776,7 +9841,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         }
     }
 
-    ALOGD("%s: exit", __func__);
+    ALOGD("%s: exit  dual_spdif_support(%d)", __func__, adev->dual_spdif_support);
     return 0;
 
 Err_MS12_MesgThreadCreate:
@@ -9792,6 +9857,31 @@ err:
     pthread_mutex_unlock(&adev_mutex);
     return ret;
 }
+
+int audio_hw_device_set_config_file(char * file_name) {
+    int name_length = 0;
+    if (file_name == NULL) {
+        return -1;
+    }
+    name_length = strlen(file_name);
+    if (name_length >= AUDIO_JASON_FILE_MAXLENGTH) {
+        return -1;
+    }
+    memcpy(aml_audio_jason_file, file_name, name_length);
+    aml_audio_jason_file[name_length] = '\0';
+
+    return 0;
+}
+
+int audio_hw_device_set_config_jason(void *config_jason) {
+    if (config_jason == NULL) {
+        return -1;
+    }
+    audio_config_jason = (cJSON *)config_jason;
+
+    return 0;
+}
+
 
 static struct hw_module_methods_t hal_module_methods = {
     .open = adev_open,
