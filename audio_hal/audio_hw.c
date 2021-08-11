@@ -7477,6 +7477,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
         aml_out->last_frames_postion = aml_out->frame_write_sum;
     }
 
+#ifndef BUILD_LINUX
     /*if system sound return too quickly, it will causes audio flinger underrun*/
     if (eDolbyMS12Lib == adev->dolby_lib_type && continous_mode(adev)) {
         uint64_t cost_time_us = 0;
@@ -7491,6 +7492,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
             aml_audio_sleep(minum_sleep_time_us - cost_time_us);
         }
     }
+#endif
     return bytes;
 
 }
