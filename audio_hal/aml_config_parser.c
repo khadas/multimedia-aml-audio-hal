@@ -92,4 +92,3 @@ cJSON * aml_config_parser(char * config_files)
 
     return config_root;
 }
-

@@ -47,7 +47,7 @@
 #include <aml_android_utils.h>
 #include <aml_data_utils.h>
 
-
+#include "aml_config_data.h"
 #include "aml_audio_stream.h"
 #include "audio_hw.h"
 #include "audio_hw_dtv.h"
@@ -70,6 +70,8 @@
 #include "aml_ddp_dec_api.h"
 #include "aml_dts_dec_api.h"
 #include "audio_dtv_utils.h"
+
+#define DTV_SKIPAMADEC "Dtv_Audio_Skipamadec"
 
 static struct timespec start_time;
 const unsigned int mute_dd_frame[] = {
@@ -3457,7 +3459,8 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     }
 
     /* now  only sc2  can use new dtv path */
-    if (property_get_bool("vendor.dtv.audio.skipamadec",false) && aml_dev->is_multi_demux) {
+    int dtv_audio_skipamadec = aml_get_jason_int_value(DTV_SKIPAMADEC);
+    if (dtv_audio_skipamadec && aml_dev->is_multi_demux) {
         patch->skip_amadec_flag = true;
     } else {
         patch->skip_amadec_flag = false;

@@ -100,6 +100,7 @@
 #include "dmx_audio_es.h"
 #include "aml_audio_ms12_render.h"
 #include "aml_audio_nonms12_render.h"
+#include "aml_config_data.h"
 
 #ifndef BUILD_LINUX
 #define ENABLE_NANO_NEW_PATH 1
@@ -192,10 +193,6 @@
 #define DISABLE_CONTINUOUS_OUTPUT "persist.vendor.audio.continuous.disable"
 /* Maximum string length in audio hal. */
 #define AUDIO_HAL_CHAR_MAX_LEN                          (64)
-
-#define AUDIO_JASON_FILE_MAXLENGTH (256)
-static char aml_audio_jason_file[AUDIO_JASON_FILE_MAXLENGTH];
-cJSON *audio_config_jason = NULL;
 
 static const struct pcm_config pcm_config_out = {
     .channels = 2,
@@ -1434,7 +1431,6 @@ exit:
 #ifndef USE_MSYNC
         aml_hwsync_set_tsync_pause(out->hwsync);
 #endif
-        aml_hwsync_set_tsync_pause(out->hwsync);
         out->tsync_status = TSYNC_STATUS_PAUSED;
     }
     pthread_mutex_unlock (&adev->lock);
@@ -9531,20 +9527,6 @@ static int adev_remove_device_effect(struct audio_hw_device *dev,
 #define DUAL_SPDIF "Dual_Spdif_Support"
 #define FORCE_DDP "Ms12_Force_Ddp_Out"
 
-static int get_jason_int_value(cJSON * config, char* key)
-{
-    cJSON *temp = NULL;
-    int value = 0;
-    if (config) {
-        temp = cJSON_GetObjectItem(config, key);
-        aml_printf_cJSON(key, temp);
-        if (temp) {
-            value = temp->valueint;
-        }
-    }
-    return value;
-}
-
 static int adev_open(const hw_module_t* module, const char* name, hw_device_t** device)
 {
     struct aml_audio_device *adev;
@@ -9698,17 +9680,8 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     }
     memset(adev->spdif_output_buf, 0, buffer_size);
 
-    /*get audio config*/
-    cJSON *config_root = NULL;
-    /*check whether jason config is set*/
-    if (audio_config_jason) {
-        config_root = audio_config_jason;
-    } else {
-        /*check is there any confi file*/
-        config_root = aml_config_parser(aml_audio_jason_file);
-    }
-    if (config_root == NULL) {
-        ALOGE("Config file parsing error\n");
+    if (0 != aml_audio_config_parser()) {
+        ALOGE("%s() Audio Config file parsing error\n",__FUNCTION__);
     }
 
     /* init speaker tuning buffers */
@@ -9748,8 +9721,8 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->continuous_audio_mode_default = 0;
     adev->need_remove_conti_mode = false;
 #ifdef BUILD_LINUX
-    adev->dual_spdif_support = get_jason_int_value(config_root,DUAL_SPDIF);
-    adev->ms12_force_ddp_out = get_jason_int_value(config_root,FORCE_DDP);
+    adev->dual_spdif_support = aml_get_jason_int_value(DUAL_SPDIF);
+    adev->ms12_force_ddp_out = aml_get_jason_int_value(FORCE_DDP);
 #else
     adev->dual_spdif_support = property_get_bool("ro.vendor.platform.is.dualspdif", false);
     adev->ms12_force_ddp_out = property_get_bool("ro.vendor.platform.is.forceddp", false);
@@ -9813,7 +9786,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 #endif
 /*[SEI-zhaopf-2018-10-29] add for HBG remote audio support } */
 #ifdef BUILD_LINUX
-    adev->is_TV = get_jason_int_value(config_root,TV_PLATFORM);
+    adev->is_TV = aml_get_jason_int_value(TV_PLATFORM);
     if (adev->is_TV ) {
         adev->default_alsa_ch =  aml_audio_get_default_alsa_output_ch();
         /*Now SoundBar type is depending on TV audio as only tv support multi-channel LPCM output*/
@@ -9829,7 +9802,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     } else {
         /* for stb/ott, fixed 2 channels speaker output for alsa*/
         adev->default_alsa_ch = 2;
-        adev->is_STB = get_jason_int_value(config_root,STB_PLATFORM);
+        adev->is_STB = aml_get_jason_int_value(STB_PLATFORM);
         ALOGI("%s(), OTT platform", __func__);
     }
 
@@ -9928,31 +9901,6 @@ err:
     pthread_mutex_unlock(&adev_mutex);
     return ret;
 }
-
-int audio_hw_device_set_config_file(char * file_name) {
-    int name_length = 0;
-    if (file_name == NULL) {
-        return -1;
-    }
-    name_length = strlen(file_name);
-    if (name_length >= AUDIO_JASON_FILE_MAXLENGTH) {
-        return -1;
-    }
-    memcpy(aml_audio_jason_file, file_name, name_length);
-    aml_audio_jason_file[name_length] = '\0';
-
-    return 0;
-}
-
-int audio_hw_device_set_config_jason(void *config_jason) {
-    if (config_jason == NULL) {
-        return -1;
-    }
-    audio_config_jason = (cJSON *)config_jason;
-
-    return 0;
-}
-
 
 static struct hw_module_methods_t hal_module_methods = {
     .open = adev_open,
