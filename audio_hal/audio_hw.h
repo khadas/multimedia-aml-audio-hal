@@ -803,11 +803,11 @@ struct aml_stream_in {
 typedef  int (*do_standby_func)(struct aml_stream_out *out);
 typedef  int (*do_startup_func)(struct aml_stream_out *out);
 
-inline int continous_mode(struct aml_audio_device *adev)
+static inline int continous_mode(struct aml_audio_device *adev)
 {
     return adev->continuous_audio_mode;
 }
-inline bool direct_continous(struct audio_stream_out *stream)
+static inline bool direct_continous(struct audio_stream_out *stream)
 {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = out->dev;
@@ -817,7 +817,7 @@ inline bool direct_continous(struct audio_stream_out *stream)
         return false;
     }
 }
-inline bool primary_continous(struct audio_stream_out *stream)
+static inline bool primary_continous(struct audio_stream_out *stream)
 {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = out->dev;
@@ -828,7 +828,7 @@ inline bool primary_continous(struct audio_stream_out *stream)
     }
 }
 /* called when adev locked */
-inline int dolby_stream_active(struct aml_audio_device *adev)
+static inline int dolby_stream_active(struct aml_audio_device *adev)
 {
     int i = 0;
     int is_dolby = 0;
@@ -848,7 +848,7 @@ inline int dolby_stream_active(struct aml_audio_device *adev)
 }
 
 /* called when adev locked */
-inline int dts_stream_active(struct aml_audio_device *adev)
+static inline int dts_stream_active(struct aml_audio_device *adev)
 {
     int i = 0;
     int is_dts = 0;
@@ -866,7 +866,7 @@ inline int dts_stream_active(struct aml_audio_device *adev)
 
 
 /* called when adev locked */
-inline int hwsync_lpcm_active(struct aml_audio_device *adev)
+static inline int hwsync_lpcm_active(struct aml_audio_device *adev)
 {
     int i = 0;
     int is_hwsync_lpcm = 0;
@@ -881,7 +881,7 @@ inline int hwsync_lpcm_active(struct aml_audio_device *adev)
     return is_hwsync_lpcm;
 }
 
-inline struct aml_stream_out *direct_active(struct aml_audio_device *adev)
+static inline struct aml_stream_out *direct_active(struct aml_audio_device *adev)
 {
     int i = 0;
     struct aml_stream_out *out = NULL;
@@ -894,7 +894,7 @@ inline struct aml_stream_out *direct_active(struct aml_audio_device *adev)
     return NULL;
 }
 
-inline bool is_bypass_submix_active(struct aml_audio_device *adev)
+static inline bool is_bypass_submix_active(struct aml_audio_device *adev)
 {
     int i = 0;
     struct aml_stream_out *out = NULL;
