@@ -1547,7 +1547,7 @@ static int out_pause_new (struct audio_stream_out *stream)
             pthread_mutex_lock(&ms12->lock);
             if ((aml_dev->ms12.dolby_ms12_enable == true) &&
                 (aml_dev->ms12.is_continuous_paused == false) &&
-                (aml_dev->ms12.ms12_main_stream_out != NULL)) {
+                (aml_out->write_func == MIXER_MAIN_BUFFER_WRITE)) {
                 audiohal_send_msg_2_ms12(ms12, MS12_MESG_TYPE_PAUSE);
             } else {
                 ALOGI("%s do nothing\n", __func__);
