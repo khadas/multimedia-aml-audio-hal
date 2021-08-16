@@ -4271,6 +4271,73 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
     #endif
+    {//add tsplayer compatible cmd
+        ret = str_parms_get_int(parms, "pid", &val);
+        if (ret >= 0) {
+            ALOGI("%s() get the audio pid %d\n", __func__, val);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_PID, val);
+            goto exit;
+        }
+        ret = str_parms_get_int(parms, "demux_id", &val);
+        if (ret > 0) {
+            ALOGI("%s() get the audio demux_id %d\n", __func__, val);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_DEMUX_INFO, val);
+            goto exit;
+        }
+        ret = str_parms_get_int(parms, "fmt", &val);
+        if (ret > 0) {
+            ALOGI("%s() get the audio format %d\n", __func__, val);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_FMT, val);
+            goto exit;
+        }
+        ret = str_parms_get_int(parms, "mode", &val);
+        if (ret > 0) {
+            ALOGI("DTV sound mode %d ", val);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_OUTPUT_MODE, val);
+            goto exit;
+        }
+        ret = str_parms_get_int(parms, "has_dtv_video", &val);
+        if (ret > 0) {
+            ALOGI("%s() get the has video parameters %d \n", __func__, val);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_HAS_VIDEO, val);
+            goto exit;
+        }
+        ret = str_parms_get_int(parms, "associate_audio_mixing_enable", &val);
+        if (ret >= 0) {
+            adev->ad_switch_enable = val;
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_AD_ENABLE, val);
+            goto exit;
+        }
+        ret = str_parms_get_int(parms, "cmd", &val);
+        if (ret >= 0) {
+         switch (val) {
+         case 1:
+            ALOGI("%s() live AUDIO_DTV_PATCH_CMD_START\n", __func__);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_CONTROL, AUDIO_DTV_PATCH_CMD_OPEN);
+            usleep(1000*50);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_CONTROL, AUDIO_DTV_PATCH_CMD_START);
+            break;
+         case 2:
+            ALOGI("%s() live AUDIO_DTV_PATCH_CMD_PAUSE\n", __func__);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_CONTROL, AUDIO_DTV_PATCH_CMD_PAUSE);
+            break;
+         case 3:
+            ALOGI("%s() live AUDIO_DTV_PATCH_CMD_RESUME\n", __func__);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_CONTROL, AUDIO_DTV_PATCH_CMD_RESUME);
+            break;
+         case 4:
+            ALOGI("%s() live AUDIO_DTV_PATCH_CMD_STOP\n", __func__);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_CONTROL, AUDIO_DTV_PATCH_CMD_STOP);
+            usleep(1000*50);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_CONTROL, AUDIO_DTV_PATCH_CMD_CLOSE);
+            break;
+         default:
+            ALOGI("%s() live %d \n", __func__, val);
+            break;
+         }
+         goto exit;
+        }
+    }
     /* dvb cmd deal with start */
     {
         ret = str_parms_get_int(parms, "hal_param_dtv_patch_cmd", &val);
