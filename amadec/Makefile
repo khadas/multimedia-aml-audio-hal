@@ -12,7 +12,11 @@ TARGET_OBJS=adec-external-ctrl.o \
 	adec_omx_brige.o \
 	audio_out/dtv_patch_out.o \
 	audio_out/aml_resample.o \
-	audiodsp_update_format.o
+	audiodsp_update_format.o \
+	adec-wfd.o \
+	dsp/audiodsp-ctl.o \
+	feeder.o \
+	audio_out/alsa-out.o
 
 TARGET=libaudamadec.so
 

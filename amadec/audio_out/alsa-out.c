@@ -433,7 +433,11 @@ OUT:
     return port;
 }
 
+#ifdef BUILD_LINUX
+static size_t pcm_write(alsa_param_t * alsa_param, unsigned char * data, size_t count)
+#else
 static size_t pcm_write(alsa_param_t * alsa_param, u_char * data, size_t count)
+#endif
 {
     snd_pcm_sframes_t r;
     size_t result = 0;

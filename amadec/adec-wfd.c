@@ -34,6 +34,10 @@
 
 #define LOG_TAG "adec-wfd"
 
+#ifndef __unused
+#define __unused __attribute__((unused))
+#endif
+
 typedef struct {
     int codec_id;
     char    name[64];

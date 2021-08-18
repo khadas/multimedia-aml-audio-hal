@@ -31,7 +31,7 @@ TARGET=libdvbaudioutils.so
 
 INSTALL_DIR=${LIB_DIR}
 
-CFLAGS += -shared -lpthread -lm -lrt -llog -lcutils -DBUILD_LINUX
+CFLAGS += -shared -lamavutils -lpthread -lm -lrt -llog -lcutils -DBUILD_LINUX
 
 TOPDIR=$(shell pwd)
 SRC?=$(TOPDIR)
