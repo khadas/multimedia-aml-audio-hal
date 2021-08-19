@@ -615,6 +615,11 @@ static int alloc_mixer_state(struct audio_route *ar)
         if (!is_supported_ctl_type(type))
             continue;
 
+        if ((type == MIXER_CTL_TYPE_BYTE) && mixer_ctl_is_access_tlv_rw(ctl)) {
+            num_values += TLV_HEADER_SIZE;
+            ar->mixer_state[i].num_values += TLV_HEADER_SIZE;
+        }
+
         size_t value_sz = sizeof_ctl_type(type);
         ar->mixer_state[i].old_value.ptr = calloc(num_values, value_sz);
         ar->mixer_state[i].new_value.ptr = calloc(num_values, value_sz);
