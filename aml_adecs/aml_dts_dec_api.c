@@ -39,7 +39,7 @@
 
 
 #ifdef BUILD_LINUX
-#define DOLBY_DTSHD_LIB_PATH "/vendor/lib/libHwAudio_dtshd.so"
+#define DOLBY_DTSHD_LIB_PATH "/usr/lib/libHwAudio_dtshd.so"
 #else
 #define DOLBY_DTSHD_LIB_PATH     "/odm/lib/libHwAudio_dtshd.so"
 #endif
