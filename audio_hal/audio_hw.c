@@ -4272,6 +4272,12 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     }
     #endif
     {//add tsplayer compatible cmd
+        ret = str_parms_get_int(parms, "dual_decoder_support", &val);
+        if (ret >= 0) {
+            ALOGI("dual_decoder_support  set to %d\n", val);
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_AD_SUPPORT ,val);
+            goto exit;
+        }
         ret = str_parms_get_int(parms, "pid", &val);
         if (ret >= 0) {
             ALOGI("%s() get the audio pid %d\n", __func__, val);
