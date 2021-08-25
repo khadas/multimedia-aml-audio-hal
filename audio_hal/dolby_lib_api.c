@@ -38,7 +38,7 @@
 
 #ifdef BUILD_LINUX
 #define DOLBY_DCV_LIB_PATH_A "/usr/lib/libHwAudio_dcvdec.so"
-#define DTS_DCA_LIB_PATH_A "/vendor/lib/libHwAudio_dtshd.so"
+#define DTS_DCA_LIB_PATH_A "/usr/lib/libHwAudio_dtshd.so"
 #else
 #define DOLBY_DCV_LIB_PATH_A "/odm/lib/libHwAudio_dcvdec.so"
 #define DTS_DCA_LIB_PATH_A "/odm/lib/libHwAudio_dtshd.so"

@@ -9,6 +9,7 @@ add_subdirectory("libms12_v24")
 add_subdirectory("audio_codec/libfaad")
 add_subdirectory("audio_codec/libmad")
 add_subdirectory("audio_codec/libvorbis")
+add_subdirectory("audio_codec/libdts")
 add_subdirectory("audio_hal/libaudioprocessing")
 
 add_library(spdifenc STATIC
