@@ -115,7 +115,6 @@
 /*Google Voice Assistant channel_mask */
 #define BUILT_IN_MIC 12
 
-#define ENABLE_DTV_PATCH
 //#define SUBMIXER_V1_1
 #define HDMI_LATENCY_MS 60
 
@@ -2663,9 +2662,11 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
     }
 #endif
     else if (adev->patch_src == SRC_DTV && adev->tuner2mix_patch) {
+#ifdef USE_DTV
         ret = dtv_in_read(stream, buffer, bytes);
         apply_volume(adev->src_gain[adev->active_inport], buffer, sizeof(uint16_t), bytes);
         goto exit;
+#endif
     } else {
 
         /* when audio is unstable, need to mute the audio data for a while
@@ -3893,7 +3894,9 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 adev->patch_src = SRC_DTV;
                 if (adev->audio_patching == 0) {
                     ALOGI("[audiohal_kpi][%s] create dtv patch start.\n", __func__);
+#ifdef USE_DTV
                     ret = create_dtv_patch(dev, AUDIO_DEVICE_IN_TV_TUNER,AUDIO_DEVICE_OUT_SPEAKER);
+#endif
                     if (ret == 0) {
                         adev->audio_patching = 1;
                     }
@@ -3919,7 +3922,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             }
             ALOGI("%s, now the audio patch src is %s, the audio_patching is %d ", __func__,
                 patchSrc2Str(adev->patch_src), adev->audio_patching);
-#ifdef ENABLE_DTV_PATCH
+#ifdef USE_DTV
            if ((adev->patch_src == SRC_DTV) && adev->audio_patching) {
                 ALOGI("[audiohal_kpi] %s, now release the dtv patch now\n ", __func__);
                 ret = release_dtv_patch(adev);
@@ -3939,7 +3942,6 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 if (adev->active_outputs[STREAM_PCM_NORMAL] != NULL)
                     usecase_change_validate_l(adev->active_outputs[STREAM_PCM_NORMAL], true);
             }
-
             ret = create_dtv_patch(dev, AUDIO_DEVICE_IN_TV_TUNER,
                                    AUDIO_DEVICE_OUT_SPEAKER);
             if (ret == 0) {
@@ -3949,7 +3951,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             ALOGI("[audiohal_kpi] %s, now end create dtv patch the audio_patching is %d ", __func__, adev->audio_patching);
 
         } else if (strncmp(value, "atv", 3) == 0) {
-#ifdef ENABLE_DTV_PATCH
+#ifdef USE_DTV
             // need create patching
             if ((adev->patch_src == SRC_DTV) && adev->audio_patching) {
                 ALOGI ("[audiohal_kpi] %s, release dtv patching", __func__);
@@ -4267,6 +4269,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
     #endif
+#ifdef USE_DTV
     {//add tsplayer compatible cmd
         ret = str_parms_get_int(parms, "pid", &val);
         if (ret >= 0) {
@@ -4443,6 +4446,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             goto exit;
         }
     }
+#endif
     /* dvb cmd deal with end */
     ret = str_parms_get_str(parms, "sound_track", value, sizeof(value));
     if (ret > 0) {
@@ -4812,13 +4816,14 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         get_audio_indicator(adev, temp_buf);
         return strdup(temp_buf);
     }
+#ifdef USE_DTV
      else if (strstr (keys, "hal_param_dtv_latencyms") ) {
         int latancyms = dtv_patch_get_latency(adev);
         sprintf(temp_buf, "hal_param_dtv_latencyms=%d", latancyms);
         ALOGD("temp_buf %s", temp_buf);
         return strdup(temp_buf);
     }
-
+#endif
     return strdup("");
 }
 
@@ -6014,7 +6019,9 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             memset(aml_out->tmp_buffer_8ch, 0, (*output_buffer_bytes));
         }
     } else if (adev->patch_src == SRC_DTV && adev->tuner2mix_patch){
+#ifdef USE_DTV
         dtv_in_write(stream, buffer, bytes);
+#endif
     }
     if (adev->audio_patching) {
         output_mute(stream,output_buffer,output_buffer_bytes);
@@ -6100,8 +6107,10 @@ ssize_t hw_write (struct audio_stream_out *stream
                 }
             }
         }
+#ifdef USE_DTV
         if (is_dtv)
             audio_set_spdif_clock(aml_out, get_codec_type(output_format));
+#endif
         aml_out->status = STREAM_HW_WRITING;
     }
 
@@ -8925,8 +8934,11 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                     ALOGD("%s: patch exists, first release it", __func__);
                     ALOGD("%s: new input %#x, old input %#x",
                         __func__, inport, aml_dev->audio_patch->input_src);
-                    if (aml_dev->audio_patch->is_dtv_src)
+                    if (aml_dev->audio_patch->is_dtv_src) {
+#ifdef USE_DTV
                         release_dtv_patch(aml_dev);
+#endif
+                    }
                     else
                         release_patch(aml_dev);
                 }
@@ -8952,7 +8964,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                     }
                 }
             } else if ((inport == INPORT_TUNER) && (aml_dev->patch_src == SRC_DTV)) {
-#ifdef ENABLE_DTV_PATCH
+#ifdef USE_DTV
                  if (/*aml_dev->is_TV*/1) {
 
                      if (aml_dev->is_TV) {
@@ -9030,13 +9042,17 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                 if (aml_dev->is_TV) {
                     if (aml_dev->audio_patching) {
                         ALOGI("%s,!!!now release the dtv patch now\n ", __func__);
+#ifdef USE_DTV
                         ret = release_dtv_patch(aml_dev);
+#endif
                         if (!ret) {
                             aml_dev->audio_patching = 0;
                         }
                     }
                     ALOGI("%s, !!! now create the dtv patch now\n ", __func__);
+#ifdef USE_DTV
                     ret = create_dtv_patch(dev, AUDIO_DEVICE_IN_TV_TUNER, AUDIO_DEVICE_OUT_SPEAKER);
+#endif
                     if (ret == 0) {
                         aml_dev->audio_patching = 1;
                     }
@@ -9094,7 +9110,7 @@ static int adev_release_audio_patch(struct audio_hw_device *dev,
     ALOGI("source 0 type=%d sink type =%d amk patch src=%s", patch->sources[0].type, patch->sinks[0].type, patchSrc2Str(aml_dev->patch_src));
     if (patch->sources[0].type == AUDIO_PORT_TYPE_DEVICE
         && patch->sinks[0].type == AUDIO_PORT_TYPE_DEVICE) {
-#ifdef ENABLE_DTV_PATCH
+#ifdef USE_DTV
         if (aml_dev->patch_src == SRC_DTV) {
             ALOGI("patch src == DTV now line %d \n", __LINE__);
             release_dtv_patch(aml_dev);
@@ -9106,14 +9122,18 @@ static int adev_release_audio_patch(struct audio_hw_device *dev,
                 && aml_dev->audio_patching == 1) {
             release_patch(aml_dev);
             if (aml_dev->patch_src == SRC_LINEIN && aml_dev->aml_ng_handle) {
-#ifdef ENABLE_DTV_PATCH
+#ifdef USE_DTV
                 release_noise_gate(aml_dev->aml_ng_handle);
                 aml_dev->aml_ng_handle = NULL;
 #endif
             }
         }
         /* for no patch case, we need to restore it, especially note the multi-instance audio-patch */
+#ifdef USE_DTV
         if (eDolbyMS12Lib == aml_dev->dolby_lib_type && (aml_dev->continuous_audio_mode_default == 1) && !is_dtv_patch_alive(aml_dev))
+#else
+        if (eDolbyMS12Lib == aml_dev->dolby_lib_type && (aml_dev->continuous_audio_mode_default == 1))
+#endif
         {
             get_dolby_ms12_cleanup(&aml_dev->ms12, false);
             /*continuous mode is using in ms12 prepare, we should lock it*/
@@ -9137,7 +9157,7 @@ static int adev_release_audio_patch(struct audio_hw_device *dev,
         if (aml_dev->patch_src == SRC_HDMIIN) {
             aml_dev2mix_parser_release(aml_dev);
         }
-#ifdef ENABLE_DTV_PATCH
+#ifdef USE_DTV
         if (aml_dev->patch_src == SRC_DTV &&
                 patch->sources[0].ext.device.type == AUDIO_DEVICE_IN_TV_TUNER) {
             ALOGI("patch src == DTV now line %d \n", __LINE__);
