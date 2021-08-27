@@ -1150,7 +1150,7 @@ exit_check:
                             return -1;
                         }
                         *channels = (adts.channel_configuration > 6) ? 2 : adts.channel_configuration;
-                        faad_log_info("[%s %d]resync adts info:FS/%lu object_type/%d chnum/%d\n", __FUNCTION__, __LINE__, *samplerate, hDecoder->object_type, (int)channels);
+                        faad_log_info("[%s %d]resync adts info:FS/%lu object_type/%d chnum/%d\n", __FUNCTION__, __LINE__, *samplerate, hDecoder->object_type, *channels);
                         break;
                     }
                 }

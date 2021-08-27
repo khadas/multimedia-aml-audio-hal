@@ -54,14 +54,18 @@
 #include "audio_hw_dtv.h"
 #include "audio_hw_profile.h"
 #include "audio_hw_utils.h"
+#ifdef USE_DTV
 #include "dtv_patch_out.h"
+#endif
 #include "aml_audio_resampler.h"
 #include "audio_hw_ms12.h"
 #include "dolby_lib_api.h"
 #include "audio_dtv_ad.h"
 #include "alsa_device_parser.h"
 #include "aml_audio_hal_avsync.h"
+#ifdef USE_DTV
 #include <audio_dtv_sync.h>
+#endif
 
 unsigned long decoder_apts_lookup(unsigned int offset)
 {

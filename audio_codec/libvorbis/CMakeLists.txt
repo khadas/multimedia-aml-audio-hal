@@ -9,14 +9,23 @@ aux_source_directory(. SRC_FILES)
 aux_source_directory(./Tremolo SRC_FILES)
 message(WARNING "PROJECT_SOURCE_DIR is ${PROJECT_SOURCE_DIR}")
 message(WARNING "SRC_FILES is ${SRC_FILES}")
+message(WARNING "CMAKE_SYSTEM_PROCESSOR is ${CMAKE_SYSTEM_PROCESSOR}")
 
-ENABLE_LANGUAGE(C ASM)
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "(arm)")
+    ENABLE_LANGUAGE(C ASM)
+    list(APPEND ARM_FILES Tremolo/bitwiseARM.s)
+    list(APPEND ARM_FILES Tremolo/dpen.s)
+    list(APPEND ARM_FILES Tremolo/floor1ARM.s)
+    list(APPEND ARM_FILES Tremolo/mdctARM.s)
+else ()
+    add_definitions(-DONLY_C)
+endif ()
+
+message(WARNING "ARM_FILES is ${ARM_FILES}")
+
 add_library(vorbis-aml SHARED
     ${SRC_FILES}
-    Tremolo/bitwiseARM.s
-    Tremolo/dpen.s
-    Tremolo/floor1ARM.s
-    Tremolo/mdctARM.s
+    ${ARM_FILES}
 )
 
 target_compile_options(vorbis-aml PRIVATE -Werror -Wmissing-field-initializers -Wunused-parameter -Wunused-variable -Wsign-compare)
