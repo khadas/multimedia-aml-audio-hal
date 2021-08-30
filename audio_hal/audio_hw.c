@@ -9747,8 +9747,8 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->continuous_audio_mode_default = 0;
     adev->need_remove_conti_mode = false;
 #ifdef BUILD_LINUX
-    adev->dual_spdif_support = aml_get_jason_int_value(DUAL_SPDIF);
-    adev->ms12_force_ddp_out = aml_get_jason_int_value(FORCE_DDP);
+    adev->dual_spdif_support = aml_get_jason_int_value(DUAL_SPDIF,0);
+    adev->ms12_force_ddp_out = aml_get_jason_int_value(FORCE_DDP,0);
 #else
     adev->dual_spdif_support = property_get_bool("ro.vendor.platform.is.dualspdif", false);
     adev->ms12_force_ddp_out = property_get_bool("ro.vendor.platform.is.forceddp", false);
@@ -9812,7 +9812,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 #endif
 /*[SEI-zhaopf-2018-10-29] add for HBG remote audio support } */
 #ifdef BUILD_LINUX
-    adev->is_TV = aml_get_jason_int_value(TV_PLATFORM);
+    adev->is_TV = aml_get_jason_int_value(TV_PLATFORM,0);
     if (adev->is_TV ) {
         adev->default_alsa_ch =  aml_audio_get_default_alsa_output_ch();
         /*Now SoundBar type is depending on TV audio as only tv support multi-channel LPCM output*/
@@ -9828,7 +9828,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     } else {
         /* for stb/ott, fixed 2 channels speaker output for alsa*/
         adev->default_alsa_ch = 2;
-        adev->is_STB = aml_get_jason_int_value(STB_PLATFORM);
+        adev->is_STB = aml_get_jason_int_value(STB_PLATFORM,0);
         ALOGI("%s(), OTT platform", __func__);
     }
 

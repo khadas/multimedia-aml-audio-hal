@@ -36,10 +36,10 @@ int aml_audio_config_parser()
     }
 }
 
-int aml_get_jason_int_value(char* key)
+int aml_get_jason_int_value(char* key,int defvalue)
 {
     cJSON *temp = NULL;
-    int value = 0;
+    int value = defvalue;
     if (audio_config_jason) {
         temp = cJSON_GetObjectItem(audio_config_jason, key);
         aml_printf_cJSON(key, temp);

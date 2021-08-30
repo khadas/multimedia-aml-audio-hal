@@ -18,5 +18,5 @@
 #include "aml_config_parser.h"
 
 int aml_audio_config_parser();
-int aml_get_jason_int_value(char* key);
+int aml_get_jason_int_value(char* key,int defvalue);
 
