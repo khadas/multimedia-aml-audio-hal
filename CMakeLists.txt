@@ -9,8 +9,10 @@ add_subdirectory("libms12_v24")
 add_subdirectory("audio_codec/libfaad")
 add_subdirectory("audio_codec/libmad")
 add_subdirectory("audio_codec/libvorbis")
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "(arm)")
 add_subdirectory("audio_codec/libdts")
 add_subdirectory("audio_codec/libdcv")
+endif()
 add_subdirectory("audio_hal/libaudioprocessing")
 
 add_library(spdifenc STATIC
@@ -172,12 +174,18 @@ if(USE_CAP_MUTE_HDMI)
 endif()
 endif()
 
-#if(USE_EQ_DRC)
+message(WARNING "Audio_hal CMAKE_SYSTEM_PROCESSOR is ${CMAKE_SYSTEM_PROCESSOR}")
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "(arm)")
 set(PREBUILD_STATIC_LIBS
 	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/lib_aml_ng.a
 	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/Amlogic_DRC_Param_Generator.a
 	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/Amlogic_EQ_Param_Generator.a)
-#endif()
+else ()
+set(PREBUILD_STATIC_LIBS
+	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/lib_aml_ng64.a
+	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/Amlogic_DRC_Param_Generator64.a
+	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/Amlogic_EQ_Param_Generator64.a)
+endif ()
 
 set_target_properties(audio_hal PROPERTIES
 	VERSION ${PROJECT_VERSION}
@@ -240,6 +248,7 @@ install(TARGETS audio_hal
 install(FILES audio_hal/mixer_paths.xml
 	DESTINATION /etc)
 
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "(arm)")
 install(PROGRAMS amlogic_AQ_tools/Amlogic_DRC_Param_Generator amlogic_AQ_tools/Amlogic_EQ_Param_Generator
 	DESTINATION /usr/bin)
-
+endif ()
