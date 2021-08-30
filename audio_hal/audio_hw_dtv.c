@@ -72,6 +72,8 @@
 #include "audio_dtv_utils.h"
 
 #define DTV_SKIPAMADEC "Dtv_Audio_Skipamadec"
+#define DTV_SYNCENABLE "Dtv_Audio_Syncenable"
+
 
 static struct timespec start_time;
 const unsigned int mute_dd_frame[] = {
@@ -1931,6 +1933,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
         goto exit_open;
     }
     aml_out = (struct aml_stream_out *)stream_out;
+    aml_out->dtvsync_enable =  aml_get_jason_int_value(DTV_SYNCENABLE);
     ALOGI("++%s live create a output stream success now!!!\n ", __FUNCTION__);
 
     patch->out_buf_size = write_bytes * EAC3_MULTIPLIER;
@@ -2927,7 +2930,7 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
 
     prctl(PR_SET_NAME, (unsigned long)"audio_output_patch");
     aml_out->output_speed = 1.0f;
-    aml_out->dtvsync_enable =  property_get_int32("vendor.media.dtvsync.enable", 1);
+    aml_out->dtvsync_enable =  aml_get_jason_int_value(DTV_SYNCENABLE);
     ALOGI("output_speed=%f,dtvsync_enable=%d\n", aml_out->output_speed, aml_out->dtvsync_enable);
     while (!patch->output_thread_exit) {
 
