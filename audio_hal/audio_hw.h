@@ -54,10 +54,8 @@
 #include "aml_audio_delay.h"
 #endif
 
-#ifdef USE_MSYNC
 #include <aml_avsync.h>
 #include <aml_avsync_log.h>
-#endif
 
 #include "aml_audio_resample_manager.h"
 #include "aml_audio_resampler.h"
@@ -582,6 +580,12 @@ typedef enum audio_data_handle_state {
     AUDIO_DATA_HANDLE_MAX
 } audio_data_handle_state_t;
 
+enum {
+    AVSYNC_TYPE_NULL    = 0,
+    AVSYNC_TYPE_TSYNC   = 1,
+    AVSYNC_TYPE_MSYNC   = 2,
+    AVSYNC_TYPE_MEDIASYNC   = 3,
+};
 
 struct aml_stream_out {
     struct audio_stream_out stream;
@@ -740,7 +744,6 @@ struct aml_stream_out {
     uint64_t write_time;
     uint64_t pause_time;
     int write_count;
-#ifdef USE_MSYNC
     /* msync session */
     void *msync_session;
     pthread_mutex_t msync_mutex;
@@ -750,7 +753,7 @@ struct aml_stream_out {
     int msync_action_delta;
     uint32_t msync_rendered_pts;
     struct timespec msync_rendered_ts;
-#endif
+    int avsync_type;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);

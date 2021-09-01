@@ -154,11 +154,12 @@ public:
     virtual int     DolbyMS12HWSyncInit(void);
     virtual int     DolbyMS12HWSyncRelease(void);
     virtual int     DolbyMS12HWSyncChecinPTS(int offset, int apts);
-#ifdef USE_MSYNC
+
     virtual void    DolbyMS12SetSync(int sync);
     virtual int     DolbyMS12GetMainUnderrun();
-#endif
+
     virtual int     DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration);
+
 
     // protected:
 

@@ -1185,29 +1185,30 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
     ret = str_parms_get_str (parms, "hw_av_sync", value, sizeof (value) );
     if (ret >= 0) {
         int hw_sync_id = atoi(value);
-#ifdef USE_MSYNC
-        void *msync_session;
+        out->avsync_type = AVSYNC_TYPE_NULL;
         unsigned char sync_enable = 0;
-
-        if (out->msync_session) {
-            ALOGW("hw_av_sync id set w/o release previous session.");
-            av_sync_destroy(out->msync_session);
-            out->msync_session = NULL;
-        }
-
-        msync_session = av_sync_attach(hw_sync_id, AV_SYNC_TYPE_AUDIO);
-        if (!msync_session) {
-            ALOGE("Cannot attach hw_sync_id %d", hw_sync_id);
-            ret = -EINVAL;
-            goto exit;
-        }
-
-        log_set_level(LOG_INFO);
-        ALOGI("av_sync_attach success %p", msync_session);
-        sync_enable = 1;
-#else
-        bool ret_set_id = false;
+        void *msync_session;
         if ((hw_sync_id != 12345678) && (hw_sync_id >= 0)) {
+            if (out->msync_session) {
+                ALOGW("hw_av_sync id set w/o release previous session.");
+                av_sync_destroy(out->msync_session);
+                out->msync_session = NULL;
+            }
+            msync_session = av_sync_attach(hw_sync_id, AV_SYNC_TYPE_AUDIO);
+            if (!msync_session) {
+                ALOGE("Cannot attach hw_sync_id %d", hw_sync_id);
+                ret = -EINVAL;
+                goto exit;
+            }
+            log_set_level(LOG_INFO);
+            ALOGI("av_sync_attach success %p", msync_session);
+            sync_enable = 1;
+            out->avsync_type = AVSYNC_TYPE_MSYNC;
+            out->hwsync->hwsync_id = hw_sync_id;
+            aml_audio_hwsync_set_id(out->hwsync, hw_sync_id);
+        }
+        else {
+            bool ret_set_id = false;
             ALOGI ("[%s]adev->hw_mediasync:%p\n", __FUNCTION__, adev->hw_mediasync);
             if (adev->hw_mediasync == NULL) {
                 adev->hw_mediasync = aml_hwsync_mediasync_create();
@@ -1217,10 +1218,13 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
                 out->hwsync->mediasync = adev->hw_mediasync;
                 out->hwsync->hwsync_id = hw_sync_id;
                 ret_set_id = aml_audio_hwsync_set_id(out->hwsync, hw_sync_id);
+                out->avsync_type = AVSYNC_TYPE_MEDIASYNC;
+            }
+            sync_enable = ((hw_sync_id == 12345678) || ret_set_id) ? 1 : 0;
+            if (hw_sync_id == 12345678) {
+                out->avsync_type = AVSYNC_TYPE_TSYNC;
             }
         }
-        unsigned char sync_enable = ((hw_sync_id == 12345678) || ret_set_id) ? 1 : 0;
-#endif
         audio_hwsync_t *hw_sync = out->hwsync;
         ALOGI("(%p)set hw_sync_id %d,%s hw sync mode\n",
                out, hw_sync_id, sync_enable ? "enable" : "disable");
@@ -1245,20 +1249,18 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         if (sync_enable) {
             ALOGI ("init hal mixer when hwsync\n");
             aml_hal_mixer_init (&adev->hal_mixer);
-#ifdef USE_MSYNC
-            out->msync_session = msync_session;
-            pthread_mutex_init(&out->msync_mutex, NULL);
-            pthread_cond_init(&out->msync_cond, NULL);
-#endif
+            if (AVSYNC_TYPE_MSYNC == out->avsync_type) {
+                out->msync_session = msync_session;
+                pthread_mutex_init(&out->msync_mutex, NULL);
+                pthread_cond_init(&out->msync_cond, NULL);
+            }
             if (eDolbyMS12Lib == adev->dolby_lib_type) {
                 adev->gap_ignore_pts = false;
             }
         }
         if (continous_mode(adev) && out->hw_sync_mode) {
             dolby_ms12_hwsync_init();
-
         }
-
         pthread_mutex_unlock (&out->lock);
         pthread_mutex_unlock (&adev->lock);
         ret = 0;
@@ -1422,18 +1424,16 @@ static int out_pause (struct audio_stream_out *stream)
     }
 exit1:
     out->pause_status = true;
-#ifdef USE_MSYNC
     if (out->msync_session) {
         av_sync_pause(out->msync_session, true);
     }
-#endif
 exit:
     if (out->hw_sync_mode) {
         ALOGI("%s set AUDIO_PAUSE when tunnel mode\n",__func__);
-#ifndef USE_MSYNC
+    if (AVSYNC_TYPE_TSYNC == out->avsync_type) {
         aml_hwsync_set_tsync_pause(out->hwsync);
-#endif
-        out->tsync_status = TSYNC_STATUS_PAUSED;
+    }
+    out->tsync_status = TSYNC_STATUS_PAUSED;
     }
     pthread_mutex_unlock (&adev->lock);
     pthread_mutex_unlock (&out->lock);
@@ -1480,25 +1480,23 @@ static int out_resume (struct audio_stream_out *stream)
         ALOGI ("init hal mixer when hwsync resume\n");
         adev->hwsync_output = out;
         aml_hal_mixer_init(&adev->hal_mixer);
-#ifndef USE_MSYNC
-        aml_hwsync_set_tsync_resume(out->hwsync);
-#endif
+        if (AVSYNC_TYPE_TSYNC == out->avsync_type) {
+            aml_hwsync_set_tsync_resume(out->hwsync);
+        }
         out->tsync_status = TSYNC_STATUS_RUNNING;
     }
     out->pause_status = false;
 
-#ifdef USE_MSYNC
     if (out->msync_session) {
-        av_sync_pause(out->msync_session, false);
+       av_sync_pause(out->msync_session, false);
     }
-#endif
 
 exit:
     if (out->hw_sync_mode) {
         ALOGI("%s set AUDIO_RESUME when tunnel mode\n",__func__);
-#ifndef USE_MSYNC
+    if (AVSYNC_TYPE_TSYNC == out->avsync_type) {
         aml_hwsync_set_tsync_resume(out->hwsync);
-#endif
+    }
         out->tsync_status = TSYNC_STATUS_RUNNING;
     }
     pthread_mutex_unlock (&adev->lock);
@@ -1534,11 +1532,9 @@ static int out_pause_new (struct audio_stream_out *stream)
         goto exit;
     }
 
-#ifdef USE_MSYNC
     if (aml_out->msync_session) {
         av_sync_pause(aml_out->msync_session, true);
     }
-#endif
 
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
         if (aml_dev->continuous_audio_mode == 1) {
@@ -1607,11 +1603,9 @@ static int out_resume_new (struct audio_stream_out *stream)
         goto exit;
     }
 
-#ifdef USE_MSYNC
     if (aml_out->msync_session) {
         av_sync_pause(aml_out->msync_session, false);
     }
-#endif
 
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
         if (aml_dev->continuous_audio_mode == 1) {
@@ -1635,9 +1629,9 @@ static int out_resume_new (struct audio_stream_out *stream)
     }
     aml_out->pause_status = false;
     if (aml_out->hw_sync_mode && !aml_dev->ms12.need_resume) {
-#ifndef USE_MSYNC
-        aml_hwsync_set_tsync_resume(aml_out->hwsync);
-#endif
+        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
+            aml_hwsync_set_tsync_resume(aml_out->hwsync);
+        }
         aml_out->tsync_status = TSYNC_STATUS_RUNNING;
     }
 
@@ -3181,10 +3175,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->need_drop_size = 0;
     out->position_update = 0;
     out->inputPortID = AML_MIXER_INPUT_PORT_BUTT;
-
-#ifdef USE_MSYNC
     out->msync_action = AV_SYNC_AA_RENDER;
-#endif
+
 
 //#ifdef ENABLE_MMAP
 #ifndef BUILD_LINUX
@@ -3303,12 +3295,12 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
 
     ALOGD("%s: enter: dev(%p) stream(%p)", __func__, dev, stream);
 
-#ifdef USE_MSYNC
+
     if (out->msync_session) {
         /* unblock feeding thread just in case */
         aml_audio_hwsync_msync_unblock_start(out);
     }
-#endif
+
 
     if (adev->useSubMix) {
         if (out->usecase == STREAM_PCM_NORMAL || out->usecase == STREAM_PCM_HWSYNC)
@@ -3458,12 +3450,12 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out->aml_dec = NULL;
     }
 
-#ifdef USE_MSYNC
+
     if (out->msync_session) {
         av_sync_destroy(out->msync_session);
         out->msync_session = NULL;
     }
-#endif
+
 
     if (out->resample_handle) {
         aml_audio_resample_close(out->resample_handle);
@@ -5459,9 +5451,9 @@ int do_output_standby_l(struct audio_stream *stream)
                         adev->ms12.need_resync       = 0;
                         adev->need_remove_conti_mode = false;
                     }
-                    #ifdef USE_MSYNC
-                    set_dolby_ms12_runtime_sync(&(adev->ms12), 0);
-                    #endif
+                    if (AVSYNC_TYPE_MSYNC == aml_out->avsync_type) {
+                        set_dolby_ms12_runtime_sync(&(adev->ms12), 0);
+                    }
                 }
             }
         }
@@ -5478,15 +5470,15 @@ int do_output_standby_l(struct audio_stream *stream)
 
     if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_STOP) {
         ALOGI("%s set AUDIO_PAUSE\n",__func__);
-#ifndef USE_MSYNC
-        aml_hwsync_set_tsync_pause(aml_out->hwsync);
-#endif
+        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
+            aml_hwsync_set_tsync_pause(aml_out->hwsync);
+        }
         aml_out->tsync_status = TSYNC_STATUS_PAUSED;
 
         ALOGI("%s set AUDIO_STOP\n",__func__);
-#ifndef USE_MSYNC
-        aml_hwsync_set_tsync_stop(aml_out->hwsync);
-#endif
+        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
+            aml_hwsync_set_tsync_stop(aml_out->hwsync);
+        }
         aml_out->tsync_status = TSYNC_STATUS_STOP;
     }
 
@@ -6145,37 +6137,35 @@ ssize_t hw_write (struct audio_stream_out *stream
             // some times "aml_out->hwsync->aout == NULL"
             // one case is no main audio playing, only aux audio playing (Netflix main screen)
             // in this case dolby_ms12_get_consumed_payload() always return 0, no AV sync can be done zzz
-#ifdef USE_MSYNC
+
                 // when msync is used, first apts handling is performed in mixer_main_buffer_write
-                if ((aml_out->hwsync->aout) && (aml_out->hwsync->first_apts_flag)) {
-#else
-                if (aml_out->hwsync->aout) {
-#endif
-                if (is_bypass_dolbyms12(stream)) {
-                    aml_audio_hwsync_audio_process(aml_out->hwsync, aml_out->hwsync->payload_offset, out_frames, &adjust_ms);
-                }
-                else {
-                    if (!audio_is_linear_pcm(aml_out->hal_internal_format)) {
-                        /*if udc decode doens't generate any data, we should not use the consume offset to get pts*/
-                        ALOGV("udc generate pcm =%lld", dolby_ms12_get_main_pcm_generated(stream));
-                        if (dolby_ms12_get_main_pcm_generated(stream)) {
-                            aml_audio_hwsync_audio_process(aml_out->hwsync, dolby_ms12_get_main_bytes_consumed(stream), out_frames, &adjust_ms);
+                if ((aml_out->hwsync->aout && AVSYNC_TYPE_MSYNC != aml_out->avsync_type) || ((aml_out->hwsync->aout) && (aml_out->hwsync->first_apts_flag) && AVSYNC_TYPE_MSYNC == aml_out->avsync_type)) {
+                    if (is_bypass_dolbyms12(stream)) {
+                        aml_audio_hwsync_audio_process(aml_out->hwsync, aml_out->hwsync->payload_offset, out_frames, &adjust_ms);
+                    }
+                    else {
+                        if (!audio_is_linear_pcm(aml_out->hal_internal_format)) {
+                            /*if udc decode doens't generate any data, we should not use the consume offset to get pts*/
+                            ALOGV("udc generate pcm =%lld", dolby_ms12_get_main_pcm_generated(stream));
+                            if (dolby_ms12_get_main_pcm_generated(stream)) {
+                                aml_audio_hwsync_audio_process(aml_out->hwsync, dolby_ms12_get_main_bytes_consumed(stream), out_frames, &adjust_ms);
+                            }
+                        } else {
+                            /* because the pcm consumed playload offset is at the end of consume buffer,
+                             * we need the beginning position and ms12 always
+                             * output 1536 frame every time
+                             */
+                            uint64_t consume_payload = dolby_ms12_get_main_bytes_consumed(stream);
+                            uint32_t ms12_frame_bytes = 1536 * aml_out->hal_frame_size;
+                            aml_audio_hwsync_audio_process(aml_out->hwsync, consume_payload, out_frames, &adjust_ms);
                         }
-                    } else {
-                        /* because the pcm consumed playload offset is at the end of consume buffer,
-                         * we need the beginning position and ms12 always
-                         * output 1536 frame every time
-                         */
-                        uint64_t consume_payload = dolby_ms12_get_main_bytes_consumed(stream);
-                        uint32_t ms12_frame_bytes = 1536 * aml_out->hal_frame_size;
-                        aml_audio_hwsync_audio_process(aml_out->hwsync, consume_payload, out_frames, &adjust_ms);
                     }
                 }
-            } else {
-                if (adev->debug_flag) {
-                    ALOGI("%s,aml_out->hwsync->aout == NULL",__FUNCTION__);
+                if (aml_out->hwsync->aout == NULL) {
+                    if (adev->debug_flag) {
+                        ALOGI("%s,aml_out->hwsync->aout == NULL",__FUNCTION__);
+                    }
                 }
-            }
         }
     }
     if (aml_out->pcm || adev->a2dp_hal || is_sco_port(adev->active_outport)) {
@@ -6889,11 +6879,11 @@ hwsync_rewrite:
                     dolby_ms12_hwsync_checkin_pts(aml_out->hwsync->payload_offset, cur_pts);
                 }
                 aml_out->hwsync->payload_offset += outsize;
-#ifdef USE_MSYNC//change
+                //change
                 // when msync is used, the original first apts->audio start logic from legacy amaster tsync
                 // implementation in hw_write() is moved to this place when main input samples are injected
                 // because the sync policy return from msync side may need block when audio starts to play.
-                if (aml_out->hwsync->first_apts_flag == false) {
+                if (aml_out->hwsync->first_apts_flag == false && AVSYNC_TYPE_MSYNC == aml_out->avsync_type) {
                                 // may be blocked by msync_cond for initial playback timing control
                                 // the first checkin pts should be consumed by aml_audio_hwsync_audio_process for av_sync_audio_start
                                 //aml_audio_hwsync_audio_process(aml_out->hwsync, 0, NULL);
@@ -6907,7 +6897,6 @@ hwsync_rewrite:
                                     aml_out->hwsync->payload_offset = 0;
                                 }
                             }
-#endif
 
             } else {
                 // if we got the frame body,which means we get a complete frame.
@@ -6957,62 +6946,62 @@ hwsync_rewrite:
                     if (hw_sync->first_apts_flag == false) {
                         aml_audio_hwsync_set_first_pts(aml_out->hwsync, cur_pts);
                     } else {
-#ifndef USE_MSYNC
-                        uint64_t apts;
-                        uint32_t apts32;
-                        uint32_t pcr = 0;
-                        uint32_t apts_gap = 0;
-                        uint64_t latency = out_get_latency (stream) * 90;
-                        // check PTS discontinue, which may happen when audio track switching
-                        // discontinue means PTS calculated based on first_apts and frame_write_sum
-                        // does not match the timestamp of next audio samples
-                        if (cur_pts > latency) {
-                            apts = cur_pts - latency;
-                        } else {
-                            apts = 0;
-                        }
-                        apts32 = apts & 0xffffffff;
-                        if (aml_hwsync_get_tsync_pts(aml_out->hwsync, &pcr) == 0) {
-                            enum hwsync_status sync_status = CONTINUATION;
-                            apts_gap = get_pts_gap (pcr, apts32);
-                            sync_status = check_hwsync_status (apts_gap);
+                        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
+                            uint64_t apts;
+                            uint32_t apts32;
+                            uint32_t pcr = 0;
+                            uint32_t apts_gap = 0;
+                            uint64_t latency = out_get_latency (stream) * 90;
+                            // check PTS discontinue, which may happen when audio track switching
+                            // discontinue means PTS calculated based on first_apts and frame_write_sum
+                            // does not match the timestamp of next audio samples
+                            if (cur_pts > latency) {
+                                apts = cur_pts - latency;
+                            } else {
+                                apts = 0;
+                            }
+                            apts32 = apts & 0xffffffff;
+                            if (aml_hwsync_get_tsync_pts(aml_out->hwsync, &pcr) == 0) {
+                                enum hwsync_status sync_status = CONTINUATION;
+                                apts_gap = get_pts_gap (pcr, apts32);
+                                sync_status = check_hwsync_status (apts_gap);
 
-                            // limit the gap handle to 0.5~5 s.
-                            if (sync_status == ADJUSTMENT) {
-                                // two cases: apts leading or pcr leading
-                                // apts leading needs inserting frame and pcr leading neads discarding frame
-                                if (apts32 > pcr) {
-                                    int insert_size = 0;
-                                    if (aml_out->codec_type == TYPE_EAC3) {
-                                        insert_size = apts_gap / 90 * 48 * 4 * 4;
+                                // limit the gap handle to 0.5~5 s.
+                                if (sync_status == ADJUSTMENT) {
+                                    // two cases: apts leading or pcr leading
+                                    // apts leading needs inserting frame and pcr leading neads discarding frame
+                                    if (apts32 > pcr) {
+                                        int insert_size = 0;
+                                        if (aml_out->codec_type == TYPE_EAC3) {
+                                            insert_size = apts_gap / 90 * 48 * 4 * 4;
+                                        } else {
+                                            insert_size = apts_gap / 90 * 48 * 4;
+                                        }
+                                        insert_size = insert_size & (~63);
+                                        ALOGI ("audio gap 0x%"PRIx32" ms ,need insert data %d\n", apts_gap / 90, insert_size);
+                                        ret = insert_output_bytes (aml_out, insert_size);
                                     } else {
-                                        insert_size = apts_gap / 90 * 48 * 4;
+                                        //audio pts smaller than pcr,need skip frame.
+                                        //we assume one frame duration is 32 ms for DD+(6 blocks X 1536 frames,48K sample rate)
+                                        if (aml_out->codec_type == TYPE_EAC3 && outsize > 0) {
+                                            ALOGI ("audio slow 0x%x,skip frame @pts 0x%"PRIx64",pcr 0x%x,cur apts 0x%x\n",
+                                            apts_gap, cur_pts, pcr, apts32);
+                                            aml_out->frame_skip_sum  +=   1536;
+                                            return_bytes = hwsync_cost_bytes;
+                                            goto exit;
+                                        }
                                     }
-                                    insert_size = insert_size & (~63);
-                                    ALOGI ("audio gap 0x%"PRIx32" ms ,need insert data %d\n", apts_gap / 90, insert_size);
-                                    ret = insert_output_bytes (aml_out, insert_size);
-                                } else {
-                                    //audio pts smaller than pcr,need skip frame.
-                                    //we assume one frame duration is 32 ms for DD+(6 blocks X 1536 frames,48K sample rate)
-                                    if (aml_out->codec_type == TYPE_EAC3 && outsize > 0) {
-                                        ALOGI ("audio slow 0x%x,skip frame @pts 0x%"PRIx64",pcr 0x%x,cur apts 0x%x\n",
-                                        apts_gap, cur_pts, pcr, apts32);
-                                        aml_out->frame_skip_sum  +=   1536;
-                                        return_bytes = hwsync_cost_bytes;
-                                        goto exit;
-                                    }
-                                }
-                            } else if (sync_status == RESYNC) {
-                                ALOGI ("tsync -> reset pcrscr 0x%x -> 0x%x, %s big,diff %"PRIx64" ms",
-                                    pcr, apts32, apts32 > pcr ? "apts" : "pcr", get_pts_gap (apts, pcr) / 90);
+                                } else if (sync_status == RESYNC) {
+                                    ALOGI ("tsync -> reset pcrscr 0x%x -> 0x%x, %s big,diff %"PRIx64" ms",
+                                        pcr, apts32, apts32 > pcr ? "apts" : "pcr", get_pts_gap (apts, pcr) / 90);
 
-                                int ret_val = aml_hwsync_reset_tsync_pcrscr(aml_out->hwsync, apts32);
-                                if (ret_val == -1) {
-                                    ALOGE ("aml_hwsync_reset_tsync_pcrscr,err: %s", strerror (errno) );
+                                    int ret_val = aml_hwsync_reset_tsync_pcrscr(aml_out->hwsync, apts32);
+                                    if (ret_val == -1) {
+                                        ALOGE ("aml_hwsync_reset_tsync_pcrscr,err: %s", strerror (errno) );
+                                    }
                                 }
                             }
                         }
-#else /* USE_MSYNC */
                         if (aml_out->msync_session) {
                             struct audio_policy policy;
                             uint64_t latency = out_get_latency(stream) * 90;
@@ -7020,7 +7009,7 @@ hwsync_rewrite:
                             av_sync_audio_render(aml_out->msync_session, apts32, &policy);
                             /* TODO: for non-amaster mode, handle sync policy on audio side */
                         }
-#endif /* USE_MSYNC */
+
                     }
                 }
             }
@@ -7303,22 +7292,20 @@ hwsync_rewrite:
             __func__, __LINE__, aml_out->hal_format, output_format, adev->sink_format);
     }
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
-#ifdef USE_MSYNC// position is proper?
+         // position is proper?
         if (!hw_sync->first_apts_flag &&
-        (aml_out->msync_action == AV_SYNC_AA_DROP)) {
+        (aml_out->msync_action == AV_SYNC_AA_DROP) && AVSYNC_TYPE_MSYNC == aml_out->avsync_type) {
             /* start dropping */
             ALOGI("MSYNC start dropping @0x%x, %d bytes", hw_sync->first_apts, write_bytes);
             goto exit;
         }
-#endif
+
         ret = aml_audio_ms12_render(stream, write_buf, write_bytes);
     } else if (eDolbyDcvLib == adev->dolby_lib_type) {
         ret = aml_audio_nonms12_render(stream, write_buf, write_bytes);
     } else {
         ret = aml_audio_nonms12_render(stream, write_buf, write_bytes);
     }
-
-
 exit:
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         if (continous_mode(adev)) {
@@ -8087,15 +8074,15 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
      */
     if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_STOP && !has_hwsync_stream_running(stream)) {
         ALOGI("%s set AUDIO_PAUSE when close stream\n",__func__);
-#ifndef USE_MSYNC
-        aml_hwsync_set_tsync_pause(aml_out->hwsync);
-#endif
+        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
+            aml_hwsync_set_tsync_pause(aml_out->hwsync);
+        }
         aml_out->tsync_status = TSYNC_STATUS_PAUSED;
 
         ALOGI("%s set AUDIO_STOP when close stream\n",__func__);
-#ifndef USE_MSYNC
-        aml_hwsync_set_tsync_stop(aml_out->hwsync);
-#endif
+        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
+            aml_hwsync_set_tsync_stop(aml_out->hwsync);
+        }
         aml_out->tsync_status = TSYNC_STATUS_STOP;
     }
     adev_close_output_stream(dev, stream);

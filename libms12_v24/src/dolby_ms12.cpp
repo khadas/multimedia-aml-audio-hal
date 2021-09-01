@@ -493,7 +493,7 @@ extern "C" int dolby_ms12_hwsync_checkin_pts_internal(int offset, int apts)
         return -1;
     }
 }
-#ifdef USE_MSYNC
+
 extern "C" int dolby_ms12_get_main_underrun()
 {
     ALOGV("%s()\n", __FUNCTION__);
@@ -514,8 +514,6 @@ extern "C" void dolby_ms12_set_sync(int sync)
     }
 }
 
-#endif
-
 extern "C" int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duration)
 {
     ALOGV("%s()\n", __FUNCTION__);
@@ -526,3 +524,4 @@ extern "C" int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duratio
         return -1;
     }
 }
+

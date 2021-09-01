@@ -74,11 +74,12 @@ int (*FuncDolbyMS12GetTotalNFramesDelay)(void *);
 int (*FuncDolbyMS12HWSyncInit)(void);
 int (*FuncDolbyMS12HWSyncRelease)(void);
 int (*FuncDolbyMS12HWSyncCheckinPTS)(int offset, int apts);
-#ifdef USE_MSYNC
+
 int (*FuncDolbyMS12GetMainUnderrun)();
 void (*FuncDolbyMS12SetSync)(int);
-#endif
+
 int (*FuncDolbyMS12SetPtsGap)(unsigned long long offset, int pts_duration);
+
 
 DolbyMS12::DolbyMS12() :
     mDolbyMS12LibHanle(NULL)
@@ -303,7 +304,7 @@ int DolbyMS12::GetLibHandle(char *dolby_ms12_path)
         //goto ERROR;
     }
 
-#ifdef USE_MSYNC
+
     FuncDolbyMS12GetMainUnderrun = (int (*)())dlsym(mDolbyMS12LibHanle, "get_main_underrun");
     if (!FuncDolbyMS12GetMainUnderrun) {
         ALOGW("%s, dlsym FuncDolbyMS12GetMainUnderrun failed\n", __FUNCTION__);
@@ -314,7 +315,6 @@ int DolbyMS12::GetLibHandle(char *dolby_ms12_path)
         ALOGW("%s, dlsym FuncDolbyMS12SetSync failed\n", __FUNCTION__);
     }
 
-#endif
 
     FuncDolbyMS12SetPtsGap= (int (*)(unsigned long long, int))  dlsym(mDolbyMS12LibHanle, "ms12_set_pts_gap");
     if (!FuncDolbyMS12SetPtsGap) {
@@ -362,10 +362,10 @@ void DolbyMS12::ReleaseLibHandle(void)
     FuncDolbyMS12SetDebugLevel = NULL;
     FuncDolbyMS12GetNBytesConsumedSysSound = NULL;
     FuncDolbyMS12GetTotalNFramesDelay = NULL;
-#ifdef USE_MSYNC
+
     FuncDolbyMS12GetMainUnderrun = NULL;
     FuncDolbyMS12SetSync = NULL;
-#endif
+
     if (mDolbyMS12LibHanle != NULL) {
         dlclose(mDolbyMS12LibHanle);
         mDolbyMS12LibHanle = NULL;
@@ -913,7 +913,7 @@ int DolbyMS12::DolbyMS12HWSyncChecinPTS(int offset, int apts)
     return ret;
 }
 
-#ifdef USE_MSYNC
+
 int DolbyMS12::DolbyMS12GetMainUnderrun()
 {
     int ret = 0;
@@ -939,7 +939,6 @@ void DolbyMS12::DolbyMS12SetSync(int sync)
     (*FuncDolbyMS12SetSync)(sync);
 }
 
-#endif
 
 int DolbyMS12::DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration)
 {
