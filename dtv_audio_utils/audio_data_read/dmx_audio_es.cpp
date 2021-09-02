@@ -152,7 +152,7 @@ AM_Dmx_Audio_ErrorCode_t Get_MainAudio_Es(void *demux_handle,struct mAudioEsData
     if (!VALID_PID(demux_wrapper->filering_aud_pid)) {
         return AM_AUDIO_Dmx_ERROR;
     }
-    TSPMutex::Autolock l(demux_wrapper->mDemuxHandleLock);
+    //TSPMutex::Autolock l(demux_wrapper->mDemuxHandleLock);
     ret = demux_wrapper->AmDemuxWrapperReadData(demux_wrapper->filering_aud_pid, (mEsDataInfo **)mAudioEsData,1);
     ALOGV("get_audio_es_package ret %d mEsdata  %p",ret,*mAudioEsData);
     if (*mAudioEsData == NULL) {
