@@ -552,6 +552,10 @@ struct aml_audio_device {
     soundbar:depending on the prop defined by device
     */
     int  default_alsa_ch;
+
+    uint64_t gap_offset;
+    uint32_t gap_pts;
+    bool gap_ignore_pts;
     /* -End- */
 };
 

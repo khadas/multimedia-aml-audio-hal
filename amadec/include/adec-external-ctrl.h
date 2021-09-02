@@ -55,7 +55,9 @@ extern "C"
     int audio_decode_get_lrvolume(void *, float* lvol, float* rvol);
     int audio_set_av_sync_threshold(void *, int);
     int audio_get_soundtrack(void *, int*);
+#ifdef USE_AOUT_IN_ADEC
     int get_audio_decoder(void);
+#endif
     int get_decoder_status(void *p, struct adec_status *adec);
     int audio_channel_lrmix_flag_set(void *, int enable);
     int audio_decpara_get(void *handle, int *pfs, int *pch,int *lfepresent);

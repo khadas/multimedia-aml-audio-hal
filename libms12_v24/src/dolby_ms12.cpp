@@ -515,3 +515,14 @@ extern "C" void dolby_ms12_set_sync(int sync)
 }
 
 #endif
+
+extern "C" int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duration)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12SetPtsGap(offset, gap_duration);
+    } else {
+        return -1;
+    }
+}

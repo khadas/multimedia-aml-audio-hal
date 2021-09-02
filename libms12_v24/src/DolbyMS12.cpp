@@ -78,6 +78,7 @@ int (*FuncDolbyMS12HWSyncCheckinPTS)(int offset, int apts);
 int (*FuncDolbyMS12GetMainUnderrun)();
 void (*FuncDolbyMS12SetSync)(int);
 #endif
+int (*FuncDolbyMS12SetPtsGap)(unsigned long long offset, int pts_duration);
 
 DolbyMS12::DolbyMS12() :
     mDolbyMS12LibHanle(NULL)
@@ -314,6 +315,11 @@ int DolbyMS12::GetLibHandle(char *dolby_ms12_path)
     }
 
 #endif
+
+    FuncDolbyMS12SetPtsGap= (int (*)(unsigned long long, int))  dlsym(mDolbyMS12LibHanle, "ms12_set_pts_gap");
+    if (!FuncDolbyMS12SetPtsGap) {
+        ALOGW("%s, dlsym FuncDolbyMS12SetPtsGap fail\n", __FUNCTION__);
+    }
 
     ALOGD("-%s() line %d get libdolbyms12 success!", __FUNCTION__, __LINE__);
     return 0;
@@ -934,6 +940,20 @@ void DolbyMS12::DolbyMS12SetSync(int sync)
 }
 
 #endif
+
+int DolbyMS12::DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration)
+{
+    int ret = -1;
+    ALOGV("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12SetPtsGap) {
+        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
+        return ret;
+    }
+
+    ret = (*FuncDolbyMS12SetPtsGap)(offset, pts_duration);
+    ALOGV("-%s() ret %d", __FUNCTION__, ret);
+    return ret;
+}
 
 /*--------------------------------------------------------------------------*/
 }   // namespace android

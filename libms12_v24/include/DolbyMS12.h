@@ -158,6 +158,7 @@ public:
     virtual void    DolbyMS12SetSync(int sync);
     virtual int     DolbyMS12GetMainUnderrun();
 #endif
+    virtual int     DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration);
 
     // protected:
 

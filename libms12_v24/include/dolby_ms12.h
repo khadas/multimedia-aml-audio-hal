@@ -278,6 +278,12 @@ int dolby_ms12_get_main_underrun();
 */
 int dolby_ms12_set_sync(int sync);
 #endif
+
+/*@@
+    @brief add pts gap record
+*/
+int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duration);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1250,6 +1250,9 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
             pthread_mutex_init(&out->msync_mutex, NULL);
             pthread_cond_init(&out->msync_cond, NULL);
 #endif
+            if (eDolbyMS12Lib == adev->dolby_lib_type) {
+                adev->gap_ignore_pts = false;
+            }
         }
         if (continous_mode(adev) && out->hw_sync_mode) {
             dolby_ms12_hwsync_init();
@@ -4633,6 +4636,21 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             adev->native_postprocess.vx_force_stereo = 0;
         dca_set_out_ch_internal(dts_decoder_output_mode);
         ALOGD("set dts decoder output mode to %d", dts_decoder_output_mode);
+        goto exit;
+    }
+
+    ret = str_parms_get_str(parms, "pts_gap", value, sizeof(value));
+    if (ret >= 0) {
+        unsigned long long offset, duration;
+        if (sscanf(value, "%llu,%d", &offset, &duration) == 2) {
+            ALOGI("pts_gap %llu %d", offset, duration);
+            adev->gap_offset = offset;
+            adev->gap_ignore_pts = false;
+            dolby_ms12_set_pts_gap(offset, duration);
+            ret = 0;
+            goto exit;
+        }
+        ret = -EINVAL;
         goto exit;
     }
 

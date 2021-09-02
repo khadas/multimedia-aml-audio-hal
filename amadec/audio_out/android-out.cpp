@@ -62,7 +62,9 @@ static int buffering_audio_data = 0;
 static int skip_unnormal_discontinue = 0;
 static int unnormal_discontinue = 0;
 static int unnormal_discontinue1 = 0;
+#ifdef USE_AOUT_IN_ADEC
 extern "C" int get_audio_decoder(void);
+#endif
 static int get_digitalraw_mode(void)
 {
 	return amsysfs_get_sysfs_int("/sys/class/audiodsp/digital_raw");
@@ -908,6 +910,8 @@ extern "C" int android_init(struct aml_audio_dec* audec)
     xxx = 0;
     memset(&diff_record[0], 0, 0x40*sizeof(diff_record[0]));
     diff_wp = 0;
+
+#ifdef USE_AOUT_IN_ADEC
     if (get_audio_decoder() == AUDIO_ARC_DECODER) {
 		wfd_ds_thrdhold = 220;
 		wfd_us_thrdhold = 180;
@@ -917,6 +921,7 @@ extern "C" int android_init(struct aml_audio_dec* audec)
 		wfd_ds_thrdhold = 250;
 		wfd_us_thrdhold = 150;
      }
+#endif
      adec_print("up/down sampling thread 	 %d /%d ms \n",wfd_us_thrdhold,wfd_ds_thrdhold);
     if (property_get("vendor.media.libplayer.wfd", wfd_prop, "0") > 0) {
        wfd_enable = (strcmp(wfd_prop, "1") == 0);

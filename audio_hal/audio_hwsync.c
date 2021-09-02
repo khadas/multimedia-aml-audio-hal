@@ -530,6 +530,14 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     p_hwsync->aout->tsync_status = TSYNC_STATUS_RUNNING;
     return 0;
 }
+
+static inline uint32_t abs32(int32_t a)
+{
+    return ((a) < 0 ? -(a) : (a));
+}
+
+#define pts_gap(a, b)   abs32(((int)(a) - (int)(b)))
+
 /*
 @offset :ms12 real costed offset
 @p_adjust_ms: a/v adjust ms.if return a minus,means
@@ -580,6 +588,26 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     }
 
     ret = aml_audio_hwsync_lookup_apts(p_hwsync, offset, &apts);
+
+    if ((ret == 0) &&
+        (adev->gap_offset != 0) &&
+        !adev->gap_ignore_pts &&
+        ((int)(offset - (adev->gap_offset & 0xffffffff)) >= 0)) {
+        /* when PTS gap exists (Netflix specific), skip APTS reset between [adev->gap_pts, adev->gap_pts + 500ms] */
+        ALOGI("gap_pts = 0x%x", apts);
+        adev->gap_pts = apts;
+        adev->gap_ignore_pts = true;
+    }
+
+    if ((adev->gap_ignore_pts) && (ret == 0)) {
+        if (pts_gap(apts, adev->gap_pts) < 90 * 500) {
+            return 0;
+        } else {
+            ALOGI("%s, Recovered APTS/PCR checking", __func__);
+            adev->gap_ignore_pts = false;
+            adev->gap_offset = 0;
+        }
+    }
 
     /*get MS12 pipe line delay + alsa delay*/
     stream = (struct audio_stream_out *)p_hwsync->aout;

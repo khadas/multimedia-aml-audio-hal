@@ -133,9 +133,11 @@ int audiodsp_format_update(aml_audio_dec_t *audec)
     unsigned long val;
     dsp_operations_t *dsp_ops = &audec->adsp_ops;
 
+#ifdef USE_AOUT_IN_ADEC
     if (dsp_ops->dsp_file_fd < 0 || get_audio_decoder() != AUDIO_ARC_DECODER) {
         return ret;
     }
+#endif
 
     ret = 0;
     if (1/*audiodsp_get_format_changed_flag()*/) {
