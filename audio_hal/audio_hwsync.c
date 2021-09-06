@@ -340,6 +340,7 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
     int pts_found = 0;
     struct aml_audio_device *adev = p_hwsync->aout->dev;
     int debug_enable = aml_audio_get_hwsync_flag();
+    int header_sub_version = 0;
     if (p_hwsync == NULL || in_buffer == NULL) {
         return 0;
     }
@@ -389,7 +390,9 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
                 p_hwsync->body_align_cnt = 0; //  alisan zz
                 p_hwsync->hw_sync_header_cnt = 0; //8.1
                 pts = hwsync_header_get_pts(&p_hwsync->hw_sync_header[0]);
-                pts = pts * 90 / 1000000;
+                header_sub_version = p_hwsync->hw_sync_header[2];
+                if (!header_sub_version)
+                    pts = pts * 90 / 1000000;
                 time_diff = get_pts_gap(pts, p_hwsync->last_apts_from_header) / 90;
                 if (debug_enable) {
                     ALOGI("pts 0x%"PRIx64",frame len %u\n", pts, p_hwsync->hw_sync_body_cnt);

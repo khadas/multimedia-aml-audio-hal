@@ -95,7 +95,7 @@ static inline bool hwsync_header_valid(uint8_t *header)
 {
     return (header[0] == 0x55) &&
            (header[1] == 0x55) &&
-           (header[2] == 0x00) &&
+           (header[2] == 0x00 || header[2] == 0x01) &&
            (header[3] == 0x01 || header[3] == 0x02);
            //(header[3] == 0x02);
 }
