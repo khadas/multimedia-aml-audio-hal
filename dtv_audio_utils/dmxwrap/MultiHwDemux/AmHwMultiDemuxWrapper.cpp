@@ -262,6 +262,7 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetADAudioParam(int aid, 
     aparam.input = DMX_IN_FRONTEND;
     aparam.output = DMX_OUT_TAP;
     aparam.flags |= DMX_ES_OUTPUT;
+    /*
     if (mDemuxPara.security_mem_level == 10) {
         aparam.flags |= DMX_MEM_SEC_LEVEL1;
         aparam.flags |= ((aud_format & 0xff) << DMX_AUDIO_FORMAT_BIT);
@@ -272,6 +273,18 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetADAudioParam(int aid, 
         aparam.flags |= DMX_MEM_SEC_LEVEL3;
         aparam.flags |= ((aud_format & 0xff) << DMX_AUDIO_FORMAT_BIT);
     }
+    */
+    if( mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL1 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL2 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL3 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL4 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL5 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL6 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL7 )
+    {
+        aparam.flags |= mDemuxPara.security_mem_level;
+    }
+    aparam.flags |= ((aud_format & 0xff) << DMX_AUDIO_FORMAT_BIT);
     //aparam.flags |= DMX_OUTPUT_RAW_MODE;
     AmDmxDevice->AM_DMX_AllocateFilter(&fid_audio);
     AmDmxDevice->AM_DMX_SetCallback(fid_audio, getAudioADEsData, NULL);
@@ -363,6 +376,7 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetAudioParam(int aid, AM
     aparam.input = DMX_IN_FRONTEND;
     aparam.output = DMX_OUT_TAP;
     aparam.flags |= DMX_ES_OUTPUT;
+    /*
     if (mDemuxPara.security_mem_level == 10) {
         aparam.flags |= DMX_MEM_SEC_LEVEL1;
         aparam.flags |= ((aud_format & 0xff) << DMX_AUDIO_FORMAT_BIT);
@@ -373,6 +387,18 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetAudioParam(int aid, AM
         aparam.flags |= DMX_MEM_SEC_LEVEL3;
         aparam.flags |= ((aud_format & 0xff) << DMX_AUDIO_FORMAT_BIT);
     }
+    */
+    if( mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL1 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL2 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL3 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL4 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL5 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL6 ||
+        mDemuxPara.security_mem_level == DMX_MEM_SEC_LEVEL7 )
+    {
+        aparam.flags |= mDemuxPara.security_mem_level;
+    }
+    aparam.flags |= ((aud_format & 0xff) << DMX_AUDIO_FORMAT_BIT);
     //aparam.flags |= DMX_OUTPUT_RAW_MODE;
     AmDmxDevice->AM_DMX_AllocateFilter(&fid_audio);
     AmDmxDevice->AM_DMX_SetCallback(fid_audio, getAudioEsData, NULL);

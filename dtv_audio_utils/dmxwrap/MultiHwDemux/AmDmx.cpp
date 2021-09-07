@@ -62,7 +62,7 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
     AM_DMX_FilterMask_t mask;
     AM_ErrorCode_t ret;
 
-#define BUF_SIZE (4096 * 10)
+#define BUF_SIZE (1024 * 100)
 
     sec_buf = (uint8_t*)malloc(BUF_SIZE);
     struct dmx_non_sec_es_header *header_es;

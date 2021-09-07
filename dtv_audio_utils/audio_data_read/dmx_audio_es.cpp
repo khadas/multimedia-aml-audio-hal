@@ -11,8 +11,8 @@
 #include <dmx.h>
 extern "C" {
 #include <dmx_audio_es.h>
+int aml_audio_get_debug_flag();
 }
-
 
 AM_Dmx_Audio_ErrorCode_t Open_Dmx_Audio (void **demux_handle ,int demux_id, int security_mem_level) {
     Am_DemuxWrapper_OpenPara_t avpara;
@@ -154,15 +154,15 @@ AM_Dmx_Audio_ErrorCode_t Get_MainAudio_Es(void *demux_handle,struct mAudioEsData
     }
     //TSPMutex::Autolock l(demux_wrapper->mDemuxHandleLock);
     ret = demux_wrapper->AmDemuxWrapperReadData(demux_wrapper->filering_aud_pid, (mEsDataInfo **)mAudioEsData,1);
-    ALOGV("get_audio_es_package ret %d mEsdata  %p",ret,*mAudioEsData);
+    //ALOGV("get_audio_es_package ret %d mEsdata  %p",ret,*mAudioEsData);
     if (*mAudioEsData == NULL) {
         return AM_AUDIO_Dmx_ERROR;
     }
     if ((*mAudioEsData)->size == 0) {
         return AM_AUDIO_Dmx_ERROR;
     }
-
-    ALOGV("mEsdata->pts : %lld size:%d \n",(*mAudioEsData)->pts,(*mAudioEsData)->size);
+    if (aml_audio_get_debug_flag() > 1)
+        ALOGV("\n mEsdata->pts : %lld size:%d \n",(*mAudioEsData)->pts,(*mAudioEsData)->size);
 
     return (AM_Dmx_Audio_ErrorCode_t)ret;
 }
@@ -180,14 +180,15 @@ AM_Dmx_Audio_ErrorCode_t Get_ADAudio_Es(void *demux_handle, struct mAudioEsDataI
     AM_DmxErrorCode_t ret = AM_Dmx_SUCCESS;
     TSPMutex::Autolock l(demux_wrapper->mAudioEsDataQueueLock);
     ret = demux_wrapper->AmDemuxWrapperReadData(demux_wrapper->filering_aud_ad_pid, (mEsDataInfo **)mAudioEsData,1);
-    ALOGV("Get_ADAudio_Es ret %d mEsdata  %p",ret,*mAudioEsData);
+    //ALOGV("Get_ADAudio_Es ret %d mEsdata  %p",ret,*mAudioEsData);
     if (*mAudioEsData == NULL) {
         return AM_AUDIO_Dmx_ERROR;
     }
     if ((*mAudioEsData)->size == 0) {
         return AM_AUDIO_Dmx_ERROR;
     }
-    ALOGV("mEsdata->pts : %lld size:%d \n",(*mAudioEsData)->pts,(*mAudioEsData)->size);
+    if (aml_audio_get_debug_flag() > 1)
+        ALOGV("\n ADmEsdata->pts : %lld size:%d \n",(*mAudioEsData)->pts,(*mAudioEsData)->size);
     return (AM_Dmx_Audio_ErrorCode_t)ret;
 }
 
