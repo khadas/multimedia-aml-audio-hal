@@ -2673,9 +2673,12 @@ int mad_layer_III(struct mad_stream *stream, struct mad_frame *frame)
                          *stream->main_data + stream->md_len - si.main_data_begin);
 
             if (md_len > si.main_data_begin) {
-                assert(stream->md_len + md_len -
-                       si.main_data_begin <= MAD_BUFFER_MDLEN);
-
+                //assert(stream->md_len + md_len -
+                //       si.main_data_begin <= MAD_BUFFER_MDLEN);
+                if (!(stream->md_len + md_len-si.main_data_begin <= MAD_BUFFER_MDLEN)) {
+                  stream->error = MAD_ERROR_BADPART3LEN;
+                  return -1;
+                }
                 memcpy(*stream->main_data + stream->md_len,
                        mad_bit_nextbyte(&stream->ptr),
                        frame_used = md_len - si.main_data_begin);
