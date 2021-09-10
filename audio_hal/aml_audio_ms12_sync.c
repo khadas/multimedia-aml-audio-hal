@@ -491,7 +491,9 @@ uint32_t out_get_ms12_bitstream_latency_ms(struct audio_stream_out *stream)
     struct bitstream_out_desc *bitstream_out = &ms12->bitstream_out[BITSTREAM_OUTPUT_A];
     int ret = 0;
 
-    bitstream_delay_ms = aml_audio_spdifout_get_delay(bitstream_out->spdifout_handle);
+    if (bitstream_out->spdifout_handle != NULL) {
+        bitstream_delay_ms = aml_audio_spdifout_get_delay(bitstream_out->spdifout_handle);
+    }
 
     return bitstream_delay_ms;
 }
