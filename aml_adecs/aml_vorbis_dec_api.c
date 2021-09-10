@@ -27,14 +27,6 @@
 #define VORBIS_REMAIN_BUFFER_SIZE (4096 * 10)
 //#define LOG_NDEBUG 0
 
-typedef struct _audio_info {
-    int bitrate;
-    int samplerate;
-    int channels;
-    int file_profile;
-    int error_num;
-} AudioInfo;
-
 typedef struct vorbis_decoder_operations {
     const char * name;
     int nAudioDecoderType;
@@ -62,6 +54,7 @@ typedef struct {
     aml_vorbis_config_t vorbis_config;
     vorbis_decoder_operations_t vorbis_operation;
     vorbis_decoder_operations_t ad_vorbis_operation;
+    aml_dec_stream_info_t stream_info;
     void *pdecoder_lib;
     char remain_data[VORBIS_REMAIN_BUFFER_SIZE];
     int remain_size;
@@ -396,6 +389,12 @@ static int vorbis_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer,
     }
 
     vorbis_operation->getinfo(vorbis_operation, &pAudioInfo);
+    vorbis_decoder->stream_info.stream_sr = pAudioInfo.samplerate;
+    vorbis_decoder->stream_info.stream_ch = pAudioInfo.channels;
+    vorbis_decoder->stream_info.stream_bitrate = pAudioInfo.bitrate;
+    vorbis_decoder->stream_info.stream_error_num = pAudioInfo.error_num;
+    vorbis_decoder->stream_info.stream_drop_num = pAudioInfo.drop_num;
+    vorbis_decoder->stream_info.stream_decode_num = pAudioInfo.decode_num;
     dec_pcm_data->data_sr = pAudioInfo.samplerate;
     dec_pcm_data->data_ch = pAudioInfo.channels;
     dec_pcm_data->data_format = vorbis_config->vorbis_format;
@@ -414,6 +413,10 @@ static int vorbis_decoder_getinfo(aml_dec_t *aml_decoder, aml_dec_info_type_t in
     switch (info_type) {
         case AML_DEC_REMAIN_SIZE:
             //dec_info->remain_size = ddp_dec->remain_size;
+            return 0;
+        case AML_DEC_STREMAM_INFO:
+            memset(&dec_info->dec_info, 0x00, sizeof(aml_dec_stream_info_t));
+            memcpy(&dec_info->dec_info, &vorbis_decoder->stream_info, sizeof(aml_dec_stream_info_t));
             return 0;
         default:
             break;

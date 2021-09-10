@@ -22,6 +22,7 @@
 #include "aml_ringbuffer.h"
 #include "aml_volume_utils.h"
 #include "aml_malloc_debug.h"
+#include "adec-armdec-mgt.h"
 
 #define ACODEC_FMT_NULL -1
 #define ACODEC_FMT_MPEG 0
@@ -86,6 +87,10 @@ typedef struct aml_dec_stream_info {
     int stream_sr;    /** the sample rate in stream*/
     int stream_ch;    /** the original channels in stream*/
     int output_bLFE;
+    int stream_bitrate;
+    unsigned int stream_error_num; // decode error frames
+    unsigned int stream_drop_num; // drop frames
+    unsigned int stream_decode_num; //decode success frames
 
 } aml_dec_stream_info_t;
 

@@ -31,6 +31,8 @@
 #define audio_codec_print printf
 static int kDefaultChannelCount = 2;
 static int kDefaultSamplingRate = 48000;
+static unsigned int error_num = 0;
+static unsigned int decode_num = 0;
 
 int _vorbis_unpack_books(vorbis_info *vi,oggpack_buffer *opb);
 int _vorbis_unpack_info(vorbis_info *vi,oggpack_buffer *opb);
@@ -64,6 +66,8 @@ int audio_dec_init(audio_decoder_operations_t *adec_ops)
     mSignalledError = false;
     mState = NULL;
     mVi = NULL;
+    error_num = 0;
+    decode_num = 0;
     if (adec_ops != NULL) {
         adec_ops->channels = kDefaultChannelCount;
         adec_ops->samplerate = kDefaultSamplingRate;
@@ -136,6 +140,7 @@ int audio_dec_decode(audio_decoder_operations_t *adec_ops, char *outbuf, int *ou
                 }
                 adec_ops->channels = mVi->channels;
                 adec_ops->samplerate = mVi->rate;
+                adec_ops->bps = mVi->bitrate_nominal;
                 mInputBufferCount = 1;
             } else if (data[0] == 5 /* codebook header */) {
                 // remove any prior state
@@ -200,6 +205,7 @@ int audio_dec_decode(audio_decoder_operations_t *adec_ops, char *outbuf, int *ou
 
         int err = vorbis_dsp_synthesis(mState, &pack, 1);
         if (err != 0) {
+            error_num++;
             // FIXME temporary workaround for log spam
 #if !defined(__arm__) && !defined(__aarch64__)
             ALOGE("%s,%d, vorbis_dsp_synthesis returned %d", __func__, __LINE__, err);
@@ -207,6 +213,7 @@ int audio_dec_decode(audio_decoder_operations_t *adec_ops, char *outbuf, int *ou
             ALOGE("%s,%d, vorbis_dsp_synthesis returned %d", __func__, __LINE__, err);
 #endif
         } else {
+            decode_num++;
             size_t numSamplesPerBuffer = kMaxNumSamplesPerBuffer;
             if (numSamplesPerBuffer > *outlen / sizeof(int16_t)) {
                 numSamplesPerBuffer = *outlen / sizeof(int16_t);
@@ -267,8 +274,21 @@ int audio_dec_getinfo(audio_decoder_operations_t *adec_ops, void *pAudioInfo)
     if (adec_ops != NULL && pAudioInfo != NULL) {
         ((AudioInfo *)pAudioInfo)->channels = adec_ops->channels > 2 ? 2 : adec_ops->channels;;
         ((AudioInfo *)pAudioInfo)->samplerate = adec_ops->samplerate;
+        ((AudioInfo *)pAudioInfo)->bitrate = adec_ops->bps;
+        ((AudioInfo *)pAudioInfo)->error_num = error_num;
+        ((AudioInfo *)pAudioInfo)->drop_num = error_num;
+        ((AudioInfo *)pAudioInfo)->decode_num = decode_num;
     }
-
+    #if 0
+    ALOGI("%s:%d stream_sr(%d) stream_ch(%d) stream_bitrate(%d) stream_error_num(%d) stream_drop_num(%d) stream_decode_num(%d)",
+        __FUNCTION__, __LINE__, ((AudioInfo *)pAudioInfo)->samplerate, ((AudioInfo *)pAudioInfo)->channels,
+        ((AudioInfo *)pAudioInfo)->bitrate, ((AudioInfo *)pAudioInfo)->error_num,
+        ((AudioInfo *)pAudioInfo)->drop_num, ((AudioInfo *)pAudioInfo)->decode_num);
+    ALOGI("%s:%d stream_sr(%d) stream_ch(%d) stream_bitrate(%d) stream_error_num(%d) stream_drop_num(%d) stream_decode_num(%d)",
+        __FUNCTION__, __LINE__, adec_ops->channels , adec_ops->samplerate,
+        adec_ops->bps, error_num,
+        error_num, decode_num);
+    #endif
     return 0;
 }
 

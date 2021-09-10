@@ -47,6 +47,10 @@ struct dolby_ddp_dec {
     size_t dcv_pcm_writed;
     size_t dcv_decoded_samples;
     int dcv_decoded_errcount;
+    aml_dec_stream_info_t stream_info;
+    unsigned long total_raw_size;
+    unsigned long total_time; // s
+    unsigned int bit_rate;
     char sysfs_buf[MAX_BUFF_LEN];
     int status;
     int inbuf_size;

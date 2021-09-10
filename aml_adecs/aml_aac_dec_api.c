@@ -31,14 +31,6 @@
 #define AAC_REMAIN_BUFFER_SIZE (4096 * 10)
 #define AAC_AD_NEED_CACHE_FRAME_COUNT  2
 
-typedef struct _audio_info {
-    int bitrate;
-    int samplerate;
-    int channels;
-    int file_profile;
-    int error_num;
-} AudioInfo;
-
 typedef struct faad_decoder_operations {
     const char * name;
     int nAudioDecoderType;
@@ -66,6 +58,11 @@ struct aac_dec_t {
     aml_faad_config_t aac_config;
     faad_decoder_operations_t faad_op;
     faad_decoder_operations_t ad_faad_op;
+    aml_dec_stream_info_t stream_info;
+    unsigned long total_raw_size;
+    unsigned long total_pcm_size;
+    unsigned long total_time; // s
+    int bit_rate; // verage bit rate in the first five minutes
     void *pdecoder;
     char remain_data[AAC_REMAIN_BUFFER_SIZE];
     int remain_size;
@@ -184,6 +181,10 @@ static int faad_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t * dec_confi
         ALOGE("malloc aac_dec failed\n");
         return -1;
     }
+    aac_dec->total_pcm_size = 0;
+    aac_dec->total_raw_size = 0;
+    aac_dec->total_time = 0;
+    aac_dec->bit_rate = 0;
 
     aml_dec = &aac_dec->aml_dec;
 
@@ -371,7 +372,16 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
           break;
       }
     }
+
+    aac_dec->total_raw_size += used_size_return;
+    aac_dec->total_pcm_size += dec_pcm_data->data_len;
     faad_op->getinfo(faad_op,&pAudioInfo);
+    aac_dec->stream_info.stream_sr = pAudioInfo.samplerate;
+    aac_dec->stream_info.stream_ch = pAudioInfo.channels;
+    aac_dec->stream_info.stream_error_num = pAudioInfo.error_num;
+    aac_dec->stream_info.stream_drop_num = pAudioInfo.drop_num;
+    aac_dec->stream_info.stream_decode_num = pAudioInfo.decode_num;
+
     if (pAudioInfo.channels == 1 && dec_pcm_data->data_len) {
             int16_t *samples_data = (int16_t *)dec_pcm_data->buf;
             int i = 0, samples_num,samples;
@@ -488,7 +498,6 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
 
 static int faad_decoder_getinfo(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_dec_info_t * dec_info)
 {
-
     int ret = -1;
     struct aac_dec_t *aac_dec= (struct aac_dec_t *)aml_dec;
 
@@ -496,11 +505,21 @@ static int faad_decoder_getinfo(aml_dec_t *aml_dec, aml_dec_info_type_t info_typ
     case AML_DEC_REMAIN_SIZE:
         //dec_info->remain_size = ddp_dec->remain_size;
         return 0;
+    case AML_DEC_STREMAM_INFO:
+        memset(&dec_info->dec_info, 0x00, sizeof(aml_dec_stream_info_t));
+        memcpy(&dec_info->dec_info, &aac_dec->stream_info, sizeof(aml_dec_stream_info_t));
+        if (aac_dec->stream_info.stream_ch != 0 && aac_dec->stream_info.stream_sr != 0 && aac_dec->total_time < 300) { //we only calculate bitrate in the first five minutes
+            aac_dec->total_time = aac_dec->total_pcm_size/(aac_dec->stream_info.stream_ch*2*(aac_dec->stream_info.stream_sr));
+            if (aac_dec->total_time != 0) {
+                aac_dec->bit_rate = (int)(aac_dec->total_raw_size/aac_dec->total_time);
+            }
+        }
+        dec_info->dec_info.stream_bitrate = aac_dec->bit_rate;
+        return 0;
     default:
         break;
     }
     return ret;
-
 }
 
 int faad_decoder_config(aml_dec_t * aml_dec, aml_dec_config_type_t config_type, aml_dec_config_t * dec_config)

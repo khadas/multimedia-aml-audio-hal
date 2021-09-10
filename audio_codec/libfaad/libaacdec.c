@@ -98,8 +98,10 @@ typedef struct FaadContext {
     int header_type;
     int gSampleRate;
     int gChannels;
-    int error_count;
-    int error_num; //add for get error num
+    int decoded_nb_frames;
+    int bit_rate;
+    unsigned int error_count;
+    unsigned int error_num; //add for get error num
     int frame_length_his[FRAME_RECORD_NUM];
     unsigned int muted_samples;
     unsigned int muted_count;
@@ -466,6 +468,7 @@ int audio_dec_decode(
     if (!gFaadCxt->init_flag) {
         gFaadCxt->error_count = 0;
         gFaadCxt->error_num = 0;
+        gFaadCxt->decoded_nb_frames = 0;
         audio_codec_print("begin audio_decoder_init,buf size %d  \n", dec_bufsize);
         ret = audio_decoder_init(adec_ops, outbuf, outlen, dec_buf, dec_bufsize, (long *)&inbuf_consumed);
         if (ret ==  AAC_ERROR_NO_ENOUGH_DATA) {
@@ -523,6 +526,7 @@ int audio_dec_decode(
         goto exit;
     }
     if ((frameInfo.error == 0) && (frameInfo.samples > 0) && sample_buffer != NULL) {
+        gFaadCxt->decoded_nb_frames++;
         store_frame_size(gFaadCxt, frameInfo.bytesconsumed);
         gFaadCxt->gSampleRate = frameInfo.samplerate;
         gFaadCxt->gChannels = frameInfo.channels;
@@ -610,6 +614,8 @@ int audio_dec_getinfo(audio_decoder_operations_t *adec_ops, void *pAudioInfo)
         ((AudioInfo *)pAudioInfo)->channels = gFaadCxt->gChannels;
         ((AudioInfo *)pAudioInfo)->samplerate = gFaadCxt->gSampleRate;
         ((AudioInfo *)pAudioInfo)->error_num = gFaadCxt->error_num;
+        ((AudioInfo *)pAudioInfo)->drop_num = gFaadCxt->error_num;
+        ((AudioInfo *)pAudioInfo)->decode_num = gFaadCxt->decoded_nb_frames;
         //audio_codec_print("--%s,gFaadCxt->error_num=%d,gFaadCxt->gSampleRate=%d--\n",__func__,gFaadCxt->error_num,gFaadCxt->gSampleRate);
     }
     return 0;

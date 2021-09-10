@@ -26,14 +26,6 @@
 #define FLAC_MAX_LENGTH (1024 * 64)
 #define FLAC_REMAIN_BUFFER_SIZE (4096 * 10)
 
-typedef struct _audio_info {
-    int bitrate;
-    int samplerate;
-    int channels;
-    int file_profile;
-    int error_num;
-} AudioInfo;
-
 typedef struct flac_decoder_operations {
     const char * name;
     int nAudioDecoderType;
@@ -59,6 +51,11 @@ typedef struct flac_decoder_operations {
 typedef struct {
     aml_dec_t  aml_decoder;
     aml_flac_config_t flac_config;
+    unsigned long total_raw_size;
+    unsigned long total_pcm_size;
+    unsigned long total_time; // s
+    int bit_rate;
+    aml_dec_stream_info_t stream_info;
     flac_decoder_operations_t flac_operation;
     void *pdecoder_lib;
     char remain_data[FLAC_REMAIN_BUFFER_SIZE];
@@ -185,6 +182,11 @@ static int flac_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t *dec_config
     *ppaml_dec = (aml_dec_t *)flac_decoder;
     flac_decoder->aml_decoder.status = 1;
     flac_decoder->remain_size = 0;
+    flac_decoder->total_pcm_size = 0;
+    flac_decoder->total_raw_size = 0;
+    flac_decoder->total_time = 0;
+    flac_decoder->bit_rate = 0;
+    memset(&(flac_decoder->stream_info), 0x00, sizeof(flac_decoder->stream_info));
     memset(flac_decoder->remain_data, 0, FLAC_REMAIN_BUFFER_SIZE * sizeof(char));
     ALOGI("%s[%d]: success", __FUNCTION__, __LINE__);
     return 0;
@@ -272,6 +274,9 @@ static int flac_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, i
         used_size_return = bytes;
         ALOGI("%s[%d]: in %d, decode_len %d, pcm_len %d, used_size %d, flac_dec->remain_size %d", __FUNCTION__, __LINE__, bytes, decode_len, pcm_len, used_size, flac_decoder->remain_size);
     }
+    flac_decoder->total_pcm_size += dec_pcm_data->data_len;
+    flac_decoder->total_raw_size += used_size_return;
+    flac_decoder->stream_info.stream_decode_num = flac_decoder->total_pcm_size/4;//2ch*2byte
 
     if ((flac_operation->channels == 1) && (dec_pcm_data->data_len > 0)) {
         int16_t *samples_data = (int16_t *)dec_pcm_data->buf;
@@ -289,6 +294,8 @@ static int flac_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, i
     flac_operation->getinfo(flac_operation, &pAudioInfo);
     dec_pcm_data->data_sr = pAudioInfo.samplerate;
     dec_pcm_data->data_ch = pAudioInfo.channels;
+    flac_decoder->stream_info.stream_ch = dec_pcm_data->data_ch;
+    flac_decoder->stream_info.stream_sr = dec_pcm_data->data_sr;
     dec_pcm_data->data_format = flac_config->flac_format;
     dump_flac_data(dec_pcm_data->buf, dec_pcm_data->data_len, "/data/flac_output.pcm");
     ALOGI("%s[%d]: used_size_return %d, decoder pcm len %d, buffer len %d", __FUNCTION__, __LINE__, used_size_return, dec_pcm_data->data_len,
@@ -305,6 +312,18 @@ static int flac_decoder_getinfo(aml_dec_t *aml_decoder, aml_dec_info_type_t info
     switch (info_type) {
         case AML_DEC_REMAIN_SIZE:
             return 0;
+        case AML_DEC_STREMAM_INFO:
+            memset(&dec_info->dec_info, 0x00, sizeof(aml_dec_stream_info_t));
+            memcpy(&dec_info->dec_info, &flac_decoder->stream_info, sizeof(aml_dec_stream_info_t));
+            if (flac_decoder->stream_info.stream_sr != 0 && flac_decoder->total_time < 300) { //we only calculate bitrate in the first five minutes
+                flac_decoder->total_time = flac_decoder->stream_info.stream_decode_num/flac_decoder->stream_info.stream_sr;
+                if (flac_decoder->total_time != 0) {
+                    flac_decoder->bit_rate = (int)(flac_decoder->total_raw_size/flac_decoder->total_time);
+                }
+            }
+            dec_info->dec_info.stream_bitrate = flac_decoder->bit_rate;
+            return 0;
+
         default:
             break;
     }

@@ -1303,12 +1303,51 @@ exit:
 
 static char *out_get_parameters(const struct audio_stream *stream, const char *keys)
 {
+    char temp_buf[64] = {0};
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    aml_dec_t *aml_dec = aml_out->aml_dec;
+
     if (strstr(keys, AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES) || \
         strstr(keys, AUDIO_PARAMETER_STREAM_SUP_CHANNELS) || \
         strstr(keys, AUDIO_PARAMETER_STREAM_SUP_FORMATS)) {
         return out_get_parameters_wrapper_about_sup_sampling_rates__channels__formats(stream, keys);
-    }
-    else {
+    } else if (strstr (keys, "stream_sr") ) {
+        aml_dec_info_t dec_info;
+        memset(&dec_info, 0x00, sizeof(dec_info));
+        aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &dec_info);
+        sprintf (temp_buf, "stream_sr=%d", dec_info.dec_info.stream_sr);
+        return strdup (temp_buf);
+    } else if (strstr (keys, "stream_ch") ) {
+        aml_dec_info_t dec_info;
+        memset(&dec_info, 0x00, sizeof(dec_info));
+        aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &dec_info);
+        sprintf (temp_buf, "stream_ch=%d", dec_info.dec_info.stream_ch);
+        return strdup (temp_buf);
+    } else if (strstr (keys, "stream_bitrate") ) {
+        aml_dec_info_t dec_info;
+        memset(&dec_info, 0x00, sizeof(dec_info));
+        aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &dec_info);
+        sprintf (temp_buf, "stream_bitrate=%d", dec_info.dec_info.stream_bitrate);
+        return strdup (temp_buf);
+    } else if (strstr (keys, "stream_error_frames") ) {
+        aml_dec_info_t dec_info;
+        memset(&dec_info, 0x00, sizeof(dec_info));
+        aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &dec_info);
+        sprintf (temp_buf, "stream_error_frames=%d", dec_info.dec_info.stream_error_num);
+        return strdup (temp_buf);
+    } else if (strstr (keys, "stream_drop_frames") ) {
+        aml_dec_info_t dec_info;
+        memset(&dec_info, 0x00, sizeof(dec_info));
+        aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &dec_info);
+        sprintf (temp_buf, "stream_drop_frames=%d", dec_info.dec_info.stream_drop_num);
+        return strdup (temp_buf);
+    } else if (strstr (keys, "stream_decode_frames") ) {
+        aml_dec_info_t dec_info;
+        memset(&dec_info, 0x00, sizeof(dec_info));
+        aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &dec_info);
+        sprintf (temp_buf, "stream_decode_frames=%d", dec_info.dec_info.stream_decode_num);
+        return strdup (temp_buf);
+    } else {
         ALOGE("%s() keys %s is not supported! TODO!\n", __func__, keys);
         return strdup ("");
     }

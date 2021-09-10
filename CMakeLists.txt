@@ -207,7 +207,8 @@ target_include_directories(audio_hal PRIVATE
 	./libms12_v24/include
 	./amlogic_AQ_tools
 	./dtv_audio_utils/audio_read_api
-	./audio_hal)
+	./audio_hal
+	./amadec)
 
 target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations -funwind-tables -fasynchronous-unwind-tables -fPIC)
 

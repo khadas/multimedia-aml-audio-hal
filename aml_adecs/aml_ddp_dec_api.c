@@ -400,7 +400,7 @@ Error:
     return -1;
 }
 
-static int dcv_decode_process(unsigned char*input, int input_size, unsigned char *outbuf,
+static int dcv_decode_process(struct dolby_ddp_dec *ddp_dec, unsigned char*input, int input_size, unsigned char *outbuf,
                               int *out_size, char *spdif_buf, int *raw_size, int nIsEc3,
                               struct pcm_info *pcm_out_info)
 {
@@ -423,6 +423,29 @@ static int dcv_decode_process(unsigned char*input, int input_size, unsigned char
                                  , (char *) spdif_buf
                                  , (int *) raw_size
                                  ,handle);
+
+/* The vale of ret can reference as bellow
+    typedef enum ERROR_CODE
+    {
+        DDPAUDEC_SUCCESS            =  0,
+        DDPAUDEC_OPEN_FAILURE       = 10,
+        DDPAUDEC_INIT_FAILURE       = 20,
+        DDPAUDEC_INVALID_HDR        = 30,
+        DDPAUDEC_FRM_PARAM_ERROR    = 40,
+        DDPAUDEC_INVALID_FRAME      = 50,
+        DDPAUDEC_INCOMPLETE_FRAME   = 60,
+        DDPAUDEC_FRM_CLEAN_FAILURE  = 70,
+        DDPAUDEC_FRM_CLOSE_FAILURE  = 80,
+        DDPAUDEC_QUITONERR = 90,
+    } ERROR_CODE;
+
+*/
+    if (0 == ret) {
+        ddp_dec->stream_info.stream_decode_num++;
+    } else if (50 == ret) {
+        ddp_dec->stream_info.stream_error_num++;
+        ddp_dec->stream_info.stream_drop_num++;
+    }
     ALOGV("used_size %d,lpcm out_size %d,raw out size %d",used_size,*out_size,*raw_size);
     return used_size;
 }
@@ -489,6 +512,11 @@ int dcv_decoder_init_patch(aml_dec_t ** ppaml_dec, aml_dec_config_t * dec_config
 
         goto error;
     }
+
+    ddp_dec->total_raw_size = 0;
+    ddp_dec->total_time = 0;
+    ddp_dec->bit_rate = 0;
+    memset(&(ddp_dec->stream_info),0x00,sizeof(aml_dec_stream_info_t));
 
     dec_pcm_data->buf_size = MAX_DECODER_FRAME_LENGTH;
     dec_pcm_data->buf = (unsigned char*) aml_audio_calloc(1, dec_pcm_data->buf_size);
@@ -822,7 +850,8 @@ int dcv_decoder_process_patch(aml_dec_t * aml_dec, unsigned char *buffer, int by
         int current_size = 0;
         ALOGV("ddp_dec->outlen_pcm=%d raw len=%d in =%p dec_pcm_data->buf=%p dec_raw_data->buf=%p",
             ddp_dec->outlen_pcm, ddp_dec->outlen_raw, read_pointer, dec_pcm_data->buf, dec_raw_data->buf);
-        current_size = dcv_decode_process((unsigned char*)read_pointer + used_size,
+        current_size = dcv_decode_process(ddp_dec,
+                                             (unsigned char*)read_pointer + used_size,
                                              mFrame_size,
                                              (unsigned char *)dec_pcm_data->buf+ ddp_dec->outlen_pcm,
                                              &outPCMLen,
@@ -848,6 +877,8 @@ int dcv_decoder_process_patch(aml_dec_t * aml_dec, unsigned char *buffer, int by
         dec_pcm_data->data_ch     = 2;
         dec_pcm_data->data_sr     = ddp_dec->pcm_out_info.sample_rate;
         dec_pcm_data->data_len    = ddp_dec->outlen_pcm;
+        ddp_dec->stream_info.stream_ch = 2;
+        ddp_dec->stream_info.stream_sr = dec_pcm_data->data_sr;
     }
 
     if (ddp_dec->outlen_raw > 0) {
@@ -878,6 +909,8 @@ int dcv_decoder_process_patch(aml_dec_t * aml_dec, unsigned char *buffer, int by
 
     //sprintf(ddp_dec->sysfs_buf, "decoded_frames %d", ddp_dec->dcv_decoded_samples);
     //sysfs_set_sysfs_str(REPORT_DECODED_INFO, ddp_dec->sysfs_buf);
+    int use_raw_size = ((total_used_size - last_remain_size) > bytes) ? bytes : (total_used_size - last_remain_size);
+    ddp_dec->total_raw_size += use_raw_size;
 
     ddp_dec->remain_size = 0;
     /* Fixme: sometimes here total_used_size - last_remain_size is larger than bytes about 8bytes. */
@@ -932,6 +965,17 @@ int dcv_decoder_info(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_dec_
     switch (info_type) {
     case AML_DEC_REMAIN_SIZE:
         dec_info->remain_size = ddp_dec->remain_size;
+        return 0;
+    case AML_DEC_STREMAM_INFO:
+        memset(&dec_info->dec_info, 0x00, sizeof(aml_dec_stream_info_t));
+        memcpy(&dec_info->dec_info, &ddp_dec->stream_info, sizeof(aml_dec_stream_info_t));
+        if (ddp_dec->stream_info.stream_sr != 0 && ddp_dec->total_time < 300) { //we only calculate bitrate in the first five minutes
+            ddp_dec->total_time = ddp_dec->dcv_decoded_samples/ddp_dec->stream_info.stream_sr;
+            if (ddp_dec->total_time != 0) {
+                ddp_dec->bit_rate = (int)(ddp_dec->total_raw_size/ddp_dec->total_time);
+            }
+        }
+        dec_info->dec_info.stream_bitrate = ddp_dec->bit_rate;
         return 0;
     default:
         break;

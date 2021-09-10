@@ -39,6 +39,8 @@
 #include "aml_aac_dec_api.h"
 #include "aml_flac_dec_api.h"
 #include "aml_vorbis_dec_api.h"
+#include "audio_hw_utils.h"
+
 #define AML_DEC_FRAGMENT_FRAMES     (512)
 #define AML_DEC_MAX_FRAMES          (AML_DEC_FRAGMENT_FRAMES * 4)
 
@@ -247,6 +249,31 @@ int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int
         ALOGE("[%s:%d] f_process is null", __func__, __LINE__);
         return -1;
     }
+
+    aml_dec_info_t dec_info;
+    char info_buf[MAX_BUFF_LEN] = {0};
+    memset(info_buf, 0x00, MAX_BUFF_LEN);
+    aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &dec_info);
+
+    sprintf(info_buf, "bitrate %d", dec_info.dec_info.stream_bitrate);
+    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+    memset(info_buf, 0x00, MAX_BUFF_LEN);
+    sprintf(info_buf, "channels %d", dec_info.dec_info.stream_ch);
+    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+    memset(info_buf, 0x00, MAX_BUFF_LEN);
+    sprintf(info_buf, "samplerate %d", dec_info.dec_info.stream_sr);
+    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+    memset(info_buf, 0x00, MAX_BUFF_LEN);
+    sprintf(info_buf, "frames %d", dec_info.dec_info.stream_decode_num);
+    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+    memset(info_buf, 0x00, MAX_BUFF_LEN);
+    sprintf(info_buf, "errors %d", dec_info.dec_info.stream_error_num);
+    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+    memset(info_buf, 0x00, MAX_BUFF_LEN);
+    sprintf(info_buf, "drops %d", dec_info.dec_info.stream_drop_num);
+    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+    memset(info_buf, 0x00, MAX_BUFF_LEN);
+
 
     frame_size = audio_bytes_per_sample(dec_pcm_data->data_format) * dec_pcm_data->data_ch;
     /*one decoded frame length is too big, we need seprate it*/
