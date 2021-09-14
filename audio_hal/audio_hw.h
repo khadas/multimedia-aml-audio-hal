@@ -554,6 +554,8 @@ struct aml_audio_device {
     uint64_t gap_offset;
     uint32_t gap_pts;
     bool gap_ignore_pts;
+    float master_volume;
+    bool master_mute;
     /* -End- */
 };
 
