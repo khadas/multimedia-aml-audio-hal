@@ -6737,6 +6737,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, const void *buf
     effect_descriptor_t tmpdesc;
     int return_bytes = bytes;
     uint32_t apts32 = 0;
+    bool has_video = adev->is_has_video;
 
     audio_hwsync_t *hw_sync = aml_out->hwsync;
     bool digital_input_src = (patch && \
@@ -6985,7 +6986,7 @@ hwsync_rewrite:
                     if (hw_sync->first_apts_flag == false) {
                         aml_audio_hwsync_set_first_pts(aml_out->hwsync, cur_pts);
                     } else {
-                        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
+                        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type && has_video) {
                             uint64_t apts;
                             uint32_t apts32;
                             uint32_t pcr = 0;
