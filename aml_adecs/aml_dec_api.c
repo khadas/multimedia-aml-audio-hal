@@ -144,6 +144,30 @@ int aml_decoder_release(aml_dec_t *aml_dec)
         return -1;
     }
 
+    if (access(REPORT_DECODED_INFO, F_OK) == 0) {
+        char info_buf[MAX_BUFF_LEN] = {0};
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        int val = 0;
+        sprintf(info_buf, "bitrate %d", val);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "channels %d", val);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "samplerate %d", val);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "frames %d", val);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "errors %d", val);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "drops %d", val);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+    }
+
     return ret;
 
 
@@ -250,29 +274,32 @@ int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int
         return -1;
     }
 
-    aml_dec_info_t dec_info;
-    char info_buf[MAX_BUFF_LEN] = {0};
-    memset(info_buf, 0x00, MAX_BUFF_LEN);
-    aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &dec_info);
+    if (access(REPORT_DECODED_INFO, F_OK) == 0) {
+        aml_dec_info_t dec_info;
+        memset(&dec_info, 0x00, sizeof(dec_info));
+        char info_buf[MAX_BUFF_LEN] = {0};
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &dec_info);
 
-    sprintf(info_buf, "bitrate %d", dec_info.dec_info.stream_bitrate);
-    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
-    memset(info_buf, 0x00, MAX_BUFF_LEN);
-    sprintf(info_buf, "channels %d", dec_info.dec_info.stream_ch);
-    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
-    memset(info_buf, 0x00, MAX_BUFF_LEN);
-    sprintf(info_buf, "samplerate %d", dec_info.dec_info.stream_sr);
-    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
-    memset(info_buf, 0x00, MAX_BUFF_LEN);
-    sprintf(info_buf, "frames %d", dec_info.dec_info.stream_decode_num);
-    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
-    memset(info_buf, 0x00, MAX_BUFF_LEN);
-    sprintf(info_buf, "errors %d", dec_info.dec_info.stream_error_num);
-    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
-    memset(info_buf, 0x00, MAX_BUFF_LEN);
-    sprintf(info_buf, "drops %d", dec_info.dec_info.stream_drop_num);
-    sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
-    memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "bitrate %d", dec_info.dec_info.stream_bitrate);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "channels %d", dec_info.dec_info.stream_ch);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "samplerate %d", dec_info.dec_info.stream_sr);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "frames %d", dec_info.dec_info.stream_decode_num);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "errors %d", dec_info.dec_info.stream_error_num);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf(info_buf, "drops %d", dec_info.dec_info.stream_drop_num);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
+        memset(info_buf, 0x00, MAX_BUFF_LEN);
+    }
 
 
     frame_size = audio_bytes_per_sample(dec_pcm_data->data_format) * dec_pcm_data->data_ch;

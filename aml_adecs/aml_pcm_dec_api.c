@@ -24,6 +24,8 @@
 
 struct pcm_dec_t {
     aml_dec_t  aml_dec;
+    aml_dec_stream_info_t stream_info;
+    int bit_rate;
     aml_pcm_config_t pcm_config;
 };
 
@@ -129,6 +131,7 @@ static int pcm_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t * dec_config
         return -1;
     }
 
+    memset(&(pcm_dec->stream_info), 0x00, sizeof(pcm_dec->stream_info));
 
     aml_dec->status = 1;
     *ppaml_dec = (aml_dec_t *)pcm_dec;
@@ -213,6 +216,12 @@ static int pcm_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
         memset(dec_pcm_data->buf, 0, downmix_size);
     }
 
+    pcm_dec->stream_info.stream_decode_num += (bytes/src_channel/2);
+    if ( pcm_dec->stream_info.stream_bitrate == 0) {
+        pcm_dec->stream_info.stream_bitrate = src_channel*2*pcm_config->samplerate;
+    }
+    pcm_dec->stream_info.stream_ch = src_channel;
+    pcm_dec->stream_info.stream_sr = pcm_config->samplerate;
 
     if (pcm_config->channel == 2) {
         /*now we only support bypass PCM data*/
@@ -254,12 +263,29 @@ static int pcm_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
     return bytes;
 }
 
+static int pcm_decoder_getinfo(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_dec_info_t * dec_info)
+{
+    int ret = -1;
+    struct pcm_dec_t *pcm_dec= (struct pcm_dec_t *)aml_dec;
 
+    switch (info_type) {
+    case AML_DEC_REMAIN_SIZE:
+        //dec_info->remain_size = pcm_dec->remain_size;
+        return 0;
+    case AML_DEC_STREMAM_INFO:
+        memset(&dec_info->dec_info, 0x00, sizeof(aml_dec_stream_info_t));
+        memcpy(&dec_info->dec_info, &pcm_dec->stream_info, sizeof(aml_dec_stream_info_t));
+        return 0;
+    default:
+        break;
+    }
+    return ret;
+}
 
 aml_dec_func_t aml_pcm_func = {
     .f_init                 = pcm_decoder_init,
     .f_release              = pcm_decoder_release,
     .f_process              = pcm_decoder_process,
     .f_config               = NULL,
-    .f_info                 = NULL,
+    .f_info                 = pcm_decoder_getinfo,
 };
