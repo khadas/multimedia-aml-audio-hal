@@ -3763,6 +3763,11 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 aml_audio_set_speaker_mute(adev, "false");
                 aml_audio_update_arc_status(adev, false);
             }
+#ifdef BUILD_LINUX
+            if ((val & AUDIO_DEVICE_OUT_HDMI) && adev->is_STB) {
+                aml_audio_set_speaker_mute(adev, "false");
+            }
+#endif
         }
         //#ifdef ENABLE_BT_A2DP
         #ifndef BUILD_LINUX
@@ -3788,6 +3793,12 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 aml_audio_set_speaker_mute(adev, "true");
                 aml_audio_update_arc_status(adev, true);
             }
+#ifdef BUILD_LINUX
+            if ((val & AUDIO_DEVICE_OUT_HDMI) && adev->is_STB) {
+                aml_audio_set_speaker_mute(adev, "true");
+            }
+#endif
+
             update_sink_format_after_hotplug(adev);
         }
         //#ifdef ENABLE_BT_A2DP

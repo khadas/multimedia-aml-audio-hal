@@ -2,17 +2,11 @@
   <ctl name="HDMI ARC Switch" value="0" />
 
   <path name="speaker">
-   <ctl name="TDMOUT_A Lane0 Mute Channel" value="0" />
-   <ctl name="AMP Ch1 Switch" value="1" />
-   <ctl name="AMP Ch2 Switch" value="1" />
-    <ctl name="AMP Maser Volume Mute" value="0" />
+    <ctl name="SPK mute" value="0" />
   </path>
 
   <path name="speaker_off">
-   <ctl name="TDMOUT_A Lane0 Mute Channel" value="3" />
-   <ctl name="AMP Ch1 Switch" value="0" />
-   <ctl name="AMP Ch2 Switch" value="0" />
-    <ctl name="AMP Maser Volume Mute" value="1" />
+    <ctl name="SPK mute" value="1" />
   </path>
 
   <path name="hdmi_arc">
