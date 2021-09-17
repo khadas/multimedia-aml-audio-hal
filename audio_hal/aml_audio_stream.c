@@ -872,6 +872,11 @@ void get_audio_indicator(struct aml_audio_device *dev, char *temp_buf) {
         sprintf (temp_buf, "audioindicator=DTS");
     else if (adev->audio_hal_info.update_type == TYPE_DTS_HD_MA)
         sprintf (temp_buf, "audioindicator=DTS HD");
+    else if (adev->audio_hal_info.update_type == TYPE_DTS_HD)
+        sprintf (temp_buf, "audioindicator=DTS HD");
+    else if (adev->audio_hal_info.update_type == TYPE_DTS_EXPRESS)
+        sprintf (temp_buf, "audioindicator=DTS EXPRESS");
+
     ALOGI("%s(), [%s]", __func__, temp_buf);
 }
 
