@@ -2602,30 +2602,26 @@ unsigned long long dolby_ms12_get_main_pcm_generated(struct audio_stream_out *st
     }
     audio_format = ms12_get_audio_hal_format(audio_format);
     if (adev->continuous_audio_mode) {
-        if (audio_format == AUDIO_FORMAT_AC4) {
-            pcm_frame_generated = ms12->master_pcm_frames;
+        /*we use 2main mixer output to calculate the position*/
+        if (audio_is_linear_pcm(audio_format)) {
+            pcm_frame_generated = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE_SYSTEM, MAIN_INPUT_STREAM);
         } else {
-            /*we use 2main mixer output to calculate the position*/
-            if (audio_is_linear_pcm(audio_format)) {
-                pcm_frame_generated = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE_SYSTEM, MAIN_INPUT_STREAM);
-            } else {
-                pcm_frame_generated = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE_PRIMARY, MAIN_INPUT_STREAM);
-            }
-            master_pcm_frame = ms12->master_pcm_frames;
-            main_mixer_write_pcm_frame  = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE, MAIN_INPUT_STREAM);
+            pcm_frame_generated = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE_PRIMARY, MAIN_INPUT_STREAM);
+        }
+        master_pcm_frame = ms12->master_pcm_frames;
+        main_mixer_write_pcm_frame  = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE, MAIN_INPUT_STREAM);
 
-            if (main_mixer_write_pcm_frame >= master_pcm_frame) {
-                latency_frames = (main_mixer_write_pcm_frame - master_pcm_frame);
-                ALOGV("ms12 pipe line mixer =%lld master =%lld latency_frames =%d", main_mixer_write_pcm_frame, master_pcm_frame, latency_frames);
-            } else {
-                ALOGE("wrong ms12 pipe line delay decode =%lld mixer =%lld", main_mixer_write_pcm_frame, master_pcm_frame);
-            }
-            /*consider the delay from mixer to pcm write*/
-            if (pcm_frame_generated > latency_frames) {
-                pcm_frame_generated -= latency_frames;
-            } else {
-                pcm_frame_generated = 0;
-            }
+        if (main_mixer_write_pcm_frame >= master_pcm_frame) {
+            latency_frames = (main_mixer_write_pcm_frame - master_pcm_frame);
+            ALOGV("ms12 pipe line mixer =%lld master =%lld latency_frames =%d", main_mixer_write_pcm_frame, master_pcm_frame, latency_frames);
+        } else {
+            ALOGE("wrong ms12 pipe line delay decode =%lld mixer =%lld", main_mixer_write_pcm_frame, master_pcm_frame);
+        }
+        /*consider the delay from mixer to pcm write*/
+        if (pcm_frame_generated > latency_frames) {
+            pcm_frame_generated -= latency_frames;
+        } else {
+            pcm_frame_generated = 0;
         }
     } else {
         pcm_frame_generated = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, audio_format, MAIN_INPUT_STREAM);
@@ -2748,47 +2744,34 @@ int dolby_ms12_main_pipeline_latency_frames(struct audio_stream_out *stream) {
     }
 
     if (adev->continuous_audio_mode) {
-        if (audio_format == AUDIO_FORMAT_AC4) {
-            /*ac4 doesn't use 2main mixer, and it doesn't insert any silence frame, so we can use the output positon*/
-            decoded_frame = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, audio_format, MAIN_INPUT_STREAM);
-            master_pcm_frame = ms12->master_pcm_frames;
-            if (decoded_frame >= master_pcm_frame) {
-                latency_frames = (decoded_frame - master_pcm_frame);
-                ALOGV("ms12 pipe line decode =%lld mixer =%lld latency_frames =%d", decoded_frame, master_pcm_frame, latency_frames);
-            } else {
-                ALOGE("wrong ms12 pipe line delay decode =%lld mixer =%lld", decoded_frame, master_pcm_frame);
-            }
+        /*the main mixer consumed frames*/
+        unsigned long long main_mixer_consume = 0;
+        /*the main mixer write frames*/
+        unsigned long long main_mixer_write = 0;
+
+        // step 1 calculate decoder to main mixer delay
+        decoded_frame = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, audio_format, MAIN_INPUT_STREAM);
+        if (audio_is_linear_pcm(audio_format)) {
+            main_mixer_consume = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE_SYSTEM, MAIN_INPUT_STREAM);
         } else {
-            /*the main mixer consumed frames*/
-            unsigned long long main_mixer_consume = 0;
-            /*the main mixer write frames*/
-            unsigned long long main_mixer_write = 0;
-
-            // step 1 calculate decoder to main mixer delay
-            decoded_frame = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, audio_format, MAIN_INPUT_STREAM);
-            if (audio_is_linear_pcm(audio_format)) {
-                main_mixer_consume = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE_SYSTEM, MAIN_INPUT_STREAM);
-            } else {
-                main_mixer_consume = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE_PRIMARY, MAIN_INPUT_STREAM);
-            }
-
-            ALOGV("decoded_frame =%lld main_mixer_pcm =%lld diff =%lld", decoded_frame, main_mixer_consume, (decoded_frame - main_mixer_consume)/48);
-            if (decoded_frame >= main_mixer_consume) {
-                latency_frames  = decoded_frame - main_mixer_consume;
-            } else {
-                latency_frames  = 0;
-            }
-            // step 2 calculate main mixer delay to pcm write delay
-            master_pcm_frame = ms12->master_pcm_frames;
-            main_mixer_write  = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE, MAIN_INPUT_STREAM);
-            ALOGV("master_pcm_frame =%lld main main mixer =%lld diff =%lld", master_pcm_frame, main_mixer_write, (main_mixer_write - master_pcm_frame) / 48);
-            if (main_mixer_write >= master_pcm_frame) {
-                latency_frames += (main_mixer_write - master_pcm_frame);
-            } else {
-                ALOGE("wrong ms12 pipe line delay decode =%lld mixer =%lld", main_mixer_write, master_pcm_frame);
-            }
+            main_mixer_consume = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE_PRIMARY, MAIN_INPUT_STREAM);
         }
 
+        ALOGV("decoded_frame =%lld main_mixer_pcm =%lld diff =%lld", decoded_frame, main_mixer_consume, (decoded_frame - main_mixer_consume)/48);
+        if (decoded_frame >= main_mixer_consume) {
+            latency_frames  = decoded_frame - main_mixer_consume;
+        } else {
+            latency_frames  = 0;
+        }
+        // step 2 calculate main mixer delay to pcm write delay
+        master_pcm_frame = ms12->master_pcm_frames;
+        main_mixer_write  = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, AUDIO_2MAIN_MIXER_NODE, MAIN_INPUT_STREAM);
+        ALOGV("master_pcm_frame =%lld main main mixer =%lld diff =%lld", master_pcm_frame, main_mixer_write, (main_mixer_write - master_pcm_frame) / 48);
+        if (main_mixer_write >= master_pcm_frame) {
+            latency_frames += (main_mixer_write - master_pcm_frame);
+        } else {
+            ALOGE("wrong ms12 pipe line delay decode =%lld mixer =%lld", main_mixer_write, master_pcm_frame);
+        }
     }
     ALOGV("%s latency_frames=%d %d ms", __func__, latency_frames, latency_frames / 48);
     return latency_frames;

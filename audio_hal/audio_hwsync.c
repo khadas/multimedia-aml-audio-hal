@@ -746,9 +746,6 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                 latency_frames);
         }
     } else {
-
-        //ALOGE("%s,================first_apts_flag:%d, apts:%d, latency_pts:%d, offset:%d\n", __func__, p_hwsync->first_apts_flag, apts, latency_pts, offset);
-
         if (p_hwsync->first_apts_flag == false && offset > 0 && (apts >= latency_pts) && AVSYNC_TYPE_TSYNC == p_hwsync->aout->avsync_type) {
             ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
             ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
@@ -762,58 +759,51 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             p_hwsync->last_lookup_apts = apts;
         }
 
-            if (p_hwsync->first_apts_flag) {
+        if (p_hwsync->first_apts_flag) {
             uint32_t apts_save = apts;
-            if (apts >= latency_pts) {
-                apts -= latency_pts;
-            } else {
-                ALOGE("wrong PTS =0x%x delay pts=0x%x",apts, latency_pts);
-                return 0;
-            }
+            apts -= latency_pts;
+            if (AVSYNC_TYPE_TSYNC == p_hwsync->aout->avsync_type) {
+                ret = aml_audio_hwsync_get_pcr(p_hwsync, &pcr);
 
-        if (AVSYNC_TYPE_TSYNC == p_hwsync->aout->avsync_type) {
-            ret = aml_audio_hwsync_get_pcr(p_hwsync, &pcr);
-
-            if (ret == 0) {
-                gap = get_pts_gap(pcr, apts);
-                gap_ms = gap / 90;
-                if (debug_enable) {
-                    ALOGI("%s pcr 0x%x,apts 0x%x,gap 0x%x,gap duration %d ms", __func__, pcr, apts, gap, gap_ms);
-                }
-                /*resume from pause status, we can sync it exactly*/
-                if (adev->ms12.need_resync) {
-                    adev->ms12.need_resync = 0;
-                    if (apts > pcr) {
-                        *p_adjust_ms = gap_ms;
-                        ALOGE("%s resync p_adjust_ms %d\n", __func__, *p_adjust_ms);
+                if (ret == 0) {
+                    gap = get_pts_gap(pcr, apts);
+                    gap_ms = gap / 90;
+                    if (debug_enable) {
+                        ALOGI("%s pcr 0x%x,apts 0x%x,gap 0x%x,gap duration %d ms", __func__, pcr, apts, gap, gap_ms);
                     }
-                }
-                if (gap > APTS_DISCONTINUE_THRESHOLD_MIN && gap < APTS_DISCONTINUE_THRESHOLD_MAX) {
-                    if (apts > pcr) {
-                        /*during video stop, pcr has been reset by video
-                        we need ignore such pcr value*/
-                        if (pcr != 0) {
+                    /*resume from pause status, we can sync it exactly*/
+                    if (adev->ms12.need_resync) {
+                        adev->ms12.need_resync = 0;
+                        if (apts > pcr) {
                             *p_adjust_ms = gap_ms;
-                            ALOGE("%s *p_adjust_ms %d\n", __func__, *p_adjust_ms);
-                        } else {
-                            ALOGE("pcr has been reset\n");
-                        }
-                    } else {
-                        ALOGI("tsync -> reset pcrscr 0x%x -> 0x%x, %s big,diff %"PRIx64" ms",
-                            pcr, apts, apts > pcr ? "apts" : "pcr", get_pts_gap(apts, pcr) / 90);
-                        int ret_val = aml_hwsync_reset_tsync_pcrscr(p_hwsync, apts);
-                        if (ret_val == -1) {
-                            ALOGE("unable to open file %s,err: %s", TSYNC_APTS, strerror(errno));
+                            ALOGE("%s resync p_adjust_ms %d\n", __func__, *p_adjust_ms);
                         }
                     }
-                } else if (gap > APTS_DISCONTINUE_THRESHOLD_MAX) {
-                    ALOGE("%s apts exceed the adjust range,need check apts 0x%x,pcr 0x%x",
-                        __func__, apts, pcr);
+                    if (gap > APTS_DISCONTINUE_THRESHOLD_MIN && gap < APTS_DISCONTINUE_THRESHOLD_MAX) {
+                        if (apts > pcr) {
+                            /*during video stop, pcr has been reset by video
+                            we need ignore such pcr value*/
+                            if (pcr != 0) {
+                                *p_adjust_ms = gap_ms;
+                                ALOGE("%s *p_adjust_ms %d\n", __func__, *p_adjust_ms);
+                            } else {
+                                ALOGE("pcr has been reset\n");
+                            }
+                        } else {
+                            ALOGI("tsync -> reset pcrscr 0x%x -> 0x%x, %s big,diff %"PRIx64" ms",
+                                pcr, apts, apts > pcr ? "apts" : "pcr", get_pts_gap(apts, pcr) / 90);
+                            int ret_val = aml_hwsync_reset_tsync_pcrscr(p_hwsync, apts);
+                            if (ret_val == -1) {
+                                ALOGE("unable to open file %s,err: %s", TSYNC_APTS, strerror(errno));
+                            }
+                        }
+                    } else if (gap > APTS_DISCONTINUE_THRESHOLD_MAX) {
+                        ALOGE("%s apts exceed the adjust range,need check apts 0x%x,pcr 0x%x",
+                            __func__, apts, pcr);
+                    }
                 }
             }
-        }
 
-#if 1
             if (out->msync_session &&  AVSYNC_TYPE_MSYNC == p_hwsync->aout->avsync_type) {
                 struct audio_policy policy;
                 if (adev->continuous_audio_mode &&
@@ -924,8 +914,6 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                         __func__, pcr, apts, gap, gap_ms, offset, apts_save / 90, latency_pts / 90);
                 }
             }
-#endif
-
         }
     }
     return ret;
@@ -1047,7 +1035,6 @@ int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsign
                     nearest_offset = pts_tab[i].offset;
                 }
                 pts_tab[i].valid = 0;
-
             }
         }
     }
