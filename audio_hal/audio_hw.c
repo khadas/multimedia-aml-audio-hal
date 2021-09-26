@@ -4903,25 +4903,64 @@ static int adev_set_voice_volume (struct audio_hw_device *dev __unused, float vo
     return 0;
 }
 
-static int adev_set_master_volume (struct audio_hw_device *dev __unused, float volume __unused)
+static int adev_set_master_volume (struct audio_hw_device *dev, float volume)
 {
-    return -ENOSYS;
+    if ((volume > 1.0) || (volume < 0.0) || (dev == NULL)) {
+        return -EINVAL;
+    }
+
+    struct aml_audio_device *adev = (struct aml_audio_device *) dev;
+    adev->master_volume = volume;
+    adev->sink_gain[adev->active_outport] = volume;
+    ALOGI("%s() volume = %f, active_outport = %d", __FUNCTION__, volume, adev->active_outport);
+    return 0;
 }
 
-static int adev_get_master_volume (struct audio_hw_device *dev __unused,
-                                   float *volume __unused)
+static int adev_get_master_volume (struct audio_hw_device *dev,
+                                   float *volume)
 {
-    return -ENOSYS;
+    if ((volume == NULL) || (dev == NULL)) {
+        return -EINVAL;
+    }
+
+    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
+    *volume = adev->master_volume;
+    ALOGI("%s() volume = %f", __FUNCTION__, *volume);
+
+    return 0;
 }
 
-static int adev_set_master_mute (struct audio_hw_device *dev __unused, bool muted __unused)
+static int adev_set_master_mute (struct audio_hw_device *dev, bool muted)
 {
-    return -ENOSYS;
+    if (dev == NULL) {
+        return -EINVAL;
+    }
+
+    struct aml_audio_device *adev = (struct aml_audio_device *) dev;
+    adev->master_mute = muted;
+    if (muted == true) {
+        ALOGI("%s() 111 muted = %d master_volume = %f", __FUNCTION__, adev->master_mute, adev->master_volume);
+        adev->sink_gain[adev->active_outport] = 0;
+    } else {
+        ALOGI("%s() 222  muted = %d master_volume = %f", __FUNCTION__, adev->master_mute, adev->master_volume);
+        adev->sink_gain[adev->active_outport] = adev->master_volume;
+    }
+    ALOGI("%s() muted = %d master_volume = %f", __FUNCTION__, adev->master_mute, adev->master_volume);
+    return 0;
 }
 
-static int adev_get_master_mute (struct audio_hw_device *dev __unused, bool *muted __unused)
+static int adev_get_master_mute (struct audio_hw_device *dev, bool *muted)
 {
-    return -ENOSYS;
+    if ((muted == NULL) || (dev == NULL)) {
+        return -EINVAL;
+    }
+
+    struct aml_audio_device *adev = (struct aml_audio_device *)dev;
+    *muted = adev->master_mute;
+    ALOGI("%s() muted = %d", __FUNCTION__, *muted);
+
+    return 0;
+
 }
 static int adev_set_mode (struct audio_hw_device *dev, audio_mode_t mode)
 {
