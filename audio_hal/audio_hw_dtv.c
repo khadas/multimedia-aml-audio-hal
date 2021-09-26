@@ -785,9 +785,12 @@ void dtv_audio_gap_monitor(struct aml_audio_patch *patch)
             get_video_discontinue() != 1) {
             audio_discontinue = 1;
             get_sysfs_uint(TSYNC_CHECKIN_APTS, &demux_apts);
-            ALOGI("cur_pts_diff=%d, diff=%d ms, apts=0x%x, pcrpts=0x%x, demux_apts=0x%x\n",
+            if (get_tsync_pcr_debug())
+            {
+                ALOGI("cur_pts_diff=%d, diff=%d ms, apts=0x%x, pcrpts=0x%x, demux_apts=0x%x\n",
                 cur_pts_diff, cur_pts_diff/90, patch->last_apts,
                 patch->last_pcrpts, demux_apts);
+            }
         } else
             audio_discontinue = 0;
     }
