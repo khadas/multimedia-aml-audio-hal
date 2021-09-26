@@ -3151,6 +3151,11 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         } else if (out->config.channels > 2) {
             out->multich = out->config.channels;
         }
+
+        if (flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
+            ALOGI("Set out->hw_sync_mode true");
+            out->hw_sync_mode = true;
+        }
     } else {
         // TODO: add other cases here
         ALOGE("%s: flags = %#x invalid", __func__, flags);
@@ -3209,7 +3214,6 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->dev = adev;
     out->standby = true;
     out->frame_write_sum = 0;
-    out->hw_sync_mode = false;
     out->need_convert = false;
     out->need_drop_size = 0;
     out->position_update = 0;
