@@ -291,10 +291,12 @@ int aml_audio_swcheck_lookup_apts(int audio_path, size_t offset, unsigned long *
     if (nearest_offset) {
         ret = 0;
         *p_apts = nearest_pts;
-        ALOGI("find nearest pts 0x%lx offset %zu align %zu offset %zu",
+        if (p_swcheck->debug_enable)
+            ALOGI("find nearest pts 0x%lx offset %zu align %zu offset %zu",
                 *p_apts, nearest_offset, align, offset);
     } else {
-        ALOGE("%s,apts lookup failed,align %zu,offset %zu", __func__, align, offset);
+        if (p_swcheck->debug_enable)
+            ALOGE("%s,apts lookup failed,align %zu,offset %zu", __func__, align, offset);
     }
     if (ret == 0) {
         if (p_swcheck->debug_enable) {
