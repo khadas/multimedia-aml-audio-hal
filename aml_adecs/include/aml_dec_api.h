@@ -149,7 +149,10 @@ typedef struct aml_pcm_config {
     audio_format_t pcm_format;
     int samplerate;
     int channel;
+    int lpcm_channel;
     int max_out_channels;
+    int width;
+    unsigned int lpcm_header;
 } aml_pcm_config_t;
 
 

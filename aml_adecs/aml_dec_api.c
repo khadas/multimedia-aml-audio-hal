@@ -61,7 +61,10 @@ static aml_dec_func_t * get_decoder_function(audio_format_t format)
     case AUDIO_FORMAT_PCM_16_BIT:
     case AUDIO_FORMAT_PCM_32_BIT:
     case AUDIO_FORMAT_PCM_8_BIT:
-    case AUDIO_FORMAT_PCM_8_24_BIT: {
+    case AUDIO_FORMAT_PCM_8_24_BIT:
+    case AUDIO_FORMAT_PCM_LPCM_DVD:
+    case AUDIO_FORMAT_PCM_LPCM_1394:
+    case AUDIO_FORMAT_PCM_LPCM_BLURAY: {
         return &aml_pcm_func;
     }
     case AUDIO_FORMAT_MP3:
