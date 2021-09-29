@@ -877,6 +877,14 @@ void get_audio_indicator(struct aml_audio_device *dev, char *temp_buf) {
     else if (adev->audio_hal_info.update_type == TYPE_DTS_EXPRESS)
         sprintf (temp_buf, "audioindicator=DTS EXPRESS");
 
+    if ((adev->audio_hal_info.update_type == TYPE_DTS
+        || adev->audio_hal_info.update_type == TYPE_DTS_HD
+        || adev->audio_hal_info.update_type == TYPE_DTS_EXPRESS)
+        && adev->dts_hd.is_headphone_x) {
+        int len = strlen(temp_buf);
+        sprintf (temp_buf + len, ",Headphone");
+    }
+
     ALOGI("%s(), [%s]", __func__, temp_buf);
 }
 
