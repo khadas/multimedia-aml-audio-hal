@@ -126,6 +126,8 @@ static inline bool is_digital_raw_format(audio_format_t format)
     case AUDIO_FORMAT_IEC61937:
     case AUDIO_FORMAT_MP3:
     case AUDIO_FORMAT_AAC:
+    case AUDIO_FORMAT_HE_AAC_V2:
+    case AUDIO_FORMAT_AAC_LATM:
     case AUDIO_FORMAT_VORBIS:
     case AUDIO_FORMAT_FLAC:
         return true;
