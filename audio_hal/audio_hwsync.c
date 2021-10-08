@@ -506,10 +506,11 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     }
 
     pts32 = (uint32_t)pts;
-    p_hwsync->first_apts_flag = true;
     p_hwsync->first_apts = pts;
 
     if (AVSYNC_TYPE_MSYNC != p_hwsync->aout->avsync_type) {
+        p_hwsync->first_apts_flag = true;
+
         if (!p_hwsync->use_mediasync) {
             while (delay_count < 10) {
                 vframe_ready_cnt = get_sysfs_int("/sys/class/video/vframe_ready_cnt");
@@ -757,6 +758,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
             aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);
             p_hwsync->last_lookup_apts = apts;
+            adev->ms12.ms12_main_input_size = 0;
         }
 
         if (p_hwsync->first_apts_flag) {
@@ -935,7 +937,18 @@ int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, unsig
     pthread_mutex_lock(&p_hwsync->lock);
     pts_tab = p_hwsync->pts_tab;
     for (i = 0; i < HWSYNC_APTS_NUM; i++) {
-        if (!pts_tab[i].valid) {
+        if (pts_tab[i].valid && (pts_tab[i].offset == offset)) {
+            /* for duplicated record, reuse previous entry.
+             * This may happen when msync returns ASYNC_AGAIN when first checkin
+             * record at offset 0 are overwritten after dropping data
+             */
+            pts_tab[i].pts = apts;
+            if (debug_enable) {
+                ALOGI("%s checkin done,offset %zu,apts 0x%x", __func__, offset, apts);
+            }
+            ret = 0;
+            break;
+        } else if (!pts_tab[i].valid) {
             pts_tab[i].pts = apts;
             pts_tab[i].offset = offset;
             pts_tab[i].valid = 1;
