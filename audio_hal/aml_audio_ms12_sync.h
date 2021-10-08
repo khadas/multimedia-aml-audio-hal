@@ -19,6 +19,8 @@
 
 int aml_audio_get_ms12_tunnel_latency(struct audio_stream_out *stream);
 
+int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream);
+
 int aml_audio_get_ms12_presentation_position(const struct audio_stream_out *stream, uint64_t *frames, struct timespec *timestamp);
 
 uint32_t aml_audio_out_get_ms12_latency_frames(struct audio_stream_out *stream);
