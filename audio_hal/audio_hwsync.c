@@ -281,6 +281,7 @@ void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out
     p_hwsync->bvariable_frame_size = 0;
     p_hwsync->version_num = 0;
     p_hwsync->wait_video_done = false;
+    p_hwsync->eos = false;
 
     p_hwsync->last_lookup_apts = 0xffffffff;
 
@@ -370,7 +371,7 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
             }
             if ((p_hwsync->version_num  == 1 && p_hwsync->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V1 ) ||
                 (p_hwsync->version_num  == 2 && p_hwsync->hw_sync_header_cnt == v2_hwsync_header )) {
-                uint64_t pts = 0;
+                uint64_t pts = 0, pts_raw = 0;
 
                 if (p_hwsync->version_num  == 2 && p_hwsync->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V2 ) {
                     v2_hwsync_header = hwsync_header_get_offset(&p_hwsync->hw_sync_header[0]);
@@ -403,7 +404,11 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
                 p_hwsync->hw_sync_frame_size = p_hwsync->hw_sync_body_cnt;
                 p_hwsync->body_align_cnt = 0; //  alisan zz
                 p_hwsync->hw_sync_header_cnt = 0; //8.1
-                pts = hwsync_header_get_pts(&p_hwsync->hw_sync_header[0]);
+                pts_raw = pts = hwsync_header_get_pts(&p_hwsync->hw_sync_header[0]);
+                if (pts == HWSYNC_PTS_EOS) {
+                    p_hwsync->eos = true;
+                    continue;
+                }
                 header_sub_version = p_hwsync->hw_sync_header[2];
                 if (!header_sub_version)
                     pts = pts * 90 / 1000000;
@@ -424,7 +429,8 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
                           p_hwsync->last_apts_from_header, pts);
                 }
                 p_hwsync->last_apts_from_header = pts;
-                *cur_pts = pts;
+                p_hwsync->last_apts_from_header_raw = pts_raw;
+                *cur_pts = (pts_raw == HWSYNC_PTS_NA) ? HWSYNC_PTS_NA : pts;
                 pts_found = 1;
                 //ALOGI("get header body_cnt = %d, pts = %lld", out->hw_sync_body_cnt, pts);
 
@@ -458,7 +464,9 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
                     we need use the last found pts when got a complete hwsync payload
                     */
                     if (!pts_found) {
-                        *cur_pts = p_hwsync->last_apts_from_header;
+                        *cur_pts = (p_hwsync->last_apts_from_header_raw == HWSYNC_PTS_NA) ?
+                                    HWSYNC_PTS_NA : p_hwsync->last_apts_from_header;
+
                     }
                     if (debug_enable) {
                         ALOGV("we found the frame total body,yeah\n");
@@ -764,6 +772,11 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         if (p_hwsync->first_apts_flag) {
             uint32_t apts_save = apts;
             apts -= latency_pts;
+
+            if (p_hwsync->eos && (eDolbyMS12Lib == adev->dolby_lib_type) && continous_mode(adev)) {
+                return 0;
+            }
+
             if (AVSYNC_TYPE_TSYNC == p_hwsync->aout->avsync_type) {
                 ret = aml_audio_hwsync_get_pcr(p_hwsync, &pcr);
 

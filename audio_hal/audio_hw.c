@@ -6946,7 +6946,7 @@ hwsync_rewrite:
 
         ALOGV ("before aml_audio_hwsync_find_frame bytes %zu\n", total_bytes - bytes_cost);
         hwsync_cost_bytes = aml_audio_hwsync_find_frame(aml_out->hwsync, (char *)buffer + bytes_cost, total_bytes - bytes_cost, &cur_pts, &outsize);
-        if (cur_pts > 0xffffffff) {
+        if ((cur_pts > 0xffffffff) && (cur_pts != HWSYNC_PTS_NA) && (cur_pts != HWSYNC_PTS_EOS)) {
             ALOGE("APTS exeed the max 32bit value");
         }
         ALOGV ("after aml_audio_hwsync_find_frame bytes remain %zu,cost %zu,outsize %d,pts %"PRIx64"\n",
@@ -6968,7 +6968,9 @@ hwsync_rewrite:
                 }
 
                 // missing code with aml_audio_hwsync_checkin_apts, need to add for netflix tunnel mode. zzz
-                aml_audio_hwsync_checkin_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, cur_pts);
+                if (cur_pts != HWSYNC_PTS_NA) {
+                    aml_audio_hwsync_checkin_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, cur_pts);
+                }
                 if (continous_mode(adev) && !audio_is_linear_pcm(aml_out->hal_internal_format) && adev->is_netflix) {
                     dolby_ms12_hwsync_checkin_pts(aml_out->hwsync->payload_offset, cur_pts);
                 }
@@ -7096,7 +7098,7 @@ hwsync_rewrite:
                                 }
                             }
                         }
-                        if (aml_out->msync_session) {
+                        if (aml_out->msync_session && (cur_pts != HWSYNC_PTS_NA)) {
                             struct audio_policy policy;
                             uint64_t latency = out_get_latency(stream) * 90;
                             uint32_t apts32 = (cur_pts - latency) & 0xffffffff;

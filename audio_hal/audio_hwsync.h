@@ -47,6 +47,8 @@
 
 #define HWSYNC_APTS_NUM     512
 #define HWSYNC_MAX_BODY_SIZE  (32768)  ///< Will do fine tune according to the bitstream.
+#define HWSYNC_PTS_EOS UINT64_MAX
+#define HWSYNC_PTS_NA  (UINT64_MAX-1)
 
 enum hwsync_status {
     CONTINUATION,  // good sync condition
@@ -80,6 +82,7 @@ typedef struct  audio_hwsync {
     bool first_apts_flag;//flag to indicate set first apts
     uint64_t first_apts;
     uint64_t last_apts_from_header;
+    uint64_t last_apts_from_header_raw;
     uint32_t last_lookup_apts;
 
     apts_tab_t pts_tab[HWSYNC_APTS_NUM];
@@ -94,6 +97,7 @@ typedef struct  audio_hwsync {
     uint32_t last_output_pts;
     struct timespec  last_timestamp;
     bool wait_video_done;
+    bool eos;
 } audio_hwsync_t;
 static inline bool hwsync_header_valid(uint8_t *header)
 {
