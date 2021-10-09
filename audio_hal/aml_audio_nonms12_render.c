@@ -514,7 +514,10 @@ int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t f
     case AUDIO_FORMAT_PCM_16_BIT:
     case AUDIO_FORMAT_PCM_32_BIT:
     case AUDIO_FORMAT_PCM_8_BIT:
-    case AUDIO_FORMAT_PCM_8_24_BIT: {
+    case AUDIO_FORMAT_PCM_8_24_BIT:
+    case AUDIO_FORMAT_PCM_LPCM_DVD:
+    case AUDIO_FORMAT_PCM_LPCM_1394:
+    case AUDIO_FORMAT_PCM_LPCM_BLURAY: {
         pcm_decoder_config_prepare(stream, &dec_config->pcm_config);
         break;
     }

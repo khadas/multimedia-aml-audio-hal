@@ -161,6 +161,9 @@ typedef enum {
     AUDIO_FORMAT_PCM_8_24_BIT          = 0x4u,        // (PCM | PCM_SUB_8_24_BIT)
     AUDIO_FORMAT_PCM_FLOAT             = 0x5u,        // (PCM | PCM_SUB_FLOAT)
     AUDIO_FORMAT_PCM_24_BIT_PACKED     = 0x6u,        // (PCM | PCM_SUB_24_BIT_PACKED)
+    AUDIO_FORMAT_PCM_LPCM_DVD          = 0x7u,
+    AUDIO_FORMAT_PCM_LPCM_1394         = 0x8u,
+    AUDIO_FORMAT_PCM_LPCM_BLURAY       = 0x9u,
     AUDIO_FORMAT_AAC_MAIN              = 0x4000001u,  // (AAC | AAC_SUB_MAIN)
     AUDIO_FORMAT_AAC_LC                = 0x4000002u,  // (AAC | AAC_SUB_LC)
     AUDIO_FORMAT_AAC_SSR               = 0x4000004u,  // (AAC | AAC_SUB_SSR)
