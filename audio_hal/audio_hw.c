@@ -1705,6 +1705,31 @@ static int out_flush_new (struct audio_stream_out *stream)
             return 0;
         }
         if (out->hw_sync_mode) {
+            if ((!out->pause_status) &&
+                continous_mode(adev) &&
+                (adev->ms12.dolby_ms12_enable == true) &&
+                (adev->ms12.is_continuous_paused == false) &&
+                (out->write_func == MIXER_MAIN_BUFFER_WRITE)) {
+                int easing_period = 150000;
+
+                ALOGI("flush easing pause");
+
+                /* issue a pause for flush to get easing out w/o stopping msync clock */
+                pthread_mutex_lock(&adev->lock);
+                pthread_mutex_lock(&out->lock);
+
+                ms12->is_continuous_paused = true;
+                pthread_mutex_lock(&ms12->lock);
+                audiohal_send_msg_2_ms12(ms12, MS12_MESG_TYPE_PAUSE);
+                pthread_mutex_unlock(&ms12->lock);
+
+                out->pause_status = true;
+                pthread_mutex_unlock(&out->lock);
+                pthread_mutex_unlock(&adev->lock);
+
+                usleep(easing_period);
+            }
+
             aml_audio_hwsync_init(out->hwsync, out);
             dolby_ms12_hwsync_init();
         }
@@ -4657,8 +4682,14 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         if (ret >= 0) {
             char *parm = strstr(kvpairs, "=");
             pthread_mutex_lock(&adev->lock);
-            if (parm)
+            if (parm) {
+                if (strcmp(parm+1, "-atmos_lock 1") == 0) {
+                    adev->atoms_lock_flag = 1;
+                } else if (strcmp(parm+1, "-atmos_lock 0") == 0) {
+                    adev->atoms_lock_flag = 0;
+                }
                 aml_ms12_update_runtime_params(&(adev->ms12), parm+1);
+            }
             pthread_mutex_unlock(&adev->lock);
             goto exit;
         }
