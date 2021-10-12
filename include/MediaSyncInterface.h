@@ -45,6 +45,10 @@ typedef enum {
     MEDIASYNC_KEY_ISOMXTUNNELMODE,
     MEDIASYNC_KEY_AUDIOCACHE,
     MEDIASYNC_KEY_VIDEOWORKMODE,
+    MEDIASYNC_KEY_AUDIOMUTE,
+    MEDIASYNC_KEY_SOURCETYPE,
+    MEDIASYNC_KEY_ALSAREADY,
+    MEDIASYNC_KEY_VSYNC_INTERVAL_MS,
     MEDIASYNC_KEY_MAX = 255,
 } mediasync_parameter;
 
@@ -83,7 +87,7 @@ struct mediasync_audio_policy {
 
 struct mediasync_video_policy {
     video_policy videopolicy;
-    int32_t  param1;
+    int64_t  param1;
     int32_t  param2;
 };
 
@@ -91,12 +95,22 @@ struct mediasync_audio_format{
     float samplerate;
     int datawidth;
     int channels;
+    int format;
 };
 
 typedef struct audioinfo{
     int cacheSize;
     int cacheDuration;
 }mediasync_audioinfo;
+
+struct mediasync_audio_queue_info{
+    int64_t apts;
+    int size;
+    int duration;
+    mediasync_time_unit tunit;
+    bool isworkingchannel;
+    bool isneedupdate;
+};
 
 extern void* MediaSync_create();
 
@@ -124,10 +138,12 @@ extern mediasync_result MediaSync_getMediaTime(void* handle, int64_t realUs,
 extern mediasync_result MediaSync_getRealTimeFor(void* handle, int64_t targetMediaUs, int64_t *outRealUs);
 extern mediasync_result MediaSync_getRealTimeForNextVsync(void* handle, int64_t *outRealUs);
 extern mediasync_result MediaSync_getTrackMediaTime(void* handle, int64_t *outMediaUs);
+extern mediasync_result MediaSync_setUpdateTimeThreshold(void* handle, int64_t updateTimeThreshold);
+extern mediasync_result MediaSync_getUpdateTimeThreshold(void* handle, int64_t* updateTimeThreshold);
 
 extern mediasync_result mediasync_setParameter(void* handle, mediasync_parameter type, void* arg);
 extern mediasync_result mediasync_getParameter(void* handle, mediasync_parameter type, void* arg);
-extern mediasync_result MediaSync_queueAudioFrame(void* handle, int64_t apts, int size, int duration, mediasync_time_unit tunit);
+extern mediasync_result MediaSync_queueAudioFrame(void* handle, struct mediasync_audio_queue_info* info);
 extern mediasync_result MediaSync_queueVideoFrame(void* handle, int64_t vpts, int size, int duration, mediasync_time_unit tunit);
 extern mediasync_result MediaSync_AudioProcess(void* handle, int64_t apts, int64_t cur_apts, mediasync_time_unit tunit, struct mediasync_audio_policy* asyncPolicy);
 extern mediasync_result MediaSync_VideoProcess(void* handle, int64_t vpts, int64_t cur_vpts, mediasync_time_unit tunit, struct mediasync_video_policy* vsyncPolicy);

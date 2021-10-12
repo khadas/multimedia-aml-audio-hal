@@ -32,7 +32,11 @@ typedef struct aml_demux__audiopara {
     int dual_decoder_support;
     int associate_audio_mixing_enable;
     int media_sync_id;
+    int media_presentation_id;
     int ad_package_status;
+    struct mAudioEsDataInfo *mEsData;
+    struct mAudioEsDataInfo *mADEsData;
+    struct package *dtv_pacakge;
 } aml_demux_audiopara_t;
 
 
@@ -54,6 +58,8 @@ struct dtvsync_audio_policy {
     int32_t  param2;
 };
 
+#define DTVSYNC_INIT_PTS     (-10000)
+#define DTVSYNC_APTS_THRESHOLD  (-5000)
 
 typedef struct  aml_dtvsync {
     bool use_mediasync;
@@ -61,10 +67,13 @@ typedef struct  aml_dtvsync {
     void* mediasync_new;
     int mediasync_id;
     int64_t cur_outapts;
+    int64_t out_start_apts;
+    int64_t out_end_apts;
     int cur_speed;
     struct dtvsync_audio_policy apolicy;
     int pcm_dropping;
     int duration;
+    pthread_mutex_t ms_lock;
 } aml_dtvsync_t;
 
 
