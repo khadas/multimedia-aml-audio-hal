@@ -612,7 +612,7 @@ int dca_decoder_init_patch(aml_dec_t **ppaml_dec, aml_dec_config_t *dec_config)
     memset(dec_raw_data->buf , 0, dec_raw_data->buf_size);
     memset(raw_in_data, 0, sizeof(dec_data_info_t));  ///< no use
 
-    if (ring_buffer_init(&dts_dec->input_ring_buf, MAX_DCA_FRAME_LENGTH * 2)) {
+    if (ring_buffer_init(&dts_dec->input_ring_buf, MAX_DCA_FRAME_LENGTH * 4)) {
         ALOGE("%s init ring buffer failed!", __func__);
         goto error;
     }

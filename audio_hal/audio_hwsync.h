@@ -46,7 +46,7 @@
 #define APTS_DISCONTINUE_THRESHOLD_MAX    (5*90000)
 
 #define HWSYNC_APTS_NUM     512
-#define HWSYNC_MAX_BODY_SIZE  (32768)  ///< Will do fine tune according to the bitstream.
+#define HWSYNC_MAX_BODY_SIZE  (65536)  ///< Will do fine tune according to the bitstream.
 #define HWSYNC_PTS_EOS UINT64_MAX
 #define HWSYNC_PTS_NA  (UINT64_MAX-1)
 
