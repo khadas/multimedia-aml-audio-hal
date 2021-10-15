@@ -2,7 +2,7 @@ M_PREFIX=$(STAGING_DIR)/usr
 LIB_DIR?=$(M_PREFIX)/lib
 HEADERS_DIR?=$(M_PREFIX)/include
 
-TARGET_OBJS=    utils/tsp_utils.o \
+TARGET_OBJS= utils/tsp_utils.o \
     utils/tsplinux.o \
     utils/Unicode.o \
     utils/TSPHandler.o \
@@ -37,8 +37,8 @@ TOPDIR=$(shell pwd)
 SRC?=$(TOPDIR)
 
 CFLAGS+=-O2 -fPIC -g
-#CFLAGS+=-I$(SRC)/dmxwrap -I$(SRC)/include -I$(SRC)/utils -I$(SRC)/../utils/include -I$(SRC)/../include -I$(SRC)/../../libplayer/src/amavutils/include -I$(SRC)/../../../vendor/amlogic/dvb/include/am_adp -I$(SRC)/dmxwrap/HwDemux -I$(SRC)/dmxwrap/MultiHwDemux -I$(SRC)/audio_read_api -I$(SRC)/sync -L${LIB_DIR} -I$(HEADERS_DIR)
 CFLAGS+=-I$(SRC)/dmxwrap -I$(SRC)/include -I$(SRC)/utils -I$(SRC)/../utils/include -I$(SRC)/../include -I$(SRC)/../../libplayer/src/amavutils/include -I$(SRC)/../../../vendor/amlogic/dvb/include/am_adp -I$(SRC)/dmxwrap/HwDemux -I$(SRC)/dmxwrap/MultiHwDemux -I$(SRC)/audio_read_api -I$(SRC)/sync -I$(SRC)/../amadec/include  -I$(SRC)/../amadec
+CFLAGS+=-I$(SRC)/../include/basic_utils
 
 %.o:%.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

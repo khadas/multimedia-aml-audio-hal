@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Amlogic Corporation.
+ * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,31 +14,28 @@
  * limitations under the License.
  */
 
-#ifndef __AUDIO_RESAMPLER_H__
-#define __AUDIO_RESAMPLER_H__
+#ifndef __CUTILS_MISC_H
+#define __CUTILS_MISC_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdint.h>
-#define MAX_RESAMPLE_CHANNEL 8
+        /* Load an entire file into a malloc'd chunk of memory
+         * that is length_of_file + 1 (null terminator).  If
+         * sz is non-zero, return the size of the file via sz.
+         * Returns 0 on failure.
+         */
+extern void *load_file(const char *fn, unsigned *sz);
 
-
-struct resample_para {
-    unsigned int FractionStep;
-    unsigned int SampleFraction;
-    unsigned int input_sr;
-    unsigned int output_sr;
-    unsigned int channels;
-    int16_t lastsample[MAX_RESAMPLE_CHANNEL];
-};
-
-int resampler_init(struct resample_para *resample);
-int resample_process(struct resample_para *resample, unsigned int in_frame,
-    int16_t* input, int16_t* output);
+        /* This is the range of UIDs (and GIDs) that are reserved
+         * for assigning to applications.
+         */
+#define FIRST_APPLICATION_UID 10000
+#define LAST_APPLICATION_UID 99999
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif /* __CUTILS_MISC_H */

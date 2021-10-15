@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Amlogic Corporation.
+ * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,31 +14,29 @@
  * limitations under the License.
  */
 
-#ifndef __AUDIO_RESAMPLER_H__
-#define __AUDIO_RESAMPLER_H__
+#ifndef ANDROID_CUTILS_MEMORY_H
+#define ANDROID_CUTILS_MEMORY_H
+
+#include <stdint.h>
+#include <sys/types.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdint.h>
-#define MAX_RESAMPLE_CHANNEL 8
+/* size is given in bytes and must be multiple of 2 */
+void android_memset16(uint16_t* dst, uint16_t value, size_t size);
 
+/* size is given in bytes and must be multiple of 4 */
+void android_memset32(uint32_t* dst, uint32_t value, size_t size);
 
-struct resample_para {
-    unsigned int FractionStep;
-    unsigned int SampleFraction;
-    unsigned int input_sr;
-    unsigned int output_sr;
-    unsigned int channels;
-    int16_t lastsample[MAX_RESAMPLE_CHANNEL];
-};
-
-int resampler_init(struct resample_para *resample);
-int resample_process(struct resample_para *resample, unsigned int in_frame,
-    int16_t* input, int16_t* output);
+#if defined(__GLIBC__) || defined(_WIN32)
+/* Declaration of strlcpy() for platforms that don't already have it. */
+size_t strlcpy(char *dst, const char *src, size_t size);
+#endif
 
 #ifdef __cplusplus
-}
+} // extern "C"
 #endif
 
-#endif
+#endif // ANDROID_CUTILS_MEMORY_H

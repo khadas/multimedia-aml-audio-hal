@@ -24,6 +24,7 @@ target_include_directories(spdifenc PRIVATE
 	./audio_hal
 	./include
 	./include/utils
+	./include/basic_utils
 	./utils/tinyalsa/include
 	./utils/include)
 
@@ -76,6 +77,8 @@ endif()
 #############################################
 # libaudio_hal
 #############################################
+file(GLOB BASIC_UTILS_FILES "utils/basic_utils/*.cpp")
+file(GLOB BASIC_CUTILS_FILES "utils/basic_cutils/*.c")
 add_library(audio_hal SHARED
 	aml_adecs/aml_aac_dec_api.c
 	aml_adecs/aml_ddp_dec_api.c
@@ -158,6 +161,8 @@ add_library(audio_hal SHARED
 	utils/audio_data_process.c
 	utils/tinyalsa/pcm.c
 	utils/tinyalsa/mixer.c
+	${BASIC_UTILS_FILES}
+	${BASIC_CUTILS_FILES}
 	#rcaudio/audio_hal_thunks.cpp
     ${DTV_FILES}
     ${EQ_DRC_FILES}
@@ -193,6 +198,8 @@ target_include_directories(audio_hal PRIVATE
 	./include
 	../hal_audio_service/include
 	./include/utils
+	./include/basic_utils
+	./include/basic_utils/utils
 	./aml_speed/include
 	./aml_speed
 	./aml_resampler/include

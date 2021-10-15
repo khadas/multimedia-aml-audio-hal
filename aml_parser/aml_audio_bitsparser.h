@@ -16,6 +16,7 @@
 
 #ifndef AML_AUDIO_BITPARSER_H
 #define AML_AUDIO_BITPARSER_H
+#include <stdint.h>
 
 struct audio_bit_parser {
     const uint8_t *data_buf;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Amlogic Corporation.
+ * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,31 +14,25 @@
  * limitations under the License.
  */
 
-#ifndef __AUDIO_RESAMPLER_H__
-#define __AUDIO_RESAMPLER_H__
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef _LIBS_UTILS_THREADS_H
+#define _LIBS_UTILS_THREADS_H
 
-#include <stdint.h>
-#define MAX_RESAMPLE_CHANNEL 8
+/*
+ * Please, DO NOT USE!
+ *
+ * This file is here only for legacy reasons. Instead, include directly
+ * the headers you need below.
+ *
+ */
 
-
-struct resample_para {
-    unsigned int FractionStep;
-    unsigned int SampleFraction;
-    unsigned int input_sr;
-    unsigned int output_sr;
-    unsigned int channels;
-    int16_t lastsample[MAX_RESAMPLE_CHANNEL];
-};
-
-int resampler_init(struct resample_para *resample);
-int resample_process(struct resample_para *resample, unsigned int in_frame,
-    int16_t* input, int16_t* output);
+#include <utils/AndroidThreads.h>
 
 #ifdef __cplusplus
-}
+#include <utils/Condition.h>
+#include <utils/Errors.h>
+#include <utils/Mutex.h>
+#include <utils/RWLock.h>
+#include <utils/Thread.h>
 #endif
 
-#endif
+#endif // _LIBS_UTILS_THREADS_H

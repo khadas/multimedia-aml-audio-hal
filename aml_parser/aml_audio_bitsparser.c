@@ -16,9 +16,9 @@
 #define LOG_TAG "audio_bit_parser"
 
 #include <cutils/log.h>
-
+#include <stdint.h>
+#include <stdbool.h>
 #include "aml_audio_bitsparser.h"
-
 
 bool static inline fillReservoir(struct audio_bit_parser * bit_parser)
 {

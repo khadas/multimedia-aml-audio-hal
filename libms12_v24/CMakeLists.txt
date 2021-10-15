@@ -27,10 +27,11 @@ target_include_directories(ms12v2 PRIVATE
 	./include
 	${PROJECT_SOURCE_DIR}/include
 	${PROJECT_SOURCE_DIR}/include/utils
+	${PROJECT_SOURCE_DIR}/include/basic_utils
 	${PROJECT_SOURCE_DIR}/utils/include)
 
 target_link_libraries(ms12v2
-	-lcutils -llog -lpthread -ldl -lstdc++ -lbinder)
+	-lcutils -llog -lpthread -ldl -lstdc++)
 
 install(TARGETS ms12v2
 	LIBRARY DESTINATION "lib")

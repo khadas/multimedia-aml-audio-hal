@@ -18,6 +18,7 @@
 #define __AML_VOLUME_UTILS_H__
 
 #include <math.h>
+#include <stdint.h>
 
 // Absolute min volume in dB (can be represented in single precision normal float value)
 #define VOLUME_MIN_DB (-100)

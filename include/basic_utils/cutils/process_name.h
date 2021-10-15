@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Amlogic Corporation.
+ * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,31 +14,29 @@
  * limitations under the License.
  */
 
-#ifndef __AUDIO_RESAMPLER_H__
-#define __AUDIO_RESAMPLER_H__
+/**
+ * Gives the current process a name.
+ */
+
+#ifndef __PROCESS_NAME_H
+#define __PROCESS_NAME_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdint.h>
-#define MAX_RESAMPLE_CHANNEL 8
+/**
+ * Sets the current process name.
+ *
+ * Warning: This leaks a string every time you call it. Use judiciously!
+ */
+void set_process_name(const char* process_name);
 
-
-struct resample_para {
-    unsigned int FractionStep;
-    unsigned int SampleFraction;
-    unsigned int input_sr;
-    unsigned int output_sr;
-    unsigned int channels;
-    int16_t lastsample[MAX_RESAMPLE_CHANNEL];
-};
-
-int resampler_init(struct resample_para *resample);
-int resample_process(struct resample_para *resample, unsigned int in_frame,
-    int16_t* input, int16_t* output);
+/** Gets the current process name. */
+const char* get_process_name(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif /* __PROCESS_NAME_H */
