@@ -7339,6 +7339,7 @@ hwsync_rewrite:
             pthread_mutex_unlock(&adev->lock);
             pthread_mutex_lock(&adev->trans_lock);
             ms12_out->hal_internal_format = aml_out->hal_internal_format;
+            ms12_out->avsync_type = aml_out->avsync_type;
             ms12_out->hw_sync_mode = aml_out->hw_sync_mode;
             ms12_out->hwsync = aml_out->hwsync;
             ms12_out->hal_ch = aml_out->hal_ch;
@@ -7358,6 +7359,7 @@ hwsync_rewrite:
             pthread_mutex_unlock(&adev->lock);
             pthread_mutex_lock(&adev->trans_lock);
             ms12_out->hal_internal_format = aml_out->hal_internal_format;
+            ms12_out->avsync_type = aml_out->avsync_type;
             ms12_out->hw_sync_mode = aml_out->hw_sync_mode;
             ms12_out->hwsync = aml_out->hwsync;
             ms12_out->hal_ch = aml_out->hal_ch;

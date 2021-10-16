@@ -35,7 +35,7 @@
 #define  AVSYNC_MS12_NONTUNNEL_PCM_LATENCY               (10)
 #define  AVSYNC_MS12_NONTUNNEL_DDP_LATENCY               (20)
 #define  AVSYNC_MS12_NONTUNNEL_ATMOS_LATENCY             (15)
-#define  AVSYNC_MS12_TUNNEL_PCM_LATENCY                  (-30)
+#define  AVSYNC_MS12_TUNNEL_PCM_LATENCY                  (0)
 
 /*
  *First version, the value of "vendor.media.audio.hal.ms12.tunnel.ddp" is 90.
@@ -58,16 +58,16 @@
 #define  AVSYNC_MS12_TUNNEL_BYPASS_LATENCY               (-130)
 
 
-#define  AVSYNC_MS12_PCM_OUT_LATENCY                     (65)
+#define  AVSYNC_MS12_PCM_OUT_LATENCY                     (20)
 #define  AVSYNC_MS12_DD_OUT_LATENCY                      (50)
-#define  AVSYNC_MS12_DDP_OUT_LATENCY                     (110)
-#define  AVSYNC_MS12_MAT_OUT_LATENCY                     (80)
+#define  AVSYNC_MS12_DDP_OUT_LATENCY                     (40)
+#define  AVSYNC_MS12_MAT_OUT_LATENCY                     (20)
 
 #define  AVSYNC_MS12_HDMI_ARC_OUT_PCM_LATENCY            (0)
 #define  AVSYNC_MS12_HDMI_ARC_OUT_DD_LATENCY             (0)
 #define  AVSYNC_MS12_HDMI_ARC_OUT_DDP_LATENCY            (120)
 #define  AVSYNC_MS12_HDMI_OUT_LATENCY                    (10)
-#define  AVSYNC_MS12_HDMI_SPEAKER_LATENCY                (-25)
+#define  AVSYNC_MS12_HDMI_SPEAKER_LATENCY                (0)
 
 #define  AVSYNC_MS12_NONTUNNEL_PCM_LATENCY_PROPERTY      "vendor.media.audio.hal.ms12.nontunnel.pcm"
 #define  AVSYNC_MS12_NONTUNNEL_DDP_LATENCY_PROPERTY      "vendor.media.audio.hal.ms12.nontunnel.ddp"

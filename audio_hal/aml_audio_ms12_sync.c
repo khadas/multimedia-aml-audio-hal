@@ -375,7 +375,6 @@ static int get_ms12_tunnel_latency_offset(enum OUT_PORT port
     return latency_ms;
 }
 
-
 int get_ms12_atmos_latency_offset(bool tunnel, bool is_netflix)
 {
     char buf[PROPERTY_VALUE_MAX];
@@ -583,6 +582,46 @@ int aml_audio_get_ms12_tunnel_latency(struct audio_stream_out *stream)
     return latency_frames;
 }
 
+int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream)
+{
+    struct aml_stream_out *out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev = out->dev;
+    int latency_frames = 0;
+    int alsa_delay = 0;
+    int tunning_delay = 0;
+    int ms12_pipeline_delay = 0;
+    int atmos_tunning_delay = 0;
+    int input_latency_ms = 0;
+    int output_latency_ms = 0;
+    int port_latency_ms = 0;
+
+    /*we need get the correct ms12 out pcm */
+    alsa_delay = (int32_t)out_get_ms12_latency_frames(stream);
+
+    if (adev->first_apts_flag) {
+        input_latency_ms  = get_ms12_tunnel_input_latency(out->hal_internal_format);
+    }
+    output_latency_ms = get_ms12_output_latency(adev->ms12.optical_format);
+    port_latency_ms   = get_ms12_port_latency(adev->active_outport, adev->ms12.optical_format);
+
+    tunning_delay = (input_latency_ms + output_latency_ms + port_latency_ms) * 48;
+
+    if ((adev->ms12.is_dolby_atmos && adev->ms12_main1_dolby_dummy == false) || adev->atoms_lock_flag) {
+        /*
+         * In DV AV sync, the ATMOS(DDP_JOC) item, it will add atmos_tunning_delay into the latency_frames.
+         * If other case choose an diff value, here seperate by is_netflix.
+         */
+        atmos_tunning_delay = get_ms12_atmos_latency_offset(true, adev->is_netflix) * 48;
+    }
+    /*ms12 pipe line has some delay, we need consider it*/
+    ms12_pipeline_delay = dolby_ms12_main_pipeline_latency_frames(stream);
+
+    latency_frames = alsa_delay + tunning_delay + atmos_tunning_delay + ms12_pipeline_delay;
+
+    ALOGV("latency frames =%d alsa delay=%d ms tunning delay=%d ms ms12 pipe =%d ms atmos =%d ms",
+        latency_frames, alsa_delay / 48, tunning_delay / 48, ms12_pipeline_delay / 48, atmos_tunning_delay / 48);
+    return latency_frames;
+}
 
 static int get_nonms12_netflix_tunnel_input_latency(audio_format_t input_format) {
     char buf[PROPERTY_VALUE_MAX];
