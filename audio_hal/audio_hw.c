@@ -1616,6 +1616,13 @@ exit:
     }
     aml_out->position_update = 0;
 
+    if (aml_dev->is_netflix) {
+        //1.audio easing duration is 32ms,
+        //2.one loop for schedule_run cost about 32ms(contains the hardware costing),
+        //3.if [pause, vol_ease(in adev_set_parameters by Netflix)] too short, means it need more time to do audio easing
+        //so, the delay time for 32ms(pause is completed after audio easing is done) is enough.
+        aml_audio_sleep(64000);
+    }
     ALOGI("%s(), stream(%p) exit", __func__, stream);
     return ret;
 }
@@ -4688,8 +4695,97 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         ALOGI("%s(), set pic mode to: %d, is game mode = %d\n", __func__, adev->pic_mode, adev->game_mode);
         goto exit;
     }
-
+    ret = str_parms_get_str(parms, "prim_mixgain", value, sizeof(value));
+    if (ret >= 0) {
+        char parm[12] = "";
+        int gain = atoi(value);
+        if ((gain <= 0) && (gain >= -96)) {
+            sprintf(parm, "-sys_prim_mixgain %d,200,0", gain << 7);
+            pthread_mutex_lock(&adev->lock);
+            aml_ms12_update_runtime_params(&(adev->ms12), parm);
+            pthread_mutex_unlock(&adev->lock);
+            ret = 0;
+            goto exit;
+        }
+        ret = -EINVAL;
+        goto exit;
+    }
+    ret = str_parms_get_str(parms, "apps_mixgain", value, sizeof(value));
+    if (ret >= 0) {
+        char parm[12] = "";
+        int gain = atoi(value);
+        if ((gain <= 0) && (gain >= -96)) {
+            sprintf(parm, "-sys_apps_mixgain %d,200,0", gain << 7);
+            pthread_mutex_lock(&adev->lock);
+            aml_ms12_update_runtime_params(&(adev->ms12), parm);
+            pthread_mutex_unlock(&adev->lock);
+            ret = 0;
+            goto exit;
+        }
+        ret = -EINVAL;
+        goto exit;
+    }
+    ret = str_parms_get_str(parms, "syss_mixgain", value, sizeof(value));
+    if (ret >= 0) {
+        char parm[12] = "";
+        int gain = atoi(value);
+        if ((gain <= 0) && (gain >= -96)) {
+            sprintf(parm, "-sys_syss_mixgain %d,200,0", gain << 7);
+            pthread_mutex_lock(&adev->lock);
+            aml_ms12_update_runtime_params(&(adev->ms12), parm);
+            pthread_mutex_unlock(&adev->lock);
+            ret = 0;
+            goto exit;
+        }
+        ret = -EINVAL;
+        goto exit;
+    }
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
+       ret = str_parms_get_str(parms, "vol_ease", value, sizeof(value));
+        ALOGI("vol_ease: value= %s", value);
+        if (ret >= 0) {
+            int gain, duration, shape;
+            if (sscanf(value, "%d,%d,%d", &gain, &duration, &shape) == 3) {
+                char cmd[128] = {0};
+                sprintf(cmd, "-main1_mixgain %d,%d,%d -main2_mixgain %d,%d,%d -ui_mixgain %d,%d,%d",
+                    gain, duration, shape,
+                    gain, duration, shape,
+                    gain, duration, shape);
+                ALOGI("vol_ease %d %d %d", gain, duration, shape);
+
+                if (duration == 0) {
+                    if (aml_ms12_update_runtime_params(&(adev->ms12), cmd) == -1) {
+                        /* an immediate setting of easing volume is not successful, which
+                         * could happen when MS12 graph has not been set up yet.
+                         * This setting is saved by libms12 and will be applied when
+                         * MS12 is launched. adev->vol_ease_valid is the flag to show there
+                         * is already a pending start volume.
+                         */
+                        ALOGI("vol_ease EASE_SETTING_START with gain %d", gain);
+                        adev->vol_ease_setting_state = EASE_SETTING_START;
+                    }
+                } else {
+                    if (adev->vol_ease_setting_state == EASE_SETTING_START) {
+                        /* when MS12 lib has an initial easing set, save the following
+                         * non-zero duration settings and apply it when MS12 is launched
+                         */
+                        adev->vol_ease_setting_state = EASE_SETTING_PENDING;
+                        adev->vol_ease_setting_gain = gain;
+                        adev->vol_ease_setting_duration = duration;
+                        adev->vol_ease_setting_shape = shape;
+
+                        ALOGI("vol_ease EASE_SETTING_PENDING with %d %d %d", gain, duration, shape);
+
+                    } else {
+                        /* when MS12 lib does not have an initial easing set, update runtime directly */
+                        ALOGI("vol_ease apply %d %d %d", gain, duration, shape);
+                        aml_ms12_update_runtime_params(&(adev->ms12), cmd);
+                    }
+                }
+                ret = 0;
+                goto exit;
+            }
+        }
         ret = str_parms_get_str(parms, "ms12_runtime", value, sizeof(value));
         if (ret >= 0) {
             char *parm = strstr(kvpairs, "=");

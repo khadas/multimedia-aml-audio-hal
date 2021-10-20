@@ -315,6 +315,13 @@ struct aml_bt_output {
 };
 
 #define HDMI_ARC_MAX_FORMAT  20
+
+enum {
+    EASE_SETTING_INIT    = 0,
+    EASE_SETTING_START   = 1,
+    EASE_SETTING_PENDING = 2
+};
+
 struct aml_audio_device {
     struct audio_hw_device hw_device;
     /* see note below on mutex acquisition order */
@@ -556,6 +563,10 @@ struct aml_audio_device {
     bool gap_ignore_pts;
     float master_volume;
     bool master_mute;
+    int vol_ease_setting_state;
+    int vol_ease_setting_gain;
+    int vol_ease_setting_duration;
+    int vol_ease_setting_shape;
     /* -End- */
 };
 

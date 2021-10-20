@@ -589,6 +589,15 @@ extern "C" void dolby_ms12_set_input_mixer_gain_values_for_2nd_main_program_inpu
     }
 }
 
+extern "C" void dolby_ms12_set_input_mixer_gain_values_for_ui_input(MixGain *mixergain)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12ConfigParams *config_param = getInstance();
+    if (config_param) {
+        return config_param->setInputMixerGainValuesForUIInput(mixergain);
+    }
+}
+
 extern "C" void dolby_ms12_set_system_sound_mixer_gain_values_for_primary_input(MixGain *mixergain)
 {
     ALOGV("%s()\n", __FUNCTION__);

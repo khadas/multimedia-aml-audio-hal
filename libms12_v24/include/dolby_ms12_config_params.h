@@ -328,7 +328,7 @@ void dolby_ms12_set_user_control_value_for_mixing_main_and_associated_audio(int 
 
 /**
  * @brief Input mixer gain values for Main program input
- * - target gain at end of ramp in dB (range: -96..0)
+ * - target gain at end of ramp in dB (range: -12288..0)
  * - duration of ramp in milliseconds (range: 0..60000)
  * - shape of the ramp (0: linear, 1: in cube, 2: out cube)
  */
@@ -336,15 +336,23 @@ void dolby_ms12_set_input_mixer_gain_values_for_main_program_input(MixGain *mixe
 
 /**
  * @brief Input mixer gain values for 2nd Main program input
- * - target gain at end of ramp in dB (range: -96..0)
+ * - target gain at end of ramp in dB (range: -12288..0)
  * - duration of ramp in milliseconds (range: 0..60000)
  * - shape of the ramp (0: linear, 1: in cube, 2: out cube)
  */
 void dolby_ms12_set_input_mixer_gain_values_for_2nd_main_program_input(MixGain *mixergain);
 
 /**
+ * @brief Input mixer gain values for UI input
+ * - target gain at end of ramp in dB (range: -12288..0)
+ * - duration of ramp in milliseconds (range: 0..60000)
+ * - shape of the ramp (0: linear, 1: in cube, 2: out cube)
+ */
+void dolby_ms12_set_input_mixer_gain_values_for_ui_program_input(MixGain *mixergain);
+
+/**
  * @brief System sound mixer gain values for primary input (Input/AD mixer output)
- * - target gain at end of ramp in dB (range: -96..0)
+ * - target gain at end of ramp in dB (range: -12288..0)
  * - duration of ramp in milliseconds (range: 0..60000)
  * - shape of the ramp (0: linear, 1: in cube, 2: out cube)
  */
@@ -352,7 +360,7 @@ void dolby_ms12_set_system_sound_mixer_gain_values_for_primary_input(MixGain *mi
 
 /**
  * @brief System sound mixer gain values for Application Sounds input
- * - target gain at end of ramp in dB (range: -96..0)
+ * - target gain at end of ramp in dB (range: -12288..0)
  * - duration of ramp in milliseconds (range: 0..60000)
  * - shape of the ramp (0: linear, 1: in cube, 2: out cube)
  */
@@ -360,7 +368,7 @@ void dolby_ms12_set_system_sound_mixer_gain_values_for_app_sounds_input(MixGain 
 
 /**
  * @brief System sound mixer gain values for System Sounds input
- * - target gain at end of ramp in dB (range: -96..0)
+ * - target gain at end of ramp in dB (range: -12288..0)
  * - duration of ramp in milliseconds (range: 0..60000)
  * - shape of the ramp (0: linear, 1: in cube, 2: out cube)
  */
@@ -573,7 +581,7 @@ bool is_dolby_ms12_continuous_mode(void);
 
 /**
  * @brief Input mixer gain values for OTT Sounds input
- * - target gain at end of ramp in dB (range: -96..0)
+ * - target gain at end of ramp in dB (range: -12288..0)
  * - duration of ramp in milliseconds (range: 0..60000)
  * - shape of the ramp (0: linear, 1: in cube, 2: out cube)
  */

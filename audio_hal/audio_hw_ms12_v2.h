@@ -130,9 +130,14 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12, bool set_non_continuous
 /*
  *@brief set dolby ms12 primary gain
  */
+ enum {
+    GAIN_SHAPE_LINEAR   = 0,
+    GAIN_SHAPE_CUBE_IN  = 1,
+    GAIN_SHAPE_CUBE_OUT = 2,
+    GAIN_SHAPE_MAX      = 3
+};
 int set_dolby_ms12_primary_input_db_gain(struct dolby_ms12_desc *ms12,
-        int db_gain, int duration);
-
+        int db_gain, int duration, int shape);
 /*
  *@brief set system app mixing status
  * if normal pcm stream status is STANDBY, set mixing off(-xs 0)

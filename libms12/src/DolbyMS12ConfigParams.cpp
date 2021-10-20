@@ -725,7 +725,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
         (*row_index)++;
     }
 
-    if (mHasAssociateInput == true) {
+    if ((mHasAssociateInput == true) || (mActivateOTTSignal == true)) {
         sprintf(ConfigParams[*row_index], "%s", "-main2_mixgain");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%d,%d,%d", mMain2MixGain.target, mMain2MixGain.duration, mMain2MixGain.shape);//choose mid-val
@@ -735,7 +735,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
     if ((mActivateOTTSignal == true) && (mMain1IsDummy == true) && (mOTTSoundInputEnable == true)) {
         sprintf(ConfigParams[*row_index], "%s", "-ott_mixgain");
         (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d,%d,%d", mOTTMixGain.target, mOTTMixGain.duration, mOTTMixGain.shape);
+        sprintf(ConfigParams[*row_index], "%d,%d,%d", mUIMixGain.target, mUIMixGain.duration, mUIMixGain.shape);
         (*row_index)++;
     }
 
@@ -749,7 +749,7 @@ int DolbyMS12ConfigParams::SetFunctionalSwitches(char **ConfigParams, int *row_i
     if (mAppSoundFlags == true) {
         sprintf(ConfigParams[*row_index], "%s", "-sys_apps_mixgain");
         (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%d,%d,%d", mSysApppsMixGain.target, mSysApppsMixGain.duration, mSysApppsMixGain.shape);//choose mid-val
+        sprintf(ConfigParams[*row_index], "%d,%d,%d", mSysAppsMixGain.target, mSysAppsMixGain.duration, mSysAppsMixGain.shape);//choose mid-val
         (*row_index)++;
     }
 
@@ -1536,6 +1536,78 @@ char **DolbyMS12ConfigParams::UpdateDolbyMS12RuntimeConfigParams(int *argc, char
             if ((val >= 0) && (val <= 1)) {
                 ALOGI("-dap_surround_decoder_enable DAPSurDecEnable: %d", val);
                 mDAPSurDecEnable = val;
+            }
+        } else if (strcmp(opt, "main1_mixgain") == 0) {
+            int param[3];
+            if (sscanf(mConfigParams[index], "%d,%d,%d",
+                &param[0], &param[1], &param[2]) == 3) {
+                if ((param[0] >= -12288) && (param[0] <= 0))
+                    mMain1MixGain.target = param[0];
+                if ((param[1] >= 0) && (param[1] <= 60000))
+                    mMain1MixGain.duration = param[1];
+                if ((param[2] >= 0) && (param[2] <= 2))
+                    mMain1MixGain.shape = param[2];
+                ALOGI("-sys_prim_mixgain System sound mixer gain for Main input: %d %d %d", param[0], param[1], param[2]);
+            }
+        } else if (strcmp(opt, "main2_mixgain") == 0) {
+            int param[3];
+            if (sscanf(mConfigParams[index], "%d,%d,%d",
+                &param[0], &param[1], &param[2]) == 3) {
+                if ((param[0] >= -12288) && (param[0] <= 0))
+                    mMain2MixGain.target = param[0];
+                if ((param[1] >= 0) && (param[1] <= 60000))
+                    mMain2MixGain.duration = param[1];
+                if ((param[2] >= 0) && (param[2] <= 2))
+                    mMain2MixGain.shape = param[2];
+                ALOGI("-sys_apps_mixgain System sound mixer gain for 2nd Main input: %d %d %d", param[0], param[1], param[2]);
+            }
+        } else if (strcmp(opt, "ui_mixgain") == 0) {
+            int param[3];
+            if (sscanf(mConfigParams[index], "%d,%d,%d",
+                &param[0], &param[1], &param[2]) == 3) {
+                if ((param[0] >= -12288) && (param[0] <= 0))
+                    mUIMixGain.target = param[0];
+                if ((param[1] >= 0) && (param[1] <= 60000))
+                    mUIMixGain.duration = param[1];
+                if ((param[2] >= 0) && (param[2] <= 2))
+                    mUIMixGain.shape = param[2];
+                ALOGI("-sys_apps_mixgain System sound mixer gain for UI input: %d %d %d", param[0], param[1], param[2]);
+            }
+        } else if (strcmp(opt, "sys_prim_mixgain") == 0) {
+            int param[3];
+            if (sscanf(mConfigParams[index], "%d,%d,%d",
+                &param[0], &param[1], &param[2]) == 3) {
+                if ((param[0] >= -12288) && (param[0] <= 0))
+                    mSysPrimMixGain.target = param[0];
+                if ((param[1] >= 0) && (param[1] <= 60000))
+                    mSysPrimMixGain.duration = param[1];
+                if ((param[2] >= 0) && (param[2] <= 2))
+                    mSysPrimMixGain.shape = param[2];
+                ALOGI("-sys_prim_mixgain System sound mixer gain for primary input: %d %d %d", param[0], param[1], param[2]);
+            }
+        } else if (strcmp(opt, "sys_apps_mixgain") == 0) {
+            int param[3];
+            if (sscanf(mConfigParams[index], "%d,%d,%d",
+                &param[0], &param[1], &param[2]) == 3) {
+                if ((param[0] >= -12288) && (param[0] <= 0))
+                    mSysAppsMixGain.target = param[0];
+                if ((param[1] >= 0) && (param[1] <= 60000))
+                    mSysAppsMixGain.duration = param[1];
+                if ((param[2] >= 0) && (param[2] <= 2))
+                    mSysAppsMixGain.shape = param[2];
+                ALOGI("-sys_apps_mixgain System sound mixer gain for application input: %d %d %d", param[0], param[1], param[2]);
+            }
+        } else if (strcmp(opt, "sys_syss_mixgain") == 0) {
+            int param[3];
+            if (sscanf(mConfigParams[index], "%d,%d,%d",
+                &param[0], &param[1], &param[2]) == 3) {
+                if ((param[0] >= -12288) && (param[0] <= 0))
+                    mSysSyssMixGain.target = param[0];
+                if ((param[1] >= 0) && (param[1] <= 60000))
+                    mSysSyssMixGain.duration = param[1];
+                if ((param[2] >= 0) && (param[2] <= 2))
+                    mSysSyssMixGain.shape = param[2];
+                ALOGI("-sys_syss_mixgain System sound mixer gain for system input: %d %d %d", param[0], param[1], param[2]);
             }
         } else if (strcmp(opt, "dap_drc") == 0) {
             val = atoi(mConfigParams[index]);

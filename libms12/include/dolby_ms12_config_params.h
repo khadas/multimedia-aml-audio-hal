@@ -319,6 +319,14 @@ void dolby_ms12_set_input_mixer_gain_values_for_main_program_input(MixGain *mixe
 void dolby_ms12_set_input_mixer_gain_values_for_2nd_main_program_input(MixGain *mixergain);
 
 /**
+ * @brief Input mixer gain values for UI input
+ * - target gain at end of ramp in dB (range: -12288..0)
+ * - duration of ramp in milliseconds (range: 0..60000)
+ * - shape of the ramp (0: linear, 1: in cube, 2: out cube)
+ */
+void dolby_ms12_set_input_mixer_gain_values_for_ui_program_input(MixGain *mixergain);
+
+/**
  * @brief System sound mixer gain values for primary input (Input/AD mixer output)
  * - target gain at end of ramp in dB (range: -96..0)
  * - duration of ramp in milliseconds (range: 0..60000)
