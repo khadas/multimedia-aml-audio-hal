@@ -3453,7 +3453,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
                 adev->ms12_ott_enable = false;
                 ALOGI("%s set ott dummy", __func__);
             }
-            if (out->ms12_acmod2ch_lock_disable) {
+            if (out->ms12_acmod2ch_lock_disable && !adev->is_netflix) {
                 set_ms12_acmod2ch_lock(&adev->ms12, true);
             }
             adev->ms12.need_resume = 0;
@@ -4150,6 +4150,18 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+    ret = str_parms_get_str (parms, "is_netflix", value, sizeof (value) );
+    if (ret >= 0) {
+        if (strcmp(value, "true") == 0) {
+            adev->is_netflix = 1;
+        } else {
+            adev->is_netflix = 0;
+        }
+        ALOGI("%s:%d is_netflix %d(%s)", __FUNCTION__, __LINE__, adev->is_netflix, value);
+
+        set_ms12_acmod2ch_lock(&(adev->ms12), !adev->is_netflix);
+        goto exit;
+    }
 
 
     /*use dolby_lib_type_last to check ms12 type, because durig playing DTS file,
