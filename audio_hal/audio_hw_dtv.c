@@ -404,6 +404,8 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
             } else if (val == AUDIO_DTV_PATCH_CMD_CLOSE) {
                 if (adev->is_multi_demux) {
                     if (demux_handle) {
+                        Stop_Dmx_Main_Audio(demux_handle);
+                        Stop_Dmx_AD_Audio(demux_handle);
                         Destroy_Dmx_Main_Audio(demux_handle);
                         if (demux_info->dual_decoder_support)
                             Destroy_Dmx_AD_Audio(demux_handle);
@@ -2277,10 +2279,10 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                 if (aml_dev->is_multi_demux) {
                     path_id = dtv_audio_instances->demux_index_working;
                     patch->demux_handle = dtv_audio_instances->demux_handle[path_id];
-                    if (patch->demux_handle) {
-                        Stop_Dmx_Main_Audio(patch->demux_handle);
-                        Stop_Dmx_AD_Audio(patch->demux_handle);
-                    }
+                    //if (patch->demux_handle) {
+                    //    Stop_Dmx_Main_Audio(patch->demux_handle);
+                    //    Stop_Dmx_AD_Audio(patch->demux_handle);
+                    //}
                 } else {
                     dtv_assoc_audio_pause(1);
                 }
@@ -2297,10 +2299,10 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                 if (aml_dev->is_multi_demux) {
                     path_id = dtv_audio_instances->demux_index_working;
                     patch->demux_handle = dtv_audio_instances->demux_handle[path_id];
-                    if (patch->demux_handle) {
-                        Stop_Dmx_Main_Audio(patch->demux_handle);
-                        Stop_Dmx_AD_Audio(patch->demux_handle);
-                    }
+                    //if (patch->demux_handle) {
+                    //    Stop_Dmx_Main_Audio(patch->demux_handle);
+                    //    Stop_Dmx_AD_Audio(patch->demux_handle);
+                    //}
                 }  else {
                     dtv_assoc_audio_stop(1);
                 }
@@ -2343,10 +2345,10 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                 if (aml_dev->is_multi_demux) {
                     path_id = dtv_audio_instances->demux_index_working;
                     patch->demux_handle = dtv_audio_instances->demux_handle[path_id];
-                    if (patch->demux_handle) {
-                        Stop_Dmx_Main_Audio(patch->demux_handle);
-                        Stop_Dmx_AD_Audio(patch->demux_handle);
-                    }
+                    //if (patch->demux_handle) {
+                    //    Stop_Dmx_Main_Audio(patch->demux_handle);
+                    //    Stop_Dmx_AD_Audio(patch->demux_handle);
+                    //}
                 }  else {
                     dtv_assoc_audio_stop(1);
                 }

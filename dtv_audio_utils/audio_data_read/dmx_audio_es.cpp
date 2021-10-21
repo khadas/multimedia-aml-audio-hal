@@ -49,7 +49,8 @@ AM_Dmx_Audio_ErrorCode_t Stop_Dmx_Main_Audio(void *demux_handle) {
         return AM_AUDIO_Dmx_ERROR;
     }
     ALOGI("%s %d",__FUNCTION__, __LINE__);
-    TSPMutex::Autolock l(demux_wrapper->mDemuxHandleLock);
+    //Temporarily remove , continue  tracking by SWPL-62301
+    //TSPMutex::Autolock l(demux_wrapper->mDemuxHandleLock);
     demux_wrapper->AmDemuxWrapperStopMain();
     return AM_AUDIO_Dmx_SUCCESS;
 }
@@ -95,7 +96,8 @@ AM_Dmx_Audio_ErrorCode_t Stop_Dmx_AD_Audio(void *demux_handle) {
         return AM_AUDIO_Dmx_ERROR;
     }
     ALOGI("%s %d",__FUNCTION__, __LINE__);
-    TSPMutex::Autolock l(demux_wrapper->mDemuxHandleLock);
+    //Temporarily remove , continue  tracking by SWPL-62301
+    //TSPMutex::Autolock l(demux_wrapper->mDemuxHandleLock);
     demux_wrapper->AmDemuxWrapperStopAD();
     return AM_AUDIO_Dmx_SUCCESS;
 }
