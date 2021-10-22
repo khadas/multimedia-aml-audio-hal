@@ -599,9 +599,17 @@ int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream)
     alsa_delay = (int32_t)out_get_ms12_latency_frames(stream);
 
     if (adev->first_apts_flag) {
-        input_latency_ms  = get_ms12_tunnel_input_latency(out->hal_internal_format);
+        if (adev->is_netflix) {
+            input_latency_ms = get_ms12_netflix_tunnel_input_latency(out->hal_internal_format);
+        } else {
+            input_latency_ms = get_ms12_tunnel_input_latency(out->hal_internal_format);
+        }
     }
-    output_latency_ms = get_ms12_output_latency(adev->ms12.optical_format);
+    if (adev->is_netflix) {
+        output_latency_ms = get_ms12_netflix_output_latency(adev->ms12.optical_format);
+    } else {
+        output_latency_ms = get_ms12_output_latency(adev->ms12.optical_format);
+    }
     port_latency_ms   = get_ms12_port_latency(adev->active_outport, adev->ms12.optical_format);
 
     tunning_delay = (input_latency_ms + output_latency_ms + port_latency_ms) * 48;
