@@ -57,11 +57,10 @@
 #define  AVSYNC_MS12_NONTUNNEL_BYPASS_LATENCY            (-130)
 #define  AVSYNC_MS12_TUNNEL_BYPASS_LATENCY               (-130)
 
-
-#define  AVSYNC_MS12_PCM_OUT_LATENCY                     (20)
+#define  AVSYNC_MS12_PCM_OUT_LATENCY                     (70)
 #define  AVSYNC_MS12_DD_OUT_LATENCY                      (50)
-#define  AVSYNC_MS12_DDP_OUT_LATENCY                     (40)
-#define  AVSYNC_MS12_MAT_OUT_LATENCY                     (20)
+#define  AVSYNC_MS12_DDP_OUT_LATENCY                     (110)
+#define  AVSYNC_MS12_MAT_OUT_LATENCY                     (100)
 
 #define  AVSYNC_MS12_HDMI_ARC_OUT_PCM_LATENCY            (0)
 #define  AVSYNC_MS12_HDMI_ARC_OUT_DD_LATENCY             (0)
