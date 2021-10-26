@@ -687,8 +687,11 @@ int get_the_dolby_ms12_prepared(
         demux_info = (aml_demux_audiopara_t *)patch->demux_info;
     }
     int ret = 0, associate_audio_mixing_enable = 0;
+#ifdef BUILD_LINUX
+    bool output_5_1_ddp = adev->is_netflix;//netflix need output 5.1 ddp
+#else
     bool output_5_1_ddp = getprop_bool(MS12_OUTPUT_5_1_DDP);
-
+#endif
     ALOGI("\n+%s()", __FUNCTION__);
     pthread_mutex_lock(&ms12->lock);
     ALOGI("++%s(), locked", __FUNCTION__);
