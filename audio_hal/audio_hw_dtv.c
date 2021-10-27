@@ -405,7 +405,8 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                 if (adev->is_multi_demux) {
                     if (demux_handle) {
                         Stop_Dmx_Main_Audio(demux_handle);
-                        Stop_Dmx_AD_Audio(demux_handle);
+                        if (demux_info->dual_decoder_support)
+                            Stop_Dmx_AD_Audio(demux_handle);
                         Destroy_Dmx_Main_Audio(demux_handle);
                         if (demux_info->dual_decoder_support)
                             Destroy_Dmx_AD_Audio(demux_handle);
@@ -2333,7 +2334,8 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                 dtv_patch_input_resume(adec_handle);
                 if (aml_dev->is_multi_demux) {
                     Start_Dmx_Main_Audio(patch->demux_handle);
-                    Start_Dmx_AD_Audio(patch->demux_handle);
+                    if (aml_dev->dual_decoder_support)
+                        Start_Dmx_AD_Audio(patch->demux_handle);
                 } else {
                     dtv_assoc_audio_resume(1,demux_info->ad_pid);
                 }
