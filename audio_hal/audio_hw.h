@@ -568,6 +568,7 @@ struct aml_audio_device {
     int vol_ease_setting_gain;
     int vol_ease_setting_duration;
     int vol_ease_setting_shape;
+    float record_volume_before_mute;//Record the master volume before mute
     /* -End- */
 };
 
@@ -642,6 +643,8 @@ struct aml_stream_out {
     bool pause_status;
     bool hw_sync_mode;
     int  tsync_status;
+    float volume_l_org;
+    float volume_r_org;
     float volume_l;
     float volume_r;
     float last_volume_l;

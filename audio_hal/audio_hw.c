@@ -1398,9 +1398,10 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
         }
 
     }
-    out->volume_l = left;
-    out->volume_r = right;
-
+    out->volume_l_org = left;//left stream volume
+    out->volume_r_org = right;//right stream volume
+    out->volume_l = out->volume_l_org * adev->master_volume;//out stream vol=stream vol * master vol
+    out->volume_r = out->volume_r_org * adev->master_volume;
     /*
      *The Dolby format(dd/ddp/ac4/true-hd/mat) and direct&UI-PCM(stereo or multi PCM)
      *will go through dolby system mixer as main input
@@ -3238,8 +3239,10 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
 
     out->out_device = devices;
     out->flags = flags;
-    out->volume_l = 1.0;
-    out->volume_r = 1.0;
+    out->volume_l_org = 1.0;//stream volume
+    out->volume_r_org = 1.0;
+    out->volume_l = adev->master_volume * out->volume_l_org;//out volume
+    out->volume_r = adev->master_volume * out->volume_r_org;
     out->last_volume_l = 0.0;
     out->last_volume_r = 0.0;
     out->ms12_vol_ctrl = false;
@@ -5058,9 +5061,18 @@ static int adev_set_master_volume (struct audio_hw_device *dev, float volume)
     }
 
     struct aml_audio_device *adev = (struct aml_audio_device *) dev;
+    int i;
+    pthread_mutex_lock (&adev->lock);
     adev->master_volume = volume;
-    adev->sink_gain[adev->active_outport] = volume;
+    for (i = 0; i < STREAM_USECASE_MAX; i++) {
+       struct aml_stream_out *aml_out = adev->active_outputs[i];
+       struct audio_stream_out *out = (struct audio_stream_out *)aml_out;
+       if (aml_out) {
+            out_set_volume (out, aml_out->volume_l_org, aml_out->volume_r_org);
+       }
+    }
     ALOGI("%s() volume = %f, active_outport = %d", __FUNCTION__, volume, adev->active_outport);
+    pthread_mutex_unlock (&adev->lock);
     return 0;
 }
 
@@ -5086,14 +5098,12 @@ static int adev_set_master_mute (struct audio_hw_device *dev, bool muted)
 
     struct aml_audio_device *adev = (struct aml_audio_device *) dev;
     adev->master_mute = muted;
-    if (muted == true) {
-        ALOGI("%s() 111 muted = %d master_volume = %f", __FUNCTION__, adev->master_mute, adev->master_volume);
-        adev->sink_gain[adev->active_outport] = 0;
+    if (muted) { //mute
+        adev_get_master_volume (dev, &adev->record_volume_before_mute); //Record the volume before mute
+        adev_set_master_volume (dev, 0); //set mute
     } else {
-        ALOGI("%s() 222  muted = %d master_volume = %f", __FUNCTION__, adev->master_mute, adev->master_volume);
-        adev->sink_gain[adev->active_outport] = adev->master_volume;
+        adev_set_master_volume (dev, adev->record_volume_before_mute); //unmute
     }
-    ALOGI("%s() muted = %d master_volume = %f", __FUNCTION__, adev->master_mute, adev->master_volume);
     return 0;
 }
 
@@ -6034,8 +6044,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
         size_t out_frames = bytes / FRAMESIZE_32BIT_STEREO;
         if (!aml_out->ms12_vol_ctrl) {
            float gain_speaker = adev->sink_gain[OUTPORT_SPEAKER];
-            if (aml_out->hw_sync_mode)
-                gain_speaker *= aml_out->volume_l;
+            gain_speaker *= aml_out->volume_l;
             apply_volume(gain_speaker, tmp_buffer, sizeof(uint32_t), bytes);
 
         }
@@ -8289,6 +8298,8 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
     }
     aml_out->codec_type = get_codec_type(aml_out->hal_internal_format);
     aml_out->continuous_mode_check = true;
+    /*In order to avoid the invalid adjustment of mastervol when there is no stream */
+    out_set_volume ((struct audio_stream_out *)aml_out, aml_out->volume_l_org, aml_out->volume_r_org);
 
     /* init ease for stream */
     if (aml_audio_ease_init(&aml_out->audio_stream_ease) < 0) {
@@ -10156,7 +10167,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     }
     pthread_mutex_unlock(&adev->lock);
 #endif
-
+    adev->master_volume = 1.0;
     adev->useSubMix = false;
 #ifdef SUBMIXER_V1_1
     adev->useSubMix = true;
@@ -10191,9 +10202,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->debug_flag = aml_audio_get_debug_flag();
     adev->count = 1;
     adev->is_multi_demux = is_multi_demux();
-
     memset(&(adev->hdmi_descs), 0, sizeof(struct aml_arc_hdmi_desc));
-
     ALOGD("%s adev->dolby_lib_type:%d  !adev->is_TV:%d", __func__, adev->dolby_lib_type, !adev->is_TV);
     /* create thread for communication between Audio Hal and MS12 */
     if ((eDolbyMS12Lib == adev->dolby_lib_type)) {
