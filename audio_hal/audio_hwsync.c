@@ -530,10 +530,11 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
                 }
                 break;
             }
+        }
+        if (aml_hwsync_set_tsync_start_pts(p_hwsync, pts32) < 0)
+            return -EINVAL;
     }
-     if (aml_hwsync_set_tsync_start_pts(p_hwsync, pts32) < 0)
-        return -EINVAL;
-    }
+
     if (p_hwsync->aout->msync_session) {
        int r = av_sync_audio_start(p_hwsync->aout->msync_session, pts32, 0,
                                    aml_audio_hwsync_msync_callback, p_hwsync->aout);

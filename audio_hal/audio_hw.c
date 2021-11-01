@@ -1179,107 +1179,119 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
 
         // We shall return Result::OK, which is 0, if parameter is set successfully,
         // or we can not pass VTS test.
-        ALOGI ("Amlogic_HAL - %s: change ret value to 0 in order to pass VTS test.", __FUNCTION__);
+        ALOGI("Amlogic_HAL - %s: change ret value to 0 in order to pass VTS test.", __FUNCTION__);
         ret = 0;
 
         goto exit;
     }
-    ret = str_parms_get_str (parms, "hw_av_sync", value, sizeof (value) );
+
+    ret = str_parms_get_str (parms, "hw_av_sync_type", value, sizeof(value));
+    if (ret >=0 ) {
+        int hw_sync_type = atoi(value);
+        out->avsync_type = hw_sync_type;
+
+        ALOGI("[%s:%d]:set av sync type=%d", __FUNCTION__, __LINE__, hw_sync_type);
+        ret = 0;
+        goto exit;
+    }
+
+    ret = str_parms_get_str (parms, "hw_av_sync", value, sizeof(value));
     if (ret >= 0) {
         int hw_sync_id = atoi(value);
-        out->avsync_type = AVSYNC_TYPE_NULL;
         unsigned char sync_enable = 0;
         void *msync_session;
-        if ((hw_sync_id != 12345678) && (hw_sync_id >= 0)) {
-            if (out->msync_session) {
-                ALOGW("hw_av_sync id set w/o release previous session.");
-                av_sync_destroy(out->msync_session);
-                out->msync_session = NULL;
-            }
-            msync_session = av_sync_attach(hw_sync_id, AV_SYNC_TYPE_AUDIO);
-            if (!msync_session) {
-                ALOGE("Cannot attach hw_sync_id %d", hw_sync_id);
-                ret = -EINVAL;
-                goto exit;
-            }
-            log_set_level(LOG_INFO);
-            ALOGI("av_sync_attach success %p", msync_session);
-            sync_enable = 1;
-            out->avsync_type = AVSYNC_TYPE_MSYNC;
-            out->hwsync->hwsync_id = hw_sync_id;
-            aml_audio_hwsync_set_id(out->hwsync, hw_sync_id);
+
+        if (hw_sync_id < 0) {
+            ALOGE("[%s:%d]:The set parameter is abnormal, hw_sync_id=%d", __FUNCTION__, __LINE__, hw_sync_id);
+            ret = -EINVAL;
+            goto exit;
         }
-        else {
-            bool ret_set_id = false;
-            // 12345678 is tsync,align with tsplayer application.
-            if (hw_sync_id != 12345678) {
-                ALOGI ("[%s]adev->hw_mediasync:%p\n", __FUNCTION__, adev->hw_mediasync);
+
+        if (hw_sync_id == 12345678) {
+            out->avsync_type = AVSYNC_TYPE_TSYNC;
+            sync_enable = 1;
+            ALOGI("[%s:%d]:The current sync type: tSync", __FUNCTION__, __LINE__);
+        } else {
+            if (out->avsync_type == AVSYNC_TYPE_MEDIASYNC) {
+                bool ret_set_id = false;
+
                 if (adev->hw_mediasync == NULL) {
                     adev->hw_mediasync = aml_hwsync_mediasync_create();
                 }
+
                 if (adev->hw_mediasync != NULL) {
                     out->hwsync->use_mediasync = true;
                     out->hwsync->mediasync = adev->hw_mediasync;
                     out->hwsync->hwsync_id = hw_sync_id;
                     ret_set_id = aml_audio_hwsync_set_id(out->hwsync, hw_sync_id);
-                    out->avsync_type = AVSYNC_TYPE_MEDIASYNC;
+                    sync_enable = ret_set_id ? 1 : 0;
+                    ALOGI("[%s:%d]:The current sync type: MediaSync", __FUNCTION__, __LINE__);
                 }
-            }
-            sync_enable = ((hw_sync_id == 12345678) || ret_set_id) ? 1 : 0;
-            if (hw_sync_id == 12345678) {
-                out->avsync_type = AVSYNC_TYPE_TSYNC;
+            } else {
+                if (out->msync_session) {
+                    ALOGW("[%s:%d]:hw_av_sync id set w/o release previous session.", __FUNCTION__, __LINE__);
+                    av_sync_destroy(out->msync_session);
+                    out->msync_session = NULL;
+                }
+
+                msync_session = av_sync_attach(hw_sync_id, AV_SYNC_TYPE_AUDIO);
+                if (!msync_session) {
+                    ALOGE("[%s:%d]:Cannot attach hw_sync_id %d", __FUNCTION__, __LINE__, hw_sync_id);
+                    ret = -EINVAL;
+                    goto exit;
+                }
+
+                sync_enable = 1;
+                out->avsync_type = AVSYNC_TYPE_MSYNC;
+                out->hwsync->hwsync_id = hw_sync_id;
+                ALOGI("[%s:%d]:The current sync type: mSync", __FUNCTION__, __LINE__);
+                ALOGI("[%s:%d]:av_sync_attach success %p", __FUNCTION__, __LINE__, msync_session);
             }
         }
-        audio_hwsync_t *hw_sync = out->hwsync;
-        ALOGI("(%p)set hw_sync_id %d,%s hw sync mode\n",
-               out, hw_sync_id, sync_enable ? "enable" : "disable");
+
         out->hw_sync_mode = sync_enable;
+        out->hwsync->first_apts_flag = false;
+        ALOGI("(%p)set hw_sync_id=%d, %s hw sync mode", out, hw_sync_id, sync_enable ? "enable" : "disable");
 
         if (adev->ms12_out != NULL && adev->ms12_out->hwsync) {
             adev->ms12_out->hw_sync_mode = out->hw_sync_mode;
-            ALOGI("set ms12_out %p hw_sync_mode %d",adev->ms12_out, adev->ms12_out->hw_sync_mode);
+            ALOGI("[%s:%d]:set ms12_out %p, hw_sync_mode = %d", __FUNCTION__, __LINE__, adev->ms12_out, adev->ms12_out->hw_sync_mode);
         }
 
-        hw_sync->first_apts_flag = false;
         pthread_mutex_lock (&adev->lock);
         pthread_mutex_lock (&out->lock);
         out->frame_write_sum = 0;
         out->last_frames_postion = 0;
+
         /* clear up previous playback output status */
         if (!out->standby) {
-            standy_func (out);
+            standy_func(out);
         }
-        //adev->hwsync_output = sync_enable?out:NULL;
+
         if (sync_enable) {
-            ALOGI ("init hal mixer when hwsync\n");
+            ALOGI ("[%s:%d]:init hal mixer when hwsync", __FUNCTION__, __LINE__);
             aml_hal_mixer_init (&adev->hal_mixer);
-            if (AVSYNC_TYPE_MSYNC == out->avsync_type) {
+            if (out->avsync_type == AVSYNC_TYPE_MSYNC) {
                 out->msync_session = msync_session;
                 pthread_mutex_init(&out->msync_mutex, NULL);
                 pthread_cond_init(&out->msync_cond, NULL);
             }
-            if (eDolbyMS12Lib == adev->dolby_lib_type) {
+
+            if (adev->dolby_lib_type == eDolbyMS12Lib) {
                 adev->gap_ignore_pts = false;
             }
         }
+
         if (continous_mode(adev) && out->hw_sync_mode) {
             dolby_ms12_hwsync_init();
         }
+
         pthread_mutex_unlock (&out->lock);
         pthread_mutex_unlock (&adev->lock);
         ret = 0;
         goto exit;
     }
-    /*ret = str_parms_get_str (parms, "A2dpSuspended", value, sizeof (value) );
-    if (ret >= 0) {
-        ret = a2dp_out_set_parameters(stream, kvpairs);
-        goto exit;
-    }
-    ret = str_parms_get_str (parms, "closing", value, sizeof (value) );
-    if (ret >= 0) {
-        ret = a2dp_out_set_parameters(stream, kvpairs);
-        goto exit;
-    }*/
+
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         ret = str_parms_get_str(parms, "ms12_runtime", value, sizeof(value));
         if (ret >= 0) {
@@ -7366,7 +7378,7 @@ hwsync_rewrite:
                         uint32_t latency = out_get_latency(stream);
                         int tunning_latency = aml_audio_get_nonms12_tunnel_latency(stream) / 48;
                         int latency_pts = (latency + tunning_latency) * 90; // latency ms-->pts
-                        ALOGD("%s latency:%u, tunning_latency:%d", __func__, latency, tunning_latency);
+                        ALOGV("%s latency:%u, tunning_latency:%d", __func__, latency, tunning_latency);
                         // check PTS discontinue, which may happen when audio track switching
                         // discontinue means PTS calculated based on first_apts and frame_write_sum
                         // does not match the timestamp of next audio samples
@@ -7382,16 +7394,11 @@ hwsync_rewrite:
                         }
                     }
 
-                    uint32_t pcr = 0;
-                    int pcr_pts_gap = 0;
-                    ret = aml_hwsync_get_tsync_pts(aml_out->hwsync, &pcr);
+                    int64_t timeus = 0;
+                    mediasync_wrap_getRealTimeFor(aml_out->hwsync->mediasync, (apts32/90)*1000/*us*/, &timeus);
                     aml_hwsync_reset_tsync_pcrscr(aml_out->hwsync, apts32);
-                    pcr_pts_gap = ((int)(apts32 - pcr)) / 90;
-                    if (abs(pcr_pts_gap) > 50) {
-                        ALOGI("%s pcr =%u pts =%d,  diff =%d ms", __func__, pcr/90, apts32/90, pcr_pts_gap);
-                    }
+                    ALOGV("%s pts=%u ms, RealTimeus=%lld us", __func__, (apts32/90), timeus);
                 } else {
-
                     if (hw_sync->first_apts_flag == false) {
                         aml_audio_hwsync_set_first_pts(aml_out->hwsync, cur_pts);
                     } else {
@@ -7458,7 +7465,6 @@ hwsync_rewrite:
                             av_sync_audio_render(aml_out->msync_session, apts32, &policy);
                             /* TODO: for non-amaster mode, handle sync policy on audio side */
                         }
-
                     }
                 }
             }
