@@ -103,7 +103,6 @@ static void dump_ad_input_data(void *buffer, int size, char *file_name)
 
 static void audio_adcallback(const unsigned char * data, int len, void * handle)
 {
-    UNUSED(handle);
     //ALOGI("ASSOC %s,len =%d,data:%02x %02x %02x %02x %02x %02x %02x %02x %02x", __FUNCTION__, len, data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
     //pthread_mutex_lock(&assoc_mutex);
     dtv_assoc_audio *param = get_assoc_audio();

@@ -25,19 +25,25 @@ TARGET_OBJS= utils/tsp_utils.o \
     audio_data_read/dmx_audio_es.o \
     audio_data_read/uio_audio_read.o \
     audio_data_read/audio_dtv_ad.o \
-    sync/audio_dtv_sync.o
+    sync/audio_dtv_sync.o \
+    avutils/amthreadpool.o \
+    avutils/itemlist.o \
+    avutils/amsysfsutils.o \
+    avutils/amconfigutils.o
 
 TARGET=libdvbaudioutils.so
 
 INSTALL_DIR=${LIB_DIR}
 
-CFLAGS += -shared -lamavutils -lpthread -lm -lrt -llog -lcutils -DBUILD_LINUX
+CFLAGS += -shared -lpthread -lm -lrt -llog -lcutils -DBUILD_LINUX
 
 TOPDIR=$(shell pwd)
 SRC?=$(TOPDIR)
 
 CFLAGS+=-O2 -fPIC -g
-CFLAGS+=-I$(SRC)/dmxwrap -I$(SRC)/include -I$(SRC)/utils -I$(SRC)/../utils/include -I$(SRC)/../include -I$(SRC)/../../libplayer/src/amavutils/include -I$(SRC)/../../../vendor/amlogic/dvb/include/am_adp -I$(SRC)/dmxwrap/HwDemux -I$(SRC)/dmxwrap/MultiHwDemux -I$(SRC)/audio_read_api -I$(SRC)/sync -I$(SRC)/../amadec/include  -I$(SRC)/../amadec
+CFLAGS+=-I$(SRC)/dmxwrap -I$(SRC)/include -I$(SRC)/utils -I$(SRC)/../utils/include -I$(SRC)/../include \
+	-I$(SRC)/dmxwrap/HwDemux -I$(SRC)/dmxwrap/MultiHwDemux -I$(SRC)/audio_read_api \
+	-I$(SRC)/sync -I$(SRC)/../amadec/include  -I$(SRC)/../amadec -I$(SRC)/avutils
 CFLAGS+=-I$(SRC)/../include/basic_utils
 
 %.o:%.c $(DEPS)

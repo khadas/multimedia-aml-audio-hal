@@ -2795,12 +2795,14 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
         }
     }
 
+#ifdef USE_EQ_DRC
     /*noise gate is only used in Linein for 16bit audio data*/
     if (adev->active_inport == INPORT_LINEIN && adev->aml_ng_enable == 1) {
         int ng_status = noise_evaluation(adev->aml_ng_handle, buffer, bytes >> 1);
         /*if (ng_status == NG_MUTE)
             ALOGI("noise gate is working!");*/
     }
+#endif
 //#ifdef ENABLE_AEC_HAL
 #ifndef BUILD_LINUX
     if (in->device & AUDIO_DEVICE_IN_BUILTIN_MIC) {
@@ -9252,6 +9254,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                  }
 #endif
             }
+#ifdef USE_EQ_DRC
             if (input_src == LINEIN && aml_dev->aml_ng_enable) {
                 aml_dev->aml_ng_handle = init_noise_gate(aml_dev->aml_ng_level,
                                          aml_dev->aml_ng_attack_time, aml_dev->aml_ng_release_time);
@@ -9259,6 +9262,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                       __func__, aml_dev->aml_ng_level,
                       aml_dev->aml_ng_attack_time, aml_dev->aml_ng_release_time);
             }
+#endif
         } else if (src_config->type == AUDIO_PORT_TYPE_MIX) {  /* 2. mix to device audio patch */
             ALOGI("[%s:%d] mix->device patch: mix - >outport:%s", __func__, __LINE__, outputPort2Str(outport));
             ret = 0;
@@ -9377,8 +9381,10 @@ static int adev_release_audio_patch(struct audio_hw_device *dev,
             release_patch(aml_dev);
             if (aml_dev->patch_src == SRC_LINEIN && aml_dev->aml_ng_handle) {
 #ifdef USE_DTV
+#ifdef USE_EQ_DRC
                 release_noise_gate(aml_dev->aml_ng_handle);
                 aml_dev->aml_ng_handle = NULL;
+#endif
 #endif
             }
         }
@@ -9580,10 +9586,12 @@ static int adev_close(hw_device_t *device)
     if (adev->spdif_output_buf) {
         free(adev->spdif_output_buf);
     }
+    #ifdef USE_EQ_DRC
     if (adev->aml_ng_handle) {
         release_noise_gate(adev->aml_ng_handle);
         adev->aml_ng_handle = NULL;
     }
+    #endif
     ring_buffer_release(&(adev->spk_tuning_rbuf));
     if (adev->ar) {
         audio_route_free(adev->ar);
