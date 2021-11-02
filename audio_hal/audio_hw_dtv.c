@@ -2280,10 +2280,11 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                 if (aml_dev->is_multi_demux) {
                     path_id = dtv_audio_instances->demux_index_working;
                     patch->demux_handle = dtv_audio_instances->demux_handle[path_id];
-                    //if (patch->demux_handle) {
-                    //    Stop_Dmx_Main_Audio(patch->demux_handle);
-                    //    Stop_Dmx_AD_Audio(patch->demux_handle);
-                    //}
+                    if (patch->demux_handle) {
+                        Stop_Dmx_Main_Audio(patch->demux_handle);
+                        if (aml_dev->dual_decoder_support)
+                            Stop_Dmx_AD_Audio(patch->demux_handle);
+                    }
                 } else {
                     dtv_assoc_audio_pause(1);
                 }
