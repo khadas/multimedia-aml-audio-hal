@@ -42,11 +42,10 @@ if(USE_DTV)
     list(APPEND DTV_FILES dtv_audio_utils/audio_data_read/audio_dtv_ad.c)
     list(APPEND DTV_FILES audio_hal/audio_hw_dtv.c)
     list(APPEND DTV_FILES audio_hal/audio_dtv_utils.c)
-    list(APPEND DTV_INC $ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/include/aml_dvb/am_adp)
-    #list(APPEND DTV_LIBS -L$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/lib/aml_libs_nf -lamadec_hal -lam_adp -lasound)
     list(APPEND DTV_LIBS -L./amadec -laudamadec)
-    list(APPEND DTV_LIBS -L$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/lib/aml_libs_nf -lam_adp -lasound)
+    list(APPEND DTV_LIBS -lam_adp -lasound)
     list(APPEND DVB_AUDIO_INC ./dtv_audio_utils/sync)
+    list(APPEND DVB_AUDIO_INC ./dtv_audio_utils/dmxwrap/MultiHwDemux)
     list(APPEND DVB_AUDIO_INC ./amadec/include)
     list(APPEND DVB_AUDIO_LIBS -L./dtv_audio_utils -ldvbaudioutils)
 
@@ -220,7 +219,7 @@ target_include_directories(audio_hal PRIVATE
 target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations -funwind-tables -fasynchronous-unwind-tables -fPIC)
 
 target_link_libraries(audio_hal
-	audioprocessing spdifenc ms12v2 ${PREBUILD_STATIC_LIBS}
+	audioprocessing spdifenc ms12v2
 	-lcutils -lamaudioutils -llog -lexpat -lpthread -ldl -lstdc++ -Wl,-z,defs)
 
 if(USE_EQ_DRC)
@@ -228,6 +227,7 @@ if(USE_EQ_DRC)
 		./include/amlogic_AQ_tools
 		./amlogic_AQ_tools
 		./amlogic_AQ_tools/ini)
+	target_link_libraries(audio_hal ${PREBUILD_STATIC_LIBS})
 	target_compile_options(audio_hal PRIVATE -DAML_EQ_DRC)
 endif()
 
