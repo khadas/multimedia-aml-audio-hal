@@ -1296,6 +1296,10 @@ MAIN_INPUT:
                         ALOGI("%s() continuous %d input ms12 bytes %d input bytes %zu sr %d main size %d parser size %d\n\n",
                               __FUNCTION__, adev->continuous_audio_mode, dolby_ms12_input_bytes, input_bytes, ms12->config_sample_rate, main_frame_size, single_decoder_used_bytes);
                     }
+                    // LINUX change
+                    // Remove rate control for main input
+#ifndef BUILD_LINUX
+                    // rate control when continuous_audio_mode for streaming
                     if (adev->continuous_audio_mode == 1) {
 
                         if (adev->debug_flag) {
@@ -1342,6 +1346,7 @@ MAIN_INPUT:
                         aml_out->main_input_ns += input_ns;
                         audio_virtual_buf_process(aml_out->virtual_buf_handle, input_ns);
                     }
+#endif
 
                     if (is_iec61937_format(stream)) {
                         *use_size = spdif_dec_used_size;
@@ -1980,7 +1985,6 @@ int stereo_pcm_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_i
     } else {
         ms12_output_master(buffer, priv_data, size, output_format, ms12_info);
     }
-
     if (adev->debug_flag > 1) {
         ALOGI("-%s() ret %d", __FUNCTION__, ret);
     }

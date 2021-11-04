@@ -1717,7 +1717,6 @@ static int out_flush_new (struct audio_stream_out *stream)
                 (adev->ms12.dolby_ms12_enable == true) &&
                 (adev->ms12.is_continuous_paused == false) &&
                 (out->write_func == MIXER_MAIN_BUFFER_WRITE)) {
-                int easing_period = 150000;
 
                 ALOGI("flush easing pause");
 
@@ -1733,8 +1732,6 @@ static int out_flush_new (struct audio_stream_out *stream)
                 out->pause_status = true;
                 pthread_mutex_unlock(&out->lock);
                 pthread_mutex_unlock(&adev->lock);
-
-                usleep(easing_period);
             }
 
             aml_audio_hwsync_init(out->hwsync, out);

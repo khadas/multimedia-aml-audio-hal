@@ -111,7 +111,10 @@ int dolby_ms12_main_pause(struct audio_stream_out *stream)
     //2.one loop for schedule_run cost about 32ms(contains the hardware costing),
     //3.if [pause, flush] too short, means it need more time to do audio easing
     //so, the delay time for 32ms(pause is completed after audio easing is done) is enough.
-    aml_audio_sleep(64000);
+    //4.easing was done on decoder, after decoder, the output is OAR buffer to mix input,
+    //to make sure all data has been into mixer, need wait to OAR buffer (64ms) was done
+    //so, the delay need up to 96ms, from start to done, put 120ms here.
+    aml_audio_sleep(120000);
 
     if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_PAUSED) {
         //ALOGI(" %s  delay 150ms", __func__);
@@ -120,7 +123,7 @@ int dolby_ms12_main_pause(struct audio_stream_out *stream)
         aml_out->tsync_status = TSYNC_STATUS_PAUSED;
     }
 
-    ALOGI("%s  sleep 64ms finished and exit", __func__);
+    ALOGI("%s  sleep 120ms finished and exit", __func__);
     return 0;
 }
 
