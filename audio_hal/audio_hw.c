@@ -8057,14 +8057,14 @@ ssize_t mixer_app_buffer_write(struct audio_stream_out *stream, const void *buff
        }
        retry--;
        if (bytes_remaining) {
-           aml_audio_sleep(1000);
+           aml_audio_sleep(3000);
        }
    }
    if (retry <= 10) {
        ALOGE("[%s:%d] write retry=%d ", __func__, __LINE__, retry);
    }
    if (retry == 0 && bytes_remaining != 0) {
-       ALOGE("[%s:%d] write timeout 10 ms ", __func__, __LINE__);
+       ALOGE("[%s:%d] write timeout 60 ms ", __func__, __LINE__);
        bytes -= bytes_remaining;
    }
 
@@ -8213,11 +8213,11 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
         if (aml_out->is_normal_pcm) {
             aml_out->write = mixer_aux_buffer_write;
             aml_out->write_func = MIXER_AUX_BUFFER_WRITE;
-        #ifndef BUILD_LINUX
+
         } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             aml_out->write = mixer_app_buffer_write;
             aml_out->write_func = MIXER_APP_BUFFER_WRITE;
-        #endif
+
         } else {
             aml_out->write = mixer_main_buffer_write;
             aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
