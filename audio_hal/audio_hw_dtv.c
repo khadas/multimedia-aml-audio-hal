@@ -74,7 +74,6 @@
 #define DTV_SKIPAMADEC "Dtv_Audio_Skipamadec"
 #define DTV_SYNCENABLE "Dtv_Audio_Syncenable"
 
-
 static struct timespec start_time;
 const unsigned int mute_dd_frame[] = {
     0x5d9c770b, 0xf0432014, 0xf3010713, 0x2020dc62, 0x4842020, 0x57100404, 0xf97c3e1f, 0x9fcfe7f3, 0xf3f97c3e, 0x3e9fcfe7, 0xe7f3f97c, 0x7c3e9fcf, 0xcfe7f3f9, 0xfb7c3e9f, 0xf97c75fe, 0x9fcfe7f3,
@@ -263,7 +262,7 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
     int audio_sync_mode = 0;
     aml_dtv_audio_instances_t *dtv_audio_instances =  (aml_dtv_audio_instances_t *)adev->aml_dtv_audio_instances;
     unsigned int path_id = val >> DVB_DEMUX_ID_BASE;
-    ALOGI("%s path_id %d cmd %d val %d\n",__FUNCTION__,path_id, cmd,val & ((1 << DVB_DEMUX_ID_BASE) - 1));
+    ALOGI("%s %p path_id %d cmd %d val %d\n",__FUNCTION__,patch,path_id, cmd,val & ((1 << DVB_DEMUX_ID_BASE) - 1));
     if (path_id < 0  ||  path_id >= DVB_DEMUX_SUPPORT_MAX_NUM) {
         ALOGI("path_id %d  is invalid ! ",path_id);
         goto exit;
@@ -381,7 +380,9 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                     if (demux_info->dual_decoder_support)
                         Init_Dmx_AD_Audio(demux_handle, demux_info->ad_fmt, demux_info->ad_pid);
                     if (dtvsync->mediasync_new == NULL) {
-                        dtvsync->mediasync_new = aml_dtvsync_create();
+                        if (patch->skip_amadec_flag) {
+                            dtvsync->mediasync_new = aml_dtvsync_create();
+                        }
                         if (dtvsync->mediasync_new == NULL)
                             ALOGI("mediasync create failed\n");
                         else {
