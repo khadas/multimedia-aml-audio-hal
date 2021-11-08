@@ -2398,10 +2398,6 @@ int dolby_ms12_main_flush(struct audio_stream_out *stream) {
     adev->ms12.main_input_start_offset_ns = 0;
     aml_out->main_input_ns = 0;
 
-    if (aml_out->hal_internal_format == AUDIO_FORMAT_AC4) {
-        ms12->master_pcm_frames = 0;
-    }
-
     dolby_ms12_flush_main_input_buffer();
 
     if (ms12->spdif_dec_handle) {
