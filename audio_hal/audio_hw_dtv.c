@@ -73,6 +73,7 @@
 
 #define DTV_SKIPAMADEC "Dtv_Audio_Skipamadec"
 #define DTV_SYNCENABLE "Dtv_Audio_Syncenable"
+#define DTV_ADSWITCH_PROPERTY   "vendor.media.audiohal.adswitch"
 
 static struct timespec start_time;
 const unsigned int mute_dd_frame[] = {
@@ -325,6 +326,9 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
             pthread_mutex_lock(&adev->lock);
             if (val == 0) {
                 dtv_assoc_audio_cache(-1);
+            }
+            if (getprop_bool(DTV_ADSWITCH_PROPERTY)) {
+                adev->ad_switch_enable = 1;
             }
             if (adev->ad_switch_enable)
                 adev->associate_audio_mixing_enable = val;
