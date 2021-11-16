@@ -71,6 +71,7 @@
 #include "aml_dts_dec_api.h"
 #include "audio_dtv_utils.h"
 
+
 #define DTV_SKIPAMADEC "vendor.dtv.audio.skipamadec"
 #define DTV_SYNCENABLE "vendor.media.dtvsync.enable"
 #define DTV_ADSWITCH_PROPERTY   "vendor.media.audiohal.adswitch"
@@ -381,8 +382,19 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                     ALOGI("path_id %d demux_hanle %p ",path_id, demux_handle);
                     dtv_audio_instances->demux_handle[path_id] = demux_handle;
                     Init_Dmx_Main_Audio(demux_handle, demux_info->main_fmt, demux_info->main_pid);
-                    if (demux_info->dual_decoder_support)
-                        Init_Dmx_AD_Audio(demux_handle, demux_info->ad_fmt, demux_info->ad_pid);
+                    if (demux_info->dual_decoder_support) {
+                        if (property_get_bool("vendor.media.dtv.pesmode",false)) {
+                            if ((VALID_AD_FMT_UK(demux_info->ad_fmt)) && (patch->skip_amadec_flag)) {
+                                Init_Dmx_AD_Audio(demux_handle, demux_info->ad_fmt, demux_info->ad_pid, 1);
+                            }
+                            else {
+                                Init_Dmx_AD_Audio(demux_handle, demux_info->ad_fmt, demux_info->ad_pid, 0);
+                            }
+                        }
+                        else {
+                            Init_Dmx_AD_Audio(demux_handle, demux_info->ad_fmt, demux_info->ad_pid, 0);
+                        }
+                    }
                     if (dtvsync->mediasync_new == NULL) {
                         if (patch->skip_amadec_flag) {
                             dtvsync->mediasync_new = aml_dtvsync_create();
@@ -2880,6 +2892,8 @@ void *audio_dtv_patch_input_threadloop(void *data)
                                 } else {
                                     dtv_pacakge->ad_size = mAdEsData->size;
                                     dtv_pacakge->ad_data = (char *)mAdEsData->data;
+                                    demux_info->ad_pan  = mAdEsData->adpan;
+                                    demux_info->ad_fade = mAdEsData->adfade;
                                     aml_audio_free(mAdEsData);
                                     mAdEsData = NULL;
                                 }
@@ -3177,6 +3191,16 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
            aml_out->dec_config.ad_mixing_enable = demux_info->associate_audio_mixing_enable;
            aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_MIXING_ENABLE, &aml_out->dec_config);
         }
+
+        if (demux_info->ad_fade != aml_out->dec_config.ad_fade) {
+            aml_out->dec_config.ad_fade = demux_info->ad_fade;
+            aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_FADE, &aml_out->dec_config);
+        }
+        if (demux_info->ad_pan != aml_out->dec_config.ad_pan) {
+            aml_out->dec_config.ad_pan = demux_info->ad_pan;
+            aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_PAN, &aml_out->dec_config);
+        }
+
         if (aml_dev->advol_level != aml_out->dec_config.advol_level) {
            aml_out->dec_config.advol_level = aml_dev->advol_level;
            aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_AD_VOL, &aml_out->dec_config);
@@ -3688,6 +3712,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
             goto err_in_thread;
         }
     } else {
+        aml_dev->dual_decoder_support = 0;
         ret = pthread_create(&(patch->audio_cmd_process_threadID), NULL,
                              audio_dtv_patch_process_threadloop, patch);
         if (ret != 0) {

@@ -75,6 +75,119 @@ void apply_volume(float volume, void *buf, int sample_size, int bytes)
     return;
 }
 
+const float msmix_pes_pan_LEFT_RGHT[43] = {
+  (0.5000000000f),
+  (0.4996503524f),
+  (0.4986018986f),
+  (0.4968561049f),
+  (0.4944154131f),
+  (0.4912832366f),
+  (0.4874639561f),
+  (0.4829629131f),
+  (0.4777864029f),
+  (0.4719416652f),
+  (0.4654368743f),
+  (0.4582811279f),
+  (0.4504844340f),
+  (0.4420576968f),
+  (0.4330127019f),
+  (0.4233620996f),
+  (0.4131193872f),
+  (0.4022988899f),
+  (0.3909157412f),
+  (0.3789858616f),
+  (0.3665259359f),
+  (0.3535533906f),
+  (0.3400863689f),
+  (0.3261437056f),
+  (0.3117449009f),
+  (0.2969100928f),
+  (0.2816600290f),
+  (0.2660160383f),
+  (0.2500000000f),
+  (0.2336343141f),
+  (0.2169418696f),
+  (0.1999460122f),
+  (0.1826705122f),
+  (0.1651395310f),
+  (0.1473775872f),
+  (0.1294095226f),
+  (0.1112604670f),
+  (0.0929558036f),
+  (0.0745211331f),
+  (0.0559822381f),
+  (0.0373650468f),
+  (0.0186955971f),
+  (0.0000000000f)
+};
+
+
+void get_left_right_volume(unsigned char panByte,float* leftvolume,float* rightvolume)
+{
+    #define PAN_ONE    1.0f
+    #define PAN_ZERO   (0)     /**< Factor when no panning is applied. */
+    #define PAN_M3DB   0.707106769f /**< 3dB <=> 1/sqrt(2) */
+    *leftvolume  = PAN_M3DB;
+    *rightvolume = PAN_M3DB;
+    if ((panByte>0) && (panByte <= 0xff))
+    {
+     if ((panByte < 21)) {
+         * leftvolume = (msmix_pes_pan_LEFT_RGHT[42-(21-panByte)]);
+         * rightvolume = (msmix_pes_pan_LEFT_RGHT[21-panByte]);
+     } else if ((panByte >= 21) && (panByte <= 127)) {
+         * rightvolume = PAN_ONE;
+     } else if ((panByte >= 128) && (panByte <= 234)) {
+         * leftvolume = PAN_ONE;
+     } else if ((panByte >= 235) && (panByte <= 255)) {
+         * leftvolume = (msmix_pes_pan_LEFT_RGHT[panByte-235]);
+         * rightvolume = (msmix_pes_pan_LEFT_RGHT[42-(panByte-235)]);
+     }
+    }
+}
+
+void apply_volume_pan(unsigned char panByte, void *buf, int sample_size, int bytes)
+{
+    int16_t *input16 = (int16_t *)buf;
+    int32_t *input32 = (int32_t *)buf;
+    unsigned int i = 0;
+    float leftvolume;
+    float rightvolume;
+    if ((panByte <= 0)|| (panByte > 0xFF))
+    {
+        return ;
+    }
+    get_left_right_volume(panByte,&leftvolume,&rightvolume);
+    if (sample_size == 2) {
+        for (i = 0; i < bytes / sizeof(int16_t); i++) {
+            int32_t samp = (int32_t)(input16[i]);
+            if (0 == i%2)
+            {
+                input16[i] = clamp16((int32_t)(leftvolume * samp));
+            }
+            else
+            {
+                input16[i] = clamp16((int32_t)(rightvolume * samp));
+            }
+        }
+    } else if (sample_size == 4) {
+        for (i = 0; i < bytes / sizeof(int32_t); i++) {
+            int64_t samp = (int64_t)(input32[i]);
+            if (0 == i%2)
+            {
+                input32[i] = clamp32((int64_t)(leftvolume * samp));
+            }
+            else
+            {
+                input32[i] = clamp32((int64_t)(rightvolume * samp));
+            }
+        }
+    } else {
+        ALOGE("%s, unsupported audio format: %d!\n", __FUNCTION__, sample_size);
+    }
+    return;
+}
+
+
 void apply_volume_16to32(float volume, int16_t *in_buf, int32_t *out_buf, int bytes)
 {
     int16_t *input16 = (int16_t *)in_buf;

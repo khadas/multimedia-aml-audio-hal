@@ -73,6 +73,8 @@ struct aac_dec_t {
     char ad_remain_data[AAC_REMAIN_BUFFER_SIZE];
     int ad_need_cache_frames;
     int ad_remain_size;
+    unsigned char ad_fade;
+    unsigned char ad_pan;
 };
 
 static  int unload_faad_decoder_lib(struct aac_dec_t *aac_dec)
@@ -239,7 +241,8 @@ static int faad_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t * dec_confi
     aac_dec->ad_mixing_enable = dec_config->ad_mixing_enable;
     aac_dec->mixer_level = dec_config->mixer_level;
     aac_dec->advol_level = dec_config->advol_level;
-
+    aac_dec->ad_fade = dec_config->ad_fade;
+    aac_dec->ad_pan = dec_config->ad_pan;
     ALOGI("aac_dec->ad_decoder_supported %d",aac_dec->ad_decoder_supported);
     aac_dec->remain_size = 0;
     memset(aac_dec->remain_data , 0 , AAC_REMAIN_BUFFER_SIZE * sizeof(char ));
@@ -470,10 +473,20 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
             data_cfg.format = AUDIO_FORMAT_PCM_16_BIT;
             data_cfg.sampleRate = pAudioInfo.samplerate;
 
-            float mixing_coefficient = 1.0f - (float)(aac_dec->mixer_level  + 32 ) / 64;
-            float ad_mixing_coefficient = (aac_dec->advol_level * 1.0f / 100 ) * (float)(aac_dec->mixer_level  + 32 ) / 64;
-            ALOGV("mixing_coefficient %f ad_mixing_coefficient %f",mixing_coefficient, ad_mixing_coefficient);
-            apply_volume(mixing_coefficient, dec_pcm_data->buf, sizeof(uint16_t), dec_pcm_data->data_len);
+            float mixing_coefficient = 0.5f;
+            float ad_mixing_coefficient = 0.5f;
+            if (property_get_bool("vendor.media.dtv.pesmode",false)) {
+                apply_volume_pan(aac_dec->ad_pan, dec_pcm_data->buf, sizeof(uint16_t), dec_pcm_data->data_len);
+                aml_decoder_calc_coefficient(aac_dec->ad_fade,&mixing_coefficient,&ad_mixing_coefficient);
+                apply_volume(mixing_coefficient, dec_pcm_data->buf, sizeof(uint16_t), dec_pcm_data->data_len);
+                ALOGI("mixing_coefficient %f ad_mixing_coefficient %f",mixing_coefficient, ad_mixing_coefficient);
+            }
+            else {
+                mixing_coefficient = 1.0f - (float)(aac_dec->mixer_level  + 32 ) / 64;
+                ad_mixing_coefficient = (aac_dec->advol_level * 1.0f / 100 ) * (float)(aac_dec->mixer_level  + 32 ) / 64;
+                apply_volume(mixing_coefficient, dec_pcm_data->buf, sizeof(uint16_t), dec_pcm_data->data_len);
+                ALOGV("mixing_coefficient %f ad_mixing_coefficient %f",mixing_coefficient, ad_mixing_coefficient);
+            }
             apply_volume(ad_mixing_coefficient, ad_dec_pcm_data->buf, sizeof(uint16_t), ad_dec_pcm_data->data_len);
 
             frames_written = do_mixing_2ch(dec_pcm_data->buf, ad_dec_pcm_data->buf ,
@@ -546,7 +559,16 @@ int faad_decoder_config(aml_dec_t * aml_dec, aml_dec_config_type_t config_type, 
         ALOGI("dec_config->advol_level %d",dec_config->advol_level);
         break;
     }
-
+    case AML_DEC_CONFIG_FADE: {
+        aac_dec->ad_fade = dec_config->ad_fade;
+        ALOGI("dec_config->ad_fade %d",dec_config->ad_fade);
+        break;
+    }
+    case AML_DEC_CONFIG_PAN: {
+        aac_dec->ad_pan = dec_config->ad_pan;
+        ALOGI("dec_config->ad_pan %d",dec_config->ad_pan);
+        break;
+    }
     default:
         break;
     }

@@ -5,6 +5,9 @@
     (fmt == ACODEC_FMT_MPEG) || (fmt == ACODEC_FMT_MPEG1) || \
     (fmt == ACODEC_FMT_MPEG2) || (fmt == ACODEC_FMT_AAC) || (fmt == ACODEC_FMT_AAC_LATM))
 
+#define VALID_AD_FMT_UK(fmt)  ((fmt == ACODEC_FMT_MPEG) || (fmt == ACODEC_FMT_MPEG1) || \
+    (fmt == ACODEC_FMT_MPEG2) || (fmt == ACODEC_FMT_AAC) || (fmt == ACODEC_FMT_AAC_LATM))
+
 #define  DVB_DEMUX_ID_BASE 20
 #define DVB_DEMUX_SUPPORT_MAX_NUM 6
 
@@ -37,6 +40,8 @@ typedef struct aml_demux__audiopara {
     struct mAudioEsDataInfo *mEsData;
     struct mAudioEsDataInfo *mADEsData;
     struct package *dtv_pacakge;
+    uint8_t ad_fade;
+    uint8_t ad_pan;
 } aml_demux_audiopara_t;
 
 
@@ -90,13 +95,15 @@ struct mAudioEsDataInfo {
     int size;
     int64_t pts;
     int used_size;
+    uint8_t adfade;
+    uint8_t adpan;
 };
 AM_Dmx_Audio_ErrorCode_t Open_Dmx_Audio (void **demux_handle, int  demux_id, int security_mem_level);
 AM_Dmx_Audio_ErrorCode_t Init_Dmx_Main_Audio(void *demux_handle, int fmt, int pid);
 AM_Dmx_Audio_ErrorCode_t Stop_Dmx_Main_Audio(void *demux_handle);
 AM_Dmx_Audio_ErrorCode_t Start_Dmx_Main_Audio(void *demux_handle);
 AM_Dmx_Audio_ErrorCode_t Destroy_Dmx_Main_Audio(void *demux_handle);
-AM_Dmx_Audio_ErrorCode_t Init_Dmx_AD_Audio(void *demux_handle, int fmt, int pid);
+AM_Dmx_Audio_ErrorCode_t Init_Dmx_AD_Audio(void *demux_handle, int fmt, int pid, int pesmode);
 AM_Dmx_Audio_ErrorCode_t Stop_Dmx_AD_Audio(void *demux_handle);
 AM_Dmx_Audio_ErrorCode_t Start_Dmx_AD_Audio(void *demux_handle);
 AM_Dmx_Audio_ErrorCode_t Destroy_Dmx_AD_Audio(void *demux_handle);

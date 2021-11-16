@@ -66,7 +66,7 @@ static void getAudioEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, const 
         mEsData->pts = es_header->pts;
         mDemuxWrapper->last_queue_es_apts = es_header->pts;
         mEsData->used_size = 0;
-        ALOGV("getAudioEsData %d mEsData->size %d mEsData->pts %lld",len,mEsData->size,mEsData->pts);
+        ALOGV("\ngetAudioEsData %d mEsData->size %d mEsData->pts %lld\n", len, mEsData->size, mEsData->pts);
         dump_demux_data((void *)data_es, es_header->len, DEMUX_AUDIO_DUMP_PATH);
     } else {
         ALOGI("error es data len %d es_header->len %d",len, es_header->len);
@@ -91,28 +91,49 @@ static void getAudioADEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, cons
 //(void)data;
 //(void)len;
 (void)user_data;
-
-    mEsDataInfo* mEsData = new mEsDataInfo;
-    dmx_non_sec_es_header *es_header = (struct dmx_non_sec_es_header *)(data);
-    if ( len == (es_header->len + sizeof(struct dmx_non_sec_es_header))) {
-        const unsigned char *data_es  = data + sizeof(struct dmx_non_sec_es_header);
-        mEsData->data = (uint8_t*)malloc(es_header->len);
-        memcpy(mEsData->data, data_es, es_header->len);
-        mEsData->size = es_header->len;
-        mEsData->pts = es_header->pts;
-        mEsData->used_size = 0;
-        ALOGV("getAudioADEsData %d mEsData->size %d mEsData->pts %lld",len,mEsData->size,mEsData->pts);
-        dump_demux_data((void *)data_es, es_header->len, DEMUX_AD_AUDIO_DUMP_PATH);
-    } else {
-        ALOGI("error es data len %d es_header->len %d",len, es_header->len);
-        delete mEsData;
-        mEsData = NULL;
-        return;
-    }
-
+    if (0 == mDemuxWrapper->adpesmode)
     {
-        TSPMutex::Autolock l(mDemuxWrapper->mAudioADEsDataQueueLock);
-        mDemuxWrapper->queueEsData(mDemuxWrapper->mAudioADEsDataQueue,mEsData);
+        mEsDataInfo* mEsData = new mEsDataInfo;
+        dmx_non_sec_es_header *es_header = (struct dmx_non_sec_es_header *)(data);
+        if ( len == (es_header->len + sizeof(struct dmx_non_sec_es_header))) {
+            const unsigned char *data_es  = data + sizeof(struct dmx_non_sec_es_header);
+            mEsData->data = (uint8_t*)malloc(es_header->len);
+            memcpy(mEsData->data, data_es, es_header->len);
+            mEsData->size = es_header->len;
+            mEsData->pts = es_header->pts;
+            mEsData->used_size = 0;
+            ALOGV("getAudioADEsData %d mEsData->size %d mEsData->pts %lld",len,mEsData->size,mEsData->pts);
+            dump_demux_data((void *)data_es, es_header->len, DEMUX_AD_AUDIO_DUMP_PATH);
+        }
+        else {
+            ALOGI("error es data len %d es_header->len %d",len, es_header->len);
+            delete mEsData;
+            mEsData = NULL;
+            return;
+        }
+        {
+            TSPMutex::Autolock l(mDemuxWrapper->mAudioADEsDataQueueLock);
+            mDemuxWrapper->queueEsData(mDemuxWrapper->mAudioADEsDataQueue,mEsData);
+        }
+    }
+    else
+    {
+        //AM_AD_Data_t *ad = (AM_AD_Data_t *)user_data;
+        //AM_ErrorCode_t ret=AM_PES_Decode((mDemuxWrapper->peshandle), (uint8_t *)data, len);
+        ST_Aduserdata *paddata=(ST_Aduserdata *)user_data;
+        mEsDataInfo* mEsData = new mEsDataInfo;
+        mEsData->data = (uint8_t*)malloc(len);
+        memcpy(mEsData->data, data, len);
+        mEsData->size = len;
+        mEsData->pts = paddata->adpts;
+        mEsData->used_size = 0;
+        mEsData->adfade= paddata->fade;
+        mEsData->adpan= paddata->pan;
+        ALOGV("\ngetADAudioEsData %d mEsData->size %d mEsData->pts %lld\n",len,mEsData->size,mEsData->pts);
+        {
+            TSPMutex::Autolock l(mDemuxWrapper->mAudioADEsDataQueueLock);
+            mDemuxWrapper->queueEsData(mDemuxWrapper->mAudioADEsDataQueue,mEsData);
+        }
     }
 
 }
@@ -220,7 +241,8 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperPause(void) {
 AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperResume(void) {
     return AM_Dmx_SUCCESS;
 }
-AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetADAudioParam(int aid, AM_AV_AFormat_t afmt ) {
+
+AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetADAudioParam(int aid, AM_AV_AFormat_t afmt, int pesmode ) {
 
    if (AmDmxDevice == NULL )  {
        ALOGE("AmDmxDevice is NULL");
@@ -257,11 +279,19 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetADAudioParam(int aid, 
           break;
     }
     aparam.pid = aid;
-    aparam.pes_type = DMX_PES_AUDIO0;
-    //aparam.pes_type = DMX_PES_VIDEO0;
     aparam.input = DMX_IN_FRONTEND;
     aparam.output = DMX_OUT_TAP;
-    aparam.flags |= DMX_ES_OUTPUT;
+    if (pesmode)
+    {
+        aparam.pes_type = DMX_PES_TELETEXT0;
+        this->adpesmode=1;
+    }
+    else
+    {
+        aparam.pes_type = DMX_PES_AUDIO0;
+        aparam.flags |= DMX_ES_OUTPUT;
+        this->adpesmode=0;
+    }
     /*
     if (mDemuxPara.security_mem_level == 10) {
         aparam.flags |= DMX_MEM_SEC_LEVEL1;
@@ -287,8 +317,18 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetADAudioParam(int aid, 
     aparam.flags |= ((aud_format & 0xff) << DMX_AUDIO_FORMAT_BIT);
     //aparam.flags |= DMX_OUTPUT_RAW_MODE;
     AmDmxDevice->AM_DMX_AllocateFilter(&fid_audio);
-    AmDmxDevice->AM_DMX_SetCallback(fid_audio, getAudioADEsData, NULL);
-    AmDmxDevice->AM_DMX_SetBufferSize(fid_audio, 1024 * 1024);
+    if (pesmode)
+    {
+        #define AD_BUF_SIZE (2*768*1024)
+        memset(&(this->ADuserdata),0,sizeof(ST_Aduserdata));
+        AmDmxDevice->AM_DMX_SetCallback(fid_audio, getAudioADEsData, &(this->ADuserdata));
+        AmDmxDevice->AM_DMX_SetBufferSize(fid_audio, AD_BUF_SIZE);
+    }
+    else
+    {
+        AmDmxDevice->AM_DMX_SetCallback(fid_audio, getAudioADEsData, NULL);
+        AmDmxDevice->AM_DMX_SetBufferSize(fid_audio, 1024 * 1024);
+    }
     ALOGI("AM_DMX_SetPesFilter aparam.flags %0x",aparam.flags);
     AmDmxDevice->AM_DMX_SetPesFilter(fid_audio, &aparam);
     mDemuxPara.aud_ad_fd = fid_audio;
@@ -297,12 +337,12 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetADAudioParam(int aid, 
     return AM_Dmx_SUCCESS;
 }
 
-AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperOpenAD(int aid, AM_AV_AFormat_t afmt ) {
+AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperOpenAD(int aid, AM_AV_AFormat_t afmt, int pesmode ) {
    if (AmDmxDevice == NULL )  {
        ALOGE("AmDmxDevice is NULL");
        return AM_Dmx_ERROR;
     }
-    AmDemuxWrapperSetADAudioParam(aid, afmt);
+    AmDemuxWrapperSetADAudioParam(aid, afmt, pesmode);
     return AM_Dmx_SUCCESS;
 }
 

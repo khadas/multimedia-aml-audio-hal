@@ -118,6 +118,8 @@ int aml_decoder_init(aml_dec_t **ppaml_dec, audio_format_t format, aml_dec_confi
     aml_dec_handel->in_frame_pts = 0;
     dec_config->advol_level = 100;
     dec_config->mixer_level = 0;
+    dec_config->ad_fade = 0;
+    dec_config->ad_pan = 0;
     return ret;
 
 ERROR:
@@ -325,4 +327,29 @@ int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int
        return ret;
     }
 
+}
+
+void aml_decoder_calc_coefficient(unsigned char ad_fade,float * mix_coefficient,float * ad_coefficient)
+{
+            #define MAIN_MIXER_VAL (0.8709635900f)
+            #define AD_MIXER_VAL (0.4897788194f)
+            float mixing_coefficient = MAIN_MIXER_VAL;
+            float ad_mixing_coefficient = AD_MIXER_VAL;
+            if (ad_fade == 0)
+            {
+                //mixing_coefficient = 1.0f;
+                //ad_mixing_coefficient = 1.0f;
+            }
+            else if (ad_fade == 0xFF)
+            {
+                mixing_coefficient = 0.0f;
+                ad_mixing_coefficient = 0.0f;
+            }
+            else if ((ad_fade > 0) && (ad_fade < 0xff))
+            {
+                mixing_coefficient = (1.0f-(float)(ad_fade)/256)*MAIN_MIXER_VAL;
+                ad_mixing_coefficient = (1.0f-(float)(ad_fade)/256)*AD_MIXER_VAL;
+            }
+            *mix_coefficient = mixing_coefficient;
+            *ad_coefficient = ad_mixing_coefficient;
 }

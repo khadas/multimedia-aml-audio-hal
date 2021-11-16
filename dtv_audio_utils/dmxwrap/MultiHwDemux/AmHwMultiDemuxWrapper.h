@@ -5,9 +5,16 @@
 #include "List.h"
 #include "RefBase.h"
 #include "AmDemuxWrapper.h"
+
+
 class AM_DMX_Device;
 typedef void (*AM_Audio_AD_DataCb) (const unsigned char * data, int len, void * handle);
-
+typedef struct aduserdata
+{
+   long long adpts;
+   unsigned char fade;
+   unsigned char pan;
+}ST_Aduserdata ;
 class  AmHwMultiDemuxWrapper : public AmDemuxWrapper{
 
 public:
@@ -23,12 +30,12 @@ public:
    virtual  AM_DmxErrorCode_t AmDemuxWrapperPause(void);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperResume(void);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioParam(int aid, AM_AV_AFormat_t afmt);
-   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetADAudioParam(int aid, AM_AV_AFormat_t afmt);
+   virtual  AM_DmxErrorCode_t AmDemuxWrapperSetADAudioParam(int aid, AM_AV_AFormat_t afmt, int pemode);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperSetAudioDescParam(int aid, AM_AV_AFormat_t afmt);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperSetSubtitleParam(int sid, int stype);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperSetVideoParam(int vid, AM_AV_VFormat_t vfmt);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperGetStates (int * value , int statetype);
-   virtual AM_DmxErrorCode_t  AmDemuxWrapperOpenAD(int aid, AM_AV_AFormat_t afmt);
+   virtual AM_DmxErrorCode_t  AmDemuxWrapperOpenAD(int aid, AM_AV_AFormat_t afmt, int pemode);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperStartAD();
    virtual  AM_DmxErrorCode_t AmDemuxWrapperStopAD();
    virtual  AM_DmxErrorCode_t AmDemuxWrapperCloseAD() ;
@@ -53,6 +60,8 @@ public:
    int              filering_aud_pid;
    int              filering_aud_ad_pid;
    int64_t          last_queue_es_apts;
+   ST_Aduserdata     ADuserdata;
+   int              adpesmode;
  private:
    sp<AM_DMX_Device> AmDmxDevice;
    // int mEsDataInfoSize;

@@ -18,7 +18,6 @@ struct mAudioEsDataInfo {
     int size;
     int64_t pts;
 };
-
 AM_Dmx_Audio_ErrorCode_t init (int demux_id, int fmt, int pid,int security_mem_level);
 AM_Dmx_Audio_ErrorCode_t get_audio_es_package(struct mAudioEsDataInfo **mEsData);
 AM_Dmx_Audio_ErrorCode_t destroy();
