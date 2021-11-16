@@ -901,7 +901,6 @@ static int do_output_standby (struct aml_stream_out *out)
         }
         out->standby = 1;
         if (out->hw_sync_mode == 1 || adev->hwsync_output == out) {
-            out->pause_status = false;
             adev->hwsync_output = NULL;
             ALOGI ("clear hwsync_output when hwsync standby\n");
         }
