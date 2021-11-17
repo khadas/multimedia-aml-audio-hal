@@ -3447,8 +3447,8 @@ static void *audio_dtv_patch_process_threadloop_v2(void *data)
                     if (dtvsync->mediasync) {
                         aml_dtvsync_setPause(dtvsync, false);
                     }
-                    Start_Dmx_Main_Audio(patch->demux_handle);
-                    Start_Dmx_AD_Audio(patch->demux_handle);
+                   // Start_Dmx_Main_Audio(patch->demux_handle);
+                   // Start_Dmx_AD_Audio(patch->demux_handle);
                 } else {
                     dtv_assoc_audio_resume(1,demux_info->ad_pid);
                 }
