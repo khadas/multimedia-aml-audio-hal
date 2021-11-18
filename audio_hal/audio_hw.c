@@ -2103,6 +2103,8 @@ static unsigned int select_port_by_device(audio_devices_t in_device)
     } else if ((in_device & AUDIO_DEVICE_IN_BACK_MIC) ||
             (in_device & AUDIO_DEVICE_IN_BUILTIN_MIC)) {
         inport = PORT_BUILTINMIC;
+    } else if (in_device & AUDIO_DEVICE_IN_WIRED_HEADSET) {
+        inport = PROT_TDM;
     } else {
         /* fix auge tv input, hdmirx, tunner */
         if (alsa_device_is_auge()
@@ -5245,6 +5247,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
     struct aml_stream_in *in;
     int channel_count = audio_channel_count_from_in_mask(config->channel_mask);
     int ret = 0;
+    enum IN_PORT inport = INPORT_HDMIIN;
 
     ALOGD("%s: enter: devices(%#x) channel_mask(%#x) rate(%d) format(%#x) source(%d)", __func__,
         devices, config->channel_mask, config->sample_rate, config->format, source);
@@ -5269,6 +5272,10 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         config->channel_mask = AUDIO_CHANNEL_IN_FRONT;
     else
         config->channel_mask = AUDIO_CHANNEL_IN_STEREO;
+
+    android_dev_convert_to_hal_dev(devices, (int *)&inport);
+    adev->active_inport = inport;
+    adev->src_gain[inport] = 1.0;
 
     in = (struct aml_stream_in *)aml_audio_calloc(1, sizeof(struct aml_stream_in));
     if (!in) {
