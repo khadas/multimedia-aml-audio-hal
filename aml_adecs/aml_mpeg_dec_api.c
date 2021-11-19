@@ -24,8 +24,8 @@
 #include "audio_data_process.h"
 #include "aml_malloc_debug.h"
 
-#define MAD_LIB_PATH "/vendor/lib/libmad.so"
-#define MAD_LIB_PATH1 "/usr/lib/libmad.so"//Linux Platform so is in /usr/lib/
+#define MAD_LIB_PATH "/vendor/lib/libmad-ahal.so"
+#define MAD_LIB_PATH1 "/usr/lib/libmad-ahal.so"//Linux Platform so is in /usr/lib/
 
 #define MAD_MAX_LENGTH (1024 * 64)
 #define MAD_REMAIN_BUFFER_SIZE (4096 * 10)
@@ -104,7 +104,7 @@ static  int load_mad_decoder_lib(struct mad_dec_t *mad_dec)
     if (!mad_dec->pdecoder) {
         mad_dec->pdecoder = dlopen(MAD_LIB_PATH1, RTLD_NOW);
         if (!mad_dec->pdecoder) {
-            ALOGE("%s, failed to open (libfaad.so), %s\n", __FUNCTION__, dlerror());
+            ALOGE("%s, failed to open (libmad-ahal.so), %s\n", __FUNCTION__, dlerror());
             return -1;
         }
     }

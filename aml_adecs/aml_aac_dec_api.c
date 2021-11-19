@@ -24,8 +24,8 @@
 #include "audio_data_process.h"
 #include "aml_malloc_debug.h"
 
-#define FAAD_LIB_PATH "/vendor/lib/libfaad.so"
-#define FAAD_LIB_PATH1 "/usr/lib/libfaad.so"//Linux Platform so is in /usr/lib/
+#define FAAD_LIB_PATH "/vendor/lib/libfaad-ahal.so"
+#define FAAD_LIB_PATH1 "/usr/lib/libfaad-ahal.so"//Linux Platform so is in /usr/lib/
 
 #define AAC_MAX_LENGTH (1024 * 64)
 #define AAC_REMAIN_BUFFER_SIZE (4096 * 10)
@@ -109,7 +109,7 @@ static  int load_faad_decoder_lib(struct aac_dec_t *aac_dec)
     if (!aac_dec->pdecoder) {
         aac_dec->pdecoder = dlopen(FAAD_LIB_PATH1, RTLD_NOW);
         if (!aac_dec->pdecoder) {
-            ALOGE("%s, failed to open (libfaad.so), %s\n", __FUNCTION__, dlerror());
+            ALOGE("%s, failed to open (libfaad-ahal.so), %s\n", __FUNCTION__, dlerror());
             return -1;
         }
     }

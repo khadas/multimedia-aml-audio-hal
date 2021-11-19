@@ -22,7 +22,7 @@
 #include "aml_malloc_debug.h"
 
 #define LOG_TAG "aml_audio_vorbis_dec"
-#define VORBIS_LIB_PATH "/usr/lib/libvorbis-aml.so"
+#define VORBIS_LIB_PATH "/usr/lib/libvorbis-ahal.so"
 #define VORBIS_MAX_LENGTH (1024 * 64)
 #define VORBIS_REMAIN_BUFFER_SIZE (4096 * 10)
 //#define LOG_NDEBUG 0
@@ -114,10 +114,10 @@ static int load_vorbis_decoder_lib(vorbis_decoder_t *vorbis_decoder)
 
     vorbis_decoder->pdecoder_lib = dlopen(VORBIS_LIB_PATH, RTLD_NOW);
     if (vorbis_decoder->pdecoder_lib == NULL) {
-        ALOGE("%s[%d]: open decoder (libvorbis-aml.so) failed, dlerror:%s\n", __FUNCTION__, __LINE__, dlerror());
+        ALOGE("%s[%d]: open decoder (libvorbis-ahal.so) failed, dlerror:%s\n", __FUNCTION__, __LINE__, dlerror());
         return -1;
     } else {
-        ALOGI("%s[%d]: open decoder (libvorbis-aml.so) succeed", __FUNCTION__, __LINE__);
+        ALOGI("%s[%d]: open decoder (libvorbis-ahal.so) succeed", __FUNCTION__, __LINE__);
     }
 
     vorbis_operation->init = ad_vorbis_operation->init = (int (*) (void *)) dlsym(vorbis_decoder->pdecoder_lib, "audio_dec_init");
