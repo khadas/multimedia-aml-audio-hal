@@ -48,6 +48,9 @@
 #include <spdifenc_wrap.h>
 #include <aml_android_utils.h>
 #include <aml_alsa_mixer.h>
+#ifndef NO_AUDIO_CAP
+    #include <IpcBuffer/IpcBuffer_c.h>
+#endif
 
 #include "audio_format_parse.h"
 #include "SPDIFEncoderAD.h"
@@ -4658,6 +4661,46 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+#ifndef NO_AUDIO_CAP
+    /*add interface to audio capture*/
+    ret = str_parms_get_str(parms, "cap_buffer", value, sizeof(value));
+    if (ret >= 0) {
+        int size = 0;
+        char *name = strtok(value, ",");
+        ALOGI("cap_buffer %s", value);
+        if (name) {
+            size = atoi(name + strlen(name) + 1);
+            if (size > 0) {
+                pthread_mutex_lock(&adev->cap_buffer_lock);
+                if (adev->cap_buffer) {
+                    IpcBuffer_destroy(adev->cap_buffer);
+                }
+                adev->cap_buffer = IpcBuffer_create(name, size);
+                ALOGI("IpcBuffer_created %p (%s, %d)", adev->cap_buffer, name, size);
+                pthread_mutex_unlock(&adev->cap_buffer_lock);
+                ret = 0;
+                goto exit;
+            } else if (size == 0) {
+                pthread_mutex_lock(&adev->cap_buffer_lock);
+                if (adev->cap_buffer) {
+                    IpcBuffer_destroy(adev->cap_buffer);
+                    adev->cap_buffer = NULL;
+                }
+                pthread_mutex_unlock(&adev->cap_buffer_lock);
+                ret = 0;
+                goto exit;
+            }
+        }
+        ret = -EINVAL;
+        goto exit;
+    }
+    ret = str_parms_get_str(parms, "cap_delay", value, sizeof(value));
+    if (ret >= 0) {
+        adev->cap_delay = atoi(value);
+        ret = 0;
+        goto exit;
+    }
+#endif
     ret = str_parms_get_str(parms, "diaglogue_enhancement", value, sizeof(value));
     if (ret >= 0) {
         adev->ms12.ac4_de = atoi(value);
@@ -6211,7 +6254,19 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     aml_out->tmp_buffer_8ch[8 * i + 7] = 0;
                 }
             }
-
+#ifndef NO_AUDIO_CAP
+                /* 2ch downmix capture for TV platform*/
+                pthread_mutex_lock(&adev->cap_buffer_lock);
+                if (adev->cap_buffer ) {
+#ifndef NO_AUDIO_CAP_MUTE_HDMI
+                     if ((adev->audio_patch) && (adev->patch_src != SRC_DTV)) {
+                        memset(tmp_buffer, 0, out_frames * 4);
+                     }
+#endif
+                   IpcBuffer_write(adev->cap_buffer, (const unsigned char *)buffer, (int) bytes);
+                }
+                pthread_mutex_unlock(&adev->cap_buffer_lock);
+#endif
             *output_buffer = aml_out->tmp_buffer_8ch;
             *output_buffer_bytes = 8 * bytes;
         } else {
@@ -6238,6 +6293,20 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             if (adev->patch_src == SRC_DTV && adev->audio_patch != NULL) {
                 aml_audio_switch_output_mode((int16_t *)buffer, bytes, adev->audio_patch->mode);
             }
+
+#ifndef NO_AUDIO_CAP
+            /* 2ch downmix capture for nonetv platform*/
+            pthread_mutex_lock(&adev->cap_buffer_lock);
+            if (adev->cap_buffer ) {
+#ifndef NO_AUDIO_CAP_MUTE_HDMI
+                     if ((adev->audio_patch) && (adev->patch_src != SRC_DTV)) {
+                        memset(tmp_buffer, 0, out_frames * 4);
+                     }
+#endif
+               IpcBuffer_write(adev->cap_buffer, (const unsigned char *)buffer, (int) bytes);
+            }
+            pthread_mutex_unlock(&adev->cap_buffer_lock);
+#endif
 
             *output_buffer = (void *) buffer;
             *output_buffer_bytes = bytes;
@@ -10202,6 +10271,9 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->debug_flag = aml_audio_get_debug_flag();
     adev->count = 1;
     adev->is_multi_demux = is_multi_demux();
+#ifndef NO_AUDIO_CAP
+    pthread_mutex_init(&adev->cap_buffer_lock, NULL);
+#endif
     memset(&(adev->hdmi_descs), 0, sizeof(struct aml_arc_hdmi_desc));
     ALOGD("%s adev->dolby_lib_type:%d  !adev->is_TV:%d", __func__, adev->dolby_lib_type, !adev->is_TV);
     /* create thread for communication between Audio Hal and MS12 */

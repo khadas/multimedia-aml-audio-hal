@@ -569,6 +569,12 @@ struct aml_audio_device {
     int vol_ease_setting_duration;
     int vol_ease_setting_shape;
     float record_volume_before_mute;//Record the master volume before mute
+#ifndef NO_AUDIO_CAP
+    /* CapTure IpcBuffer */
+    pthread_mutex_t cap_buffer_lock;
+    void *cap_buffer;
+    int cap_delay;
+#endif
     /* -End- */
 };
 
