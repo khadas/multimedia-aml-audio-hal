@@ -163,8 +163,8 @@ AM_Dmx_Audio_ErrorCode_t Get_MainAudio_Es(void *demux_handle,struct mAudioEsData
     if ((*mAudioEsData)->size == 0) {
         return AM_AUDIO_Dmx_ERROR;
     }
-    if (aml_audio_get_debug_flag() > 1)
-        ALOGV("\n mEsdata->pts : %lld size:%d \n",(*mAudioEsData)->pts,(*mAudioEsData)->size);
+    //if (aml_audio_get_debug_flag() > 1)
+    //    ALOGV("\n mEsdata->pts : %lld size:%d \n",(*mAudioEsData)->pts,(*mAudioEsData)->size);
 
     return (AM_Dmx_Audio_ErrorCode_t)ret;
 }

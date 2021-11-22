@@ -217,7 +217,7 @@ AM_ErrorCode_t AmLinuxDvd::dvb_poll(AM_DMX_Device *dev, AM_DMX_FilterMask_t *mas
             fds[cnt].fd     = dmx->fd[i];
             fids[cnt] = i;
             cnt++;
-            ALOGV("dvb_poll %d",cnt);
+            //ALOGV("dvb_poll %d",cnt);
         }
     }
 
@@ -243,7 +243,7 @@ AM_ErrorCode_t AmLinuxDvd::dvb_poll(AM_DMX_Device *dev, AM_DMX_FilterMask_t *mas
         if (fds[i].revents&(POLLIN|POLLERR))
         {
             AM_DMX_FILTER_MASK_SET(mask, fids[i]);
-            ALOGV("fids[i] %d mask %d",fids[i],*mask);
+           // ALOGV("fids[i] %d mask %d",fids[i],*mask);
         }
     }
 
