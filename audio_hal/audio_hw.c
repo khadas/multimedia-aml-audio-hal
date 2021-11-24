@@ -5033,6 +5033,12 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         get_audio_indicator(adev, temp_buf);
         return strdup(temp_buf);
     }
+    else if (strstr(keys, "main_input_underrun")) {
+        if (eDolbyMS12Lib == adev->dolby_lib_type) {
+            sprintf(temp_buf, "main_input_underrun=%d", dolby_ms12_get_main_underrun());
+            return strdup(temp_buf);
+        }
+    }
 #ifdef USE_DTV
      else if (strstr (keys, "hal_param_dtv_latencyms") ) {
         int latancyms = dtv_patch_get_latency(adev);
