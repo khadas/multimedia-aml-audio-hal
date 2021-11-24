@@ -2511,7 +2511,6 @@ bool is_audio_postprocessing_add_dolbyms12_dap(struct aml_audio_device *adev)
     else {
         is_dap_enable =  false;
     }
-
     return is_dap_enable;
 }
 

@@ -46,7 +46,9 @@ static cJSON *aml_createJsonRoot(const char *filename)
         ALOGE("%s filename is NULL\n", __FUNCTION__);
         return NULL;
     }
-    fp = fopen(filename, "r+");
+    /*All files in roku system are read-only, "r+" cannot be used
+    and this json file does not do write operation*/
+    fp = fopen(filename, "r");
     if (fp == NULL) {
         ALOGD("cannot open the default json file %s\n", filename);
         return NULL;
