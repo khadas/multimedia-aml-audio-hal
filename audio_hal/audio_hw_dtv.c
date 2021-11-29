@@ -3670,7 +3670,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     }
 
     /* now  only sc2  can use new dtv path */
-    int dtv_audio_skipamadec = aml_get_jason_int_value(DTV_SKIPAMADEC,0);
+    int dtv_audio_skipamadec = property_get_bool("vendor.dtv.audio.skipamadec", false);
     if (dtv_audio_skipamadec && aml_dev->is_multi_demux) {
         patch->skip_amadec_flag = true;
     } else {
