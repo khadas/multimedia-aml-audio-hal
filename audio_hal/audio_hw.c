@@ -1208,16 +1208,19 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         }
         else {
             bool ret_set_id = false;
-            ALOGI ("[%s]adev->hw_mediasync:%p\n", __FUNCTION__, adev->hw_mediasync);
-            if (adev->hw_mediasync == NULL) {
-                adev->hw_mediasync = aml_hwsync_mediasync_create();
-            }
-            if (adev->hw_mediasync != NULL) {
-                out->hwsync->use_mediasync = true;
-                out->hwsync->mediasync = adev->hw_mediasync;
-                out->hwsync->hwsync_id = hw_sync_id;
-                ret_set_id = aml_audio_hwsync_set_id(out->hwsync, hw_sync_id);
-                out->avsync_type = AVSYNC_TYPE_MEDIASYNC;
+            // 12345678 is tsync,align with tsplayer application.
+            if (hw_sync_id != 12345678) {
+                ALOGI ("[%s]adev->hw_mediasync:%p\n", __FUNCTION__, adev->hw_mediasync);
+                if (adev->hw_mediasync == NULL) {
+                    adev->hw_mediasync = aml_hwsync_mediasync_create();
+                }
+                if (adev->hw_mediasync != NULL) {
+                    out->hwsync->use_mediasync = true;
+                    out->hwsync->mediasync = adev->hw_mediasync;
+                    out->hwsync->hwsync_id = hw_sync_id;
+                    ret_set_id = aml_audio_hwsync_set_id(out->hwsync, hw_sync_id);
+                    out->avsync_type = AVSYNC_TYPE_MEDIASYNC;
+                }
             }
             sync_enable = ((hw_sync_id == 12345678) || ret_set_id) ? 1 : 0;
             if (hw_sync_id == 12345678) {
