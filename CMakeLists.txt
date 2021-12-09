@@ -31,9 +31,9 @@ target_include_directories(spdifenc PRIVATE
 target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations -fPIC)
 
 option(USE_DTV "Compile with DTV option" OFF)
-option(USE_CAP "Support audio capture" ON)
+option(NO_USE_CAP "Don't support audio capture" OFF)
 option(USE_SC2 "Current platform is sc2" OFF)
-option(USE_CAP_MUTE_HDMI "Support audio capture mute for HDMI INPUT" ON)
+option(NO_USE_CAP_MUTE_HDMI "Don't support audio capture mute for HDMI INPUT" OFF)
 option(USE_APP_MIXING "Support appsound mixing" ON)
 option(USE_DIAG_LOG "Support diagnostic logging for RDK" OFF)
 
@@ -59,9 +59,6 @@ endif()
 if(USE_DIAG_LOG)
 add_definitions(-DDIAG_LOG)
 endif()
-
-
-
 option(USE_EQ_DRC "Compile with EQ/DRC" OFF)
 
 if(USE_EQ_DRC)
@@ -168,11 +165,11 @@ add_library(audio_hal SHARED
 )
 
 add_definitions(-DNDEBUG -DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK -DDOLBY_MS12_ENABLE -DMS12_V24_ENABLE -DBUILD_LINUX)
-if(USE_CAP)
-add_definitions(-DAUDIO_CAP)
+if(NO_USE_CAP)
+add_definitions(-DNO_AUDIO_CAP)
 
-if(USE_CAP_MUTE_HDMI)
-	add_definitions(-DAUDIO_CAP_MUTE_HDMI)
+if(NO_USE_CAP_MUTE_HDMI)
+	add_definitions(-DNO_AUDIO_CAP_MUTE_HDMI)
 endif()
 endif()
 

@@ -649,6 +649,11 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             } else {
                 latency_frames = aml_audio_get_ms12_tunnel_latency(stream) + frame_len;
             }
+#ifndef NO_AUDIO_CAP
+            if (adev->cap_buffer) {
+                latency_frames += adev->cap_delay * 48;
+            }
+#endif
             alsa_pcm_delay_frames = out_get_ms12_latency_frames(stream);
             alsa_bitstream_delay_frames = out_get_ms12_bitstream_latency_ms(stream) * 48;
             ms12_pipeline_delay_frames = dolby_ms12_main_pipeline_latency_frames(stream);
