@@ -1240,7 +1240,6 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
             ALOGI("set ms12_out %p hw_sync_mode %d",adev->ms12_out, adev->ms12_out->hw_sync_mode);
         }
 
-
         hw_sync->first_apts_flag = false;
         pthread_mutex_lock (&adev->lock);
         pthread_mutex_lock (&out->lock);
@@ -3305,24 +3304,21 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         memset(out->audioeffect_tmp_buffer, 0, out->config.period_size * 6);
     }
 
-    out->hwsync =  aml_audio_calloc(1, sizeof(audio_hwsync_t));
-    if (!out->hwsync) {
-        ALOGE("%s,malloc hwsync failed", __func__);
-        if (out->tmp_buffer_8ch) {
-            aml_audio_free(out->tmp_buffer_8ch);
-        }
-        if (out->audioeffect_tmp_buffer) {
-            aml_audio_free(out->audioeffect_tmp_buffer);
-        }
-        aml_audio_free(out);
-        return -ENOMEM;
-    }
-    out->hwsync->tsync_fd = -1;
-    // for every stream , init hwsync once. ready to use in hwsync mode ..zzz
-    aml_audio_hwsync_init(out->hwsync, out);
-
     if (out->hw_sync_mode) {
-        //aml_audio_hwsync_init(out->hwsync, out);
+        out->hwsync = aml_audio_calloc(1, sizeof(audio_hwsync_t));
+        if (!out->hwsync) {
+            ALOGE("%s, malloc hwsync failed", __func__);
+            if (out->tmp_buffer_8ch) {
+                aml_audio_free(out->tmp_buffer_8ch);
+            }
+            if (out->audioeffect_tmp_buffer) {
+                aml_audio_free(out->audioeffect_tmp_buffer);
+            }
+            aml_audio_free(out);
+            return -ENOMEM;
+        }
+        out->hwsync->tsync_fd = -1;
+        aml_audio_hwsync_init(out->hwsync, out);
     }
 
     /*if tunnel mode pcm is not 48Khz, resample to 48K*/
@@ -6932,6 +6928,7 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
         if (continous_mode(adev) && ms12->dolby_ms12_enable) {
             is_compatible = is_ms12_output_compatible(stream, adev->sink_format, adev->optical_format);
         }
+
         if (is_compatible) {
             reset_decoder = false;
         }
@@ -6999,6 +6996,7 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
             if (continous_mode(adev) && main1_dummy && !adev->is_netflix) {
                 set_ms12_acmod2ch_lock(&adev->ms12, true);
             }
+
             if (adev->ms12_out != NULL && adev->ms12_out->hwsync) {
                 //aml_audio_hwsync_init(adev->ms12_out->hwsync, adev->ms12_out);
                 adev->ms12_out->hwsync->aout = adev->ms12_out;
@@ -7679,6 +7677,7 @@ hwsync_rewrite:
         }
 #endif
     }
+
     aml_out->input_bytes_size += write_bytes;
     if (patch && (adev->dtslib_bypass_enable || adev->dcvlib_bypass_enable)) {
         int cur_samplerate = audio_parse_get_audio_samplerate(patch->audio_parse_para);
@@ -8208,20 +8207,14 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
         if (aml_out->is_normal_pcm) {
             aml_out->write = mixer_aux_buffer_write;
             aml_out->write_func = MIXER_AUX_BUFFER_WRITE;
-
-            //ALOGE("%s(),2 mixer_aux_buffer_write !", __FUNCTION__);
-            //FIXEME if need config ms12 here if neeeded.
-        //#ifdef ENABLE_MMAP
         #ifndef BUILD_LINUX
         } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             aml_out->write = mixer_app_buffer_write;
             aml_out->write_func = MIXER_APP_BUFFER_WRITE;
-            //ALOGI("[%s:%d], mixer_app_buffer_write !", __func__, __LINE__);
         #endif
         } else {
             aml_out->write = mixer_main_buffer_write;
             aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
-            //ALOGE("%s(),2 mixer_main_buffer_write !", __FUNCTION__);
         }
     }
 
