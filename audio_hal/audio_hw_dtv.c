@@ -71,8 +71,8 @@
 #include "aml_dts_dec_api.h"
 #include "audio_dtv_utils.h"
 
-#define DTV_SKIPAMADEC "Dtv_Audio_Skipamadec"
-#define DTV_SYNCENABLE "Dtv_Audio_Syncenable"
+#define DTV_SKIPAMADEC "vendor.dtv.audio.skipamadec"
+#define DTV_SYNCENABLE "vendor.media.dtvsync.enable"
 #define DTV_ADSWITCH_PROPERTY   "vendor.media.audiohal.adswitch"
 
 static struct timespec start_time;
@@ -1954,7 +1954,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
         goto exit_open;
     }
     aml_out = (struct aml_stream_out *)stream_out;
-    aml_out->dtvsync_enable =  aml_get_jason_int_value(DTV_SYNCENABLE,1);
+    aml_out->dtvsync_enable = property_get_bool(DTV_SYNCENABLE, true);
     ALOGI("++%s live create a output stream success now!!!\n ", __FUNCTION__);
 
     patch->out_buf_size = write_bytes * EAC3_MULTIPLIER;
@@ -3119,7 +3119,7 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
 
     prctl(PR_SET_NAME, (unsigned long)"audio_output_patch");
     aml_out->output_speed = 1.0f;
-    aml_out->dtvsync_enable =  aml_get_jason_int_value(DTV_SYNCENABLE,1);
+    aml_out->dtvsync_enable = property_get_bool(DTV_SYNCENABLE, true);
     ALOGI("output_speed=%f,dtvsync_enable=%d\n", aml_out->output_speed, aml_out->dtvsync_enable);
     while (!patch->output_thread_exit) {
 
@@ -3670,7 +3670,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     }
 
     /* now  only sc2  can use new dtv path */
-    int dtv_audio_skipamadec = property_get_bool("vendor.dtv.audio.skipamadec", false);
+    int dtv_audio_skipamadec = property_get_bool(DTV_SKIPAMADEC, false);
     if (dtv_audio_skipamadec && aml_dev->is_multi_demux) {
         patch->skip_amadec_flag = true;
     } else {
