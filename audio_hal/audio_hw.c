@@ -3904,6 +3904,71 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+    //"digital_output_format=pcm"
+    //"digital_output_format=dd"
+    //"digital_output_format=ddp"
+    //"digital_output_format=auto"
+    //"digital_output_format=bypass", the same as "disable_pcm_mixing"
+    ret = str_parms_get_str(parms, "digital_output_format", value, sizeof(value));
+    if (ret >= 0) {
+        struct aml_arc_hdmi_desc *hdmi_desc = &adev->hdmi_descs;
+        int hdmi_format = PCM;
+        if (strcmp(value, "pcm") == 0) {
+            hdmi_format = PCM;
+            adev->disable_pcm_mixing = 0;
+            ALOGI("digital_output_format is PCM");
+        } else if (strcmp(value, "ddp") == 0) {
+            hdmi_format = DDP;
+            hdmi_desc->ddp_fmt.is_support = true;
+            hdmi_desc->dd_fmt.is_support = true;
+            adev->disable_pcm_mixing = 0;
+            ALOGI("digital_output_format is DDP");
+        } else if (strcmp(value, "dd") == 0) {
+            hdmi_format = DD;
+            adev->disable_pcm_mixing = 0;
+            hdmi_desc->dd_fmt.is_support = true;
+            hdmi_desc->ddp_fmt.is_support = false;
+            ALOGI("digital_output_format is DD");
+        } else if (strcmp(value, "auto") == 0) {
+            hdmi_format = AUTO;
+            adev->disable_pcm_mixing = 0;
+            ALOGI("digital_output_format is AUTO");
+        } else if (strcmp(value, "bypass") == 0) {
+            //make sink caps as MAX for roku
+            hdmi_format = BYPASS;
+            hdmi_desc->ddp_fmt.is_support = true;
+            hdmi_desc->dd_fmt.is_support = true;
+            hdmi_desc->dts_fmt.is_support = true;
+            adev->disable_pcm_mixing = 1;
+            ALOGI("digital_output_format is bypass");
+        } else {
+            ALOGE("unknown kvpairs");
+        }
+
+        if (adev->hdmi_format != hdmi_format)
+            adev->hdmi_format_updated = 1;
+        adev->hdmi_format = hdmi_format;
+        ALOGI ("HDMI format: %d\n", adev->hdmi_format);
+
+        goto exit;
+    }
+
+    //add for roku
+    ret = str_parms_get_str(parms, "sink_atoms_capability", value, sizeof(value));
+    if (ret >= 0) {
+        struct aml_arc_hdmi_desc *hdmi_desc = &adev->hdmi_descs;
+
+        if (strcmp(value, "true") == 0) {
+            hdmi_desc->ddp_fmt.atmos_supported = true;
+            ALOGI("atoms enable");
+        } else {
+            hdmi_desc->ddp_fmt.atmos_supported = false;
+            ALOGI("atmos disable");
+        }
+
+        goto exit;
+    }
+
     ret = str_parms_get_int (parms, "hal_param_spdif_output_enable", &val);
     if (ret >= 0 ) {
         ALOGI ("[%s:%d] set spdif output enable:%d", __func__, __LINE__, val);
@@ -4981,6 +5046,18 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
     } else if (strstr (keys, "hdmi_format") ) {
         sprintf (temp_buf, "hdmi_format=%d", adev->hdmi_format);
         return strdup (temp_buf);
+    } else if (strstr (keys, "digital_output_format") ) {
+        if (adev->hdmi_format == PCM) {
+            return strdup ("digital_output_format=pcm");
+        } else if (adev->hdmi_format == DD) {
+            return strdup ("digital_output_format=dd");
+        } else if (adev->hdmi_format == DDP) {
+            return strdup ("digital_output_format=ddp");
+        } else if (adev->hdmi_format == AUTO) {
+            return strdup ("digital_output_format=auto");
+        } else if (adev->hdmi_format == BYPASS) {
+            return strdup ("digital_output_format=bypass");
+        }
     } else if (strstr (keys, "spdif_format") ) {
         sprintf (temp_buf, "spdif_format=%d", adev->spdif_format);
         return strdup (temp_buf);
@@ -8176,17 +8253,19 @@ ssize_t out_write_new(struct audio_stream_out *stream,
      * call many times open/close to query the hdmi capability, this will affect the
      * sink format
      */
-    if (!aml_out->is_sink_format_prepared && !adev->is_TV) {
+    if (!aml_out->is_sink_format_prepared) {
         get_sink_format(&aml_out->stream);
-        if (is_use_spdifb(aml_out)) {
-            aml_audio_select_spdif_to_hdmi(AML_SPDIF_B_TO_HDMITX);
-            aml_out->restore_hdmitx_selection = true;
-        }
-        aml_out->card = alsa_device_get_card_index();
-        if (adev->sink_format == AUDIO_FORMAT_PCM_16_BIT) {
-            aml_out->device = PORT_I2S;
-        } else {
-            aml_out->device = PORT_SPDIF;
+        if (!adev->is_TV) {
+            if (is_use_spdifb(aml_out)) {
+                aml_audio_select_spdif_to_hdmi(AML_SPDIF_B_TO_HDMITX);
+                aml_out->restore_hdmitx_selection = true;
+            }
+            aml_out->card = alsa_device_get_card_index();
+            if (adev->sink_format == AUDIO_FORMAT_PCM_16_BIT) {
+                aml_out->device = PORT_I2S;
+            } else {
+                aml_out->device = PORT_SPDIF;
+            }
         }
         aml_out->is_sink_format_prepared = true;
     }
@@ -9244,12 +9323,16 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
         } else {
             ALOGI("[%s:%d] one sink, sink:%s", __func__, __LINE__, outputPort2Str(outport));
         }
-        if (outport != OUTPORT_SPDIF) {
-            ret = aml_audio_output_routing(dev, outport, false);
-        }
-        aml_dev->out_device = 0;
-        for (i = 0; i < num_sinks; i++) {
-            aml_dev->out_device |= sink_config[i].ext.device.type;
+
+        /*ingore outport SPEAKER, because LINUX always sets SPEAKER when ARC or HDMI connected*/
+        if (outport != OUTPORT_SPEAKER || aml_dev->active_outport == OUTPORT_MAX) {
+            if (outport != OUTPORT_SPDIF) {
+                ret = aml_audio_output_routing(dev, outport, false);
+            }
+            aml_dev->out_device = 0;
+            for (i = 0; i < num_sinks; i++) {
+                aml_dev->out_device |= sink_config[i].ext.device.type;
+            }
         }
 
         /* 1.device to device audio patch. TODO: unify with the android device type */
