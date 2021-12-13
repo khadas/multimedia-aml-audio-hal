@@ -10010,6 +10010,7 @@ static int adev_remove_device_effect(struct audio_hw_device *dev,
 #define STB_PLATFORM "STB_Platform"
 #define DUAL_SPDIF "Dual_Spdif_Support"
 #define FORCE_DDP "Ms12_Force_Ddp_Out"
+#define AUDIO_DELAY_MAX "Audio_Delay_Max"
 
 static int adev_open(const hw_module_t* module, const char* name, hw_device_t** device)
 {
@@ -10283,7 +10284,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         adev->is_SBR = aml_audio_check_sbr_product();
         ALOGI("%s(), TV platform,soundbar platform %d", __func__,adev->is_SBR);
 #ifdef ADD_AUDIO_DELAY_INTERFACE
-        ret = aml_audio_delay_init();
+        ret = aml_audio_delay_init(aml_get_jason_int_value(AUDIO_DELAY_MAX, 1000));
         if (ret < 0) {
             ALOGE("[%s:%d] aml_audio_delay_init fail", __func__, __LINE__);
             goto err;
@@ -10304,7 +10305,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->is_SBR = aml_audio_check_sbr_product();
     ALOGI("%s(), TV platform,soundbar platform %d", __func__,adev->is_SBR);
 #ifdef ADD_AUDIO_DELAY_INTERFACE
-    ret = aml_audio_delay_init();
+    ret = aml_audio_delay_init(aml_get_jason_int_value(AUDIO_DELAY_MAX, 1000));
     if (ret < 0) {
         ALOGE("[%s:%d] aml_audio_delay_init fail", __func__, __LINE__);
         goto err;

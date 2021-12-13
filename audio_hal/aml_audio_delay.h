@@ -35,7 +35,7 @@ typedef enum AML_AUDIO_DELAY_TYPE{
     AML_DELAY_OUTPORT_BUTT              = 3,
 } aml_audio_delay_type_e;
 
-int aml_audio_delay_init();
+int aml_audio_delay_init(int s32MaxDelayMs);
 int aml_audio_delay_deinit();
 int aml_audio_delay_set_time(aml_audio_delay_type_e enAudioDelayType, int s32DelayTimeMs);
 int aml_audio_delay_clear(aml_audio_delay_type_e enAudioDelayType);

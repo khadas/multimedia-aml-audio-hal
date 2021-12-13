@@ -30,12 +30,13 @@
 
 
 static aml_audio_delay_st g_stAudioOutputDelay[AML_DELAY_OUTPORT_BUTT];
-static const int g_u32OutDelayMaxDefault[AML_DELAY_OUTPORT_BUTT] = {1000, 1000, 1000};
+static int g_u32OutDelayMaxDefault[AML_DELAY_OUTPORT_BUTT] = {1000, 1000, 1000};
 static bool g_bAudioDelayInit = false;
 
-int aml_audio_delay_init()
+int aml_audio_delay_init(int s32MaxDelayMs)
 {
     memset(&g_stAudioOutputDelay, 0, sizeof(aml_audio_delay_st)*AML_DELAY_OUTPORT_BUTT);
+    ALOGI("%s, audio delay: %d", __FUNCTION__, s32MaxDelayMs);
     for (unsigned int i=0; i<AML_DELAY_OUTPORT_BUTT; i++) {
         int s32BfferSize = 0;
         unsigned int u32ChannelCnt = 2;
@@ -43,6 +44,7 @@ int aml_audio_delay_init()
             /*calculate the max size for 8ch */
             u32ChannelCnt = 8;
         }
+        g_u32OutDelayMaxDefault[i] = s32MaxDelayMs;
         s32BfferSize = 192 * u32ChannelCnt * 4 * g_u32OutDelayMaxDefault[i];
         ring_buffer_init(&g_stAudioOutputDelay[i].stDelayRbuffer, s32BfferSize);
     }
