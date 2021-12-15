@@ -4502,6 +4502,12 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_SECURITY_MEM_LEVEL, val);
             goto exit;
         }
+        ret = str_parms_get_int(parms, "hal_param_dtv_synctype", &val);
+        if (ret >= 0) {
+            adev->synctype = val;
+            ALOGI("adev->synctype set to %d\n", adev->synctype);
+            goto exit;
+        }
         ret = str_parms_get_int(parms, "hal_param_audio_output_mode", &val);
         if (ret >= 0) {
             dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_OUTPUT_MODE, val);
