@@ -282,7 +282,8 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetADAudioParam(int aid, 
     aparam.output = DMX_OUT_TAP;
     if (pesmode)
     {
-        aparam.pes_type = DMX_PES_TELETEXT0;
+        //aparam.pes_type = DMX_PES_TELETEXT0; //chuangcheng need fix bug on multi-demux
+        aparam.pes_type = DMX_PES_AUDIO3;
         this->adpesmode=1;
     }
     else
