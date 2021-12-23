@@ -42,6 +42,7 @@
 #define CARD_NAME_MESON      "AMLMESONAUDIO"
 #define CARD_NAME_M8         "AMLM8AUDIO"
 #define CARD_NAME_TV         "AMLTVAUDIO"
+#define CARD_AML_KEYWORD     "AML"
 
 /* for parse device port
  * for i2s, i2s_playback, i2s_capture,  when select device, firstly to check i2s_playback,
@@ -60,6 +61,9 @@
 #define ALSAPORT_LPBK             "alsaPORT-loopback"
 #define ALSAPORT_BUILTINMIC       "builtinmic"
 #define ALSAPORT_EARC             "alsaPORT-earc"
+#define ALSAPORT_I2S4HDMIRX       "i2s4hdmirx"
+#define ALSAPORT_I2S4PARSER       "alsaPORT-i2s4parser"
+
 
 struct AudioDeviceDescriptor {
 	char name[NAME_LEN];
@@ -91,6 +95,8 @@ struct alsa_info {
 	struct AudioDeviceDescriptor *lpbk_descrpt;
 	struct AudioDeviceDescriptor *builtinmic_descrpt;
 	struct AudioDeviceDescriptor *earc_descrpt;
+	struct AudioDeviceDescriptor *i2s4hdmirx_descrpt;
+	struct AudioDeviceDescriptor *i2s4parser_descrpt;
 };
 
 static struct alsa_info *p_aml_alsa_info;
@@ -209,41 +215,62 @@ void alsa_device_parser_pcm_string(struct alsa_info *p_info, char *InputBuffer)
 			memcpy(mStreamName, Rch, 256);
 			PortName = strstr(mStreamName, "alsaPORT-");
 			if (PortName) {
-				memcpy(mAudioDeviceDescriptor->name, PortName, strlen(PortName));
+				memcpy(mAudioDeviceDescriptor->name, PortName, sizeof(mAudioDeviceDescriptor->name));
 
-				if (!strncmp(PortName, ALSAPORT_PCM, strlen(ALSAPORT_PCM)))
+				if (!strncmp(PortName, ALSAPORT_PCM, strlen(ALSAPORT_PCM)) &&
+					p_info->pcm_descrpt == NULL) {
 					p_info->pcm_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_I2S2HDMI, strlen(ALSAPORT_I2S2HDMI)))
+				} else if (!strncmp(PortName, ALSAPORT_I2S2HDMI, strlen(ALSAPORT_I2S2HDMI)) &&
+					p_info->i2s2hdmi_descrpt == NULL) {
 					p_info->i2s2hdmi_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_I2SPLAYPLAYBACK, strlen(ALSAPORT_I2SPLAYPLAYBACK)))
+				} else if (!strncmp(PortName, ALSAPORT_I2SPLAYPLAYBACK, strlen(ALSAPORT_I2SPLAYPLAYBACK)) &&
+					p_info->i2s1_descrpt == NULL) {
 					p_info->i2s1_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_I2SCAPTURE, strlen(ALSAPORT_I2SCAPTURE)))
+				} else if (!strncmp(PortName, ALSAPORT_I2SCAPTURE, strlen(ALSAPORT_I2SCAPTURE)) &&
+					p_info->i2s2_descrpt == NULL) {
 					p_info->i2s2_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_I2S, strlen(ALSAPORT_I2S)))
+				} else if (!strncmp(PortName, ALSAPORT_I2S4PARSER, strlen(ALSAPORT_I2S4PARSER)) &&
+					p_info->i2s4parser_descrpt == NULL) {
+					p_info->i2s4parser_descrpt = mAudioDeviceDescriptor;
+				} else if (!strncmp(PortName, ALSAPORT_I2S, strlen(ALSAPORT_I2S)) &&
+					p_info->i2s_descrpt == NULL) {
 					p_info->i2s_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_TDM, strlen(ALSAPORT_TDM)))
+					if (strstr(PortName, ALSAPORT_I2S4HDMIRX))
+						p_info->i2s4hdmirx_descrpt = mAudioDeviceDescriptor;
+				} else if (!strncmp(PortName, ALSAPORT_TDM, strlen(ALSAPORT_TDM)) &&
+					p_info->tdm_descrpt == NULL) {
 					p_info->tdm_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_PDM, strlen(ALSAPORT_PDM)))
+				} else if (!strncmp(PortName, ALSAPORT_PDM, strlen(ALSAPORT_PDM)) &&
+					p_info->pdm_descrpt == NULL) {
 					p_info->pdm_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_SPDIFB, strlen(ALSAPORT_SPDIFB)))
+				} else if (!strncmp(PortName, ALSAPORT_SPDIFB, strlen(ALSAPORT_SPDIFB)) &&
+					p_info->spdifb_descrpt == NULL) {
 					p_info->spdifb_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_SPDIF, strlen(ALSAPORT_SPDIF)))
+				} else if (!strncmp(PortName, ALSAPORT_SPDIF, strlen(ALSAPORT_SPDIF)) &&
+					p_info->spdif_descrpt == NULL) {
 					p_info->spdif_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_TV, strlen(ALSAPORT_TV)))
+				} else if (!strncmp(PortName, ALSAPORT_TV, strlen(ALSAPORT_TV)) &&
+					p_info->tvin_descrpt == NULL) {
 					p_info->tvin_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_LPBK, strlen(ALSAPORT_LPBK)))
+				} else if (!strncmp(PortName, ALSAPORT_LPBK, strlen(ALSAPORT_LPBK)) &&
+					p_info->lpbk_descrpt == NULL) {
 					p_info->lpbk_descrpt = mAudioDeviceDescriptor;
-				else if (!strncmp(PortName, ALSAPORT_EARC, strlen(ALSAPORT_EARC)))
+				} else if (!strncmp(PortName, ALSAPORT_EARC, strlen(ALSAPORT_EARC)) &&
+					p_info->earc_descrpt == NULL) {
 					p_info->earc_descrpt = mAudioDeviceDescriptor;
-				else
+				} else {
+					ALOGD("%s(), port:%s, not used for any desc", __func__, PortName);
 					free(mAudioDeviceDescriptor);
+					mAudioDeviceDescriptor = NULL;
+				}
 
 				if (strstr(PortName, ALSAPORT_BUILTINMIC) != NULL)
 					p_info->builtinmic_descrpt = mAudioDeviceDescriptor;
 			} else
 				ALOGD("\tstream no alsaPORT prefix name, StreamName:%s\n", mStreamName);
 		}
-		ALOGD("%s mCardindex:%d, mPcmindex:%d, PortName:%s\n", __FUNCTION__, mAudioDeviceDescriptor->mCardindex, mAudioDeviceDescriptor->mPcmIndex, PortName);
+		ALOGD("%s Desc:%p mCardindex:%d, mPcmindex:%d, PortName:%s\n", __FUNCTION__, mAudioDeviceDescriptor,
+		        mAudioDeviceDescriptor->mCardindex, mAudioDeviceDescriptor->mPcmIndex, PortName);
 		Rch = strtok(NULL, ": ");
 	}
 }
@@ -352,13 +379,23 @@ int alsa_device_update_pcm_index(int alsaPORT, int stream)
 		pADD = p_info->i2s2_descrpt;
 		break;
 	case PORT_LOOPBACK:
+	case PORT_ECHO_REFERENCE:
 		pADD = p_info->lpbk_descrpt;
 		break;
 	case PORT_BUILTINMIC:
 		pADD = p_info->builtinmic_descrpt;
+		if (!pADD) {
+			pADD = p_info->i2s_descrpt;
+		}
 		break;
 	case PORT_EARC:
 		pADD = p_info->earc_descrpt;
+		break;
+	case PORT_I2S4HDMIRX:
+		pADD = p_info->i2s4hdmirx_descrpt;
+		break;
+	case PORT_I2S4PARSER:
+		pADD = p_info->i2s4parser_descrpt;
 		break;
 	default:
 		pADD = p_info->i2s_descrpt;
