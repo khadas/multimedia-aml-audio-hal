@@ -3089,6 +3089,12 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         default:
             break;
         }
+
+        if (flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
+            ALOGI("Set out->hw_sync_mode true");
+            out->hw_sync_mode = true;
+        }
+
     } else if (flags & AUDIO_OUTPUT_FLAG_DIRECT) {
         if (config->format == AUDIO_FORMAT_DEFAULT)
             config->format = AUDIO_FORMAT_AC3;
