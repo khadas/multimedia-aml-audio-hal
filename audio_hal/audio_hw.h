@@ -576,6 +576,7 @@ struct aml_audio_device {
     int cap_delay;
 #endif
     int synctype; //tsplayer TS mode input set
+    int injection_enable;
     /* -End- */
 };
 

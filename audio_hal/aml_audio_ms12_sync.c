@@ -444,6 +444,7 @@ uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream)
     struct aml_stream_out *ms12_out = NULL;
     struct pcm_config *config = &adev->ms12_config;
     int mul = 1;
+    unsigned int device;
 
     if (continous_mode(adev)) {
         ms12_out = adev->ms12_out;
@@ -454,6 +455,9 @@ uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream)
     if (ms12_out == NULL) {
         return 0;
     }
+
+    device = ms12_out->device;
+    ms12_out->pcm = adev->pcm_handle[device];
 //#ifdef ENABLE_BT_A2DP
 #ifndef BUILD_LINUX
     if (ms12_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {

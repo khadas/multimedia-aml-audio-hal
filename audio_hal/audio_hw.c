@@ -1781,6 +1781,9 @@ static int insert_output_bytes (struct aml_stream_out *out, size_t size)
     size_t output_buffer_bytes = 0;
     audio_format_t output_format = get_output_format(stream);
     char *insert_buf = (char*) aml_audio_malloc (8192);
+    unsigned int device = out->device;
+
+    out->pcm = adev->pcm_handle[device];
 
     if (insert_buf == NULL) {
         ALOGE ("malloc size failed \n");
@@ -4966,6 +4969,24 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+    ret = str_parms_get_int(parms, "audioinject", &val);
+    if (ret >= 0) {
+        if (val == 1) {
+            ALOGI("close pcm out");
+            pthread_mutex_lock(&adev->alsa_pcm_lock);
+            if (adev->pcm_handle[I2S_DEVICE]) {
+                pcm_close(adev->pcm_handle[I2S_DEVICE]);
+                adev->pcm_handle[I2S_DEVICE] = NULL;
+                adev->pcm_refs[I2S_DEVICE] = 0;
+            }
+            pthread_mutex_unlock(&adev->alsa_pcm_lock);
+            adev->injection_enable = 1;
+        } else {
+            adev->injection_enable = 0;
+        }
+        goto exit;
+    }
+
 #ifdef BUILD_LINUX
     ret = str_parms_get_str(parms, "setenv", value, sizeof(value));
     if (ret >= 0) {
@@ -6545,6 +6566,9 @@ ssize_t hw_write (struct audio_stream_out *stream
             audio_set_spdif_clock(aml_out, get_codec_type(output_format));
 #endif
         aml_out->status = STREAM_HW_WRITING;
+    } else if (!aml_out->pcm && !adev->injection_enable) {
+        ALOGI("pcm is null, open device");
+        aml_alsa_output_open(stream);
     }
 
     if (eDolbyMS12Lib == adev->dolby_lib_type && !is_bypass_dolbyms12(stream)) {
