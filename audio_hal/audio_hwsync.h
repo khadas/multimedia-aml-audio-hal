@@ -42,6 +42,7 @@
 #define APTS_DISCONTINUE_THRESHOLD          (90000/10*11)
 #define APTS_DISCONTINUE_THRESHOLD_MIN    (90000/1000*100)
 #define APTS_DISCONTINUE_THRESHOLD_MIN_35MS    (90000/1000*35)
+#define APTS_TSYNC_DROP_THRESHOLD_MIN_300MS    (90000/1000*300)
 
 #define APTS_DISCONTINUE_THRESHOLD_MAX    (5*90000)
 
@@ -172,6 +173,7 @@ void aml_audio_hwsync_release(audio_hwsync_t *p_hwsync);
 bool aml_audio_hwsync_get_id(audio_hwsync_t *p_hwsync, int32_t* id);
 bool aml_audio_hwsync_set_id(audio_hwsync_t *p_hwsync, uint32_t id);
 void aml_audio_hwsync_msync_unblock_start(struct aml_stream_out *out);
+int aml_hwsync_get_tsync_video_started(audio_hwsync_t *p_hwsync, uint32_t *video_started);
 
 
 #endif

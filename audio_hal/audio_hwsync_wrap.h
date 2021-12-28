@@ -30,6 +30,7 @@
 #define TSYNC_VPTS      "/sys/class/tsync/pts_video"
 #define TSYNC_ENABLE    "/sys/class/tsync/enable"
 #define TSYNC_MODE      "/sys/class/tsync/mode"
+#define TSYNC_VSTARTED  "/sys/class/tsync/videostarted"
 
 void* aml_hwsync_wrap_mediasync_create (void);
 void aml_hwsync_wrap_set_tsync_init(audio_hwsync_t *p_hwsync);
@@ -47,5 +48,6 @@ bool aml_hwsync_wrap_set_id(audio_hwsync_t *p_hwsync, uint32_t id);
 bool aml_hwsync_wrap_release(audio_hwsync_t *p_hwsync);
 void aml_hwsync_wrap_wait_video_start(audio_hwsync_t *p_hwsync, uint32_t wait_count);
 void aml_hwsync_wrap_wait_video_drop(audio_hwsync_t *p_hwsync, uint32_t cur_pts, uint32_t wait_count);
+int aml_hwsync_wrap_get_tsync_video_started(audio_hwsync_t *p_hwsync, uint32_t *video_started);
 
 #endif

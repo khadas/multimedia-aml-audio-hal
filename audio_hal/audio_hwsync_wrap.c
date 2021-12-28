@@ -114,6 +114,16 @@ static int aml_hwsync_wrap_single_get_tsync_firstvpts(uint32_t *pts)
     return get_sysfs_uint(TSYNC_FIRSTVPTS, pts);
 }
 
+static int aml_hwsync_wrap_single_get_tsync_video_started(uint32_t *video_started)
+{
+    if (!video_started) {
+        ALOGE("%s(), NULL pointer", __func__);
+        return -EINVAL;
+    }
+
+    return get_sysfs_uint(TSYNC_VSTARTED, video_started);
+}
+
 static int aml_hwsync_wrap_single_reset_tsync_pcrscr(uint32_t pts)
 {
     char buf[64] = {0};
@@ -225,6 +235,16 @@ int aml_hwsync_wrap_get_tsync_firstvpts(audio_hwsync_t *p_hwsync, uint32_t *pts)
     /*To do*/
     (void)p_hwsync;
     (void)pts;
+    return 0;
+}
+
+int aml_hwsync_wrap_get_tsync_video_started(audio_hwsync_t *p_hwsync, uint32_t *video_started)
+{
+    ALOGI("%s(), [To do ]get tsync video started", __func__);
+    if (!p_hwsync->use_mediasync) {
+        return aml_hwsync_wrap_single_get_tsync_video_started(video_started);
+    }
+
     return 0;
 }
 

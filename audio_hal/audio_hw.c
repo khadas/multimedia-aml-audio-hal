@@ -7471,6 +7471,23 @@ hwsync_rewrite:
                     ALOGV("%s pts=%u ms, RealTimeus=%lld us", __func__, (apts32/90), timeus);
                 } else {
                     if (hw_sync->first_apts_flag == false) {
+                        if (has_video == true && aml_out->avsync_type == AVSYNC_TYPE_TSYNC) {
+                            uint32_t first_vpts = 0;
+                            uint32_t apts_gap = 0;
+                            uint32_t video_started = 0;
+
+                            apts32 = cur_pts & 0xffffffff;
+                            aml_hwsync_get_tsync_video_started(aml_out->hwsync, &video_started);
+                            aml_hwsync_get_tsync_firstvpts(aml_out->hwsync, &first_vpts);
+                            apts_gap = get_pts_gap (first_vpts, apts32);
+                            ALOGI("video_started:%d, first_vpts:0x%lx, apts32:0x%lx, diff:0x%lx", video_started, first_vpts, apts32, apts_gap);
+                            if (apts_gap >= APTS_TSYNC_DROP_THRESHOLD_MIN_300MS &&
+                                (((int32_t)apts32 < (int32_t)first_vpts) || (!video_started))) {
+                                return_bytes = hwsync_cost_bytes;
+                                goto exit;
+                            }
+                        }
+
                         aml_audio_hwsync_set_first_pts(aml_out->hwsync, cur_pts);
                     } else {
                         if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type && has_video) {
@@ -7550,7 +7567,6 @@ hwsync_rewrite:
             write_bytes = outsize;
             //in_frames = outsize / frame_size;
             write_buf = hw_sync->hw_sync_body_buf;
-
         } else {
             return_bytes = hwsync_cost_bytes;
             if (need_reconfig_output) {

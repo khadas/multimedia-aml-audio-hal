@@ -155,6 +155,12 @@ int aml_hwsync_get_tsync_firstvpts(audio_hwsync_t *p_hwsync, uint32_t *pts)
     return aml_hwsync_wrap_get_tsync_firstvpts(p_hwsync, pts);
 }
 
+int aml_hwsync_get_tsync_video_started(audio_hwsync_t *p_hwsync, uint32_t *video_started)
+{
+    ALOGV("%s", __func__);
+    return aml_hwsync_wrap_get_tsync_video_started(p_hwsync, video_started);
+}
+
 int aml_hwsync_reset_tsync_pcrscr(audio_hwsync_t *p_hwsync, uint32_t pts)
 {
     ALOGV("%s", __func__);
