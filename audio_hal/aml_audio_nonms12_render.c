@@ -117,6 +117,10 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
     struct aml_audio_patch *patch = adev->audio_patch;
     struct aml_native_postprocess *VX_postprocess = &adev->native_postprocess;
     bool do_sync_flag = adev->patch_src  == SRC_DTV && patch && patch->skip_amadec_flag;
+    if (!aml_out->dtvsync_enable)
+    {
+        do_sync_flag = 0;
+    }
     int return_bytes = bytes;
     int out_frames = 0;
     void *input_buffer = (void *)buffer;
