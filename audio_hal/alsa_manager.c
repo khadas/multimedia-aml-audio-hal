@@ -101,6 +101,15 @@ static void alsa_write_rate_control(struct audio_stream_out *stream, size_t byte
     int rate_multiply = 1;
     uint64_t frame_ms = 0;
     snd_pcm_sframes_t frames = 0;
+    unsigned int device = aml_out->device;
+    struct pcm *pcm = adev->pcm_handle[device];
+
+    if (!pcm && adev->injection_enable) {
+        ALOGI("pcm is null, device %d", device);
+        aml_out->pcm = NULL;
+        return;
+    }
+
     switch (out_format) {
     case AUDIO_FORMAT_E_AC3:
         frame_size = AUDIO_EAC3_FRAME_SIZE;
@@ -203,6 +212,12 @@ int aml_alsa_output_open(struct audio_stream_out *stream) {
     int card = aml_out->card;
     struct pcm *pcm = adev->pcm_handle[device];
     ALOGI("%s pcm %p", __func__, pcm);
+
+    if (adev->injection_enable) {
+        ALOGI("%s pcm is null, device %d", __FUNCTION__, device);
+        aml_out->pcm = NULL;
+        return 0;
+    }
 
     // close former and open with configs
     // TODO: check pcm configs and if no changes, do nothing
@@ -309,6 +324,15 @@ static int aml_alsa_add_zero(struct aml_stream_out *stream, int size) {
     int write_size = 0;
     int adjust_bytes = size;
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
+    unsigned int device = aml_out->device;
+    struct aml_audio_device *adev = aml_out->dev;
+
+    aml_out->pcm = adev->pcm_handle[device];
+
+    if (!aml_out->pcm && adev->injection_enable) {
+        ALOGI("pcm is null, device %d", device);
+        return 0;
+    }
 
     while (retry--) {
         buf = aml_audio_malloc(AML_ZERO_ADD_MIN_SIZE);
@@ -357,6 +381,16 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
     int64_t pretime = 0;
     unsigned char*audio_data = (unsigned char*)buffer;
     int debug_enable = aml_audio_get_alsa_debug();
+    unsigned int device = aml_out->device;
+
+    aml_out->pcm = adev->pcm_handle[device];
+
+    if (!aml_out->pcm && adev->injection_enable) {
+        ALOGI("%s, pcm is null, device %d", __FUNCTION__, device);
+        aml_out->pcm = NULL;
+        return bytes;
+    }
+
     switch (aml_out->alsa_output_format) {
     case AUDIO_FORMAT_E_AC3:
         frame_size = AUDIO_EAC3_FRAME_SIZE;
@@ -594,6 +628,10 @@ int aml_alsa_output_pause(struct audio_stream_out *stream) {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = out->dev;
     int ret = 0;
+    unsigned int device = out->device;
+
+    out->pcm = adev->pcm_handle[device];
+
     if (out->pcm && pcm_is_ready (out->pcm)) {
         ret = pcm_ioctl (out->pcm, SNDRV_PCM_IOCTL_PAUSE, 1);
         if (ret < 0) {
@@ -615,6 +653,9 @@ int aml_alsa_output_resume(struct audio_stream_out *stream) {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = out->dev;
     int ret = 0;
+    unsigned int device = out->device;
+
+    out->pcm = adev->pcm_handle[device];
     if (out->pcm && pcm_is_ready (out->pcm) ) {
         ret = pcm_ioctl (out->pcm, SNDRV_PCM_IOCTL_PREPARE, 0);
         if (ret < 0) {
@@ -631,10 +672,14 @@ int aml_alsa_output_resume(struct audio_stream_out *stream) {
 }
 
 int aml_alsa_output_get_letancy(struct audio_stream_out *stream) {
-    const struct aml_stream_out *aml_out = (const struct aml_stream_out *)stream;
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
     int codec_type = get_codec_type(aml_out->hal_internal_format);
     snd_pcm_sframes_t frames = 0;
+    unsigned int device = aml_out->device;
+
+    aml_out->pcm = adev->pcm_handle[device];
+
     if (aml_out->pcm && pcm_is_ready(aml_out->pcm)) {
         if (pcm_ioctl(aml_out->pcm, SNDRV_PCM_IOCTL_DELAY, &frames) >= 0) {
             if (adev->sink_format == AUDIO_FORMAT_E_AC3 || adev->sink_format == AUDIO_FORMAT_DTS_HD) {
