@@ -13,9 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef _AML_CONFIG_PARSER_H_
+#define _AML_CONFIG_PARSER_H_
 
 #include <cJSON.h>
 
 cJSON *aml_config_parser(char * config_files);
 void aml_printf_cJSON(const char *json_name, cJSON *pcj);
 
+#endif

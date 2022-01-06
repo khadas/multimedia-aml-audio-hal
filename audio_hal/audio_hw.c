@@ -5211,6 +5211,9 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         return strdup(temp_buf);
     }
 #endif
+    else if (strstr (keys, "codecsupport")) {
+        return strdup(aml_get_codec_support(&keys[strlen("codecsupport") + 1])? "true": "false");
+    }
     return strdup("");
 }
 

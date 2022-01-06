@@ -13,10 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef _AML_CONFIG_DATA_H_
+#define _AML_CONFIG_DATA_H_
 
 #include <cJSON.h>
+#include <stdbool.h>
+
 #include "aml_config_parser.h"
 
 int aml_audio_config_parser();
 int aml_get_jason_int_value(char* key,int defvalue);
+bool aml_get_codec_support(char* aformat);
 
+#endif

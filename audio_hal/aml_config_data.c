@@ -19,8 +19,10 @@
 #include <cJSON.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "aml_config_data.h"
 #include <cutils/log.h>
+#include <string.h>
+#include <audio-base.h>
+#include "aml_config_data.h"
 
 
 #define AML_AUDIO_CONFIG_FILE_PATH "/etc/halaudio/aml_audio_config.json"
@@ -50,3 +52,41 @@ int aml_get_jason_int_value(char* key,int defvalue)
     return value;
 }
 
+bool aml_get_codec_support(char* aformat)
+{
+    cJSON *item = NULL;
+    cJSON *list = NULL;
+    cJSON *format = NULL;
+    cJSON *support = NULL;
+    int array_size = 0;
+    ALOGI("aformat %s!\n", aformat);
+    if (audio_config_jason) {
+        list = cJSON_GetObjectItem(audio_config_jason, "Codec_Support_List");
+        if (!list || !cJSON_IsArray(list)) {
+            ALOGI("no Codec_Support_List or not a Array!");
+            return false;
+        }
+
+        array_size = cJSON_GetArraySize(list);
+        for (int i=0; i< array_size; i++) {
+            item = cJSON_GetArrayItem(list, i);
+            format = cJSON_GetObjectItem(item, "Format");
+            if (!format) {
+                ALOGI("no format string!");
+                continue;
+            }
+            if (strcmp(aformat, format->valuestring) == 0) {
+                support = cJSON_GetObjectItem(item, "Support");
+                if (!support) {
+                    ALOGI("no support string!\n");
+                    return false;
+                } else {
+                    ALOGI("support:%d", support->type == cJSON_True);
+                    return (support->type == cJSON_True);
+                }
+            }
+        }
+
+    }
+    return false;
+}
