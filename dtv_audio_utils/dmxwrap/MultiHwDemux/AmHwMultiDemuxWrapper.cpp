@@ -66,7 +66,6 @@ static void getAudioEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, const 
         mEsData->pts = es_header->pts;
         mDemuxWrapper->last_queue_es_apts = es_header->pts;
         mEsData->used_size = 0;
-        ALOGV("\ngetAudioEsData %d mEsData->size %d mEsData->pts %lld\n", len, mEsData->size, mEsData->pts);
         dump_demux_data((void *)data_es, es_header->len, DEMUX_AUDIO_DUMP_PATH);
     } else {
         ALOGI("error es data len %d es_header->len %d",len, es_header->len);
