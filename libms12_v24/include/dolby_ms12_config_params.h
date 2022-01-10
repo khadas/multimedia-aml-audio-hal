@@ -281,6 +281,7 @@ void dolby_ms12_set_donwmix_51_pcm_to_51_on_multi_outputs(int val);
  * 1 = 5.1 Locked: Channel mode is always 5.1. [amlogic default]
  */
 void dolby_ms12_set_encoder_channel_mode_locking_mode(int val);
+int dolby_ms12_get_encoder_channel_mode_locking_mode();
 
 /**
  * @brief RISC precision flag (fixpoint backends only)

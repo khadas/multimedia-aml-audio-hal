@@ -5809,6 +5809,7 @@ int do_output_standby_l(struct audio_stream *stream)
     }
     aml_out->status = STREAM_STANDBY;
     aml_out->standby= 1;
+    aml_out->continuous_mode_check = true;
 
     if (adev->continuous_audio_mode == 0) {
         // release buffers
@@ -7917,6 +7918,12 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
                     ALOGI("hdmi format is changed from %d to %d need reconfig output", adev->pre_hdmi_format, adev->hdmi_format);
                     adev->pre_hdmi_format = adev->hdmi_format;
                     need_reconfig_output = true;
+                }
+                /* here to check if ms12 is initialized. */
+                if (adev->ms12_out == NULL && adev->doing_reinit_ms12 == true) {
+                    ALOGI("adev->ms12_out == NULL, init ms12 and reset decoder");
+                    need_reconfig_output = true;
+                    need_reset_decoder = true;
                 }
             }
             /* here to check if ms12 is already enabled, if main stream is doing init ms12, we don't need do it */
