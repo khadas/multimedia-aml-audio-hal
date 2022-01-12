@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <cutils/log.h>
 #include <string.h>
-#include <audio-base.h>
+#include <hardware/audio.h>
 #include "aml_config_data.h"
 
 
