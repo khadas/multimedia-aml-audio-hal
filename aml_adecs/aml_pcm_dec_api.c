@@ -36,6 +36,26 @@ static inline short CLIP16(int r)
            r;
 }
 
+static void downmix_4ch_to_2ch(void *in_buf, void *out_buf, int bytes, int audio_format) {
+    int frames_num = 0;
+    int channel = 4;
+    int i = 0;
+    if (audio_format == AUDIO_FORMAT_PCM_16_BIT) {
+        frames_num = bytes / (channel * 2);
+        int16_t *src = (int16_t *)in_buf;
+        int16_t *dst = (int16_t *)out_buf;
+        for (i = 0; i < frames_num; i++) {
+            dst[2*i]   = (int16_t)CLIP16((int)src[channel*i] * 0.5
+                       + (int)src[channel*i + 2] * 0.25
+                       + (int)src[channel*i + 3] * 0.25) ;
+            dst[2*i+1] = (int16_t)CLIP16((int)src[channel*i + 1] * 0.5
+                       + (int)src[channel*i + 2] * 0.25
+                       + (int)src[channel*i + 3] * 0.25);
+        }
+    }
+    return;
+}
+
 static void downmix_6ch_to_2ch(void *in_buf, void *out_buf, int bytes, int audio_format) {
     int frames_num = 0;
     int channel = 6;
@@ -45,8 +65,14 @@ static void downmix_6ch_to_2ch(void *in_buf, void *out_buf, int bytes, int audio
         int16_t *src = (int16_t *)in_buf;
         int16_t *dst = (int16_t *)out_buf;
         for (i = 0; i < frames_num; i++) {
-            dst[2*i]   = (int16_t)CLIP16((int)src[channel*i] * 0.5     + (int)src[channel*i + 2] * 0.25 + (int)src[channel*i + 3] * 0.25 + (int)src[channel*i + 5] * 0.25) ;
-            dst[2*i+1] = (int16_t)CLIP16((int)src[channel*i + 1] * 0.5 + (int)src[channel*i + 2] * 0.25 + (int)src[channel*i + 4] * 0.25 + (int)src[channel*i + 5] * 0.25);
+            dst[2*i]   = (int16_t)CLIP16((int)src[channel*i] * 0.5
+                       + (int)src[channel*i + 2] * 0.25
+                       + (int)src[channel*i + 3] * 0.25
+                       + (int)src[channel*i + 5] * 0.25);
+            dst[2*i+1] = (int16_t)CLIP16((int)src[channel*i + 1] * 0.5
+                       + (int)src[channel*i + 2] * 0.25
+                       + (int)src[channel*i + 4] * 0.25
+                       + (int)src[channel*i + 5] * 0.25);
         }
     }
     return;
@@ -440,7 +466,7 @@ static aml_dec_return_type_t lpcm_process(aml_dec_t * aml_dec, unsigned char*buf
         if (-1 == parse_lpcm_bluray_header (pcm_config, header)) {
             ALOGE ("%s():%d AUDIO_FORMAT_PCM_LPCM_BLURAY parser header fail!", __FUNCTION__, __LINE__);
         }
-    }else if (pcm_config->pcm_format == AUDIO_FORMAT_PCM_LPCM_DVD) {
+    } else if (pcm_config->pcm_format == AUDIO_FORMAT_PCM_LPCM_DVD) {
         int first_access = (buffer[0] << 8) | buffer[1];
         if (first_access > bytes) {
             ALOGE ("%s():%d invalid data!", __FUNCTION__, __LINE__);
@@ -501,37 +527,38 @@ static int pcm_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
         pcm_config->channel = 2;
         src_channel = pcm_config->lpcm_channel;
     } else {
-    src_channel = pcm_config->channel;
-    dst_channel = 2;
-    downmix_conf = src_channel / dst_channel;
-    downmix_size = bytes / downmix_conf;
+        src_channel = pcm_config->channel;
+        dst_channel = 2;
+        downmix_conf = src_channel / dst_channel;
+        downmix_size = bytes / downmix_conf;
 
-    if (dec_pcm_data->buf_size < downmix_size) {
-        ALOGI("realloc outbuf_max_len  from %zu to %zu\n", dec_pcm_data->buf_size, downmix_size);
-        dec_pcm_data->buf = aml_audio_realloc(dec_pcm_data->buf, downmix_size);
-        if (dec_pcm_data->buf == NULL) {
-            ALOGE("realloc pcm buffer failed size %zu\n", downmix_size);
-            return AML_DEC_RETURN_TYPE_FAIL;
+        if (dec_pcm_data->buf_size < downmix_size) {
+            ALOGI("realloc outbuf_max_len  from %zu to %zu\n", dec_pcm_data->buf_size, downmix_size);
+            dec_pcm_data->buf = aml_audio_realloc(dec_pcm_data->buf, downmix_size);
+            if (dec_pcm_data->buf == NULL) {
+                ALOGE("realloc pcm buffer failed size %zu\n", downmix_size);
+                return AML_DEC_RETURN_TYPE_FAIL;
+            }
+            dec_pcm_data->buf_size = downmix_size;
+            memset(dec_pcm_data->buf, 0, downmix_size);
         }
-        dec_pcm_data->buf_size = downmix_size;
-        memset(dec_pcm_data->buf, 0, downmix_size);
-    }
 
 
-    if (pcm_config->channel == 2) {
-        /*now we only support bypass PCM data*/
-        memcpy(dec_pcm_data->buf, buffer, bytes);
-    } else if (pcm_config->channel == 6) {
-        downmix_6ch_to_2ch(buffer, dec_pcm_data->buf, bytes, pcm_config->pcm_format);
-    } else if (pcm_config->channel == 8) {
-        downmix_8ch_to_2ch(buffer, dec_pcm_data->buf, bytes, pcm_config->pcm_format);
-    }else {
-        ALOGI("unsupport channel =%d", pcm_config->channel);
-        return AML_DEC_RETURN_TYPE_OK;
-    }
+        if (pcm_config->channel == 2) {
+            /*now we only support bypass PCM data*/
+            memcpy(dec_pcm_data->buf, buffer, bytes);
+        } else if (pcm_config->channel == 4) {
+            downmix_4ch_to_2ch(buffer, dec_pcm_data->buf, bytes, pcm_config->pcm_format);
+        } else if (pcm_config->channel == 6) {
+            downmix_6ch_to_2ch(buffer, dec_pcm_data->buf, bytes, pcm_config->pcm_format);
+        } else if (pcm_config->channel == 8) {
+            downmix_8ch_to_2ch(buffer, dec_pcm_data->buf, bytes, pcm_config->pcm_format);
+        } else {
+            ALOGI("unsupport channel =%d", pcm_config->channel);
+            return AML_DEC_RETURN_TYPE_OK;
+        }
 
-
-    dec_pcm_data->data_len = downmix_size;
+        dec_pcm_data->data_len = downmix_size;
     }
     pcm_dec->stream_info.stream_decode_num += dec_pcm_data->data_len/4;
     if ( pcm_dec->stream_info.stream_bitrate == 0) {
