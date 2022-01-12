@@ -3771,7 +3771,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     struct aml_audio_device *adev = (struct aml_audio_device *) dev;
     struct str_parms *parms;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    char value[AUDIO_HAL_CHAR_MAX_LEN];
+    char value[AUDIO_HAL_CHAR_MAX_LEN] = {0};
     int val = 0;
     int ret = 0;
 
@@ -4884,9 +4884,9 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     }
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
        ret = str_parms_get_str(parms, "vol_ease", value, sizeof(value));
-        ALOGI("vol_ease: value= %s", value);
         if (ret >= 0) {
             int gain, duration, shape;
+            ALOGI("vol_ease: value= %s", value);
             if (sscanf(value, "%d,%d,%d", &gain, &duration, &shape) == 3) {
                 char cmd[128] = {0};
                 sprintf(cmd, "-main1_mixgain %d,%d,%d -main2_mixgain %d,%d,%d -ui_mixgain %d,%d,%d",
