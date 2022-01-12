@@ -515,6 +515,17 @@ extern "C" void dolby_ms12_set_encoder_channel_mode_locking_mode(int val)
     }
 }
 
+extern "C" int dolby_ms12_get_encoder_channel_mode_locking_mode()
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12ConfigParams *config_param = getInstance();
+    if (config_param) {
+        return config_param->getEncoderChannelModeLockingMode();
+    }
+
+    return 0;
+}
+
 extern "C" void dolby_ms12_set_risc_precision_flag(int val)
 {
     ALOGV("%s()\n", __FUNCTION__);

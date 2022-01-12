@@ -232,6 +232,11 @@ public:
     {
         mLockingChannelModeENC = val;    //0 or 1
     }
+    virtual int getEncoderChannelModeLockingMode()
+    {
+        return mLockingChannelModeENC;    //0 or 1
+    }
+
     virtual void setRISCprecisionFlag(int val)
     {
         mRISCPrecisionFlag = val;

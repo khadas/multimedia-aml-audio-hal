@@ -461,11 +461,6 @@ void set_ms12_atmos_lock(struct dolby_ms12_desc *ms12, bool is_atmos_lock_on)
 void set_ms12_acmod2ch_lock(struct dolby_ms12_desc *ms12, bool is_lock_on)
 {
     char parm[64] = "";
-    bool output_5_1_ddp = getprop_bool(MS12_OUTPUT_5_1_DDP);
-    ALOGI("%s output_5_1_ddp %d", __func__, output_5_1_ddp);
-
-    if (output_5_1_ddp)
-        is_lock_on = false;
 
     sprintf(parm, "%s %d", "-acmod2ch_lock", is_lock_on);
     if ((strlen(parm)) > 0 && ms12)
@@ -2463,14 +2458,16 @@ bool is_support_ms12_reset(struct audio_stream_out *stream) {
     struct aml_audio_device *adev = aml_out->dev;
     bool is_atmos_supported = is_platform_supported_ddp_atmos(adev->hdmi_descs.ddp_fmt.atmos_supported, adev->active_outport, adev->is_TV);
     bool need_reset_ms12_out = !is_ms12_out_ddp_5_1_suitable(is_atmos_supported);
-    /* we meet 3 conditions:
+    /* we meet 2 conditions:
      * 1. edid atmos support not match with currently ms12 output
-     * 2. it is the main stream
-     * 3. it has write some data
+     * 2. it has write some data
      */
-    if (is_dolby_ms12_main_stream(stream) && need_reset_ms12_out) {
+    if (need_reset_ms12_out) {
         return true;
     }
+
+    if (adev->is_netflix && dolby_ms12_get_encoder_channel_mode_locking_mode() == 0)
+        return true;
 
     return false;
 }
