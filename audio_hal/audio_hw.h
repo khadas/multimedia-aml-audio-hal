@@ -564,6 +564,9 @@ struct aml_audio_device {
     bool gap_ignore_pts;
     float master_volume;
     bool master_mute;
+    int syss_mixgain;
+    int apps_mixgain;
+
     int vol_ease_setting_state;
     int vol_ease_setting_gain;
     int vol_ease_setting_duration;
