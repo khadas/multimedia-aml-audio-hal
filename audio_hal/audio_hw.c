@@ -1419,19 +1419,53 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
     out->volume_r_org = right;//right stream volume
     out->volume_l = out->volume_l_org * adev->master_volume;//out stream vol=stream vol * master vol
     out->volume_r = out->volume_r_org * adev->master_volume;
-    /*
-     *The Dolby format(dd/ddp/ac4/true-hd/mat) and direct&UI-PCM(stereo or multi PCM)
-     *will go through dolby system mixer as main input
-     *use set_ms12_main_volume to control it.
-     *The volume about mixer-PCM is controled by AudioFlinger
-     */
-    if ((eDolbyMS12Lib == adev->dolby_lib_type) && (is_dolby_format || is_ms12_pcm_volume_control)) {
-        if (out->volume_l != out->volume_r) {
-            ALOGW("%s, left:%f right:%f NOT match", __FUNCTION__, left, right);
+    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+        /* when MS12 lib is available, control stream volume by adjusting
+         * main_volume (after first mixing between main1/main2/UI sound)
+         * for main input, or adjust system and UI sound mixing gain
+         */
+        if (is_dolby_format || is_ms12_pcm_volume_control) {
+            if (out->volume_l != out->volume_r) {
+                ALOGW("%s, left:%f right:%f NOT match", __FUNCTION__, left, right);
+            }
+            ALOGI("dolby_ms12_set_main_volume %f", out->volume_l);
+            out->ms12_vol_ctrl = true;
+            set_ms12_main_volume(&adev->ms12, out->volume_l);
+        } else if (out->is_normal_pcm) {
+            /* system sound */
+            int gain = 2560.0f * log10((adev->master_mute) ? 0.0f : adev->master_volume);
+            char parm[12] = "";
+
+            gain += adev->syss_mixgain;
+            if (gain > 0) {
+                gain = 0;
+            }
+            if (gain < (-96 << 7)) {
+                gain = -96 << 7;
+            }
+            sprintf(parm, "-sys_syss_mixgain %d,200,0", gain);
+            aml_ms12_update_runtime_params(&(adev->ms12), parm);
+            ALOGI("Set syss mixgain %d", gain);
+#ifdef USE_APP_MIXING
+        } else if (out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
+            /* app sound */
+            int gain = 2560.0f * log10((adev->master_mute) ? 0.0f : adev->master_volume);
+            char parm[12] = "";
+
+            gain += adev->apps_mixgain;
+            if (gain > 0) {
+                gain = 0;
+            }
+            if (gain < (-96 << 7)) {
+                gain = -96 << 7;
+            }
+            sprintf(parm, "-sys_apps_mixgain %d,200,0", gain);
+            aml_ms12_update_runtime_params(&(adev->ms12), parm);
+            ALOGI("Set apps mixgain %d", gain);
+#endif
         }
-        out->ms12_vol_ctrl = true;
-        set_ms12_main_volume(&adev->ms12, out->volume_l);
     }
+
     return 0;
 }
 
@@ -4857,7 +4891,16 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         char parm[12] = "";
         int gain = atoi(value);
         if ((gain <= 0) && (gain >= -96)) {
-            sprintf(parm, "-sys_apps_mixgain %d,200,0", gain << 7);
+            int after_master_gain;
+            adev->apps_mixgain = gain << 7;
+            after_master_gain = 2560.0f * log10((adev->master_mute) ? 0.0f : adev->master_volume);
+            after_master_gain += adev->apps_mixgain;
+            if (after_master_gain > 0) {
+                after_master_gain = 0;
+            } else if (after_master_gain < (-96 << 7)) {
+                after_master_gain = -96 << 7;
+            }
+            sprintf(parm, "-sys_apps_mixgain %d,200,0", after_master_gain);
             pthread_mutex_lock(&adev->lock);
             aml_ms12_update_runtime_params(&(adev->ms12), parm);
             pthread_mutex_unlock(&adev->lock);
@@ -4872,7 +4915,16 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         char parm[12] = "";
         int gain = atoi(value);
         if ((gain <= 0) && (gain >= -96)) {
-            sprintf(parm, "-sys_syss_mixgain %d,200,0", gain << 7);
+            int after_master_gain;
+            adev->syss_mixgain = gain << 7;
+            after_master_gain = 2560.0f * log10((adev->master_mute) ? 0.0f : adev->master_volume);
+            after_master_gain += adev->syss_mixgain;
+            if (after_master_gain > 0) {
+                after_master_gain = 0;
+            } else if (after_master_gain < (-96 << 7)) {
+                after_master_gain = -96 << 7;
+            }
+            sprintf(parm, "-sys_syss_mixgain %d,200,0", after_master_gain);
             pthread_mutex_lock(&adev->lock);
             aml_ms12_update_runtime_params(&(adev->ms12), parm);
             pthread_mutex_unlock(&adev->lock);
@@ -10375,6 +10427,8 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     pthread_mutex_unlock(&adev->lock);
 #endif
     adev->master_volume = 1.0;
+    adev->syss_mixgain = 1.0;
+    adev->apps_mixgain = 1.0;
     adev->useSubMix = false;
 #ifdef SUBMIXER_V1_1
     adev->useSubMix = true;
