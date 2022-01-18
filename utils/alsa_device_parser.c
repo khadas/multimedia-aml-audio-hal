@@ -146,25 +146,25 @@ int alsa_device_get_card_index()
 		}
 
 		while (!feof(mCardFile)) {
-			fgets(tempbuffer, READ_BUFFER_SIZE, mCardFile);
-
-			/* this line contain '[' character */
-			if (strchr(tempbuffer, '[')) {
-				char *Rch = strtok(tempbuffer, "[");
-				mCardIndex = atoi(Rch);
-				ALOGD("\tcurrent mCardIndex = %d, Rch = %s", mCardIndex, Rch);
-				Rch = strtok(NULL, " ]");
-				ALOGD("\tcurrent sound card name = %s", Rch);
-				if (strcmp(Rch, CARD_NAME_AUGE) == 0) {
-					ALOGD("\t auge sound cardIndex found = %d", mCardIndex);
-					isCardIndexFound = true;
-					p_aml_alsa_info->is_auge = 1;
-					break;
-				} else {
-					ALOGD("\t meson sound cardIndex found = %d", mCardIndex);
-					isCardIndexFound = true;
-					p_aml_alsa_info->is_auge = 0;
-					break;
+			if (fgets(tempbuffer, READ_BUFFER_SIZE, mCardFile) != NULL) {
+				/* this line contain '[' character */
+				if (strchr(tempbuffer, '[')) {
+					char *Rch = strtok(tempbuffer, "[");
+					mCardIndex = atoi(Rch);
+					ALOGD("\tcurrent mCardIndex = %d, Rch = %s", mCardIndex, Rch);
+					Rch = strtok(NULL, " ]");
+					ALOGD("\tcurrent sound card name = %s", Rch);
+					if (strcmp(Rch, CARD_NAME_AUGE) == 0) {
+						ALOGD("\t auge sound cardIndex found = %d", mCardIndex);
+						isCardIndexFound = true;
+						p_aml_alsa_info->is_auge = 1;
+						break;
+					} else {
+						ALOGD("\t meson sound cardIndex found = %d", mCardIndex);
+						isCardIndexFound = true;
+						p_aml_alsa_info->is_auge = 0;
+						break;
+					}
 				}
 			}
 
@@ -199,7 +199,7 @@ void alsa_device_parser_pcm_string(struct alsa_info *p_info, char *InputBuffer)
 
 	Rch = strtok(InputBuffer, "-");
 	/* parse for stream name */
-	if (Rch  != NULL) {
+	if (Rch != NULL) {
 		struct AudioDeviceDescriptor *mAudioDeviceDescriptor =
 			calloc(1, sizeof(struct AudioDeviceDescriptor));
 		if (!mAudioDeviceDescriptor) {
@@ -264,13 +264,19 @@ void alsa_device_parser_pcm_string(struct alsa_info *p_info, char *InputBuffer)
 					mAudioDeviceDescriptor = NULL;
 				}
 
-				if (strstr(PortName, ALSAPORT_BUILTINMIC) != NULL)
+				if (strstr(PortName, ALSAPORT_BUILTINMIC) != NULL) {
 					p_info->builtinmic_descrpt = mAudioDeviceDescriptor;
-			} else
+				}
+			} else {
 				ALOGD("\tstream no alsaPORT prefix name, StreamName:%s\n", mStreamName);
+			}
 		}
-		ALOGD("%s Desc:%p mCardindex:%d, mPcmindex:%d, PortName:%s\n", __FUNCTION__, mAudioDeviceDescriptor,
-		        mAudioDeviceDescriptor->mCardindex, mAudioDeviceDescriptor->mPcmIndex, PortName);
+
+		if (mAudioDeviceDescriptor != NULL) {
+			ALOGD("%s Desc:%p mCardindex:%d, mPcmindex:%d, PortName:%s\n", __FUNCTION__, mAudioDeviceDescriptor,
+				mAudioDeviceDescriptor->mCardindex, mAudioDeviceDescriptor->mPcmIndex, PortName);
+		}
+
 		Rch = strtok(NULL, ": ");
 	}
 }
@@ -324,9 +330,10 @@ int alsa_device_update_pcm_index(int alsaPORT, int stream)
 		if (mPcmFile) {
 			ALOGD("Pcm open success");
 			while (!feof(mPcmFile)) {
-				fgets(tempbuffer, READ_BUFFER_SIZE, mPcmFile);
-				alsa_device_parser_pcm_string(p_info, tempbuffer);
-				memset((void *)tempbuffer, 0, READ_BUFFER_SIZE);
+				if (fgets(tempbuffer, READ_BUFFER_SIZE, mPcmFile) != NULL) {
+					alsa_device_parser_pcm_string(p_info, tempbuffer);
+					memset((void *)tempbuffer, 0, READ_BUFFER_SIZE);
+				}
 			}
 			ALOGD("reach EOF");
 			fclose(mPcmFile);
@@ -336,6 +343,7 @@ int alsa_device_update_pcm_index(int alsaPORT, int stream)
 		} else
 			ALOGD("Pcm open fail");
 	}
+
 	switch (alsaPORT) {
 	case PORT_I2S:
 		if (stream == PLAYBACK) {
