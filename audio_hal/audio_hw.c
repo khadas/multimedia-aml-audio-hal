@@ -7392,9 +7392,14 @@ hwsync_rewrite:
                 if (cur_pts != HWSYNC_PTS_NA) {
                     aml_audio_hwsync_checkin_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, cur_pts);
                 }
+#ifndef BUILD_LINUX
+                // dolby_ms12_hwsync_checkin_pts checkin PTS info to MS12's global PTS sync table, which
+                // is only used by UDC decoder to detect PTS gap for NTS. On Linux, audio gap for timestamp
+                // is sent from upper layer directly and the gap detection is not needed.
                 if (continous_mode(adev) && !audio_is_linear_pcm(aml_out->hal_internal_format) && adev->is_netflix) {
                     dolby_ms12_hwsync_checkin_pts(aml_out->hwsync->payload_offset, cur_pts);
                 }
+#endif
                 aml_out->hwsync->payload_offset += outsize;
                 //change
                 // when msync is used, the original first apts->audio start logic from legacy amaster tsync
