@@ -3298,7 +3298,6 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     }
 
     out->out_device = devices;
-    out->flags = flags;
     out->volume_l_org = 1.0;//stream volume
     out->volume_r_org = 1.0;
     out->volume_l = adev->master_volume * out->volume_l_org;//out volume
@@ -3374,6 +3373,11 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         }
         out->hwsync->tsync_fd = -1;
         aml_audio_hwsync_init(out->hwsync, out);
+        if ((adev->active_inport == INPORT_HDMIIN) && (adev->is_TV)) {
+            /* TV HDMI IN does not require avsync */
+            out->hw_sync_mode = false;
+            flags = flags & (~AUDIO_OUTPUT_FLAG_HW_AV_SYNC);
+        }
     }
 
     /*if tunnel mode pcm is not 48Khz, resample to 48K*/
@@ -3405,6 +3409,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         aml_ac4_parser_open(&out->ac4_parser_handle);
     }
 
+    out->flags = flags;
     out->ddp_frame_size = aml_audio_get_ddp_frame_size();
     out->resample_handle = NULL;
     *stream_out = &out->stream;
@@ -7814,9 +7819,9 @@ hwsync_rewrite:
             __func__, __LINE__, aml_out->hal_format, output_format, adev->sink_format);
     }
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
-         // position is proper?
+        // position is proper?
         if (!hw_sync->first_apts_flag &&
-        (aml_out->msync_action == AV_SYNC_AA_DROP) && AVSYNC_TYPE_MSYNC == aml_out->avsync_type) {
+            (aml_out->msync_action == AV_SYNC_AA_DROP) && AVSYNC_TYPE_MSYNC == aml_out->avsync_type) {
             /* start dropping */
             ALOGI("MSYNC start dropping @0x%x, %d bytes", hw_sync->first_apts, write_bytes);
             goto exit;
@@ -8874,7 +8879,7 @@ void *audio_patch_output_threadloop(void *data)
     ret = adev_open_output_stream_new(patch->dev,
                                       0,
                                       patch->output_src,
-                                      AUDIO_OUTPUT_FLAG_DIRECT,
+                                      AUDIO_OUTPUT_FLAG_DIRECT | AUDIO_OUTPUT_FLAG_HW_AV_SYNC,
                                       &stream_config,
                                       &stream_out,
                                       "AML_TV_SOURCE");
