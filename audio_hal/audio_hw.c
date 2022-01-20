@@ -1434,7 +1434,7 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
         } else if (out->is_normal_pcm) {
             /* system sound */
             int gain = 2560.0f * log10((adev->master_mute) ? 0.0f : adev->master_volume);
-            char parm[12] = "";
+            char parm[32] = "";
 
             gain += adev->syss_mixgain;
             if (gain > 0) {
@@ -1450,7 +1450,7 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
         } else if (out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             /* app sound */
             int gain = 2560.0f * log10((adev->master_mute) ? 0.0f : adev->master_volume);
-            char parm[12] = "";
+            char parm[32] = "";
 
             gain += adev->apps_mixgain;
             if (gain > 0) {
