@@ -448,7 +448,7 @@ static aml_dec_return_type_t convert_data_from_be_to_16bit_le(aml_dec_t * aml_de
         ALOGE("[%s %d]lpcm is %d bps, don't process now\n", __FUNCTION__, __LINE__, pcm_config->width);
         return 0;
     }
-     dec_pcm_data->data_len = frame_num * 4;
+    dec_pcm_data->data_len = frame_num * 4;
     return AML_DEC_RETURN_TYPE_OK;
 }
 static aml_dec_return_type_t lpcm_process(aml_dec_t * aml_dec, unsigned char*buffer, int in_bytes)
@@ -485,6 +485,7 @@ static aml_dec_return_type_t lpcm_process(aml_dec_t * aml_dec, unsigned char*buf
     }
     return convert_data_from_be_to_16bit_le(aml_dec, buffer + header_size, bytes - header_size);
 }
+
 static bool is_lpcm(audio_format_t format)
 {
     if (format == AUDIO_FORMAT_PCM_LPCM_BLURAY|| format == AUDIO_FORMAT_PCM_LPCM_DVD || format == AUDIO_FORMAT_PCM_LPCM_1394) {
@@ -493,6 +494,41 @@ static bool is_lpcm(audio_format_t format)
         return false;
     }
 }
+
+static bool is_u8pcm(audio_format_t format)
+{
+    if (format == AUDIO_FORMAT_PCM_8_BIT) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static aml_dec_return_type_t u8pcm_process(aml_dec_t * aml_dec, unsigned char*buffer, int in_bytes)
+{
+    short *ouBuffer = NULL;
+    dec_data_info_t *dec_pcm_data = &aml_dec->dec_pcm_data;
+
+    if (dec_pcm_data->buf_size < in_bytes * 2) { // the max out buffer size is that input is 1ch 16bit
+        ALOGI("%s() realloc outbuf_max_len from %zu to %zu\n", __FUNCTION__, dec_pcm_data->buf_size, in_bytes * 2);
+        dec_pcm_data->buf = aml_audio_realloc(dec_pcm_data->buf, in_bytes * 2);
+        if (dec_pcm_data->buf == NULL) {
+            ALOGE("%s() realloc pcm buffer failed size %zu\n", __FUNCTION__, in_bytes * 2);
+            return AML_DEC_RETURN_TYPE_FAIL;
+        }
+        dec_pcm_data->buf_size = in_bytes * 2;
+        memset(dec_pcm_data->buf, 0, dec_pcm_data->buf_size);
+    }
+
+    ouBuffer = (short *)dec_pcm_data->buf;
+    for (int i = 0; i < in_bytes; i++) {
+        ouBuffer[i] = (short)(buffer[i] - 128)*256;
+    }
+
+    dec_pcm_data->data_len = in_bytes * 2;
+    return AML_DEC_RETURN_TYPE_OK;
+}
+
 static int pcm_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int bytes)
 {
     struct pcm_dec_t *pcm_dec = NULL;
@@ -526,6 +562,12 @@ static int pcm_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
         }
         pcm_config->channel = 2;
         src_channel = pcm_config->lpcm_channel;
+    } else if (is_u8pcm(pcm_config->pcm_format)) {
+        if (u8pcm_process(aml_dec, buffer, bytes) != AML_DEC_RETURN_TYPE_OK) {
+            ALOGE("%s():%d u8pcm_process error", __FUNCTION__, __LINE__);
+            return in_bytes;
+        }
+        src_channel = pcm_config->channel;
     } else {
         src_channel = pcm_config->channel;
         dst_channel = 2;
@@ -561,14 +603,14 @@ static int pcm_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
         dec_pcm_data->data_len = downmix_size;
     }
     pcm_dec->stream_info.stream_decode_num += dec_pcm_data->data_len/4;
-    if ( pcm_dec->stream_info.stream_bitrate == 0) {
+    if (pcm_dec->stream_info.stream_bitrate == 0) {
         pcm_dec->stream_info.stream_bitrate = src_channel*2*pcm_config->samplerate;
     }
     pcm_dec->stream_info.stream_ch = src_channel;
     pcm_dec->stream_info.stream_sr = pcm_config->samplerate;
-    dec_pcm_data->data_sr  = pcm_config->samplerate;
-    dec_pcm_data->data_ch  = 2;
-    dec_pcm_data->data_format  = pcm_config->pcm_format;
+    dec_pcm_data->data_sr = pcm_config->samplerate;
+    dec_pcm_data->data_ch = 2;
+    dec_pcm_data->data_format = pcm_config->pcm_format;
     ALOGV("%s data_in=%d ch =%d out=%d ch=%d", __func__, bytes, pcm_config->channel, downmix_size, 2);
 
     if (pcm_config->max_out_channels >= pcm_config->channel) {
