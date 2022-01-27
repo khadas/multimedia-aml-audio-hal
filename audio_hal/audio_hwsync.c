@@ -347,38 +347,36 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
         return 0;
     }
 
-    //ALOGI(" --- out_write %d, cache cnt = %d, body = %d, hw_sync_state = %d", out_frames * frame_size, out->body_align_cnt, out->hw_sync_body_cnt, out->hw_sync_state);
     while (remain > 0) {
-        //if (p_hwsync->hw_sync_state == HW_SYNC_STATE_RESYNC) {
-        //}
         if (p_hwsync->hw_sync_state == HW_SYNC_STATE_HEADER) {
-            //ALOGI("Add to header buffer [%d], 0x%x", p_hwsync->hw_sync_header_cnt, *p);
             p_hwsync->hw_sync_header[p_hwsync->hw_sync_header_cnt++] = *p++;
             remain--;
-            if (p_hwsync->hw_sync_header_cnt == HW_SYNC_VERSION_SIZE ) {
+
+            if (p_hwsync->hw_sync_header_cnt == HW_SYNC_VERSION_SIZE) {
                 if (!hwsync_header_valid(&p_hwsync->hw_sync_header[0])) {
-                    //ALOGE("!!!!!!hwsync header out of sync! Resync.should not happen????");
                     p_hwsync->hw_sync_state = HW_SYNC_STATE_HEADER;
                     memcpy(p_hwsync->hw_sync_header, p_hwsync->hw_sync_header + 1, HW_SYNC_VERSION_SIZE - 1);
                     p_hwsync->hw_sync_header_cnt--;
                     continue;
                 }
+
                 p_hwsync->version_num = p_hwsync->hw_sync_header[3];
-                if (p_hwsync->version_num == 1 || p_hwsync->version_num == 2) {
-                } else  {
-                    ALOGI("invalid hwsync version num %d",p_hwsync->version_num);
+                if (p_hwsync->version_num != 1 && p_hwsync->version_num != 2) {
+                    ALOGI("invalid hwsync version num %d", p_hwsync->version_num);
                 }
             }
-            if ((p_hwsync->version_num  == 1 && p_hwsync->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V1 ) ||
-                (p_hwsync->version_num  == 2 && p_hwsync->hw_sync_header_cnt == v2_hwsync_header )) {
+
+            if ((p_hwsync->version_num == 1 && p_hwsync->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V1) ||
+                (p_hwsync->version_num == 2 && p_hwsync->hw_sync_header_cnt == v2_hwsync_header)) {
                 uint64_t pts = 0, pts_raw = 0;
 
-                if (p_hwsync->version_num  == 2 && p_hwsync->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V2 ) {
+                if (p_hwsync->version_num == 2 && p_hwsync->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V2) {
                     v2_hwsync_header = hwsync_header_get_offset(&p_hwsync->hw_sync_header[0]);
                     if (v2_hwsync_header > HW_AVSYNC_MAX_HEADER_SIZE) {
-                        ALOGE("buffer overwrite, check the header size %zu \n",v2_hwsync_header);
+                        ALOGE("buffer overwrite, check the header size %zu \n", v2_hwsync_header);
                         break;
                     }
+
                     if (v2_hwsync_header > p_hwsync->hw_sync_header_cnt) {
                         ALOGV("need skip more sync header, %zu\n",v2_hwsync_header);
                         continue;
@@ -388,8 +386,12 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
                 if ((in_bytes - remain) > p_hwsync->hw_sync_header_cnt) {
                     ALOGI("got the frame sync header cost %zu", in_bytes - remain);
                 }
-                p_hwsync->hw_sync_state = HW_SYNC_STATE_BODY;
+
                 p_hwsync->hw_sync_body_cnt = hwsync_header_get_size(&p_hwsync->hw_sync_header[0]);
+                if (p_hwsync->hw_sync_body_cnt != 0) {
+                    p_hwsync->hw_sync_state = HW_SYNC_STATE_BODY;
+                }
+
                 if (p_hwsync->hw_sync_body_cnt > HWSYNC_MAX_BODY_SIZE) {
                     ALOGE("body max size =%d hw_sync_body_cnt =%d", HWSYNC_MAX_BODY_SIZE, p_hwsync->hw_sync_body_cnt);
                     p_hwsync->hw_sync_body_cnt = HWSYNC_MAX_BODY_SIZE;
@@ -432,25 +434,12 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
                 p_hwsync->last_apts_from_header_raw = pts_raw;
                 *cur_pts = (pts_raw == HWSYNC_PTS_NA) ? HWSYNC_PTS_NA : pts;
                 pts_found = 1;
-                //ALOGI("get header body_cnt = %d, pts = %lld", out->hw_sync_body_cnt, pts);
-
             }
             continue;
         } else if (p_hwsync->hw_sync_state == HW_SYNC_STATE_BODY) {
             int m = (p_hwsync->hw_sync_body_cnt < remain) ? p_hwsync->hw_sync_body_cnt : remain;
             // process m bytes body with an empty fragment for alignment
-            if (m  > 0) {
-                //ret = pcm_write(out->pcm, p, m - align);
-#if 0
-                FILE *fp1 = fopen("/data/hwsync_body.pcm", "a+");
-                if (fp1) {
-                    int flen = fwrite((char *)p, 1, m, fp1);
-                    //ALOGD("flen = %d---outlen=%d ", flen, out_frames * frame_size);
-                    fclose(fp1);
-                } else {
-                    ALOGE("could not open file:/data/hwsync_body.pcm");
-                }
-#endif
+            if (m > 0) {
                 memcpy(p_hwsync->hw_sync_body_buf + p_hwsync->hw_sync_frame_size - p_hwsync->hw_sync_body_cnt, p, m);
                 p += m;
                 remain -= m;
