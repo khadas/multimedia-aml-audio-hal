@@ -6652,12 +6652,13 @@ ssize_t hw_write (struct audio_stream_out *stream
             // one case is no main audio playing, only aux audio playing (Netflix main screen)
             // in this case dolby_ms12_get_consumed_payload() always return 0, no AV sync can be done zzz
 
-                // when msync is used, first apts handling is performed in mixer_main_buffer_write
-                if ((aml_out->hwsync->aout && AVSYNC_TYPE_MSYNC != aml_out->avsync_type) || ((aml_out->hwsync->aout) && (aml_out->hwsync->first_apts_flag) && AVSYNC_TYPE_MSYNC == aml_out->avsync_type)) {
+            // when msync is used, first apts handling is performed in mixer_main_buffer_write
+            if (aml_out->hwsync && aml_out->hwsync->aout) {
+                if ((AVSYNC_TYPE_MSYNC != aml_out->avsync_type) ||
+                    ((AVSYNC_TYPE_MSYNC == aml_out->avsync_type) && (aml_out->hwsync->first_apts_flag))) {
                     if (is_bypass_dolbyms12(stream)) {
                         aml_audio_hwsync_audio_process(aml_out->hwsync, aml_out->hwsync->payload_offset, out_frames, &adjust_ms);
-                    }
-                    else {
+                    } else {
                         if (!audio_is_linear_pcm(aml_out->hal_internal_format)) {
                             /*if udc decode doens't generate any data, we should not use the consume offset to get pts*/
                             ALOGV("udc generate pcm =%lld", dolby_ms12_get_main_pcm_generated(stream));
@@ -6666,20 +6667,22 @@ ssize_t hw_write (struct audio_stream_out *stream
                             }
                         } else {
                             /* because the pcm consumed playload offset is at the end of consume buffer,
-                             * we need the beginning position and ms12 always
-                             * output 1536 frame every time
-                             */
+                            * we need the beginning position and ms12 always
+                            * output 1536 frame every time
+                            */
                             uint64_t consume_payload = dolby_ms12_get_main_bytes_consumed(stream);
                             uint32_t ms12_frame_bytes = 1536 * aml_out->hal_frame_size;
                             aml_audio_hwsync_audio_process(aml_out->hwsync, consume_payload, out_frames, &adjust_ms);
                         }
                     }
                 }
-                if (aml_out->hwsync->aout == NULL) {
-                    if (adev->debug_flag) {
-                        ALOGI("%s,aml_out->hwsync->aout == NULL",__FUNCTION__);
-                    }
+            }
+
+            if (aml_out->hwsync == NULL || aml_out->hwsync->aout == NULL) {
+                if (adev->debug_flag) {
+                    ALOGI("%s,aml_out->hwsync == NULL or aml_out->hwsync->aout == NULL", __FUNCTION__);
                 }
+            }
         }
     }
     if (aml_out->pcm || adev->a2dp_hal || is_sco_port(adev->active_outport)) {
@@ -7366,7 +7369,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, const void *buf
 
 hwsync_rewrite:
     /* handle HWSYNC audio data*/
-    if (aml_out->hw_sync_mode) {
+    if (aml_out->hw_sync_mode && aml_out->hwsync) {
         uint64_t  cur_pts = 0xffffffff;
         int outsize = 0;
 
@@ -7411,20 +7414,19 @@ hwsync_rewrite:
                 // implementation in hw_write() is moved to this place when main input samples are injected
                 // because the sync policy return from msync side may need block when audio starts to play.
                 if (aml_out->hwsync->first_apts_flag == false && AVSYNC_TYPE_MSYNC == aml_out->avsync_type) {
-                                // may be blocked by msync_cond for initial playback timing control
-                                // the first checkin pts should be consumed by aml_audio_hwsync_audio_process for av_sync_audio_start
-                                //aml_audio_hwsync_audio_process(aml_out->hwsync, 0, NULL);
-                                aml_audio_hwsync_audio_process(aml_out->hwsync, 0, 0, NULL);
-                                // when dropping is needed at av_sync_audio_start
-                                // reset payload_offset since the data will not be
-                                // sent to MS12 pipeline. The consumed bytes number
-                                // from MS12 should match PTS checkin record from
-                                // payload_offset
-                                if (aml_out->msync_action == AV_SYNC_AA_DROP) {
-                                    aml_out->hwsync->payload_offset = 0;
-                                }
-                            }
-
+                    // may be blocked by msync_cond for initial playback timing control
+                    // the first checkin pts should be consumed by aml_audio_hwsync_audio_process for av_sync_audio_start
+                    //aml_audio_hwsync_audio_process(aml_out->hwsync, 0, NULL);
+                    aml_audio_hwsync_audio_process(aml_out->hwsync, 0, 0, NULL);
+                    // when dropping is needed at av_sync_audio_start
+                    // reset payload_offset since the data will not be
+                    // sent to MS12 pipeline. The consumed bytes number
+                    // from MS12 should match PTS checkin record from
+                    // payload_offset
+                    if (aml_out->msync_action == AV_SYNC_AA_DROP) {
+                        aml_out->hwsync->payload_offset = 0;
+                    }
+                }
             } else {
                 // if we got the frame body,which means we get a complete frame.
                 //we take this frame pts as the first apts.
