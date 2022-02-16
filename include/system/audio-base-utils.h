@@ -195,7 +195,7 @@ enum {
 #define MIC_FIELD_DIMENSION_DEFAULT MIC_FIELD_DIMENSION_NORMAL
 
 #ifdef __cplusplus
-#define CONST_ARRAY inline constexpr
+#define CONST_ARRAY constexpr
 #else
 #define CONST_ARRAY const
 #endif
