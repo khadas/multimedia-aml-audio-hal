@@ -32,8 +32,7 @@ int sonic_speed_init(sonic_speed_handle_t *handle,
     float volume = 1.0f;
     int emulateChordPitch = 1;
     int quality = 0;
-    //#ifdef ENABLE_SONIC
-#ifndef BUILD_LINUX
+
     handle->stream = sonicCreateStream(sr, ch);
     sonicSetSpeed(handle->stream, speed);
     sonicSetPitch(handle->stream, pitch);
@@ -41,8 +40,8 @@ int sonic_speed_init(sonic_speed_handle_t *handle,
     sonicSetVolume(handle->stream, volume);
     sonicSetChordPitch(handle->stream, emulateChordPitch);
     sonicSetQuality(handle->stream, quality);
-#endif
-    handle->speed   = speed;
+
+    handle->speed = speed;
     //sonicFlushStream(handle->stream);
     ALOGI("init sonic  speed %f sr %d ch %d rate %f", speed, sr ,ch, rate);
     return 0;
@@ -57,10 +56,7 @@ int sonic_speed_write(sonic_speed_handle_t *handle, void *buf, size_t in_size) {
         ALOGI("aml_speed_handle is NULL\n");
         return -1;
     }
-    //#ifdef ENABLE_SONIC
-#ifndef BUILD_LINUX
     ret = sonicWriteShortToStream(handle->stream, buf, in_frame);
-#endif
     ALOGV("ret %d in_frame %d", ret, in_frame);
     return in_frame;
 
@@ -76,10 +72,7 @@ int sonic_speed_read(sonic_speed_handle_t *handle, void *buf, size_t read_size) 
         return -1;
     }
     read_frame = read_size / audio_bytes_per_frame(handle->channels, handle->format);
-    //#ifdef ENABLE_SONIC
-#ifndef BUILD_LINUX
     samplesprocess = sonicReadShortFromStream(handle->stream, buf, read_frame);
-#endif
     ALOGV("samplesprocess=%d\n", samplesprocess);
     return samplesprocess;
 
@@ -92,10 +85,7 @@ int sonic_speed_release(sonic_speed_handle_t *handle)
         return -1;
     }
     if (handle) {
-        //#ifdef ENABLE_SONIC
-#ifndef BUILD_LINUX
         sonicDestroyStream(handle->stream);
-#endif
     }
 
     return 0;

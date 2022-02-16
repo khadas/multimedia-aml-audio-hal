@@ -98,6 +98,7 @@ add_library(audio_hal SHARED
 	aml_speed/aml_audio_speed_manager.c
 	aml_speed/audio_sonic_speed_api.c
 	aml_speed/sonic_speed_wrapper.c
+	aml_speed/sonic/sonic.c
 	audio_hal/alsa_config_parameters.c
 	audio_hal/alsa_manager.c
 	audio_hal/audio_bt_sco.c
