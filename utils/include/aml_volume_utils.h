@@ -47,6 +47,8 @@ void apply_volume_pan(unsigned char panByte, void *buf, int sample_size, int byt
 void apply_volume_16to32(float volume, int16_t *in_buf, int32_t *out_buf, int bytes);
 void apply_volume_fade(float last_volume, float volume, void *buf, int sample_size, int channels, int bytes);
 
+void appply_tone_16bit2ch(unsigned char* buf, int datalen);
+
 
 #endif
 
