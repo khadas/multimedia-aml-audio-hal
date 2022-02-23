@@ -94,6 +94,9 @@ ssize_t aml_audio_spdif_output(struct audio_stream_out *stream, void **spdifout_
         if (ret != 0) {
             return -1;
         }
+
+        if (aml_out->offload_mute)
+            aml_audio_spdifout_mute(*spdifout_handle, aml_out->offload_mute);
     }
 
     ALOGV("[%s:%d] format =0x%x length =%d", __func__, __LINE__, data_info->data_format, data_info->data_len);

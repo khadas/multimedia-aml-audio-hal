@@ -1399,14 +1399,16 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
         __func__, stream, left, right, continous_mode(adev), out->hal_internal_format, is_dolby_format, is_direct_pcm, is_mmap_pcm);
 
     /* for not use ms12 case, we can use spdif enc mute, other wise ms12 can handle it*/
-    if (is_dolby_format && (eDolbyDcvLib == adev->dolby_lib_type || is_bypass_dolbyms12(stream) || adev->hdmi_format == BYPASS)) {
-        if (out->volume_l < FLOAT_ZERO && left > FLOAT_ZERO) {
+    if (is_dts_format(out->hal_internal_format) ||
+        (is_dolby_format && (eDolbyDcvLib == adev->dolby_lib_type || is_bypass_dolbyms12(stream) || adev->hdmi_format == BYPASS))) {
+        if (left * adev->master_volume > FLOAT_ZERO) {
             ALOGI("set offload mute: false");
             out->offload_mute = false;
-        } else if (out->volume_l > FLOAT_ZERO && left < FLOAT_ZERO) {
+        } else if (left * adev->master_volume < FLOAT_ZERO) {
             ALOGI("set offload mute: true");
             out->offload_mute = true;
         }
+
         if (out->spdifout_handle) {
             aml_audio_spdifout_mute(out->spdifout_handle, out->offload_mute);
         }
@@ -7090,7 +7092,7 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
                 ALOGI("main start offset ns =%lld", adev->ms12.main_input_start_offset_ns);
             }
             /*set the volume to current one*/
-            if (!audio_is_linear_pcm(aml_out->hal_internal_format)) {
+            if (!audio_is_linear_pcm(aml_out->hal_internal_format) || aml_out->ms12_vol_ctrl) {
                 set_ms12_main_volume(&adev->ms12, aml_out->volume_l);
             }
             if (continous_mode(adev) && adev->ms12.dolby_ms12_enable) {
