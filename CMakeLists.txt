@@ -11,8 +11,8 @@ add_subdirectory("audio_codec/libmad")
 add_subdirectory("audio_codec/libvorbis")
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(arm)")
 add_subdirectory("audio_codec/libdts")
-add_subdirectory("audio_codec/libdcv")
 endif()
+add_subdirectory("audio_codec/libdcv")
 add_subdirectory("audio_hal/libaudioprocessing")
 
 add_library(spdifenc STATIC
