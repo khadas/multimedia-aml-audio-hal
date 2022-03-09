@@ -29,7 +29,8 @@
 //#define  LOG_TAG    "amadec"
 #define adec_print(...) __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
 #else
-#define adec_print(f,s...) fprintf(stderr,f,##s)
+#include <cutils/log.h>
+#define adec_print(...)    __android_log_print(ANDROID_##LOG_INFO, LOG_TAG, __VA_ARGS__)
 #endif
 
 
