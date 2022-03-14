@@ -1434,7 +1434,8 @@ int dolby_ms12_system_process(
     }
     pthread_mutex_unlock(&ms12->lock);
 
-    if (adev->continuous_audio_mode == 1) {
+    /* Netflix UI mixer output has flow control so need skip flow control here */
+    if ((adev->continuous_audio_mode == 1) && (!adev->is_netflix)) {
         uint64_t input_ns = 0;
         input_ns = (uint64_t)(*use_size) * NANO_SECOND_PER_SECOND / 4 / mixer_default_samplerate;
 
