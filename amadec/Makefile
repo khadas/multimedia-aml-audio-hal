@@ -32,7 +32,7 @@ SRC?=$(TOPDIR)
 
 CFLAGS+=-O2 -fPIC -g -D_POSIX_SOURCE -DDOLBY_USE_ARMDEC -DUSE_ARM_AUDIO_DEC
 #CFLAGS+=-I$(SRC)/dmxwrap -I$(SRC)/include -I$(SRC)/utils -I$(SRC)/../utils/include -I$(SRC)/../include -I$(SRC)/../../libplayer/src/amavutils/include -I$(SRC)/../../../vendor/amlogic/dvb/include/am_adp -I$(SRC)/dmxwrap/HwDemux -I$(SRC)/dmxwrap/MultiHwDemux -I$(SRC)/audio_read_api -I$(SRC)/sync -L${LIB_DIR} -I$(HEADERS_DIR)
-CFLAGS+=-I$(SRC)/include -I$(SRC) -I$(SRC)/../include -I$(SRC)/../utils/include -I$(SRC)/../dtv_audio_utils/audio_read_api -I$(SRC)/../dtv_audio_utils/sync -I$(SRC)/../dtv_audio_utils/avutils
+CFLAGS+=-I$(SRC)/include -I$(SRC) -I$(SRC)/../include -I$(SRC)/../include/basic_utils -I$(SRC)/../utils/include -I$(SRC)/../dtv_audio_utils/audio_read_api -I$(SRC)/../dtv_audio_utils/sync -I$(SRC)/../dtv_audio_utils/avutils
 
 %.o:%.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
