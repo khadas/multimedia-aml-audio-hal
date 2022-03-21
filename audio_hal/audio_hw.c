@@ -7846,8 +7846,8 @@ hwsync_rewrite:
     }
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         // position is proper?
-        if (!hw_sync->first_apts_flag &&
-            (aml_out->msync_action == AV_SYNC_AA_DROP) && AVSYNC_TYPE_MSYNC == aml_out->avsync_type) {
+        if ((AVSYNC_TYPE_MSYNC == aml_out->avsync_type) &&
+            (aml_out->msync_action == AV_SYNC_AA_DROP) && (!hw_sync->first_apts_flag)) {
             /* start dropping */
             ALOGI("MSYNC start dropping @0x%x, %d bytes", hw_sync->first_apts, write_bytes);
             goto exit;
