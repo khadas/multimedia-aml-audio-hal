@@ -452,7 +452,7 @@ int aml_audio_spdifout_mute(void *phandle, bool b_mute) {
     }
 
     spdifout_phandle->b_mute = b_mute;
-    ALOGI("%s mute:%d", __FUNCTION__, b_mute);
+    ALOGV("%s mute:%d", __FUNCTION__, b_mute);
     return 0;
 }
 

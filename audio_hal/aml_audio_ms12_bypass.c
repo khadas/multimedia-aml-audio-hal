@@ -181,7 +181,6 @@ int aml_ms12_bypass_checkin_data(void *phandle, const void *buffer, int32_t numB
     struct bypass_frame_item * new_frame = NULL;
     struct bypass_frame_item * last_frame = NULL;
     struct listnode *item = NULL, *n = NULL;
-    int frame_no = 0;
     struct aml_ms12_bypass_handle *bypass_handle = (struct aml_ms12_bypass_handle *)phandle;
     if ((bypass_handle == NULL) ||
         (buffer == NULL)        ||
@@ -192,17 +191,6 @@ int aml_ms12_bypass_checkin_data(void *phandle, const void *buffer, int32_t numB
     }
     ALOGV("size =%d frame info rate=%d dependency=%d numblks=%d", numBytes, data_info->samplerate, data_info->dependency_frame, data_info->numblks);
     pthread_mutex_lock(&bypass_handle->list_lock);
-    list_for_each_safe(item, n, &bypass_handle->frame_list) {
-        frame_no++;
-    }
-    pthread_mutex_unlock(&bypass_handle->list_lock);
-    if (frame_no >= MAX_BYPASS_FRAME_CAPACITY) {
-        aml_ms12_bypass_reset(phandle);
-        ALOGW("The checked in data is too many, please check it");
-    }
-    ALOGV("%s frame_no =%d", __FUNCTION__, frame_no);
-    pthread_mutex_lock(&bypass_handle->list_lock);
-
     new_frame = new_bypass_frame(buffer, numBytes, data_info);
     if (new_frame) {
         new_frame->offset_start = bypass_handle->data_offset;
@@ -213,8 +201,6 @@ int aml_ms12_bypass_checkin_data(void *phandle, const void *buffer, int32_t numB
     } else {
         ret = -1;
     }
-
-
     pthread_mutex_unlock(&bypass_handle->list_lock);
 
     if (new_frame) {
