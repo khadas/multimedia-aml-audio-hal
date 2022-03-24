@@ -31,6 +31,8 @@ typedef enum AML_BOOLEAN_DEFINE {
  */
 int aml_getprop_bool(const char *path);
 int aml_getprop_int(const char *path);
+int aml_property_set(char *string, char *val, int overwrite);
+void aml_property_decrease(char *string, char *str2);
 
 /*
  * Sys Fs Interface

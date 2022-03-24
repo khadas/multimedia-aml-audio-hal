@@ -3143,6 +3143,7 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
         goto exit_open;
     }
     aml_out = (struct aml_stream_out *)stream_out;
+    patch->dtv_aml_out = aml_out;
     ALOGI("++%s live create a output stream success now!!!\n ", __FUNCTION__);
     patch->out_buf_size = write_bytes * EAC3_MULTIPLIER;
     patch->out_buf = aml_audio_calloc(1, patch->out_buf_size);

@@ -242,6 +242,9 @@ struct audio_patch_latency_detail {
     unsigned int total_latency;
 };
 
+struct audio_stream_out;
+struct audio_stream_in;
+struct aml_stream_out;
 struct aml_audio_patch {
     struct audio_hw_device *dev;
     ring_buffer_t aml_ringbuffer;
@@ -394,10 +397,8 @@ struct aml_audio_patch {
     void *dtv_package_list;
     struct package *cur_package;
     bool skip_amadec_flag;
+    struct aml_stream_out * dtv_aml_out;
 };
-
-struct audio_stream_out;
-struct audio_stream_in;
 
 stream_usecase_t convert_usecase_mask_to_stream_usecase(usecase_mask_t mask);
 

@@ -68,6 +68,25 @@ int aml_getprop_int(const char *path)
 	return value;
 }
 
+int aml_property_set(char *string, char *val, int overwrite)
+{
+	return setenv(string, val, overwrite);
+}
+
+void aml_property_decrease(char *string, char *str2)
+{
+	int printcount = aml_getprop_int(string);
+	if (printcount > 0)
+	{
+		char putstr[50] = {0};
+		memset(putstr, 0, 50);
+		printcount--;
+		sprintf(putstr,"%d", printcount);
+		aml_property_set(str2, putstr, 1);
+		//ALOGI("aml_property_decrease6, %d,!!!\n", printcount);
+	}
+}
+
 /*
 * Linux Sys Fs Set/Get Interface
 */
