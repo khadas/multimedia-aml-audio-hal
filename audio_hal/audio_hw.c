@@ -76,6 +76,7 @@
 #include "aml_audio_ease.h"
 #include "aml_audio_spdifout.h"
 #include "aml_config_parser.h"
+#include "audio_effect_if.h"
 
 #ifdef BUILD_LINUX
 #include "atomic.h"
@@ -10006,6 +10007,7 @@ static int adev_close(hw_device_t *device)
     release_aec(adev->aec);
 #endif
     g_adev = NULL;
+    audio_effect_unload_interface(&(adev->hw_device));
 
     aml_audio_free(device);
     pthread_mutex_unlock(&adev_mutex);
@@ -10213,6 +10215,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     int ret = 0, i;
     char buf[PROPERTY_VALUE_MAX] = {0};
     int disable_continuous = 1;
+    audio_effect_t *audio_effect;
 
     ALOGD("%s: enter", __func__);
     pthread_mutex_lock(&adev_mutex);
@@ -10324,6 +10327,13 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         ret = -EINVAL;
         goto err_adev;
     }
+
+    audio_effect_load_interface(&(adev->hw_device), &audio_effect);
+#ifdef __LP64__
+    adev->hw_device.common.reserved[0] = (uint64_t)audio_effect;
+#else
+    adev->hw_device.common.reserved[0] = (uint32_t)audio_effect;
+#endif
 
     adev->next_unique_ID = 1;
     list_init(&adev->patch_list);
