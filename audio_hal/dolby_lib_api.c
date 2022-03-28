@@ -125,6 +125,8 @@ enum eDolbyLibType detect_dolby_lib_type(void) {
                 ALOGI("%s,FOUND libdolbyms12 lib\n", __FUNCTION__);
                 return eDolbyMS12Lib;
             }
+        } else {
+            ALOGE("%s, failed to open dolby lib %s, %s\n", __FUNCTION__, DOLBY_MS12_LIB_PATH_A, dlerror());
         }
     }
 
