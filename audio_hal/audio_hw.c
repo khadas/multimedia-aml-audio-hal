@@ -3436,8 +3436,12 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = (struct aml_audio_device *)dev;
 
-    ALOGD("%s: enter: dev(%p) stream(%p)", __func__, dev, stream);
+    if (dev == NULL || stream == NULL) {
+        ALOGE("%s: Input parameter error!!!", __func__);
+        return;
+    }
 
+    ALOGI("%s: enter: dev(%p) stream(%p)", __func__, dev, stream);
 
     if (out->msync_session) {
         /* unblock feeding thread just in case */
@@ -3641,8 +3645,12 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
 
     pthread_mutex_unlock(&out->lock);
 
-    aml_audio_free(stream);
-    ALOGD("%s: exit", __func__);
+    if (stream) {
+        aml_audio_free(stream);
+        stream = NULL;
+    }
+
+    ALOGI("%s: exit", __func__);
 }
 
 static int aml_audio_output_routing(struct audio_hw_device *dev,
@@ -8612,7 +8620,12 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
     struct aml_audio_device *adev = (struct aml_audio_device *)dev;
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
 
-    ALOGD("%s: enter usecase = %s", __func__, usecase2Str(aml_out->usecase));
+    if (dev == NULL || stream == NULL) {
+        ALOGE("%s: Input parameter error!!!", __func__);
+        return;
+    }
+
+    ALOGI("%s: enter usecase = %s", __func__, usecase2Str(aml_out->usecase));
 
     /* free stream ease resource  */
     aml_audio_ease_close(aml_out->audio_stream_ease);
@@ -8649,7 +8662,7 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
     adev_close_output_stream(dev, stream);
     //adev->dual_decoder_support = false;
     //destroy_aec_reference_config(adev->aec);
-    ALOGD("%s: exit", __func__);
+    ALOGI("%s: exit", __func__);
 }
 
 static void ts_wait_time(struct timespec *ts, uint32_t time)
