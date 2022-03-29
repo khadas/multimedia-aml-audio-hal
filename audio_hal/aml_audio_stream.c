@@ -816,6 +816,96 @@ void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
         dprintf(fd, "[AML_HAL]      -dd: %d, ddp: %d, mat: %d\n",
                 dd_is_support, ddp_is_support, mat_is_support);
     }
+    dprintf(fd, "-------------[AML_HAL] DTV patch [%p]---------------\n", pstPatch);
+    dprintf(fd, "[AML_HAL] is_dtv_src:%d,dtvin_buffer_inited:%d\n",pstPatch->is_dtv_src,pstPatch->dtvin_buffer_inited);
+    if (SRC_DTV == aml_dev->patch_src)
+    {
+        if (pstPatch->dtvin_buffer_inited)
+        {
+            if (pstPatch->dtvin_ringbuffer.size != 0) {
+                uint32_t u32FreeBuffer = get_buffer_write_space(&pstPatch->dtvin_ringbuffer);
+                dprintf(fd, "[AML_HAL]      dtvin_ringbuffer   size: %10d Byte|  UnusedBuf:%10d Byte(%d%%)\n",
+                pstPatch->dtvin_ringbuffer.size, u32FreeBuffer, u32FreeBuffer* 100 / pstPatch->dtvin_ringbuffer.size);
+            } else {
+                dprintf(fd, "[AML_HAL]      patch  dtvin_ringbuffer    : buffer size is 0\n");
+            }
+        }
+        dprintf(fd, "[AML_HAL] dtv_aformat:%d,dtv_has_video:%d,dtv_decoder_state:%d,dtv_decoder_cmd:%d,dtv_first_apts_flag:%d\n",
+                pstPatch->dtv_aformat,pstPatch->dtv_has_video,pstPatch->dtv_decoder_state,
+                pstPatch->dtv_decoder_cmd,pstPatch->dtv_first_apts_flag);
+        dprintf(fd, "[AML_HAL] dtv_NchOriginal:%x,dtv_lfepresent:%x,dtv_first_apts:%x,dtv_pcm_writed:%x,dtv_pcm_readed:%x,dtv_decoder_ready:%x\n",
+                pstPatch->dtv_NchOriginal,pstPatch->dtv_lfepresent,
+                pstPatch->dtv_first_apts,pstPatch->dtv_pcm_writed,
+                pstPatch->dtv_pcm_readed,pstPatch->dtv_decoder_ready);
+        dprintf(fd, "[AML_HAL] dtv_symple_rate:%d,dtv_pcm_channel:%d,dtv_replay_flag:%d,dtv_output_clock:%x,dtv_default_i2s_clock:%x,dtv_default_spdif_clock:%x\n",
+                pstPatch->dtv_symple_rate,pstPatch->dtv_pcm_channel,
+                pstPatch->dtv_replay_flag,pstPatch->dtv_output_clock,
+                pstPatch->dtv_default_i2s_clock,pstPatch->dtv_default_spdif_clock);
+        dprintf(fd, "[AML_HAL] dtv_audio_mode:%d,dtv_apts_lookup:%d,dtv_audio_tune:%d,avsync_callback:%p,dtv_output_mutex:%p,dtv_input_mutex:%p\n",
+                pstPatch->dtv_audio_mode,pstPatch->dtv_apts_lookup,
+                pstPatch->dtv_audio_tune,pstPatch->avsync_callback,
+                &(pstPatch->dtv_output_mutex),&(pstPatch->dtv_input_mutex));
+        dprintf(fd, "[AML_HAL] dtv_cmd_process_cond:%p,dtv_cmd_process_mutex:%p,dtv_log_retry_cnt:%d,dtvsync:%p,dtv_cmd_list:%p,dtv_package_list %p\n",
+                &(pstPatch->dtv_cmd_process_cond),&(pstPatch->dtv_cmd_process_mutex),
+                pstPatch->dtv_log_retry_cnt,pstPatch->dtvsync,
+                pstPatch->dtv_cmd_list,pstPatch->dtv_package_list);
+        dprintf(fd, "[AML_HAL] dtv_resample:%x,%x,%x,%x,%x,\n",
+                pstPatch->dtv_resample.FractionStep,pstPatch->dtv_resample.SampleFraction,
+                pstPatch->dtv_resample.input_sr, pstPatch->dtv_resample.output_sr,pstPatch->dtv_resample.channels);
+        if (pstPatch->dtvsync)
+        {
+            dprintf(fd, "[AML_HAL] use_mediasync:%d,mediasync %p,mediasync_new %p,mediasync_id %d,cur_outapts %lld,out_start_apts %lld,out_end_apts %lld\n",
+                    pstPatch->dtvsync->use_mediasync,pstPatch->dtvsync->mediasync,pstPatch->dtvsync->mediasync_new,
+                    pstPatch->dtvsync->mediasync_id,pstPatch->dtvsync->cur_outapts,
+                    pstPatch->dtvsync->out_start_apts,pstPatch->dtvsync->out_end_apts);
+            dprintf(fd, "[AML_HAL] cur_speed:%d,pcm_dropping %d,duration %d,apolicy %d,param1 %d,param2 %d\n",
+                    pstPatch->dtvsync->cur_speed,pstPatch->dtvsync->pcm_dropping,pstPatch->dtvsync->duration,
+                    pstPatch->dtvsync->apolicy.audiopolicy,pstPatch->dtvsync->apolicy.param1,
+                    pstPatch->dtvsync->apolicy.param2);
+        }
+        if (pstPatch->cur_package)
+        {
+            dprintf(fd, "[AML_HAL] data:%p,size %d,ad_data %p,ad_size %d,next %p,pts %lld,ad_pts %lld\n",
+                    pstPatch->cur_package->data,pstPatch->cur_package->size,
+                    pstPatch->cur_package->ad_data,pstPatch->cur_package->ad_size,
+                    pstPatch->cur_package->next,pstPatch->cur_package->pts,pstPatch->cur_package->ad_pts);
+        }
+        dprintf(fd, "[AML_HAL] demux_handle:%p,demux_info %p\n",
+                pstPatch->demux_handle,pstPatch->demux_info);
+        if (pstPatch->demux_info)
+        {
+            aml_demux_audiopara_t * tm = (aml_demux_audiopara_t *)pstPatch->demux_info;
+            dprintf(fd, "[AML_HAL] demux_id:%d,security_mem_level %d,output_mode %d,has_video %d,main_fmt %d,main_pid %d,\n",
+                    tm->demux_id,tm->security_mem_level,tm->output_mode,tm->has_video,tm->main_fmt,tm->main_pid);
+            dprintf(fd, "[AML_HAL] ad_fmt:%d,ad_pid %d,dual_decoder_support %d,associate_audio_mixing_enable %d,media_sync_id %d,media_presentation_id %d,\n",
+                    tm->ad_fmt,tm->ad_pid,tm->dual_decoder_support,tm->associate_audio_mixing_enable,tm->media_sync_id,tm->media_presentation_id);
+            dprintf(fd, "[AML_HAL] ad_package_status:%d,mEsData %p,mADEsData %p,dtv_pacakge %p,ad_fade %d,ad_pan %d,\n",
+                    tm->ad_package_status,tm->mEsData,tm->mADEsData,tm->dtv_pacakge,tm->ad_fade,tm->ad_pan);
+        }
+        dprintf(fd, "-------------[AML_HAL] DTV patch outstream [%p]---------------\n", pstPatch);
+        if (pstPatch->skip_amadec_flag &&  pstPatch->dtv_aml_out)
+        {
+            struct aml_stream_out * dtv_aml_out = pstPatch->dtv_aml_out;
+            aml_dec_t *aml_dec= dtv_aml_out->aml_dec;
+            dprintf(fd, "[AML_HAL] ad_decoder_supported:%d,ad_mixing_enable %d,advol_level %d,mixer_level %d,ad_fade %x,ad_pan %x,\n",
+                    dtv_aml_out->dec_config.ad_decoder_supported,dtv_aml_out->dec_config.ad_mixing_enable,
+                    dtv_aml_out->dec_config.advol_level,dtv_aml_out->dec_config.mixer_level,
+                    dtv_aml_out->dec_config.ad_fade,dtv_aml_out->dec_config.ad_pan);
+            dprintf(fd, "[AML_HAL] format:%d,ad_data %p,ad_size %d,in_frame_pts %lld,out_frame_pts %lld,status %d,\n",
+                    aml_dec->format,aml_dec->ad_data,aml_dec->ad_size,aml_dec->in_frame_pts,aml_dec->out_frame_pts,aml_dec->status);
+            dprintf(fd, "[AML_HAL] frame_cnt:%d,fragment_left_size %d,dev %p \n",
+                    aml_dec->frame_cnt,aml_dec->fragment_left_size,aml_dec->dev);
+            dprintf(fd, "[AML_HAL] main data_format:%d,sub_format %d,buf_size %d,data_len %d,data_ch %d,data_sr %d,buf %p\n",
+                    aml_dec->dec_pcm_data.data_format,aml_dec->dec_pcm_data.sub_format,
+                    aml_dec->dec_pcm_data.buf_size,aml_dec->dec_pcm_data.data_len,
+                    aml_dec->dec_pcm_data.data_ch,aml_dec->dec_pcm_data.data_sr,aml_dec->dec_pcm_data.buf);
+            dprintf(fd, "[AML_HAL] ad data_format:%d,sub_format %d,buf_size %d,data_len %d,data_ch %d,data_sr %d,buf %p\n",
+                    aml_dec->ad_dec_pcm_data.data_format,aml_dec->ad_dec_pcm_data.sub_format,
+                    aml_dec->ad_dec_pcm_data.buf_size,aml_dec->ad_dec_pcm_data.data_len,
+                    aml_dec->ad_dec_pcm_data.data_ch,aml_dec->ad_dec_pcm_data.data_sr,aml_dec->ad_dec_pcm_data.buf);
+        }
+    }
+    dprintf(fd, "-------------[AML_HAL] End DTV patch [%p]---------------\n", pstPatch);
 
 
 }
