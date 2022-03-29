@@ -802,7 +802,8 @@ int get_the_dolby_ms12_prepared(
     if (adev->is_SBR)
         output_config = MS12_OUTPUT_MASK_SPEAKER;
 
-    set_dolby_ms12_drc_parameters(input_format, output_config);
+    /* just use drc parameters saved in ms12, that are changed by adev_set_parameters */
+    //set_dolby_ms12_drc_parameters(input_format, output_config);
 #if 0
     /*we reconfig the ms12 nodes depending on the user case when digital input case to refine ms12 perfermance*/
     if (patch && \
@@ -1028,7 +1029,8 @@ int dolby_ms12_main_process(
             dolby_ms12_main_open(stream);
 
             /* dynamicly set the drc parameters mode/cut/boost */
-            dynamic_set_dolby_ms12_drc_parameters(ms12);
+            /* just use drc parameters saved in ms12, that are changed by adev_set_parameters */
+            //dynamic_set_dolby_ms12_drc_parameters(ms12);
         }
 
         /*this status is only updated in hw_write, continuous mode also need it*/
