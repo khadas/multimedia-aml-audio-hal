@@ -34,6 +34,8 @@ void aml_audio_select_spdif_to_hdmi(int spdif_select);
 
 int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config);
 
+int aml_audio_spdifout_insert_pause(void *phandle, int frames);
+
 int aml_audio_spdifout_processs(void *phandle, void *buffer, size_t byte);
 
 int aml_audio_spdifout_close(void *phandle);

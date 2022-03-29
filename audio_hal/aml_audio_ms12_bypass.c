@@ -23,7 +23,7 @@
 
 #define BYPASS_MS12_MAX_FRAME_SIZE (32768)
 #define DDP_FRAME_BLK_NUM          (6)
-#define MAX_BYPASS_FRAME_CAPACITY  (50)
+#define MAX_BYPASS_FRAME_CAPACITY  (5000)
 
 struct bypass_frame_item {
     struct listnode list;

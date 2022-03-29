@@ -632,6 +632,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             ALOGI("%s, Recovered APTS/PCR checking", __func__);
             adev->gap_ignore_pts = false;
             adev->gap_offset = 0;
+            adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_IDLE;
         }
     }
 

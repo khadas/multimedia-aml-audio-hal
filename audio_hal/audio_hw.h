@@ -322,6 +322,14 @@ enum {
     EASE_SETTING_PENDING = 2
 };
 
+enum {
+    GAP_PASSTHROUGH_STATE_IDLE = 0,
+    GAP_PASSTHROUGH_STATE_SET,
+    GAP_PASSTHROUGH_STATE_WAIT_START,
+    GAP_PASSTHROUGH_STATE_INSERT,
+    GAP_PASSTHROUGH_STATE_DONE,
+};
+
 struct aml_audio_device {
     struct audio_hw_device hw_device;
     /* see note below on mutex acquisition order */
@@ -562,6 +570,8 @@ struct aml_audio_device {
     uint64_t gap_offset;
     uint32_t gap_pts;
     bool gap_ignore_pts;
+    int gap_passthrough_state;
+    uint32_t gap_passthrough_ms12_no_output_counter;
     float master_volume;
     bool master_mute;
     int syss_mixgain;

@@ -1633,6 +1633,23 @@ exit:
     return ret;
 }
 
+static ssize_t aml_ms12_spdif_output_insert (struct audio_stream_out *stream,
+                                struct bitstream_out_desc * bitstream_desc)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev = aml_out->dev;
+
+    int ret = 0;
+
+    if (bitstream_desc->spdifout_handle == NULL) {
+        return 0;
+    }
+
+    ret = aml_audio_spdifout_insert_pause(bitstream_desc->spdifout_handle, 256 * 4); /* 256 frames x4 (DDP) */
+
+    return ret;
+}
+
 static ssize_t aml_ms12_spdif_output_new (struct audio_stream_out *stream,
                                 struct bitstream_out_desc * bitstream_desc, audio_format_t output_format, audio_format_t sub_format, void *buffer, size_t byte)
 {
@@ -1827,10 +1844,11 @@ int ms12_passthrough_output(struct aml_stream_out *aml_out) {
     audio_format_t hal_internal_format = ms12_get_audio_hal_format(aml_out->hal_internal_format);
     uint64_t ms12_dec_out_nframes = dolby_ms12_get_decoder_nframes_pcm_output(adev->ms12.dolby_ms12_ptr, hal_internal_format, MAIN_INPUT_STREAM);
     struct bitstream_out_desc *bitstream_out = &ms12->bitstream_out[BITSTREAM_OUTPUT_A];
+    uint64_t consume_offset = 0;
 
     if (ms12_dec_out_nframes != 0 &&
         (hal_internal_format == AUDIO_FORMAT_E_AC3 || hal_internal_format == AUDIO_FORMAT_AC3)) {
-        uint64_t consume_offset = dolby_ms12_get_decoder_n_bytes_consumed(ms12->dolby_ms12_ptr, hal_internal_format, MAIN_INPUT_STREAM);
+        consume_offset = dolby_ms12_get_decoder_n_bytes_consumed(ms12->dolby_ms12_ptr, hal_internal_format, MAIN_INPUT_STREAM);
         aml_ms12_bypass_checkout_data(ms12->ms12_bypass_handle, &output_buf, &out_size, consume_offset, &frame_info);
     }
     if ((adev->hdmi_format != BYPASS)) {
@@ -1843,7 +1861,6 @@ int ms12_passthrough_output(struct aml_stream_out *aml_out) {
         }
         memset(bitstream_out, 0, sizeof(struct bitstream_out_desc));
     }
-
 
     if (ms12->is_bypass_ms12) {
         ALOGV("bypass ms12 size=%d", out_size);
@@ -1860,10 +1877,54 @@ int ms12_passthrough_output(struct aml_stream_out *aml_out) {
             out_size = 0;
         }
 
-        if (out_size != 0 && output_buf != NULL) {
+        /* Netflix GAP processing when MS12 is in Passthrough mode */
+#if 0
+        if ((adev->gap_passthrough_state != GAP_PASSTHROUGH_STATE_IDLE) && (adev->gap_passthrough_state != GAP_PASSTHROUGH_STATE_DONE)) {
+            ALOGI("consume_offset = %" PRIu64 " gap_offset = %" PRIu64 " out_size = %d", consume_offset, adev->gap_offset, out_size);
+        }
+#endif
+
+        if ((adev->gap_passthrough_state == GAP_PASSTHROUGH_STATE_SET) &&
+            ((adev->gap_offset > 0) && (consume_offset > adev->gap_offset))) {
+            ALOGI("gap_passthrough_state: SET->WAIT_START");
+            adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_WAIT_START;
+        }
+
+        if (adev->gap_passthrough_state == GAP_PASSTHROUGH_STATE_WAIT_START) {
+            if (out_size == 0) {
+                adev->gap_passthrough_ms12_no_output_counter++;
+                if (adev->gap_passthrough_ms12_no_output_counter > 6) {
+                    ALOGI("gap_passthrough_state: WAIT_START->INSERT");
+                    adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_INSERT;
+                }
+            } else {
+                adev->gap_passthrough_ms12_no_output_counter = 0;
+            }
+        }
+
+        if (adev->gap_passthrough_state == GAP_PASSTHROUGH_STATE_INSERT) {
+            if (out_size != 0 && output_buf != NULL) {
+                ALOGI("gap_passthrough_state: INSERT->DONE");
+                adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_DONE;
+            }
+        }
+
+        if ((out_size != 0 && output_buf != NULL) &&
+            ((adev->gap_passthrough_state == GAP_PASSTHROUGH_STATE_IDLE) ||
+             (adev->gap_passthrough_state == GAP_PASSTHROUGH_STATE_SET) ||
+             (adev->gap_passthrough_state == GAP_PASSTHROUGH_STATE_DONE))) {
             struct audio_stream_out *stream_out = (struct audio_stream_out *)aml_out;
+            adev->gap_passthrough_ms12_no_output_counter = 0;
             ret = aml_ms12_spdif_output_new(stream_out, bitstream_out, output_format, aml_out->hal_internal_format, output_buf, out_size);
         }
+#if 0
+        else if (adev->gap_passthrough_state == GAP_PASSTHROUGH_STATE_INSERT) {
+            /* insert muting frame (256 frames) to digital output */
+            struct audio_stream_out *stream_out = (struct audio_stream_out *)aml_out;
+            ALOGI("gap_passthrough_state: INSERT");
+            aml_ms12_spdif_output_insert(stream_out, bitstream_out);
+        }
+#endif
         passthrough_delay_ms = aml_audio_spdifout_get_delay(bitstream_out->spdifout_handle);
         ALOGV("passthrough_delay_ms =%d", passthrough_delay_ms);
     }

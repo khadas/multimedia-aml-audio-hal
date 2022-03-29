@@ -1789,6 +1789,9 @@ static int out_flush_new (struct audio_stream_out *stream)
 
             aml_audio_hwsync_init(out->hwsync, out);
             dolby_ms12_hwsync_init();
+
+            adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_IDLE;
+            adev->gap_offset = 0;
         }
         //normal pcm(mixer thread) do not flush dolby ms12 input buffer
         if (continous_mode(adev) && (out->flags & AUDIO_OUTPUT_FLAG_DIRECT)) {
@@ -3406,6 +3409,11 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
                 aml_audio_free(out->resample_outbuf);
             out->resample_outbuf = NULL;
         }
+
+        if (adev->is_netflix) {
+            adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_IDLE;
+            adev->gap_offset = 0;
+        }
     }
 
     if (out->hal_format == AUDIO_FORMAT_AC4) {
@@ -4307,6 +4315,8 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             adev->is_netflix = 1;
         } else {
             adev->is_netflix = 0;
+            adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_IDLE;
+            adev->gap_offset = 0;
         }
         ALOGI("%s:%d is_netflix %d(%s)", __FUNCTION__, __LINE__, adev->is_netflix, value);
 
@@ -5041,6 +5051,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             ALOGI("pts_gap %llu %d", offset, duration);
             adev->gap_offset = offset;
             adev->gap_ignore_pts = false;
+            adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_SET;
             dolby_ms12_set_pts_gap(offset, duration);
             ret = 0;
             goto exit;

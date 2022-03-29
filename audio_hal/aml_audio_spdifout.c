@@ -338,6 +338,37 @@ error:
 
 }
 
+/* insert mute frames */
+int aml_audio_spdifout_insert_pause(void *phandle, int frames)
+{
+    int ret = -1;
+    struct spdifout_handle *spdifout_phandle = (struct spdifout_handle *)phandle;
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *)adev_get_handle();
+    int device_id = -1;
+    void *alsa_handle = NULL;
+    void *tmp;
+
+    if (phandle == NULL) {
+        return -1;
+    }
+    device_id = spdifout_phandle->device_id;
+    alsa_handle = aml_dev->alsa_handle[device_id];
+
+    tmp = calloc(1, frames * 4);
+    if (tmp) {
+        unsigned short *p = (unsigned short *)tmp;
+        p[0] = 0xf872;    /* Pa */
+        p[1] = 0x4e1f;    /* Pb */
+        p[2] = 3;         /* Pc (PAUSE) */
+        p[3] = 4;         /* Payload of 32 bits */
+                          /* with unspecified gap length */
+        ret = aml_alsa_output_write_new(alsa_handle, tmp, frames * 4);
+        free(tmp);
+    }
+
+    return ret;
+}
+
 int aml_audio_spdifout_processs(void *phandle, void *buffer, size_t byte)
 {
     int ret = -1;
