@@ -3256,6 +3256,21 @@ exit_open:
     return ((void *)0);
 }
 
+//pip case only works with single dtv patch.
+//number of demux handle greater than 1 is pip case
+static bool IsPipRun(aml_dtv_audio_instances_t * dtv_audio_instances)
+{
+    int ret=0;
+    {
+        for (int index = 0; index < DVB_DEMUX_SUPPORT_MAX_NUM; index ++) {
+            if (dtv_audio_instances->demux_handle[index] != 0)
+            {
+                ret++;
+            }
+        }
+    }
+    return ret > 1;
+}
 
 static void *audio_dtv_patch_process_threadloop_v2(void *data)
 {
@@ -3404,10 +3419,18 @@ static void *audio_dtv_patch_process_threadloop_v2(void *data)
 
                 patch->dtv_pcm_readed = patch->dtv_pcm_writed = 0;
                 patch->numDecodedSamples = patch->numOutputSamples = 0;
+                //flush old data when start dmx
+                if (aml_dev->is_multi_demux) {
+                    if (patch->demux_handle && (!IsPipRun(dtv_audio_instances))) {
+                        Flush_Dmx_Audio(patch->demux_handle);
+                    }
+                    if (!IsPipRun(dtv_audio_instances)) {
+                        dtv_package_list_flush(patch->dtv_package_list);
+                    }
+                    Start_Dmx_Main_Audio(patch->demux_handle);
+                }
                 create_dtv_input_stream_thread(patch);
                 create_dtv_output_stream_thread(patch);
-                if (aml_dev->is_multi_demux)
-                    Start_Dmx_Main_Audio(patch->demux_handle);
             } else {
                 ALOGI("++%s line %d  live state unsupport state %d cmd %d !\n",
                       __FUNCTION__, __LINE__, patch->dtv_decoder_state, cmd);
@@ -3465,7 +3488,11 @@ static void *audio_dtv_patch_process_threadloop_v2(void *data)
                 ALOGI("[audiohal_kpi]++%s live now  stop  the audio decoder now \n",
                       __FUNCTION__);
                 dtv_do_ease_out(aml_dev);
-                //release_dtv_input_stream_thread(patch);
+                //non-pip case ,Make sure you get the first new data
+                //Always hold a current package in input_stream thread,so need release it.
+                if (!IsPipRun(dtv_audio_instances)) {
+                    release_dtv_input_stream_thread(patch);
+                }
                 release_dtv_output_stream_thread(patch);
                 if (aml_dev->is_multi_demux) {
                     dtv_package_list_flush(patch->dtv_package_list);
@@ -3474,9 +3501,8 @@ static void *audio_dtv_patch_process_threadloop_v2(void *data)
                 if (aml_dev->is_multi_demux) {
                     path_id = dtv_audio_instances->demux_index_working;
                     patch->demux_handle = dtv_audio_instances->demux_handle[path_id];
-                    //if (patch->demux_handle) {
-                    //    Stop_Dmx_Main_Audio(patch->demux_handle);
-                    //    Stop_Dmx_AD_Audio(patch->demux_handle);
+                    //if (patch->demux_handle && (!IsPipRun(dtv_audio_instances))) {
+                    //    Flush_Dmx_Audio(patch->demux_handle);
                     //}
                 }  else {
                     //dtv_assoc_audio_stop(1);
@@ -3656,6 +3682,12 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     int ret = 0;
     // ALOGI("++%s live period_size %d\n", __func__, period_size);
     //pthread_mutex_lock(&aml_dev->patch_lock);
+    {
+        aml_dtv_audio_instances_t *dtv_audio_instances = (aml_dtv_audio_instances_t *)aml_dev->aml_dtv_audio_instances;
+        for (int index = 0; index < DVB_DEMUX_SUPPORT_MAX_NUM; index ++) {
+            dtv_audio_instances->demux_handle[index] = 0;
+        }
+    }
     if (aml_dev->audio_patch) {
         ALOGD("%s: patch exists, first release it", __func__);
         if (aml_dev->audio_patch->is_dtv_src) {

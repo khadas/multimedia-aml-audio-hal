@@ -230,6 +230,14 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperReadData(int pid, mEsData
 
 AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperFlushData(int pid) {
     (void) pid;
+    {
+        TSPMutex::Autolock l(mAudioEsDataQueueLock);
+        clearPendingEsData(mAudioEsDataQueue);
+    }
+    {
+        TSPMutex::Autolock l(mAudioADEsDataQueueLock);
+        clearPendingEsData(mAudioADEsDataQueue);
+    }
     return AM_Dmx_SUCCESS;
 }
 

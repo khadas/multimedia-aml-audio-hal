@@ -42,6 +42,18 @@ AM_Dmx_Audio_ErrorCode_t Init_Dmx_Main_Audio(void *demux_handle,int fmt, int pid
 
     return AM_AUDIO_Dmx_SUCCESS;
 }
+
+AM_Dmx_Audio_ErrorCode_t Flush_Dmx_Audio(void *demux_handle) {
+    AmHwMultiDemuxWrapper * demux_wrapper = (AmHwMultiDemuxWrapper *)demux_handle;
+    if (demux_wrapper == NULL) {
+        ALOGD("demux not open !!!");
+        return AM_AUDIO_Dmx_ERROR;
+    }
+    ALOGI("%s %d",__FUNCTION__, __LINE__);
+    demux_wrapper->AmDemuxWrapperFlushData(demux_wrapper->filering_aud_pid);
+    return AM_AUDIO_Dmx_SUCCESS;
+}
+
 AM_Dmx_Audio_ErrorCode_t Stop_Dmx_Main_Audio(void *demux_handle) {
     AmHwMultiDemuxWrapper * demux_wrapper = (AmHwMultiDemuxWrapper *)demux_handle;
     if (demux_wrapper == NULL) {
