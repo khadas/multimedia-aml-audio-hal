@@ -5160,8 +5160,16 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         }
         return strdup ("hw_av_sync=12345678");
     }
-
-    if (strstr (keys, AUDIO_PARAMETER_HW_AV_EAC3_SYNC) ) {
+    ALOGI ("adev_get_parameters keys: %s \n", keys);
+    if (strstr (keys, "getenv=") ) {
+        char *pret=getenv(&keys[7]);
+        if (NULL != pret) {
+            ALOGI ("ret: val %s,key %s \n", pret, &keys[7]);
+            return strdup (pret);
+        } else {
+            return strdup ("find not");
+        }
+    } else if (strstr (keys, AUDIO_PARAMETER_HW_AV_EAC3_SYNC) ) {
         return strdup ("HwAvSyncEAC3Supported=true");
     } else if (strstr (keys, "hdmi_format") ) {
         sprintf (temp_buf, "hdmi_format=%d", adev->hdmi_format);
