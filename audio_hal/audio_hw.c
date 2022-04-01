@@ -5281,6 +5281,10 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
 #endif
     else if (strstr (keys, "codecsupport")) {
         return strdup(aml_get_codec_support(&keys[strlen("codecsupport") + 1])? "true": "false");
+    } else if (strstr(keys, "dolby_lib_type")) {
+        ALOGI("dolby_lib_type: %d", adev->dolby_lib_type);
+        sprintf(temp_buf, "dolby_lib_type=%d", adev->dolby_lib_type);
+        return strdup(temp_buf);
     }
     return strdup("");
 }
