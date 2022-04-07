@@ -7099,7 +7099,7 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
                 aformat = AUDIO_FORMAT_E_AC3;
                 main1_dummy = true;
             }
-            if (continous_mode(adev) && hwsync_lpcm_active(adev)) {
+            if (continous_mode(adev) && (hwsync_lpcm_active(adev) || !is_dolby_ms12_support_compression_format(aformat))) {
                 ott_input = true;
             }
             if (continous_mode(adev)) {
@@ -7772,7 +7772,7 @@ hwsync_rewrite:
         continous mode,available dolby format coming,need set main dolby dummy to false
         */
         if (continous_mode(adev) && adev->ms12_main1_dolby_dummy == true
-            && !audio_is_linear_pcm(aml_out->hal_internal_format)) {
+            && (!audio_is_linear_pcm(aml_out->hal_internal_format) && is_dolby_ms12_support_compression_format(aml_out->hal_internal_format))) {
             pthread_mutex_lock(&adev->lock);
             dolby_ms12_set_main_dummy(0, false);
             adev->ms12_main1_dolby_dummy = false;
@@ -7791,7 +7791,7 @@ hwsync_rewrite:
             pthread_mutex_unlock(&adev->trans_lock);
             ALOGI("%s set dolby main1 dummy false", __func__);
         } else if (continous_mode(adev) && adev->ms12_ott_enable == false
-                   && audio_is_linear_pcm(aml_out->hal_internal_format)) {
+                   && (audio_is_linear_pcm(aml_out->hal_internal_format) || !is_dolby_ms12_support_compression_format(aml_out->hal_internal_format))) {
             pthread_mutex_lock(&adev->lock);
             dolby_ms12_set_main_dummy(1, false);
             adev->ms12_ott_enable = true;
