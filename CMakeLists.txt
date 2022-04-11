@@ -4,7 +4,19 @@ project(aml_audio_hal
 	VERSION 1.0)
 
 include(GNUInstallDirs)
-
+set(COMMIT_HASH_AUDIO_HAL_P "")
+set(COMMIT_HASH_AUDIO_HAL_H "")
+set(COMMIT_ATIME_AUDIO_HAL "")
+set(COMMIT_CTIME_AUDIO_HAL "")
+execute_process(COMMAND git log -1 --format="%p" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE  COMMIT_HASH_AUDIO_HAL_P OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND git log -1 --format="%h" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE  COMMIT_HASH_AUDIO_HAL_H OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND git log -1 --format="%ad" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE  COMMIT_ATIME_AUDIO_HAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND git log -1 --format="%cd" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE  COMMIT_CTIME_AUDIO_HAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/version.h.ini
+  ${CMAKE_CURRENT_SOURCE_DIR}/audio_hal/audio_hal_version.h
+  @ONLY
+  )
 add_subdirectory("libms12_v24")
 add_subdirectory("audio_codec/libfaad")
 add_subdirectory("audio_codec/libmad")
