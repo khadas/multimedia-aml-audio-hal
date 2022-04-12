@@ -908,6 +908,7 @@ int get_the_dolby_ms12_prepared(
     }
     ms12->dolby_ms12_init_flags = true;
     adev->doing_reinit_ms12     = false;
+    adev->dolby_ms12_need_recovery = false;
     ALOGI("--%s(), locked", __FUNCTION__);
     pthread_mutex_unlock(&ms12->lock);
     ALOGI("-%s()\n\n", __FUNCTION__);
@@ -1209,6 +1210,10 @@ int dolby_ms12_main_process(
         }
 
 MAIN_INPUT:
+
+        /*set the dolby ms12 debug level*/
+        dolby_ms12_enable_debug();
+
         if (main_frame_buffer && (main_frame_size > 0)) {
             /*input main frame*/
             int main_format = ms12->input_config_format;
@@ -1279,8 +1284,6 @@ MAIN_INPUT:
                 ALOGI("%s line %d main_frame_size %d ret dolby_ms12 input_bytes %d",
                     __func__, __LINE__, main_frame_size, dolby_ms12_input_bytes);
 
-            /*set the dolby ms12 debug level*/
-            dolby_ms12_enable_debug();
             if (adev->continuous_audio_mode == 0) {
                 dolby_ms12_scheduler_run(ms12->dolby_ms12_ptr);
             }
@@ -2289,6 +2292,8 @@ static void *dolby_ms12_threadloop(void *data)
     struct aml_stream_out *aml_out = (struct aml_stream_out *)data;
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
+    int run_ret = 0;
+    int error_count = 0;
     if (ms12 == NULL) {
         ALOGE("%s ms12 pointer invalid!", __FUNCTION__);
         goto Error;
@@ -2307,11 +2312,20 @@ static void *dolby_ms12_threadloop(void *data)
     while ((ms12->dolby_ms12_thread_exit == false) && (ms12->dolby_ms12_enable)) {
         ALOGV("%s() goto dolby_ms12_scheduler_run", __FUNCTION__);
         if (ms12->dolby_ms12_ptr) {
-            dolby_ms12_scheduler_run(ms12->dolby_ms12_ptr);
+            run_ret = dolby_ms12_scheduler_run(ms12->dolby_ms12_ptr);
         } else {
             ALOGE("%s() ms12->dolby_ms12_ptr is NULL, fatal error!", __FUNCTION__);
             break;
         }
+
+        if (run_ret < 0) {
+            adev->dolby_ms12_need_recovery = true;
+            if (error_count < 10) {
+                error_count ++;
+                ALOGI("%s() dolby_ms12_scheduler_run return FATAL_ERROR", __FUNCTION__);
+            }
+        }
+
         ALOGV("%s() dolby_ms12_scheduler_run end", __FUNCTION__);
     }
     ALOGI("%s remove   ms12 stream %p", __func__, aml_out);
@@ -2773,6 +2787,10 @@ bool is_need_reset_ms12_continuous(struct audio_stream_out *stream) {
 
     if (!adev->continuous_audio_mode || !adev->ms12.dolby_ms12_enable) {
         return false;
+    }
+
+    if (adev->dolby_ms12_need_recovery) {
+        return true;
     }
 
     /*IEC61937 DDP format, the real samplerate need device by 4*/

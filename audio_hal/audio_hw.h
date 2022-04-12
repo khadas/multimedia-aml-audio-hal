@@ -416,7 +416,7 @@ struct aml_audio_device {
 
     /* Dolby MS12 lib variable start */
     struct dolby_ms12_desc ms12;
-    bool dolby_ms12_status;
+    bool dolby_ms12_need_recovery;
     struct pcm_config ms12_config;
     int mixing_level;
     int advol_level;

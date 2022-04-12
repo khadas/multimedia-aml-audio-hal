@@ -5160,7 +5160,7 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         }
         return strdup ("hw_av_sync=12345678");
     }
-    ALOGI ("adev_get_parameters keys: %s \n", keys);
+    //ALOGI ("adev_get_parameters keys: %s \n", keys);
     if (strstr (keys, "getenv=") ) {
         char *pret=getenv(&keys[7]);
         if (NULL != pret) {
