@@ -44,6 +44,7 @@
 #include "tinyalsa_ext.h"
 
 #include "aml_android_utils.h"
+#define MSYNC_CALLBACK_WAIT_TIMEOUT_US (4000*1000)
 
 static int aml_audio_get_hwsync_flag()
 {
@@ -550,26 +551,30 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     }
 
     if (p_hwsync->aout->msync_session) {
-       int r = av_sync_audio_start(p_hwsync->aout->msync_session, pts32, 0,
+        int r = av_sync_audio_start(p_hwsync->aout->msync_session, pts32, 0,
                                    aml_audio_hwsync_msync_callback, p_hwsync->aout);
 
-       if (r == AV_SYNC_ASTART_SYNC) {
-           ALOGI("MSYNC AV_SYNC_ASTART_SYNC");
-           p_hwsync->first_apts_flag = true;
-           p_hwsync->aout->msync_action = AV_SYNC_AA_RENDER;
-       } else if (r == AV_SYNC_ASTART_ASYNC) {
-           pthread_mutex_lock(&p_hwsync->aout->msync_mutex);
-           while (!p_hwsync->aout->msync_start) {
-               pthread_cond_wait(&p_hwsync->aout->msync_cond, &p_hwsync->aout->msync_mutex);
-           }
-           pthread_mutex_unlock(&p_hwsync->aout->msync_mutex);
-           ALOGI("MSYNC AV_SYNC_ASTART_ASYNC");
-           p_hwsync->first_apts_flag = true;
-           p_hwsync->aout->msync_action = AV_SYNC_AA_RENDER;
-       } else if (r == AV_SYNC_ASTART_AGAIN) {
-           ALOGI("MSYNC AV_SYNC_ASTART_AGAIN");
-           p_hwsync->aout->msync_action = AV_SYNC_AA_DROP;
-       }
+        if (r == AV_SYNC_ASTART_SYNC) {
+            ALOGI("MSYNC AV_SYNC_ASTART_SYNC");
+            p_hwsync->first_apts_flag = true;
+            p_hwsync->aout->msync_action = AV_SYNC_AA_RENDER;
+        } else if (r == AV_SYNC_ASTART_ASYNC) {
+            struct timespec ts;
+            ts_wait_time_us(&ts, MSYNC_CALLBACK_WAIT_TIMEOUT_US);
+            pthread_mutex_lock(&p_hwsync->aout->msync_mutex);
+            while (!p_hwsync->aout->msync_start) {
+                ALOGI("%s wait %d ms", __func__, MSYNC_CALLBACK_WAIT_TIMEOUT_US/1000);
+                pthread_cond_timedwait(&p_hwsync->aout->msync_cond, &p_hwsync->aout->msync_mutex, &ts);
+                p_hwsync->aout->msync_start = true;
+            }
+            pthread_mutex_unlock(&p_hwsync->aout->msync_mutex);
+            ALOGI("MSYNC AV_SYNC_ASTART_ASYNC");
+            p_hwsync->first_apts_flag = true;
+            p_hwsync->aout->msync_action = AV_SYNC_AA_RENDER;
+        } else if (r == AV_SYNC_ASTART_AGAIN) {
+            ALOGI("MSYNC AV_SYNC_ASTART_AGAIN");
+            p_hwsync->aout->msync_action = AV_SYNC_AA_DROP;
+        }
     }
 
     p_hwsync->aout->tsync_status = TSYNC_STATUS_RUNNING;

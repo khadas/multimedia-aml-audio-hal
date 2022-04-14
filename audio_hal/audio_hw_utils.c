@@ -1026,6 +1026,7 @@ void ts_wait_time_us(struct timespec *ts, uint32_t time_us)
 {
     clock_gettime(CLOCK_REALTIME, ts);
     ts->tv_sec += (time_us / 1000000);
+    time_us %= 1000000;
     ts->tv_nsec += (time_us * 1000);
     if (ts->tv_nsec >= 1000000000) {
         ts->tv_sec++;
