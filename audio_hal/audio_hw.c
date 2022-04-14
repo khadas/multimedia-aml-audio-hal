@@ -1395,6 +1395,15 @@ static char *out_get_parameters(const struct audio_stream *stream, const char *k
         aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &dec_info);
         sprintf (temp_buf, "stream_decode_frames=%d", dec_info.dec_info.stream_decode_num);
         return strdup (temp_buf);
+    } else if (strstr (keys, "alsa_device_config")) {
+        sprintf (temp_buf, "period_cnt=%d;period_sz=%d", aml_out->config.period_count, aml_out->config.period_size);
+        return strdup (temp_buf);
+    } else if (strstr (keys, "get_buffer_avail")) {
+        if ((is_dolby_ms12_support_compression_format(aml_out->hal_internal_format) || is_multi_channel_pcm(stream))) {
+            sprintf (temp_buf, "remain_frame=%d", (dolby_ms12_get_main_buffer_avail(NULL)));
+            return strdup (temp_buf);
+        }
+        return strdup ("");
     } else {
         ALOGE("%s() keys %s is not supported! TODO!\n", __func__, keys);
         return strdup ("");
@@ -2477,7 +2486,6 @@ static int in_set_parameters (struct audio_stream *stream, const char *kvpairs)
         }
     }
 
-
     str_parms_destroy (parms);
 
     // VTS can only recognizes Result::OK, which is 0x0.
@@ -2493,10 +2501,35 @@ static int in_set_parameters (struct audio_stream *stream, const char *kvpairs)
     return ret;
 }
 
+static uint32_t in_get_latency_frames (const struct audio_stream_in *stream)
+{
+    struct aml_stream_in *in = (struct aml_stream_in *)stream;
+    struct aml_audio_device *adev = in->dev;
+
+    snd_pcm_sframes_t frames = 0;
+    uint32_t whole_latency_frames;
+    int ret = 0;
+    int mul = 1;
+    unsigned int device = in->device;
+
+    in->pcm = adev->pcm_handle[device];
+
+    whole_latency_frames = in->config.period_size * in->config.period_count;
+    if (!in->pcm || !pcm_is_ready(in->pcm)) {
+        return whole_latency_frames / mul;
+    }
+    ret = pcm_ioctl(in->pcm, SNDRV_PCM_IOCTL_DELAY, &frames);
+    if (ret < 0) {
+        return whole_latency_frames / mul;
+    }
+    return frames / mul;
+}
+
 static char * in_get_parameters (const struct audio_stream *stream, const char *keys)
 {
     char *cap = NULL;
     char *para = NULL;
+    char temp_buf[AUDIO_HAL_CHAR_MAX_LEN] = {0};
     struct aml_stream_in *in = (struct aml_stream_in *)stream;
 
     ALOGI ("in_get_parameters %s,in %p\n", keys, in);
@@ -2508,12 +2541,23 @@ static char * in_get_parameters (const struct audio_stream *stream, const char *
             aml_audio_free (cap);
             return para;
         }
+    } else if (strstr (keys, "alsa_device_config")) {
+        sprintf (temp_buf, "period_cnt=%d;period_sz=%d", in->config.period_count, in->config.period_size);
+        return strdup (temp_buf);
+    } else if (strstr (keys, "get_aml_source_latency")) {
+        sprintf (temp_buf, "aml_source_latency_ms=%zu", in_get_latency_frames(in));
+        ALOGI ("in_get_parameters %zu", in_get_latency_frames(in));
+        return strdup (temp_buf);
     }
     return strdup ("");
 }
 
-static int in_set_gain (struct audio_stream_in *stream __unused, float gain __unused)
+static int in_set_gain (struct audio_stream_in *stream, float gain)
 {
+    struct aml_stream_in *in = (struct aml_stream_in *)stream;
+    struct aml_audio_device *adev = in->dev;
+    adev->src_gain[adev->active_inport] = gain;
+    ALOGI(" - set src gain: gain[%f], active inport:%s", adev->src_gain[adev->active_inport], inputPort2Str(adev->active_inport));
     return 0;
 }
 
@@ -2902,19 +2946,15 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
         apply_volume(source_gain * adev->src_gain[adev->active_inport], buffer, sizeof(uint16_t), bytes);
     }
 
-#if defined(ENABLE_AEC_APP)
-    struct aec_info info;
-    get_pcm_timestamp(in->pcm, in->config.rate, &info, false /*isOutput*/);
-    if (ret == 0) {
+    if (ret >= 0) {
         in->frames_read += in_frames;
-        in->timestamp_nsec = audio_utils_ns_from_timespec(&info.timestamp);
+        in->timestamp_nsec = pcm_get_timestamp(in->pcm, in->config.rate, 0 /*isOutput*/);
     }
     bool mic_muted = false;
     adev_get_mic_mute((struct audio_hw_device*)adev, &mic_muted);
     if (mic_muted) {
         memset(buffer, 0, bytes);
     }
-#endif
 
 exit:
     if (ret < 0) {
@@ -2944,10 +2984,8 @@ exit:
         aml_audio_dump_audio_bitstreams("/data/audio/alsa_read.raw",
             buffer, bytes);
     }
-
     return bytes;
 }
-
 
 static int in_get_capture_position (const struct audio_stream_in* stream, int64_t* frames,
                                    int64_t* time) {
@@ -2955,13 +2993,14 @@ static int in_get_capture_position (const struct audio_stream_in* stream, int64_
         return -EINVAL;
     }
     struct aml_stream_in *in = (struct aml_stream_in *)stream;
-
+    if ((in->dev->is_STB) && (in->device & AUDIO_DEVICE_IN_HDMI)) {
+        return -ENOSYS;
+    }
     *frames = in->frames_read;
     *time = in->timestamp_nsec;
 
     return 0;
 }
-
 
 static uint32_t in_get_input_frames_lost (struct audio_stream_in *stream __unused)
 {
@@ -3905,12 +3944,10 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     ret = str_parms_get_int(parms, "Audio hdmi-out mute", &val);
     if (ret >= 0) {
         /* for tv,hdmitx module is not registered, do not reponse this control interface */
-#ifndef TV_AUDIO_OUTPUT
-        {
+        if (adev->is_STB) {
             aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_HDMI_OUT_AUDIO_MUTE, val);
             ALOGI("audio hdmi out status: %d\n", val);
         }
-#endif
         goto exit;
     }
 
@@ -5288,6 +5325,8 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         return  strdup (temp_buf);
     } else if (!strcmp(keys, "SOURCE_GAIN")) {
         sprintf(temp_buf, "source_gain = %f %f %f %f %f", adev->eq_data.s_gain.atv, adev->eq_data.s_gain.dtv,
+                adev->eq_data.s_gain.hdmi, adev->eq_data.s_gain.av, adev->eq_data.s_gain.media);
+        ALOGD("source_gain = %f %f %f %f %f", adev->eq_data.s_gain.atv, adev->eq_data.s_gain.dtv,
                 adev->eq_data.s_gain.hdmi, adev->eq_data.s_gain.av, adev->eq_data.s_gain.media);
         return strdup(temp_buf);
     } else if (!strcmp(keys, "POST_GAIN")) {
@@ -10074,6 +10113,12 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
                     ALOGI("patch found mix->dev patch id:%d, sink id:%d, patchset:%p", patch->id, config->id, patch_set);
                     break;
                 }
+                if ((patch->sources[0].type == AUDIO_PORT_TYPE_DEVICE &&
+                       patch->sinks[i].type == AUDIO_PORT_TYPE_DEVICE &&
+                       patch->sinks[i].id == config->id)) {
+                    ALOGI("patch found dev->dev patch id:%d, sink id:%d, patchset:%p", patch->id, config->id, patch_set);
+                    break;
+                }
             }
             if (i >= patch->num_sinks) {
                 patch_set = NULL;
@@ -10176,22 +10221,42 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
                             config->gain.values[0], aml_dev->sink_gain[outport]);
             } else if (patch->sinks[0].type == AUDIO_PORT_TYPE_MIX) {
                 aml_dev->src_gain[inport] = DbToAmpl(config->gain.values[0] / 100.0);
-                ALOGI(" - set src device[%#x](inport:%s): gain[%f]",
-                            config->ext.device.type, inputPort2Str(inport), aml_dev->src_gain[inport]);
+                ALOGI(" - set src device[%#x](inport:%s): gain[%f], active inport:%s",
+                            config->ext.device.type, inputPort2Str(inport), aml_dev->src_gain[inport], inputPort2Str(aml_dev->active_inport));
             }
-            ALOGI(" - set gain for in_port:%s, active inport:%s",
-                   inputPort2Str(inport), inputPort2Str(aml_dev->active_inport));
         } else {
             ALOGW("[%s:%d] unsupported role:%d type.", __func__, __LINE__, config->role);
         }
     }
-
     return 0;
 }
 
-static int adev_get_audio_port(struct audio_hw_device *dev __unused, struct audio_port *port __unused)
+static int adev_get_audio_port(struct audio_hw_device *dev, struct audio_port *port)
 {
-    return -ENOSYS;
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *) dev;
+    enum OUT_PORT outport = OUTPORT_SPEAKER;
+    enum IN_PORT inport = INPORT_HDMIIN;
+    int ret = 0;
+
+    if (port == NULL) {
+        ALOGE("[%s:%d] port is null", __func__, __LINE__);
+        return -EINVAL;
+    }
+    ALOGI("++[%s:%d] audio_port_config id:%d, type:%x", __func__, __LINE__, port->active_config.id, port->ext.device.type);
+
+    if (port->active_config.id == AUDIO_PORT_ROLE_SOURCE) {
+        android_dev_convert_to_hal_dev(port->ext.device.type, (int *)&inport);
+        port->active_config.gain.values[0] = aml_dev->src_gain[inport] * 100;
+        ALOGI("[%s:%d] device  %x, inport %d, gain %d", __func__, __LINE__,
+            port->ext.device.type, inport, port->active_config.gain.values[0] );
+    } else if (port->active_config.id == AUDIO_PORT_ROLE_SINK) {
+        android_dev_convert_to_hal_dev(port->ext.device.type, (int *)&outport);
+        port->active_config.gain.values[0] = aml_dev->sink_gain[outport] * 100;
+        ALOGI("[%s:%d] device  %x, outport %d, gain %d", __func__, __LINE__,
+            port->ext.device.type, outport, port->active_config.gain.values[0]);
+    }
+
+    return 0;
 }
 
 static int adev_add_device_effect(struct audio_hw_device *dev,

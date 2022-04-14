@@ -181,8 +181,43 @@ int alsa_device_get_card_index()
 		ALOGE("ParseCardIndex doesn't found card index");
 
 	ALOGD("%s() parse card index:%d\n", __FUNCTION__, mCardIndex);
-
+	alsa_device_get_pcm_index();
 	return mCardIndex;
+}
+
+/*
+ * alsaPORT is kept same with meson sound card
+ * cat /proc/asound/pcm
+ * 00-00: TDM-A-dummy-alsaPORT-pcm multicodec-0 :  : playback 1 : capture 1
+ * 00-01: TDM-B-dummy-alsaPORT-i2s multicodec-1 :  : playback 1 : capture 1
+ * 00-02: TDM-C-dummy multicodec-2 :  : playback 1 : capture 1
+ * 00-03: PDM-dummy-alsaPORT-pdm dummy-3 :	: capture 1
+ * 00-04: SPDIF-dummy-alsaPORT-spdif dummy-4 :	: playback 1 : capture 1
+ * 00-05: SPDIF-B-dummy-alsaPORT-hdmi dummy-5 :  : playback 1
+ */
+void alsa_device_get_pcm_index()
+{
+	struct alsa_info *p_info = alsa_device_get_info();
+
+	if (!p_info->deviced_checked) {
+		FILE *mPcmFile = NULL;
+		char tempbuffer[READ_BUFFER_SIZE];
+
+		mPcmFile = fopen(ALSASOUND_PCM_PATH, "r");
+		if (mPcmFile) {
+			ALOGD("Pcm open success");
+			while (!feof(mPcmFile)) {
+				if (fgets(tempbuffer, READ_BUFFER_SIZE, mPcmFile) != NULL) {
+					alsa_device_parser_pcm_string(p_info, tempbuffer);
+					memset((void *)tempbuffer, 0, READ_BUFFER_SIZE);
+				}
+			}
+			ALOGD("reach EOF");
+			fclose(mPcmFile);
+			p_info->deviced_checked = 1;
+		} else
+			ALOGD("Pcm open fail");
+	}
 }
 
 void alsa_device_parser_pcm_string(struct alsa_info *p_info, char *InputBuffer)
@@ -298,16 +333,6 @@ static void dump_alsa_device_desc(struct alsa_info *p_info)
 	ALOGD("%s %s: %p", __func__, ALSAPORT_EARC, p_info->earc_descrpt);
 }
 
-/*
- * alsaPORT is kept same with meson sound card
- * cat /proc/asound/pcm
- * 00-00: TDM-A-dummy-alsaPORT-pcm multicodec-0 :  : playback 1 : capture 1
- * 00-01: TDM-B-dummy-alsaPORT-i2s multicodec-1 :  : playback 1 : capture 1
- * 00-02: TDM-C-dummy multicodec-2 :  : playback 1 : capture 1
- * 00-03: PDM-dummy-alsaPORT-pdm dummy-3 :	: capture 1
- * 00-04: SPDIF-dummy-alsaPORT-spdif dummy-4 :	: playback 1 : capture 1
- * 00-05: SPDIF-B-dummy-alsaPORT-hdmi dummy-5 :  : playback 1
- */
 int alsa_device_update_pcm_index(int alsaPORT, int stream)
 {
 	struct alsa_info *p_info = alsa_device_get_info();
@@ -321,29 +346,7 @@ int alsa_device_update_pcm_index(int alsaPORT, int stream)
 
 		return alsaPORT;
 	}
-
-	if (!p_info->deviced_checked) {
-		FILE *mPcmFile = NULL;
-		char tempbuffer[READ_BUFFER_SIZE];
-
-		mPcmFile = fopen(ALSASOUND_PCM_PATH, "r");
-		if (mPcmFile) {
-			ALOGD("Pcm open success");
-			while (!feof(mPcmFile)) {
-				if (fgets(tempbuffer, READ_BUFFER_SIZE, mPcmFile) != NULL) {
-					alsa_device_parser_pcm_string(p_info, tempbuffer);
-					memset((void *)tempbuffer, 0, READ_BUFFER_SIZE);
-				}
-			}
-			ALOGD("reach EOF");
-			fclose(mPcmFile);
-			if (0)
-				dump_alsa_device_desc(p_info);
-			p_info->deviced_checked = 1;
-		} else
-			ALOGD("Pcm open fail");
-	}
-
+	alsa_device_get_pcm_index();
 	switch (alsaPORT) {
 	case PORT_I2S:
 		if (stream == PLAYBACK) {
