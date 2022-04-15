@@ -9838,9 +9838,7 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     }
 #endif
     aml_dev->debug_flag = aml_audio_get_debug_flag();
-#ifdef AUDIO_HAL_GIT_VERSION_P
-    dprintf(fd, "AUDIO_HAL_GIT_VERSION %s,%s,%s,%s\n",AUDIO_HAL_GIT_VERSION_P,AUDIO_HAL_GIT_VERSION_H,AUDIO_HAL_GIT_VER_TIMEC,AUDIO_HAL_GIT_VER_TIMEA);
-#endif
+    dprintf(fd, "AUDIO_HAL_GIT_VERSION %s\n",libVersion);
 
     dprintf(fd, "\n----------------------------[AML_HAL] primary audio hal[dev:%p]----------------------------\n", aml_dev);
     while (retry > 0 && pthread_mutex_trylock(&aml_dev->lock) != 0) {
