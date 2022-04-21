@@ -94,6 +94,17 @@ static int aml_hwsync_wrap_single_get_tsync_pts(uint32_t *pts)
     return get_sysfs_uint(TSYNC_PCRSCR, pts);
 }
 
+static int aml_hwsync_wrap_single_get_tsync_apts(uint32_t *pts)
+{
+    if (!pts) {
+        ALOGE("%s(), NULL pointer", __func__);
+        return -EINVAL;
+    }
+
+    return get_sysfs_uint(TSYNC_APTS, pts);
+}
+
+
 static int aml_hwsync_wrap_single_get_tsync_vpts(uint32_t *pts)
 {
     if (!pts) {
@@ -211,6 +222,19 @@ int aml_hwsync_wrap_get_tsync_pts(audio_hwsync_t *p_hwsync, uint32_t *pts)
     }
     mediasync_wrap_getMediaTime(p_hwsync->mediasync, systemTime(SYSTEM_TIME_MONOTONIC) / 1000LL, &timeus, 0);
     *pts = timeus / 1000 * 90;
+    return 0;
+}
+
+int aml_hwsync_wrap_get_tsync_apts(audio_hwsync_t *p_hwsync, uint32_t *pts)
+{
+    int64_t timeus = 0;
+    ALOGV("%s(), get tsync apts", __func__);
+    if (!p_hwsync->use_mediasync) {
+        return aml_hwsync_wrap_single_get_tsync_apts(pts);
+    }
+    /*To do*/
+    (void)p_hwsync;
+    (void)pts;
     return 0;
 }
 
@@ -470,4 +494,3 @@ int aml_hwsync_wrap_reset_tsync_pcrscr(uint32_t pts)
     return sysfs_set_sysfs_str(TSYNC_APTS, buf);
 }
 #endif
-

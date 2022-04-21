@@ -143,6 +143,12 @@ int aml_hwsync_get_tsync_pts(audio_hwsync_t *p_hwsync, uint32_t *pts)
     return aml_hwsync_wrap_get_tsync_pts(p_hwsync, pts);
 }
 
+int aml_hwsync_get_tsync_apts(audio_hwsync_t *p_hwsync, uint32_t *pts)
+{
+    ALOGV("%s", __func__);
+    return aml_hwsync_wrap_get_tsync_apts(p_hwsync, pts);
+}
+
 int aml_hwsync_get_tsync_vpts(audio_hwsync_t *p_hwsync, uint32_t *pts)
 {
     ALOGV("%s", __func__);
@@ -281,6 +287,7 @@ void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out
         return;
     }
     p_hwsync->first_apts_flag = false;
+    p_hwsync->video_valid_time = 0;
     p_hwsync->hw_sync_state = HW_SYNC_STATE_HEADER;
     p_hwsync->hw_sync_header_cnt = 0;
     p_hwsync->hw_sync_frame_size = 0;

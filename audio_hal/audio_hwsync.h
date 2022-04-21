@@ -43,6 +43,7 @@
 #define APTS_DISCONTINUE_THRESHOLD_MIN    (90000/1000*100)
 #define APTS_DISCONTINUE_THRESHOLD_MIN_35MS    (90000/1000*35)
 #define APTS_TSYNC_DROP_THRESHOLD_MIN_300MS    (90000/1000*300)
+#define APTS_TSYNC_START_WAIT_THRESHOLD_US     (1*1000*1000)
 
 #define APTS_DISCONTINUE_THRESHOLD_MAX    (5*90000)
 
@@ -85,6 +86,7 @@ typedef struct  audio_hwsync {
     uint64_t last_apts_from_header;
     uint64_t last_apts_from_header_raw;
     uint32_t last_lookup_apts;
+    int video_valid_time;
 
     apts_tab_t pts_tab[HWSYNC_APTS_NUM];
     pthread_mutex_t lock;
@@ -158,6 +160,7 @@ int aml_hwsync_set_tsync_start_pts(audio_hwsync_t *p_hwsync, uint32_t pts);
 int aml_hwsync_set_tsync_start_pts64(audio_hwsync_t *p_hwsync, uint64_t pts);
 void aml_hwsync_set_tsync_stop(audio_hwsync_t *p_hwsync);
 int aml_hwsync_get_tsync_pts(audio_hwsync_t *p_hwsync, uint32_t *pts);
+int aml_hwsync_get_tsync_apts(audio_hwsync_t *p_hwsync, uint32_t *pts);
 int aml_hwsync_reset_tsync_pcrscr(audio_hwsync_t *p_hwsync, uint32_t pts);
 void aml_hwsync_wait_video_start(audio_hwsync_t *p_hwsync);
 void aml_hwsync_wait_video_drop(audio_hwsync_t *p_hwsync, uint32_t cur_pts);

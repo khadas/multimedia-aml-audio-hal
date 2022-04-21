@@ -42,6 +42,7 @@ int aml_hwsync_wrap_set_tsync_start_pts(audio_hwsync_t *p_hwsync, uint32_t pts);
 int aml_hwsync_wrap_set_tsync_start_pts64(audio_hwsync_t *p_hwsync,uint64_t pts);
 void aml_hwsync_wrap_set_tsync_stop(audio_hwsync_t *p_hwsync);
 int aml_hwsync_wrap_get_tsync_pts(audio_hwsync_t *p_hwsync, uint32_t *pts);
+int aml_hwsync_wrap_get_tsync_apts(audio_hwsync_t *p_hwsync, uint32_t *pts);
 int aml_hwsync_wrap_reset_tsync_pcrscr(audio_hwsync_t *p_hwsync, uint32_t pts);
 bool aml_hwsync_wrap_get_id(void *mediasync, int32_t* id);
 bool aml_hwsync_wrap_set_id(audio_hwsync_t *p_hwsync, uint32_t id);

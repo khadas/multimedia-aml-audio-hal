@@ -1252,6 +1252,7 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
 
         out->hw_sync_mode = sync_enable;
         out->hwsync->first_apts_flag = false;
+        out->hwsync->video_valid_time = 0;
         ALOGI("(%p)set hw_sync_id=%d, %s hw sync mode", out, hw_sync_id, sync_enable ? "enable" : "disable");
 
         if (adev->ms12_out != NULL && adev->ms12_out->hwsync) {
@@ -7503,20 +7504,42 @@ hwsync_rewrite:
                     ALOGV("%s pts=%u ms, RealTimeus=%lld us", __func__, (apts32/90), timeus);
                 } else {
                     if (hw_sync->first_apts_flag == false) {
-                        if (has_video == true && aml_out->avsync_type == AVSYNC_TYPE_TSYNC) {
+                        if (aml_out->avsync_type == AVSYNC_TYPE_TSYNC) {
                             uint32_t first_vpts = 0;
                             uint32_t apts_gap = 0;
                             uint32_t video_started = 0;
+                            int64_t start_wait_threshold_ms = property_get_int64("vendor.media.audio_hal.waitthresholdus", APTS_TSYNC_START_WAIT_THRESHOLD_US);
 
                             apts32 = cur_pts & 0xffffffff;
                             aml_hwsync_get_tsync_video_started(aml_out->hwsync, &video_started);
                             aml_hwsync_get_tsync_firstvpts(aml_out->hwsync, &first_vpts);
                             apts_gap = get_pts_gap (first_vpts, apts32);
-                            ALOGI("video_started:%d, first_vpts:0x%lx, apts32:0x%lx, diff:0x%lx", video_started, first_vpts, apts32, apts_gap);
-                            if (apts_gap >= APTS_TSYNC_DROP_THRESHOLD_MIN_300MS &&
-                                (((int32_t)apts32 < (int32_t)first_vpts) || (!video_started))) {
-                                return_bytes = hwsync_cost_bytes;
+
+                            if ((!video_started) && (hw_sync->video_valid_time < start_wait_threshold_ms)) {
+                                //return 0 for EAGAIN, wait video threshold is 1s
+                                return_bytes = 0;
+                                hw_sync->video_valid_time += 5000;
+                                usleep(5000);
                                 goto exit;
+                            }
+
+                            if (video_started && (apts_gap >= APTS_TSYNC_DROP_THRESHOLD_MIN_300MS)) {
+                                if ((int32_t)apts32 < (int32_t)first_vpts) {
+                                    //apts < vpts need do drop pcm
+                                    return_bytes = hwsync_cost_bytes;
+                                    goto exit;
+                                } else {
+                                    //apts > vpts need do insert zero
+                                    int insert_size = 0;
+                                    if (aml_out->codec_type == TYPE_EAC3) {
+                                        insert_size = apts_gap / 90 * 48 * 4 * 4;
+                                    } else {
+                                        insert_size = apts_gap / 90 * 48 * 4;
+                                    }
+                                    insert_size = insert_size & (~63);
+                                    ALOGI ("audio start gap 0x%"PRIx32" ms ,need insert data %d\n", apts_gap / 90, insert_size);
+                                    ret = insert_output_bytes (aml_out, insert_size);
+                                }
                             }
                         }
 
@@ -7919,10 +7942,8 @@ exit:
             else
                 goto hwsync_rewrite;
         }
-        else if (return_bytes < 0)
-            return return_bytes;
         else
-            return total_bytes;
+            return return_bytes;
     }
 
 
