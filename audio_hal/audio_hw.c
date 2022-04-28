@@ -3472,14 +3472,6 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         adev->usecase_masks &= ~(1 << out->usecase);
     }
 
-    if (continous_mode(adev) && (eDolbyMS12Lib == adev->dolby_lib_type)) {
-        if (out->volume_l != 1.0) {
-            if (!audio_is_linear_pcm(out->hal_internal_format)) {
-                set_ms12_main_volume(&adev->ms12, 1.0);
-            }
-        }
-    }
-
     pthread_mutex_lock(&out->lock);
     if (out->audioeffect_tmp_buffer) {
         aml_audio_free(out->audioeffect_tmp_buffer);
@@ -3578,6 +3570,14 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
             dolby_ms12_hwsync_release();
         }
         dolby_ms12_main_close(stream);
+    }
+    if (continous_mode(adev) && (eDolbyMS12Lib == adev->dolby_lib_type)) {
+        if (out->volume_l != 1.0) {
+            if (!audio_is_linear_pcm(out->hal_internal_format)) {
+                ALOGI("recover main volume to %f", adev->master_volume);
+                set_ms12_main_volume(&adev->ms12, 1.0 * adev->master_volume);
+            }
+        }
     }
     if (out->hwsync) {
         if (adev->hw_mediasync && (adev->hw_mediasync == out->hwsync->mediasync))
