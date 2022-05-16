@@ -3757,7 +3757,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     }
 
     /* now  only sc2  can use new dtv path */
-    if ((aml_dev->synctype == AVSYNC_TYPE_MEDIASYNC) && aml_dev->is_multi_demux) {
+    if (aml_dev->is_multi_demux) {
         patch->skip_amadec_flag = true;
     } else {
         patch->skip_amadec_flag = false;
