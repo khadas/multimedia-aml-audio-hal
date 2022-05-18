@@ -5364,12 +5364,15 @@ static int adev_set_master_mute (struct audio_hw_device *dev, bool muted)
     }
 
     struct aml_audio_device *adev = (struct aml_audio_device *) dev;
-    adev->master_mute = muted;
-    if (muted) { //mute
-        adev_get_master_volume (dev, &adev->record_volume_before_mute); //Record the volume before mute
-        adev_set_master_volume (dev, 0); //set mute
-    } else {
-        adev_set_master_volume (dev, adev->record_volume_before_mute); //unmute
+    ALOGI("%s, %d -> %d", __FUNCTION__, adev->master_mute, muted);
+    if (adev->master_mute != muted) {
+        adev->master_mute = muted;
+        if (muted) { //mute
+            adev_get_master_volume (dev, &adev->record_volume_before_mute); //Record the volume before mute
+            adev_set_master_volume (dev, 0); //set mute
+        } else {
+            adev_set_master_volume (dev, adev->record_volume_before_mute); //unmute
+        }
     }
     return 0;
 }
