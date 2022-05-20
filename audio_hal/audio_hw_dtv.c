@@ -2710,14 +2710,18 @@ void *audio_dtv_patch_input_threadloop(void *data)
                     usleep(20000);
                     continue;
                 }
-                rlen += nRet;
-                nNextReadSize -= nRet;
+                else
+                {
+                    rlen += nRet;
+                    nNextReadSize -= nRet;
+                    break ;
+                }
             }
             trycount = 0;
             dtv_pacakge->size = rlen;
             dtv_pacakge->data = (char *)inbuf;
 
-            if (demux_info->dual_decoder_support && VALID_PID(demux_info->ad_pid)) {
+            if (demux_info->dual_decoder_support && VALID_PID(demux_info->ad_pid) && (rlen > 4)) {
                 int getadcount = 0;
                 do {
                     nRet=Get_ADAudio_Es(demux_handle, &mAdEsData);
@@ -2727,7 +2731,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                     {
                     break;
                     }
-                } while (nRet != AM_AUDIO_Dmx_SUCCESS);
+                } while (nRet != AM_AUDIO_Dmx_SUCCESS && !patch->input_thread_exit);
 
                 if (nRet == AM_AUDIO_Dmx_SUCCESS) {
                     dtv_pacakge->ad_size = mAdEsData->size;
@@ -3490,7 +3494,7 @@ static void *audio_dtv_patch_process_threadloop_v2(void *data)
                 dtv_do_ease_out(aml_dev);
                 //non-pip case ,Make sure you get the first new data
                 //Always hold a current package in input_stream thread,so need release it.
-                if (!IsPipRun(dtv_audio_instances)) {
+                if (!IsPipRun(dtv_audio_instances) && aml_dev->is_multi_demux) {
                     release_dtv_input_stream_thread(patch);
                 }
                 release_dtv_output_stream_thread(patch);

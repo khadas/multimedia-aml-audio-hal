@@ -12,7 +12,7 @@
 #include <dmx.h>
 #include <AmHwMultiDemuxWrapper.h>
 #include "pes.h"
-
+#define PESBUFFERLEN 2048
 
 AM_DMX_Device::AM_DMX_Device(AmHwMultiDemuxWrapper* DemuxWrapper) :
     mDemuxWrapper (DemuxWrapper){
@@ -183,7 +183,12 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_handlePESpacket(AM_DMX_Device *dev, AM_DMX_
       usleep (1000);
     }while(AM_FALSE==found && dev->enable_thread && !filter->to_be_stopped);
 
-    static unsigned char PESbuffer[2048]={0};
+    if (filter->to_be_stopped)
+    {
+        return AM_DMX_ERR_TIMEOUT;
+    }
+
+    static unsigned char PESbuffer[PESBUFFERLEN]={0};
     memset(PESbuffer,0,2048);
     int hassize=(findbuf+AUDIO_STARTLEN+ulen - &findbuf[pos]);
     memcpy(PESbuffer,&findbuf[pos],hassize);
@@ -239,9 +244,17 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_handlePESpacket(AM_DMX_Device *dev, AM_DMX_
         paddata->fade = fade;
        // ALOGI("PES_header_len  %d,%d,%d,%lld \n",PES_header_len,pan,fade,outpts);
     }
-    #define SKIPLEN 3
-    *eslen = PES_packet_length -SKIPLEN-PES_header_len ;
-    memcpy(esbuf,PESbuffer+PES_START_LEN+SKIPLEN+PES_header_len,*eslen);
+#define SKIPLEN 3
+    *eslen = PES_packet_length -SKIPLEN-PES_header_len;
+    if (*eslen > 0 &&  *eslen < PESBUFFERLEN)
+    {
+        memcpy(esbuf,PESbuffer+PES_START_LEN+SKIPLEN+PES_header_len,*eslen);
+    }
+    else
+    {
+        ALOGI("PESinfo... %d   %d\n",PES_packet_length ,PES_header_len);
+        return AM_DMX_ERR_TIMEOUT;
+    }
     //dmx_audio_dump_audio_bitstreams("/data/esraw.bin",esbuf,*eslen);
     return AM_SUCCESS;
 }
