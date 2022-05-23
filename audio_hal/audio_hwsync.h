@@ -23,6 +23,7 @@
 #ifdef BUILD_LINUX
 #include <pthread.h>
 #endif
+#include "audio_mediasync_wrap.h"
 #define SYSTIME_CORRECTION_THRESHOLD        (90000*10/100)
 #define NSEC_PER_SECOND 1000000000ULL
 #define HW_SYNC_STATE_HEADER 0
@@ -68,8 +69,23 @@ enum tsync_status {
 typedef struct apts_tab {
     int  valid;
     size_t offset;
-    unsigned pts;
+    uint64_t pts;
 } apts_tab_t;
+
+typedef enum {
+    ESSYNC_AUDIO_DROP = 0,
+    ESSYNC_AUDIO_OUTPUT,
+} sync_process_res;
+
+typedef struct audio_hwsync_mediasync {
+    void* mediasync;
+    int mediasync_id;
+    int64_t cur_outapts;
+    int64_t out_start_apts;
+    int64_t out_end_apts;
+    int duration;
+    struct mediasync_audio_policy apolicy;
+}audio_hwsync_mediasync_t;//for AudioProcess mode
 
 typedef struct  audio_hwsync {
     uint8_t hw_sync_header[HW_AVSYNC_MAX_HEADER_SIZE];
@@ -85,7 +101,7 @@ typedef struct  audio_hwsync {
     uint64_t first_apts;
     uint64_t last_apts_from_header;
     uint64_t last_apts_from_header_raw;
-    uint32_t last_lookup_apts;
+    uint64_t last_lookup_apts;
     int video_valid_time;
 
     apts_tab_t pts_tab[HWSYNC_APTS_NUM];
@@ -95,9 +111,9 @@ typedef struct  audio_hwsync {
     int tsync_fd;
     int version_num;
     bool use_mediasync;
-    void* mediasync;
+    audio_hwsync_mediasync_t es_mediasync;
     int hwsync_id;
-    uint32_t last_output_pts;
+    uint64_t last_output_pts;
     struct timespec  last_timestamp;
     bool wait_video_done;
     bool eos;
@@ -169,8 +185,8 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
         const void *in_buffer, size_t in_bytes,
         uint64_t *cur_pts, int *outsize);
 int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts);
-int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, unsigned apts);
-int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, unsigned *p_apts);
+int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, uint64_t apts);
+int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, uint64_t *p_apts);
 int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int frame_len, int *p_adjust_ms);
 void aml_audio_hwsync_release(audio_hwsync_t *p_hwsync);
 bool aml_audio_hwsync_get_id(audio_hwsync_t *p_hwsync, int32_t* id);

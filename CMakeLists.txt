@@ -135,6 +135,7 @@ add_library(audio_hal SHARED
 	audio_hal/aml_audio_nonms12_render.c
 	audio_hal/aml_audio_spdifdec.c
 	audio_hal/aml_dtvsync.c
+	audio_hal/aml_esmode_sync.c
 	audio_hal/audio_mediasync_wrap.c
 	audio_hal/audio_hdmi_util.c
 	audio_hal/aml_audio_hal_avsync.c
