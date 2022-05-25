@@ -22,7 +22,6 @@
 #include <stdbool.h>
 #include "audio_mediasync_wrap.h"
 #include "audio_hw_ms12_v2.h"
-#include "MediaSyncInterface.h"
 #include "dmx_audio_es.h"
 //#define SYSTIME_CORRECTION_THRESHOLD        (90000*10/100)
 

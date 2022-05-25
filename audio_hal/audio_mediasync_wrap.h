@@ -19,7 +19,96 @@
 #ifndef _AUDIO_MEDIASYNC_WRAP_H_
 #define _AUDIO_MEDIASYNC_WRAP_H_
 
-#include "MediaSyncInterface.h"
+//#include "MediaSyncInterface.h"
+typedef enum {
+    MEDIA_SYNC_VMASTER = 0,
+    MEDIA_SYNC_AMASTER = 1,
+    MEDIA_SYNC_PCRMASTER = 2,
+    MEDIA_SYNC_MODE_MAX = 255,
+}sync_mode;
+
+typedef enum {
+    MEDIA_VIDEO = 0,
+    MEDIA_AUDIO = 1,
+    MEDIA_DMXPCR = 2,
+    MEDIA_SUBTITLE = 3,
+    MEDIA_COMMON = 4,
+    MEDIA_TYPE_MAX = 255,
+}sync_stream_type;
+
+typedef enum {
+    AM_MEDIASYNC_OK  = 0,                      // OK
+    AM_MEDIASYNC_ERROR_INVALID_PARAMS = -1,    // Parameters invalid
+    AM_MEDIASYNC_ERROR_INVALID_OPERATION = -2, // Operation invalid
+    AM_MEDIASYNC_ERROR_INVALID_OBJECT = -3,    // Object invalid
+    AM_MEDIASYNC_ERROR_RETRY = -4,             // Retry
+    AM_MEDIASYNC_ERROR_BUSY = -5,              // Device busy
+    AM_MEDIASYNC_ERROR_END_OF_STREAM = -6,     // End of stream
+    AM_MEDIASYNC_ERROR_IO            = -7,     // Io error
+    AM_MEDIASYNC_ERROR_WOULD_BLOCK   = -8,     // Blocking error
+    AM_MEDIASYNC_ERROR_MAX = -254
+} mediasync_result;
+
+
+typedef enum {
+    MEDIASYNC_KEY_HASAUDIO = 0,
+    MEDIASYNC_KEY_HASVIDEO,
+    MEDIASYNC_KEY_VIDEOLATENCY,
+    MEDIASYNC_KEY_AUDIOFORMAT,
+    MEDIASYNC_KEY_STARTTHRESHOLD,
+    MEDIASYNC_KEY_ISOMXTUNNELMODE,
+    MEDIASYNC_KEY_AUDIOCACHE,
+    MEDIASYNC_KEY_VIDEOWORKMODE,
+    MEDIASYNC_KEY_AUDIOMUTE,
+    MEDIASYNC_KEY_SOURCETYPE,
+    MEDIASYNC_KEY_ALSAREADY,
+    MEDIASYNC_KEY_VSYNC_INTERVAL_MS,
+    MEDIASYNC_KEY_VIDEOFRAME,
+    MEDIASYNC_KEY_MAX = 255,
+} mediasync_parameter;
+
+typedef enum {
+    MEDIASYNC_UNIT_MS = 0,
+    MEDIASYNC_UNIT_US,
+    MEDIASYNC_UNIT_PTS,
+    MEDIASYNC_UNIT_MAX,
+} mediasync_time_unit;
+
+typedef enum {
+    MEDIASYNC_AUDIO_UNKNOWN = 0,
+    MEDIASYNC_AUDIO_NORMAL_OUTPUT,
+    MEDIASYNC_AUDIO_DROP_PCM,
+    MEDIASYNC_AUDIO_INSERT,
+    MEDIASYNC_AUDIO_HOLD,
+    MEDIASYNC_AUDIO_MUTE,
+    MEDIASYNC_AUDIO_RESAMPLE,
+    MEDIASYNC_AUDIO_ADJUST_CLOCK,
+    MEDIASYNC_AUDIO_EXIT,
+} audio_policy;
+
+struct mediasync_audio_policy {
+    audio_policy audiopolicy;
+    int32_t  param1;
+    int32_t  param2;
+};
+
+struct mediasync_audio_format {
+    int samplerate;
+    int datawidth;
+    int channels;
+    int format;
+};
+
+struct mediasync_audio_queue_info{
+    int64_t apts;
+    int size;
+    int duration;
+    mediasync_time_unit tunit;
+    bool isworkingchannel;
+    bool isneedupdate;
+};
+
+
 
 void* mediasync_wrap_create();
 

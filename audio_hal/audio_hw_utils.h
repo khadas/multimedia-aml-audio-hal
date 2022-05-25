@@ -23,7 +23,7 @@
 #include "audio_hw_dtv.h"
 #include "aml_audio_types_def.h"
 #include "aml_audio_stream.h"
-#include "MediaSyncInterface.h"
+#include "audio_mediasync_wrap.h"
 
 #define ENUM_TYPE_STR_MAX_LEN                           (100)
 #define REPORT_DECODED_INFO  "/sys/class/amaudio/codec_report_info"
