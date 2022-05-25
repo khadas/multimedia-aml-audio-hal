@@ -236,7 +236,7 @@ if(USE_DTV)
 		${DVB_AUDIO_INC})
 	target_link_libraries(audio_hal
 		${DTV_LIBS}
-		${DVB_AUDIO_LIBS} -lamavutils)
+		${DVB_AUDIO_LIBS})
 endif()
 
 
