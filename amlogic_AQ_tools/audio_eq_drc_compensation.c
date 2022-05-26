@@ -29,7 +29,7 @@
 #undef  LOG_TAG
 #define LOG_TAG  "audio_hw_primary"
 
-#define MODEL_SUM_DEFAULT_PATH "/mnt/vendor/odm_ext/etc/tvconfig/model/model_sum.ini"
+#define MODEL_SUM_DEFAULT_PATH "/vendor/etc/tvconfig/model/model_sum.ini"
 
 static struct audio_file_config_s dev_cfg[2] = {
     {/*amlogic inner EQ & DRC*/
@@ -150,22 +150,22 @@ static int volume_set(struct audio_eq_drc_info_s *p_attr, int card)
 
     ret = eq_drc_ctl_value_set(card, p_attr->volume.ch1, p_attr->volume.ch1_name);
     if (ret < 0) {
-        ALOGE("%s: set CH1 volume failed", __FUNCTION__);
+        ALOGE("%s: set CH1 volume failed(%s)", __FUNCTION__, p_attr->volume.ch1_name);
     }
 
     ret = eq_drc_ctl_value_set(card, p_attr->volume.ch2, p_attr->volume.ch2_name);
     if (ret < 0) {
-        ALOGE("%s: set CH2 volume failed", __FUNCTION__);
+        ALOGE("%s: set CH2 volume failed(%s)", __FUNCTION__, p_attr->volume.ch2_name);
     }
 
     ret = eq_drc_ctl_value_set(card, p_attr->volume.LL_vol, p_attr->volume.LL_vol_name);
     if (ret < 0) {
-        ALOGE("%s: set LL volume failed", __FUNCTION__);
+        ALOGE("%s: set LL volume failed(%s)", __FUNCTION__, p_attr->volume.LL_vol_name);
     }
 
     ret = eq_drc_ctl_value_set(card, p_attr->volume.RR_vol, p_attr->volume.RR_vol_name);
     if (ret < 0) {
-        ALOGE("%s: set RR volume failed", __FUNCTION__);
+        ALOGE("%s: set RR volume failed(%s)", __FUNCTION__, p_attr->volume.RR_vol_name);
     }
 
 exit:
