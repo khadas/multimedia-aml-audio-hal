@@ -45,51 +45,6 @@
 extern int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, const void *write_buf, size_t write_bytes);
 #define SYNC_BUF_SIZE (DEFAULT_PLAYBACK_PERIOD_SIZE * PLAYBACK_PERIOD_COUNT * EAC3_MULTIPLIER)
 
-static const unsigned int hwmuted_frame_dd[DD_MUTE_FRAME_SIZE] = {
-    0x4e1ff872, 0x50000001, 0xcdc80b77, 0xe1ff2430, 0x9200fcf4, 0x5578fc02, 0x187f6186, 0x9f3eceaf, 0xf3e77cf9, 0x3e7ccf9f, 0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7, 0xf9f33e7c, 0x9f3ee7cf, 0xf3e77cf9,
-    0x3e7ccf9f, 0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7, 0xf9f33e7c, 0x9f3ee7cf, 0xf7ff7cf9, 0x7cf93abe, 0xcf9ff3e7, 0xf9f33e7c, 0x9f3ee7cf, 0xf3e77cf9, 0x3e7ccf9f, 0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7,
-    0xf9f33e7c, 0x9f3ee7cf, 0xf3e77cf9, 0x3e7ccf9f, 0xe7cff9f3, 0x7cf99f3e, 0xdffcf3e7, 0xf3e7eaf9, 0x3e7ccf9f, 0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7, 0xf9f33e7c, 0x9f3ee7cf, 0xf3e77cf9, 0x3e7ccf9f,
-    0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7, 0xf9f33e7c, 0x9f3ee7cf, 0xf3e77cf9, 0x7ff3cf9f, 0xcf9fabe7, 0xf9f33e7c, 0x9f3ee7cf, 0xf3e77cf9, 0x3e7ccf9f, 0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7, 0xf9f33e7c,
-    0x9f3ee7cf, 0xf3e77cf9, 0x3e7ccf9f, 0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7, 0xffce3e7d, 0x3e7caf9f, 0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7, 0xf9f33e7c, 0x9f3ee7cf, 0xf3e77cf9, 0x3e7ccf9f, 0xe7cff9f3,
-    0x7cf99f3e, 0xcf9ff3e7, 0xf9f33e7c, 0x9f3ee7cf, 0xf3e77cf9, 0x3e7ccf9f, 0xff3af9f7, 0x3891e53e, 0x89102244, 0x3fa0fd00, 0xc78f1de3, 0xdddd1ddd,     0xdc00,          0,          0,          0,
-             0,          0, 0xbbbb003b, 0x6db6b6db, 0xcd6bdbe7, 0xb5af5ad6, 0x7cf99f3e, 0xcf9ff3e7, 0xf9f33e7c,     0xe7c0, 0xbc780003, 0xbbbbf1e3, 0x8000bbbb,          0,          0,          0,
-             0,          0,  0x7770000, 0xdb6d7776, 0x7cf9b6db, 0x5ad6ad6b, 0xe7cfb5f3, 0x7cf99f3e, 0xcf9ff3e7, 0xfbf03e7c,   0x67013e, 0x3c778f1e, 0x77707777,          0,          0,          0,
-             0,          0,          0, 0xeedbeeee, 0xdb6f6db6, 0xad6b9f35, 0xbe7c5ad6, 0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7,          0, 0xe3c70ef1, 0xeeee8eee,     0xee00,          0,          0,
-             0,          0,          0, 0xdddd001d, 0xb6dbdb6d, 0xe6b56df3, 0x5ad7ad6b, 0x3e7ccf9f, 0xe7cff9f3, 0x7cf99f3e,     0xf3e0, 0xde3c0001, 0xdddd78f1, 0xc000dddd,          0,          0,
-             0,          0,          0,  0x3bb0000, 0x6db6bbbb, 0xbe7cdb6d, 0xad6bd6b5, 0xf3e75af9, 0x3e7ccf9f, 0xe7cff9f3, 0x7c009f3e,   0x3b0000,     0xc07e,   0x7f01fa, 0xc78f403b, 0xbbbb1e3b,
-        0xbbb8,          0,          0,          0,          0,          0, 0x77770000, 0xb6db776d, 0xcf9a6db7, 0xad6bd6b5, 0x7cf95f3e, 0xcf9ff3e7, 0xf9f33e7c, 0x8000e7cf,  0x7780000, 0xc777f1e3,
-    0x77007777,          0,          0,          0,          0,          0,    0xe0000, 0xedb6eeee, 0xb6f9db6d, 0xd6b5f35a, 0xe7cfad6b, 0x7cf99f3e, 0xcf9ff3e7, 0xf9f73e7c, 0x7c00e002, 0x3c78cf1e,
-    0xeeeeeeee,     0xe000,          0,          0,          0,          0,          0, 0xdddd01dd, 0x6db6b6db, 0x6b5adf3e, 0xad7cd6b5, 0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7,     0x3e00, 0xe3c7001d,
-    0xdddd8f1d,     0xdddc,          0,          0,          0,          0,          0, 0x3bbb0000, 0xdb6dbbb6, 0xe7cdb6db, 0xd6b56b5a, 0x3e7caf9f, 0xe7cff9f3, 0x7cf99f3e, 0xc000f3e7,  0x3bc0000,
-    0xe3bb78f1, 0xbb80bbbb,          0,          0,          0,          0,          0,    0x70000, 0x76db7777, 0xdb7c6db6, 0x6b5af9ad, 0xf3e7d6b5, 0x3e7ccf9f, 0xe7cff9f3, 0x7cf89f3e,          0,
-    0xfc007780, 0xf4000003, 0x778ffe80, 0x77771e3c, 0x70007777,          0,          0,          0,          0,          0,   0xee0000, 0xdb6deeee, 0x6f9fb6db, 0x6b5a35ad, 0x7cf9d6be, 0xcf9ff3e7,
-    0xf9f33e7c, 0x9f00e7cf,    0xe0000, 0xc78ef1e3, 0xeeeeeeee,          0,          0,          0,          0,          0,          0, 0xdddb1ddd, 0xdb6d6db6, 0xb5adf3e6, 0xd7cf6b5a, 0x7cf99f3e,
-    0xcf9ff3e7, 0xf9f33e7c,  0x4f8efc0, 0x3c78019e, 0xddddf1dd,     0xddc0,          0,          0,          0,          0,          0, 0xbbbb0003, 0xb6dbbb6d, 0x7cd66dbe, 0x6b5ab5ad, 0xe7cff9f3,
-    0x7cf99f3e, 0xcf9ff3e7,     0x3e7c, 0x3bc70000, 0x3bbb8f1e, 0xb800bbbb,          0,          0,          0,          0,          0,   0x770000, 0x6db67777, 0xb7cfdb6d, 0xb5ad9ad6, 0x3e7c6b5f,
-    0xe7cff9f3, 0x7cf99f3e, 0xcf80f3e7,    0x70000, 0xe3c778f1, 0x77777777,          0,          0,          0,          0,          0,          0, 0xeeed0eee, 0x6db6b6db, 0x5ad6f9f3, 0x6be7b5ad,
-    0x3e7ccf9f, 0xe7cff9f3, 0x7cf99f3e,     0xf000,  0x1f800ef,  0x8380000, 0xea4402ad, 0xfd8909ba,  0x7559e6c, 0xf4008783, 0x778ffe80, 0x77771e3c, 0x70007777,          0,          0,          0,
-             0,          0,   0xee0000, 0xdb6deeee, 0x6f9fb6db, 0x6b5a35ad, 0x7cf9d6be, 0xcf9ff3e7, 0xf9f33e7c, 0x9f00e7cf,    0xe0000, 0xc78ef1e3, 0xeeeeeeee,          0,          0,          0,
-             0,          0,          0, 0xdddb1ddd, 0xdb6d6db6, 0xb5adf3e6, 0xd7cf6b5a, 0x7cf99f3e, 0xcf9ff3e7, 0xf9f33e7c,  0x4f8efc0, 0x3c78019e, 0xddddf1dd,     0xddc0,          0,          0,
-             0,          0,          0, 0xbbbb0003, 0xb6dbbb6d, 0x7cd66dbe, 0x6b5ab5ad, 0xe7cff9f3, 0x7cf99f3e, 0xcf9ff3e7,     0x3e7c, 0x3bc70000, 0x3bbb8f1e, 0xb800bbbb,          0,          0,
-             0,          0,          0,   0x770000, 0x6db67777, 0xb7cfdb6d, 0xb5ad9ad6, 0x3e7c6b5f, 0xe7cff9f3, 0x7cf99f3e, 0xcf80f3e7,    0x70000, 0xe3c778f1, 0x77777777,          0,          0,
-             0,          0,          0,          0, 0xeeed0eee, 0x6db6b6db, 0x5ad6f9f3, 0x6be7b5ad, 0x3e7ccf9f, 0xe7cff9f3, 0x7cf99f3e,     0xf000,  0x1f800ef,  0x9600000, 0x678702c0, 0x7755b8ed,
-    0x4cbcd453, 0xab7696aa, 0x4b47bdb4, 0xebe40734, 0x511930e9, 0x3ea40092, 0x684037ec, 0x9db490bc, 0x96bbccc3,  0xf17adba, 0xce80f164, 0x90c75984, 0x1598a7da, 0x20c19a22, 0x7202ee1d, 0xc1106588,
-    0xd9bbc22c, 0x77b2c1c6, 0x56c22a12, 0x36a3b0d1, 0xfe80f400, 0x1e3c778f, 0x77777777,     0x7000,          0,          0,          0,          0,          0, 0xeeee00ee, 0xb6dbdb6d, 0x35ad6f9f,
-    0xd6be6b5a, 0xf3e77cf9, 0x3e7ccf9f, 0xe7cff9f3,     0x9f00, 0xf1e3000e, 0xeeeec78e,     0xeeee,          0,          0,          0,          0,          0, 0x1ddd0000, 0x6db6dddb, 0xf3e6db6d,
-    0x6b5ab5ad, 0x9f3ed7cf, 0xf3e77cf9, 0x3e7ccf9f, 0xefc0f9f3,  0x19e04f8, 0xf1dd3c78, 0xddc0dddd,          0,          0,          0,          0,          0,    0x30000, 0xbb6dbbbb, 0x6dbeb6db,
-    0xb5ad7cd6, 0xf9f36b5a, 0x9f3ee7cf, 0xf3e77cf9, 0x3e7ccf9f,          0, 0x8f1e3bc7, 0xbbbb3bbb,     0xb800,          0,          0,          0,          0,          0, 0x77770077, 0xdb6d6db6,
-    0x9ad6b7cf, 0x6b5fb5ad, 0xf9f33e7c, 0x9f3ee7cf, 0xf3e77cf9,     0xcf80, 0x78f10007, 0x7777e3c7,     0x7777,          0,          0,          0,          0,          0,  0xeee0000, 0xb6dbeeed,
-    0xf9f36db6, 0xb5ad5ad6, 0xcf9f6be7, 0xf9f33e7c, 0x9f3ee7cf, 0xf0007cf9,   0xef0000,      0x1f8,   0x1f095c, 0x152cc7df, 0xe0a1af0b, 0xbd3f4b74, 0x71b859e9, 0xb4da9f21, 0x515fd7d9, 0xfe05c0db,
-    0x819022dd, 0x96c4b6a1, 0xfc593cef, 0x7d127a7c, 0xcfac240e, 0xb6ec0a66, 0xed96e243, 0x3e5e6c62, 0x5c0a6d81, 0x1158a269, 0x1d0ecbd5, 0x39e9a681, 0x2ea4f735, 0xb2077aac,   0xfef3f4, 0x8f1e8077,
-    0x77773c77,     0x7770,          0,          0,          0,          0,          0, 0xeeee0000, 0x6db6eedb, 0x9f35db6f, 0x5ad6ad6b, 0xf9f3be7c, 0x9f3ee7cf, 0xf3e77cf9,     0xcf9f,  0xef10000,
-    0x8eeee3c7, 0xee00eeee,          0,          0,          0,          0,          0,   0x1d0000, 0xdb6ddddd, 0x6df3b6db, 0xad6be6b5, 0xcf9f5ad7, 0xf9f33e7c, 0x9f3ee7cf, 0xf3ef7cf9, 0xf801c004,
-    0x78f19e3c, 0xdddddddd,     0xc000,          0,          0,          0,          0,          0, 0xbbbb03bb, 0xdb6d6db6, 0xd6b5be7c, 0x5af9ad6b, 0xcf9ff3e7, 0xf9f33e7c, 0x9f3ee7cf,     0x7c00,
-    0xc78f003b, 0xbbbb1e3b,     0xbbb8,          0,          0,          0,          0,          0, 0x77770000, 0xb6db776d, 0xcf9a6db7, 0xad6bd6b5, 0x7cf95f3e, 0xcf9ff3e7, 0xf9f33e7c, 0x8000e7cf,
-     0x7780000, 0xc777f1e3, 0x77007777,          0,          0,          0,          0,          0,    0xe0000, 0xedb6eeee, 0xb6f9db6d, 0xd6b5f35a, 0xe7cfad6b, 0x7cf99f3e, 0xcf9ff3e7, 0xf9f03e7c,
-             0, 0xf9e9ef00,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,
-             0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,
-};
-
 const unsigned int hwm_mute_dd_frame[] = {
     0x5d9c770b, 0xf0432014, 0xf3010713, 0x2020dc62, 0x4842020, 0x57100404, 0xf97c3e1f, 0x9fcfe7f3, 0xf3f97c3e, 0x3e9fcfe7, 0xe7f3f97c, 0x7c3e9fcf, 0xcfe7f3f9, 0xfb7c3e9f, 0xf97c75fe, 0x9fcfe7f3,
     0xf3f97c3e, 0x3e9fcfe7, 0xe7f3f97c, 0x7c3e9fcf, 0xcfe7f3f9, 0xfb7c3e9f, 0x3e5f9dff, 0xe7f3f97c, 0x7c3e9fcf, 0xcfe7f3f9, 0xf97c3e9f, 0x9fcfe7f3, 0xf3f97c3e, 0x3e9fcfe7, 0x48149ff2, 0x2091,
@@ -285,8 +240,11 @@ bool aml_hwsynces_spdif_insertraw(struct audio_stream_out *stream,  void **spdif
     memset(buffer, 0, sizeof(buffer));
 
     if (is_packed) {
-        memcpy(buffer, hwmuted_frame_dd, sizeof(hwmuted_frame_dd));
-        size = sizeof(hwmuted_frame_dd);
+        char *raw_buf = NULL;
+        int raw_size = 0;
+        raw_buf = aml_audio_get_muteframe(AUDIO_FORMAT_AC3,&raw_size,0);
+        memcpy(buffer, raw_buf, raw_size);
+        size = raw_size;
         ALOGI("packet dd size = %d\n",  size);
     } else {
         memcpy(buffer, hwm_mute_ddp_frame, sizeof(hwm_mute_ddp_frame));
@@ -365,18 +323,23 @@ void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
     audio_hwsync_mediasync_t* p_esmediasync = &(aml_out->hwsync->es_mediasync);
     do {
         mediasync_wrap_AudioProcess(p_esmediasync->mediasync, p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
-        if (adev->debug_flag > 0)
-            ALOGI("do get m_audiopolicy=%d=%s, param1=%u, param2=%u, out_pts=0x%llx,cur=0x%llx\n",
+        if (adev->debug_flag > 0) {
+            static int64_t beforepts = 0;
+            static int64_t beforepts1 = 0;
+            ALOGI("do ms12_1 get m_audiopolicy=%d=%s, param1=%u, param2=%u, cur_pts=0x%llx,cur_outpts=0x%llx,diff_cur_pts=%lld,diff_cur_outpts=%lld \n",
                 m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
                 m_audiopolicy.param1, m_audiopolicy.param2,
-                p_esmediasync->out_start_apts, p_esmediasync->cur_outapts);
+                p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, p_esmediasync->out_start_apts - beforepts1, p_esmediasync->cur_outapts - beforepts);
+           beforepts = p_esmediasync->cur_outapts;
+           beforepts1 = p_esmediasync->out_start_apts;
+        }
+        p_esmediasync->apolicy.audiopolicy= (audio_policy)m_audiopolicy.audiopolicy;
+        p_esmediasync->apolicy.param1 = m_audiopolicy.param1;
+        p_esmediasync->apolicy.param2 = m_audiopolicy.param2;
         if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD)
             usleep(15*1000);
+    } while (aml_out->hwsync && (aml_out->pause_status == false) && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
 
-    } while (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
-    p_esmediasync->apolicy.audiopolicy= (audio_policy)m_audiopolicy.audiopolicy;
-    p_esmediasync->apolicy.param1 = m_audiopolicy.param1;
-    p_esmediasync->apolicy.param2 = m_audiopolicy.param2;
 }
 
 int aml_hwsynces_ms12_process_insert(void *priv_data, int insert_time_ms,
@@ -467,9 +430,16 @@ sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_
 
     {
         async_policy = &(aml_out->hwsync->es_mediasync.apolicy);
-        ALOGI("cur policy:%d, prm1:%d, prm2:%d\n", async_policy->audiopolicy,
+        ALOGI("process_policy1:%d, prm1:%d, prm2:%d\n", async_policy->audiopolicy,
             async_policy->param1, async_policy->param2);
 
+        while (aml_out->hwsync && (aml_out->pause_status == false) && async_policy->audiopolicy == MEDIASYNC_AUDIO_HOLD) {
+            usleep(15*1000);
+            if (aml_out->hwsync == NULL)
+            {
+                return ESSYNC_AUDIO_OUTPUT;
+            }
+        };
         if (async_policy->audiopolicy == MEDIASYNC_AUDIO_DROP_PCM) {
 
             return ESSYNC_AUDIO_DROP;
@@ -517,8 +487,8 @@ int aml_audio_get_cur_ms12_latencyes(struct audio_stream_out *stream) {
         ms12_latencyms = ((ms12->ms12_main_input_size - inputnode_consumed ) / 4 + frames_generated - ms12->master_pcm_frames) / 48;
     }
     if (adev->debug_flag)
-        ALOGI("ms12_latencyms %d  ms12_main_input_size %lld inputnode_consumed %lld frames_generated %lld master_pcm_frames %lld",
-        ms12_latencyms, ms12->ms12_main_input_size, inputnode_consumed,frames_generated, ms12->master_pcm_frames);
+        ALOGI("ms12_latencyms %d  ms12_main_input_size %lld inputnode_consumed %lld frames_generated %lld master_pcm_frames %lld,audio format %d\n",
+        ms12_latencyms, ms12->ms12_main_input_size, inputnode_consumed,frames_generated, ms12->master_pcm_frames,aml_out->hal_internal_format);
     return ms12_latencyms;
 
 }
@@ -573,7 +543,7 @@ sync_process_res  aml_hwmediasync_nonms12_process(struct audio_stream_out *strea
     do {
         mediasync_wrap_AudioProcess(aml_out->hwsync->es_mediasync.mediasync, aml_dec->out_frame_pts, aml_out->hwsync->es_mediasync.cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
         if (adev->debug_flag > 0)
-            ALOGI("do get m_audiopolicy=%d=%s, param1=%u, param2=%u, out_pts=0x%llx,cur=0x%llx \n",
+            ALOGI("get m_audiopolicy=%d=%s, param1=%u, param2=%u, out_pts=0x%llx,cur=0x%llx \n",
                 m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
                 m_audiopolicy.param1, m_audiopolicy.param2,
                 aml_dec->out_frame_pts, aml_out->hwsync->es_mediasync.cur_outapts);

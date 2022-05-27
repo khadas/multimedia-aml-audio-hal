@@ -302,7 +302,8 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                     if (pro_result == ESSYNC_AUDIO_DROP)
                         continue;
 
-                    if (fabs(aml_out->output_speed - 1.0f) > 1e-6) {
+                    // pcm case, asink do speed before audio_hal.
+                    if ((fabs(aml_out->output_speed - 1.0f) > 1e-6) && !audio_is_linear_pcm(aml_out->hal_internal_format)) {
                         ret = aml_audio_speed_process_wrapper(&aml_out->speed_handle, dec_data,
                                                 pcm_len, aml_out->output_speed,
                                                 OUTPUT_ALSA_SAMPLERATE, dec_pcm_data->data_ch);
@@ -315,6 +316,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                             pcm_len = aml_out->speed_handle->speed_size;
                         }
                     }
+
                }
 
                 aml_hw_mixer_mixing(&adev->hw_mixer, dec_data, pcm_len, output_format);

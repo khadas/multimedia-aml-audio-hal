@@ -1037,8 +1037,9 @@ static void hwsync_mediasync_outset(struct aml_audio_device *adev, struct aml_st
     mediasync_wrap_setParameter(adev->hw_mediasync, MEDIASYNC_KEY_HASAUDIO, &has_audio);
     audio_format.format = out->hal_format;
     mediasync_wrap_setParameter(adev->hw_mediasync, MEDIASYNC_KEY_AUDIOFORMAT, &audio_format);
+    out->output_speed = 1.0f;
     *sync_enable = ret_set_id ? 1 : 0;
-    ALOGI("[%s:%d]:The current sync type: MediaSync %d,%d", __FUNCTION__, __LINE__,*sync_enable,hw_sync_id);
+    ALOGI("[%s:%d]:The current sync type: MediaSync %d,%d,%x", __FUNCTION__, __LINE__,*sync_enable,hw_sync_id,out->hal_format);
 }
 
 
@@ -1241,20 +1242,11 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         }
 
         if (hw_sync_id == 12345678) {
-            if (adev->synctype == AVSYNC_TYPE_TSYNC) {
-                out->avsync_type = AVSYNC_TYPE_TSYNC;
-                out->hwsync->hwsync_id = hw_sync_id;
-                sync_enable = 1;
-                out->hwsync->use_mediasync = false;
-                ALOGI("[%s:%d]:The current sync type: tSync", __FUNCTION__, __LINE__);
-            }
-            else {
-                //compatible ts mode hal_param_media_sync_id
-                aml_dtv_audio_instances_t *dtv_audio_instances =  (aml_dtv_audio_instances_t *)adev->aml_dtv_audio_instances;
-                aml_demux_audiopara_t *demux_info = &dtv_audio_instances->demux_info[0];
-                hwsync_mediasync_outset(adev,out,&sync_enable,demux_info->media_sync_id);
-                out->avsync_type = AVSYNC_TYPE_MEDIASYNC;
-            }
+            out->avsync_type = AVSYNC_TYPE_TSYNC;
+            out->hwsync->hwsync_id = hw_sync_id;
+            sync_enable = 1;
+            out->hwsync->use_mediasync = false;
+            ALOGI("[%s:%d]:The current sync type: tSync", __FUNCTION__, __LINE__);
         } else {
             if (out->avsync_type == AVSYNC_TYPE_MEDIASYNC) {
                 hwsync_mediasync_outset(adev,out,&sync_enable,hw_sync_id);
@@ -1826,6 +1818,7 @@ static int out_flush_new (struct audio_stream_out *stream)
             }
 
             aml_audio_hwsync_init(out->hwsync, out);
+
             dolby_ms12_hwsync_init();
 
             adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_IDLE;
@@ -4731,10 +4724,10 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_SECURITY_MEM_LEVEL, val);
             goto exit;
         }
+        //t5d tsmode todo
         ret = str_parms_get_int(parms, "hal_param_dtv_synctype", &val);
         if (ret >= 0) {
-            adev->synctype = val;
-            ALOGI("adev->synctype set to %d\n", adev->synctype);
+            ALOGI("adev->synctype set to %d\n", val);
             goto exit;
         }
         ret = str_parms_get_int(parms, "hal_param_audio_output_mode", &val);

@@ -2268,6 +2268,12 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
         if (process_result == DTVSYNC_AUDIO_DROP)
             return ret;
     }
+    if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
+    {
+        process_result = aml_hwsynces_ms12_process_policy(priv_data, ms12_info);
+        if (process_result == ESSYNC_AUDIO_DROP)
+            return ret;
+    }
     if (audio_is_linear_pcm(output_format)) {
         if (ms12_info->pcm_type == DAP_LPCM) {
             dap_pcm_output(buffer, priv_data, size, ms12_info);
