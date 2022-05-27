@@ -138,6 +138,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
         config_output(stream, true);
     }
     aml_dec_t *aml_dec = aml_out->aml_dec;
+
     if (aml_dec) {
         dec_data_info_t * dec_pcm_data = &aml_dec->dec_pcm_data;
         dec_data_info_t * dec_raw_data = &aml_dec->dec_raw_data;
@@ -149,6 +150,16 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                 aml_dec->in_frame_pts = patch->cur_package->pts;
             } else {
                 aml_dec->in_frame_pts = decoder_apts_lookup(patch->decoder_offset);
+            }
+        }
+
+        if ((aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
+        {
+            int64_t apts = 0;
+            if ( 0 == aml_audio_hwsync_lookup_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, &apts)) {
+                aml_dec->in_frame_pts = apts;
+            } else {
+                ALOGE("[%s:%d] es av sync loopup apts fail", __func__, __LINE__);
             }
         }
 
@@ -275,6 +286,37 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                         }
                     }
                 }
+
+                if ((aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
+                {
+                    sync_process_res pro_result = ESSYNC_AUDIO_OUTPUT;
+                    if (dec_pcm_data->data_ch != 0)
+                        duration =  (pcm_len * 1000) / (2 * dec_pcm_data->data_ch * aml_out->config.rate);
+
+
+                    alsa_latency = 90 *(out_get_alsa_latency_frames(stream)  * 1000) / aml_out->config.rate;
+                    aml_out->hwsync->es_mediasync.cur_outapts = aml_dec->out_frame_pts - decoder_latency - alsa_latency;
+
+                    //sync process here
+                    pro_result = aml_hwmediasync_nonms12_process(stream, duration, &speed_enabled);
+                    if (pro_result == ESSYNC_AUDIO_DROP)
+                        continue;
+
+                    if (fabs(aml_out->output_speed - 1.0f) > 1e-6) {
+                        ret = aml_audio_speed_process_wrapper(&aml_out->speed_handle, dec_data,
+                                                pcm_len, aml_out->output_speed,
+                                                OUTPUT_ALSA_SAMPLERATE, dec_pcm_data->data_ch);
+                        if (ret != 0) {
+                            ALOGE("aml_audio_speed_process_wrapper failed");
+                        } else {
+
+                            ALOGV("data_len=%d, speed_size=%d\n", pcm_len, aml_out->speed_handle->speed_size);
+                            dec_data = aml_out->speed_handle->speed_buffer;
+                            pcm_len = aml_out->speed_handle->speed_size;
+                        }
+                    }
+               }
+
                 aml_hw_mixer_mixing(&adev->hw_mixer, dec_data, pcm_len, output_format);
                 if (audio_hal_data_processing(stream, dec_data, pcm_len, &output_buffer, &output_buffer_bytes, output_format) == 0) {
                     hw_write(stream, output_buffer, output_buffer_bytes, output_format);
