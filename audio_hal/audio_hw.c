@@ -1246,6 +1246,7 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
             out->hwsync->hwsync_id = hw_sync_id;
             sync_enable = 1;
             out->hwsync->use_mediasync = false;
+            aml_hwsync_set_tsync_init(out->hwsync);
             ALOGI("[%s:%d]:The current sync type: tSync", __FUNCTION__, __LINE__);
         } else {
             if (out->avsync_type == AVSYNC_TYPE_MEDIASYNC) {

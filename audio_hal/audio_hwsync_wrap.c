@@ -62,8 +62,11 @@ static void aml_hwsync_wrap_single_set_tsync_resume(void)
 
 static void aml_hwsync_wrap_single_set_tsync_stop(void)
 {
-    ALOGI("%s(), send stop event", __func__);
+    ALOGI("%s(), send stop event and disable tsync", __func__);
+
+    sysfs_set_sysfs_str(TSYNC_EVENT, "AUDIO_RESUME");
     sysfs_set_sysfs_str(TSYNC_EVENT, "AUDIO_STOP");
+    sysfs_set_sysfs_str(TSYNC_ENABLE, "0"); // disable avsync
 }
 
 static int aml_hwsync_wrap_single_set_tsync_start_pts(uint32_t pts)
