@@ -3770,7 +3770,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     if (getprop_bool(DTV_SKIPAMADEC)) {
         patch->skip_amadec_flag = true;
     }
-    ALOGI("%s, synctype %d skip_amadec_flag %d \n", __FUNCTION__,aml_dev->synctype,patch->skip_amadec_flag);
+    ALOGI("%s, skip_amadec_flag %d \n", __FUNCTION__, patch->skip_amadec_flag);
     if (patch->skip_amadec_flag) {
         ret = pthread_create(&(patch->audio_cmd_process_threadID), NULL,
                              audio_dtv_patch_process_threadloop_v2, patch);
@@ -3901,7 +3901,6 @@ int release_dtv_patch(struct aml_audio_device *aml_dev)
         dtv_instances->dvb_path_count--;
     ALOGI("dtv_instances->dvb_path_count %d",dtv_instances->dvb_path_count);
     if (dtv_instances->dvb_path_count == 0) {
-        aml_dev->synctype = AVSYNC_TYPE_NULL;
         ret = release_dtv_patch_l(aml_dev);
     }
     pthread_mutex_unlock(&aml_dev->patch_lock);
