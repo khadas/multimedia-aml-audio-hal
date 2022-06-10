@@ -1241,12 +1241,20 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         }
 
         if (hw_sync_id == 12345678) {
-            //always treat as tsync
-            out->avsync_type = AVSYNC_TYPE_TSYNC;
-            out->hwsync->hwsync_id = hw_sync_id;
-            sync_enable = 1;
-            out->hwsync->use_mediasync = false;
-            ALOGI("[%s:%d]:The current sync type: tSync", __FUNCTION__, __LINE__);
+            if (adev->synctype == AVSYNC_TYPE_TSYNC) {
+                out->avsync_type = AVSYNC_TYPE_TSYNC;
+                out->hwsync->hwsync_id = hw_sync_id;
+                sync_enable = 1;
+                out->hwsync->use_mediasync = false;
+                ALOGI("[%s:%d]:The current sync type: tSync", __FUNCTION__, __LINE__);
+            }
+            else {
+                //compatible ts mode hal_param_media_sync_id
+                aml_dtv_audio_instances_t *dtv_audio_instances =  (aml_dtv_audio_instances_t *)adev->aml_dtv_audio_instances;
+                aml_demux_audiopara_t *demux_info = &dtv_audio_instances->demux_info[0];
+                hwsync_mediasync_outset(adev,out,&sync_enable,demux_info->media_sync_id);
+                out->avsync_type = AVSYNC_TYPE_MEDIASYNC;
+            }
         } else {
             if (out->avsync_type == AVSYNC_TYPE_MEDIASYNC) {
                 hwsync_mediasync_outset(adev,out,&sync_enable,hw_sync_id);
@@ -4725,7 +4733,8 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         }
         ret = str_parms_get_int(parms, "hal_param_dtv_synctype", &val);
         if (ret >= 0) {
-            ALOGI("donothing for hal_param_dtv_synctype %d\n", val);
+            adev->synctype = val;
+            ALOGI("adev->synctype set to %d\n", adev->synctype);
             goto exit;
         }
         ret = str_parms_get_int(parms, "hal_param_audio_output_mode", &val);
