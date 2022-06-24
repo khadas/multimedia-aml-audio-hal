@@ -411,7 +411,7 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                             mediasync_wrap_setParameter(dtvsync->mediasync_new, MEDIASYNC_KEY_ISOMXTUNNELMODE, &audio_sync_mode);
                             mediasync_wrap_bindInstance(dtvsync->mediasync_new, dtvsync->mediasync_id, MEDIA_AUDIO);
                             ALOGI("normal output version CMD open audio bind syncId:%d\n", dtvsync->mediasync_id);
-                            mediasync_wrap_setParameter(dtvsync, MEDIASYNC_KEY_HASAUDIO, &has_audio);
+                            mediasync_wrap_setParameter(dtvsync->mediasync_new, MEDIASYNC_KEY_HASAUDIO, &has_audio);
                         }
                         pthread_mutex_unlock(&dtvsync->ms_lock);
                     }

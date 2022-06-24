@@ -99,7 +99,10 @@ struct alsa_info {
 	struct AudioDeviceDescriptor *i2s4parser_descrpt;
 };
 
-static struct alsa_info *p_aml_alsa_info;
+static struct alsa_info *p_aml_alsa_info = NULL;
+
+static void alsa_device_get_pcm_index();
+static void alsa_device_parser_pcm_string(struct alsa_info *p_info, char *InputBuffer);
 
 static struct alsa_info *alsa_device_get_info()
 {
@@ -195,11 +198,11 @@ int alsa_device_get_card_index()
  * 00-04: SPDIF-dummy-alsaPORT-spdif dummy-4 :	: playback 1 : capture 1
  * 00-05: SPDIF-B-dummy-alsaPORT-hdmi dummy-5 :  : playback 1
  */
-void alsa_device_get_pcm_index()
+static void alsa_device_get_pcm_index()
 {
 	struct alsa_info *p_info = alsa_device_get_info();
 
-	if (!p_info->deviced_checked) {
+	if (p_info && (!p_info->deviced_checked)) {
 		FILE *mPcmFile = NULL;
 		char tempbuffer[READ_BUFFER_SIZE];
 
@@ -220,7 +223,7 @@ void alsa_device_get_pcm_index()
 	}
 }
 
-void alsa_device_parser_pcm_string(struct alsa_info *p_info, char *InputBuffer)
+static void alsa_device_parser_pcm_string(struct alsa_info *p_info, char *InputBuffer)
 {
 	char *Rch;
 	char mStreamName[256];
