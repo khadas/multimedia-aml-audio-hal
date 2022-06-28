@@ -151,7 +151,7 @@ int alsa_device_get_card_index()
 		while (!feof(mCardFile)) {
 			if (fgets(tempbuffer, READ_BUFFER_SIZE, mCardFile) != NULL) {
 				/* this line contain '[' character */
-				if (strchr(tempbuffer, '[')) {
+				if (strchr(tempbuffer, '[') && strstr(tempbuffer, CARD_AML_KEYWORD)) {
 					char *Rch = strtok(tempbuffer, "[");
 					mCardIndex = atoi(Rch);
 					ALOGD("\tcurrent mCardIndex = %d, Rch = %s", mCardIndex, Rch);
@@ -162,7 +162,7 @@ int alsa_device_get_card_index()
 						isCardIndexFound = true;
 						p_aml_alsa_info->is_auge = 1;
 						break;
-					} else {
+					} else if (strcmp(Rch, CARD_NAME_MESON) == 0) {
 						ALOGD("\t meson sound cardIndex found = %d", mCardIndex);
 						isCardIndexFound = true;
 						p_aml_alsa_info->is_auge = 0;
