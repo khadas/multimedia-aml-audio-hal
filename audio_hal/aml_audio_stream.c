@@ -33,6 +33,10 @@
 #include "alsa_config_parameters.h"
 #include "audio_hw_ms12.h"
 
+#ifdef USE_MEDIAINFO
+#include "aml_media_info.h"
+#endif
+
 #ifdef MS12_V24_ENABLE
 #include "audio_hw_ms12_v2.h"
 #endif
@@ -1031,6 +1035,16 @@ static int update_audio_hal_info(struct aml_audio_device *adev, audio_format_t f
     }
 
     if (atmos_flag == 1) {
+#ifdef USE_MEDIAINFO
+        if ((adev->minfo_h) && (atmos_flag != adev->minfo_atmos_flag)) {
+            if (adev->info_rid == -1) {
+                minfo_publish_record(adev->minfo_h, MINFO_TYPE_AUDIO ",atmos=1", &adev->info_rid);
+            } else {
+                minfo_update_record(adev->minfo_h, MINFO_TYPE_AUDIO ",atmos=1", adev->info_rid);
+            }
+            adev->minfo_atmos_flag = atmos_flag;
+        }
+#endif
         if (format == AUDIO_FORMAT_E_AC3)
             update_type = TYPE_DDP_ATMOS;
         else if (format == AUDIO_FORMAT_DOLBY_TRUEHD)
@@ -1040,6 +1054,16 @@ static int update_audio_hal_info(struct aml_audio_device *adev, audio_format_t f
         else if (format == AUDIO_FORMAT_AC4)
             update_type = TYPE_AC4_ATMOS;
     }
+#ifdef USE_MEDIAINFO
+    else if ((adev->minfo_h) && (atmos_flag != adev->minfo_atmos_flag)) {
+        if (adev->info_rid == -1) {
+            minfo_publish_record(adev->minfo_h, MINFO_TYPE_AUDIO ",atmos=0", &adev->info_rid);
+        } else {
+            minfo_update_record(adev->minfo_h, MINFO_TYPE_AUDIO ",atmos=0", adev->info_rid);
+        }
+        adev->minfo_atmos_flag = atmos_flag;
+    }
+#endif
 
     ALOGV("%s() update_cnt %d format %#x vs hal_internal_format %#x  atmos_flag %d vs is_dolby_atmos %d update_type %d\n",
         __FUNCTION__, adev->audio_hal_info.update_cnt, format, adev->audio_hal_info.format,

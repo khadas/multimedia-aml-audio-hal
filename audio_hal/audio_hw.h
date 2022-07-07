@@ -589,6 +589,12 @@ struct aml_audio_device {
     int cap_delay;
 #endif
     int injection_enable;
+
+#ifdef USE_MEDIAINFO
+    void *minfo_h;
+    uint32_t info_rid;
+    int minfo_atmos_flag;
+#endif
     /* -End- */
 };
 

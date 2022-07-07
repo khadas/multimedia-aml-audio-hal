@@ -34,6 +34,7 @@ option(USE_SC2 "Current platform is sc2" OFF)
 option(NO_USE_CAP_MUTE_HDMI "Don't support audio capture mute for HDMI INPUT" OFF)
 option(USE_APP_MIXING "Support appsound mixing" ON)
 option(USE_DIAG_LOG "Support diagnostic logging for RDK" OFF)
+option(USE_MEDIA_INFO "Support media info API reporting" ON)
 
 
 if(USE_DTV)
@@ -66,6 +67,10 @@ if(USE_EQ_DRC)
 		amlogic_AQ_tools/ini/dictionary.c
 		amlogic_AQ_tools/ini/iniparser.c)
 	add_definitions(-DUSE_EQ_DRC)
+endif()
+
+if(USE_MEDIA_INFO)
+    add_definitions(-DUSE_MEDIAINFO)
 endif()
 
 #############################################
@@ -238,6 +243,9 @@ if(USE_DTV)
 		${DVB_AUDIO_LIBS})
 endif()
 
+if(USE_MEDIA_INFO)
+	target_link_libraries(audio_hal -lamlminfo)
+endif()
 
 target_link_libraries(audio_hal -lamlavsync)
 

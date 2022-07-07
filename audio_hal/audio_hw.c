@@ -113,6 +113,10 @@
 #include "jb_nano.h"
 #endif
 
+#ifdef USE_MEDIAINFO
+#include "aml_media_info.h"
+#endif
+
 // for dtv playback
 #include "audio_hw_dtv.h"
 #include "../bt_voice/kehwin/audio_kw.h"
@@ -3559,6 +3563,16 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out->ac3_parser_handle = NULL;
         out->ac3_parser_init = false;
     }
+
+#ifdef USE_MEDIAINFO
+    if (adev->minfo_h) {
+        if (adev->info_rid != -1) {
+            minfo_retrieve_record(adev->minfo_h, adev->info_rid);
+            adev->info_rid = -1;
+            adev->minfo_atmos_flag = -1;
+        }
+    }
+#endif
 
 //#ifdef ENABLE_MMAP
 #ifndef BUILD_LINUX
@@ -10015,6 +10029,11 @@ static int adev_close(hw_device_t *device)
         adev->ms12_out = NULL;
     }
 
+#ifdef USE_MEDIAINFO
+    minfo_destroy(adev->minfo_h);
+    adev->minfo_h = NULL;
+#endif
+
 /*[SEI-zhaopf-2018-10-29] add for HBG remote audio support { */
 #if defined(ENABLE_HBG_PATCH)
     stopReceiveAudioData();
@@ -10640,6 +10659,15 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         ret = -EINVAL;
         goto err_ringbuf;
     }
+
+#ifdef USE_MEDIAINFO
+    adev->minfo_h = minfo_init();
+    if (!adev->minfo_h) {
+        ALOGE("Mediainfo init failed");
+    }
+    adev->info_rid = -1;
+    adev->minfo_atmos_flag = -1;
+#endif
 
     // adev->debug_flag is set in hw_write()
     // however, sometimes function didn't goto hw_write() before encounting error.
