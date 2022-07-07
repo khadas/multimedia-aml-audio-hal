@@ -1299,3 +1299,17 @@ int update_sink_format_after_hotplug(struct aml_audio_device *adev)
     return 0;
 }
 
+int set_hdmiin_audio_mode(struct aml_mixer_handle *mixer_handle, char *mode)
+{
+    if (mode == NULL || strlen(mode) > 5)
+        return -EINVAL;
+
+    return aml_mixer_ctrl_set_str(mixer_handle,
+            AML_MIXER_ID_HDMIIN_AUDIO_MODE, mode);
+}
+
+enum hdmiin_audio_mode get_hdmiin_audio_mode(struct aml_mixer_handle *mixer_handle)
+{
+    return (enum hdmiin_audio_mode)aml_mixer_ctrl_get_int(mixer_handle,
+            AML_MIXER_ID_HDMIIN_AUDIO_MODE);
+}

@@ -470,4 +470,17 @@ int update_sink_format_after_hotplug(struct aml_audio_device *adev);
 
 int stream_check_reconfig_param(struct audio_stream_out *stream);
 
+/*
+ * @breif set HDMIIN audio mode: "SPDIF", "I2S", "TDM"
+ * return negative if fails.
+ */
+int set_hdmiin_audio_mode(struct aml_mixer_handle *mixer_handle, char *mode);
+
+enum hdmiin_audio_mode {
+    HDMIIN_MODE_SPDIF = 0,
+    HDMIIN_MODE_I2S   = 1,
+    HDMIIN_MODE_TDM   = 2
+};
+enum hdmiin_audio_mode get_hdmiin_audio_mode(struct aml_mixer_handle *mixer_handle);
+
 #endif /* _AML_AUDIO_STREAM_H_ */

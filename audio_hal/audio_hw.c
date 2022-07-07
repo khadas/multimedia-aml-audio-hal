@@ -2173,9 +2173,11 @@ static void release_buffer (struct resampler_buffer_provider *buffer_provider,
                             struct resampler_buffer* buffer);
 
 /** audio_stream_in implementation **/
-static unsigned int select_port_by_device(audio_devices_t in_device)
+static unsigned int select_port_by_device(struct aml_stream_in *in)
 {
+    struct aml_audio_device *adev = in->dev;
     unsigned int inport = PORT_I2S;
+    audio_devices_t in_device = in->device;
 
     if (in_device & AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET) {
         inport = PORT_PCM;
@@ -2186,6 +2188,9 @@ static unsigned int select_port_by_device(audio_devices_t in_device)
         if (alsa_device_is_auge() &&
                 (in_device & AUDIO_DEVICE_IN_HDMI)) {
             inport = PORT_TV;
+            if (get_hdmiin_audio_mode(&adev->alsa_mixer) == HDMIIN_MODE_I2S) {
+                inport = PORT_I2S4HDMIRX;
+            }
         } else if ((access(SYS_NODE_EARC, F_OK) == 0) &&
                 (in_device & AUDIO_DEVICE_IN_HDMI_ARC)) {
             inport = PORT_EARC;
@@ -2254,7 +2259,7 @@ int start_input_stream(struct aml_stream_in *in)
     }
 
     card = alsa_device_get_card_index();
-    port = select_port_by_device(adev->in_device);
+    port = select_port_by_device(in);
     /* check to update alsa device by port */
     alsa_device = alsa_device_update_pcm_index(port, CAPTURE);
     ALOGD("*%s, open alsa_card(%d %d) alsa_device(%d), in_device:0x%x\n",
@@ -8470,6 +8475,7 @@ ssize_t out_write_new(struct audio_stream_out *stream,
     ssize_t ret = 0;
     write_func  write_func_p = NULL;
 
+    adev->debug_flag = aml_audio_get_debug_flag();
     if (adev->debug_flag > 1) {
         ALOGI("+<IN>%s: out_stream(%p) position(%zu)", __func__, stream, bytes);
     }
@@ -9058,8 +9064,8 @@ void *audio_patch_output_threadloop(void *data)
         }
         pthread_mutex_unlock(&patch->mutex);
 
-        ALOGV("%s(), ringbuffer level read after wait-- %d",
-              __func__, get_buffer_read_space(ringbuffer));
+        ALOGV("%s(), ringbuffer level read after wait-- %d, %d * %d",
+              __func__, get_buffer_read_space(ringbuffer), write_bytes, period_mul);
         if (get_buffer_read_space(ringbuffer) >= (write_bytes * period_mul)) {
             ret = ring_buffer_read(ringbuffer,
                                    (unsigned char*)patch->out_buf, write_bytes * period_mul);
