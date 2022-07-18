@@ -623,12 +623,13 @@ dtvsync_process_res  aml_dtvsync_nonms12_process(struct audio_stream_out *stream
         aml_dtvsync_audioprocess(patch->dtvsync, aml_dec->out_frame_pts,
                                 patch->dtvsync->cur_outapts,
                                 MEDIASYNC_UNIT_PTS, &m_audiopolicy);
-        if (m_audiopolicy.audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT)
-            ALOGI("do get m_audiopolicy=%d=%s, param1=%u, param2=%u, out_pts=0x%llx,cur=0x%llx,exit=%d\n",
+        //if (m_audiopolicy.audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT)
+        if (adev->debug_flag > 0)
+            ALOGI("do get m_audiopolicy=%d=%s, param1=%u, param2=%u, out_pts=0x%llx,cur=0x%llx,exit=%d,oripts=0x%llx\n",
                 m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
                 m_audiopolicy.param1, m_audiopolicy.param2,
                 aml_dec->out_frame_pts, patch->dtvsync->cur_outapts,
-                patch->output_thread_exit);
+                patch->output_thread_exit, aml_dec->in_frame_pts);
 
         if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
             if (m_audiopolicy.param1 == -1) {
@@ -652,7 +653,7 @@ dtvsync_process_res  aml_dtvsync_nonms12_process(struct audio_stream_out *stream
         patch->dtvsync->cur_outapts = aml_dec->out_frame_pts;
         return DTVSYNC_AUDIO_DROP;
     } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_INSERT) {
-
+        adev->underrun_mute_flag = true;
         aml_dtvsync_nonms12_process_insert(stream,  &m_audiopolicy);
 
     } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_ADJUST_CLOCK) {
@@ -661,7 +662,7 @@ dtvsync_process_res  aml_dtvsync_nonms12_process(struct audio_stream_out *stream
         adev->underrun_mute_flag = false;
 
     } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_RESAMPLE) {
-
+        adev->underrun_mute_flag = false;
         aml_dtvsync_process_resample(stream, &m_audiopolicy, speed_enabled);
     } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_MUTE) {
         adev->underrun_mute_flag = true;

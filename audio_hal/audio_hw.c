@@ -6863,13 +6863,15 @@ ssize_t hw_write (struct audio_stream_out *stream
         ALOGI("+%s() buffer %p bytes %zu, format %#x out %p hw_sync_mode %d\n",
             __func__, buffer, bytes, output_format, aml_out, aml_out->hw_sync_mode);
     }
+
+#if 0  //if old version,will enable it for debug.
     if (patch && !patch->skip_amadec_flag) {
         if (is_dtv && need_hw_mix(adev->usecase_masks)) {
         if (adev->audio_patch->avsync_callback && aml_out->dtvsync_enable)
             adev->audio_patch->avsync_callback(adev->audio_patch,aml_out);
         }
     }
-
+#endif
     pthread_mutex_lock(&adev->alsa_pcm_lock);
     aml_out->alsa_output_format = output_format;
     if (aml_out->status != STREAM_HW_WRITING) {
@@ -10230,6 +10232,11 @@ static int adev_close(hw_device_t *device)
             aml_dtvsync_t *dtvsync =  &dtv_audio_instances->dtvsync[index];
             pthread_mutex_destroy(&dtvsync->ms_lock);
         }
+        if (dtv_audio_instances->paudiofd != -1)
+        {
+            close(dtv_audio_instances->paudiofd);
+            dtv_audio_instances->paudiofd = -1;
+        }
         aml_audio_free(adev->aml_dtv_audio_instances);
     }
     if (adev->sm) {
@@ -10661,15 +10668,24 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->mixing_level = 0;
     adev->advol_level = 100;
     adev->aml_dtv_audio_instances = aml_audio_calloc(1, sizeof(aml_dtv_audio_instances_t));
+    adev->is_multi_demux = is_multi_demux();
     if (adev->aml_dtv_audio_instances == NULL) {
         ALOGE("malloc aml_dtv_audio_instances failed");
         ret = -ENOMEM;
         goto err_adev;
     } else {
         aml_dtv_audio_instances_t *dtv_audio_instances = (aml_dtv_audio_instances_t *)adev->aml_dtv_audio_instances;
+        dtv_audio_instances->paudiofd = -1;
         for (int index = 0; index < DVB_DEMUX_SUPPORT_MAX_NUM; index ++) {
             aml_dtvsync_t *dtvsync =  &dtv_audio_instances->dtvsync[index];
             pthread_mutex_init(&dtvsync->ms_lock, NULL);
+        }
+        if (!adev->is_multi_demux) {
+            dtv_audio_instances->paudiofd = open( "/tmp/paudiofifo", O_RDONLY | O_NONBLOCK);
+            if (dtv_audio_instances->paudiofd == -1)
+            {
+                ALOGE("open /tmp/paudiofifo %d\n",errno);
+            }
         }
     }
     pthread_mutex_init(&adev->dtv_lock, NULL);
@@ -10787,7 +10803,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     // set debug_flag here to see more debug log when debugging.
     adev->debug_flag = aml_audio_get_debug_flag();
     adev->count = 1;
-    adev->is_multi_demux = is_multi_demux();
+
 #ifndef NO_AUDIO_CAP
     pthread_mutex_init(&adev->cap_buffer_lock, NULL);
 #endif

@@ -147,7 +147,7 @@ static inline void waiting_bits(int bits, int threadexit)
         {
             break;
         }
-        usleep(1000);
+        usleep(10);
         bytes = READ_MPEG_REG(AIU_MEM_AIFIFO_BYTES_AVAIL);
     }
 }
@@ -217,7 +217,7 @@ int uio_read_buffer(unsigned char *buffer, int size, int threadexit)
         for (i = 0; i < bytes; i++) {
             while (!AIFIFO_READY) {
                 fifo_ready_wait++;
-                usleep(1000);
+                usleep(10);
                 if (fifo_ready_wait > 100 || threadexit) {
                     ALOGI("FATAL err,AIFIFO is not ready,check!!\n");
                     pthread_mutex_unlock(&uio_mutex);

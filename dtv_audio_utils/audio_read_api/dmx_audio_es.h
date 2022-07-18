@@ -39,7 +39,7 @@ typedef struct aml_demux__audiopara {
     int ad_package_status;
     struct mAudioEsDataInfo *mEsData;
     struct mAudioEsDataInfo *mADEsData;
-    struct package *dtv_pacakge;
+    struct package *dtv_package;
     uint8_t ad_fade;
     uint8_t ad_pan;
 } aml_demux_audiopara_t;
@@ -88,6 +88,8 @@ typedef struct aml_dtv_audio_instances {
     void *demux_handle[DVB_DEMUX_SUPPORT_MAX_NUM];
     aml_demux_audiopara_t demux_info[DVB_DEMUX_SUPPORT_MAX_NUM];
     aml_dtvsync_t dtvsync[DVB_DEMUX_SUPPORT_MAX_NUM];
+    int paudiofd;
+    int prelen;
 } aml_dtv_audio_instances_t;
 
 struct mAudioEsDataInfo {
