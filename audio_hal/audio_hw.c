@@ -5455,6 +5455,8 @@ static int adev_set_master_volume (struct audio_hw_device *dev, float volume)
     int i;
     pthread_mutex_lock (&adev->lock);
     adev->master_volume = volume;
+    if (adev->master_mute)
+        adev->master_mute = false;
     for (i = 0; i < STREAM_USECASE_MAX; i++) {
        struct aml_stream_out *aml_out = adev->active_outputs[i];
        struct audio_stream_out *out = (struct audio_stream_out *)aml_out;
@@ -5490,13 +5492,13 @@ static int adev_set_master_mute (struct audio_hw_device *dev, bool muted)
     struct aml_audio_device *adev = (struct aml_audio_device *) dev;
     ALOGI("%s, %d -> %d", __FUNCTION__, adev->master_mute, muted);
     if (adev->master_mute != muted) {
-        adev->master_mute = muted;
         if (muted) { //mute
             adev_get_master_volume (dev, &adev->record_volume_before_mute); //Record the volume before mute
             adev_set_master_volume (dev, 0); //set mute
         } else {
             adev_set_master_volume (dev, adev->record_volume_before_mute); //unmute
         }
+        adev->master_mute = muted;
     }
     return 0;
 }
