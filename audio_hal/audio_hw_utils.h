@@ -48,6 +48,35 @@
     }                                                       \
     return pStr;
 
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
+#define AM_LOGV(fmt, ...)  ALOGV("[%s:%d] " fmt, __func__,__LINE__, ##__VA_ARGS__)
+#define AM_LOGD(fmt, ...)  ALOGD("[%s:%d] " fmt, __func__,__LINE__, ##__VA_ARGS__)
+#define AM_LOGI(fmt, ...)  ALOGI("[%s:%d] " fmt, __func__,__LINE__, ##__VA_ARGS__)
+#define AM_LOGW(fmt, ...)  ALOGW("[%s:%d] " fmt, __func__,__LINE__, ##__VA_ARGS__)
+#define AM_LOGE(fmt, ...)  ALOGE("[%s:%d] " fmt, __func__,__LINE__, ##__VA_ARGS__)
+
+#define R_CHECK_RET(ret, fmt, ...)                                                              \
+    if (ret != 0) {                                                                             \
+        AM_LOGE("ret:%d " fmt, ret, ##__VA_ARGS__);                                             \
+        return ret;                                                                             \
+    }
+
+#define NO_R_CHECK_RET(ret, fmt, ...)                                                           \
+    if (ret != 0) {                                                                             \
+        AM_LOGE("ret:%d " fmt, ret, ##__VA_ARGS__);                                             \
+    }
+
+#define R_CHECK_PARAM_LEGAL(ret, param, min, max, fmt, ...)                                     \
+    if (param < min || param > max) {                                                           \
+        AM_LOGE("%s:%d is illegal, min:%d, max:%d " fmt, #param, param, min, max, ##__VA_ARGS__);\
+        return ret;                                                                             \
+    }
+
+#define R_CHECK_POINTER_LEGAL(ret, pointer, fmt, ...)                                           \
+    if (pointer == NULL) {                                                                      \
+        AM_LOGE("%s is null pointer " fmt, #pointer, ##__VA_ARGS__);                            \
+        return ret;                                                                             \
+    }
 int64_t aml_gettime(void);
 int get_sysfs_uint(const char *path, uint32_t *value);
 int sysfs_set_sysfs_str(const char *path, const char *val);
@@ -72,7 +101,6 @@ int aml_audio_get_ddp_latency_offset(int aformat,  bool dual_spdif);
 int aml_audio_get_pcm_latency_offset(int format, bool is_netflix, stream_usecase_t usecase);
 int aml_audio_get_hwsync_latency_offset(bool b_raw);
 int aml_audio_get_ddp_frame_size();
-bool is_stream_using_mixer(struct aml_stream_out *out);
 uint32_t out_get_outport_latency(const struct audio_stream_out *stream);
 uint32_t out_get_latency_frames(const struct audio_stream_out *stream);
 int aml_audio_get_spdif_tuning_latency(void);
@@ -117,6 +145,8 @@ const char* usecase2Str(stream_usecase_t type);
 const char* outputPort2Str(enum OUT_PORT type);
 const char* inputPort2Str(enum IN_PORT type);
 const char* mixerInputType2Str(aml_mixer_input_port_type_e type);
+const char* mixerOutputType2Str(MIXER_OUTPUT_PORT type);
+uint8_t get_bit_position_in_mask(uint8_t max_position, uint32_t *p_mask);
 const char* mediasyncAudiopolicyType2Str(audio_policy type);
 const char* dtvAudioPatchCmd2Str(AUDIO_DTV_PATCH_CMD_TYPE type);
 const char* hdmiFormat2Str(AML_HDMI_FORMAT_E type);
@@ -129,6 +159,8 @@ int aml_audio_trace_debug_level(void);
  * @return period multi coefficient(1/4/16)
  */
 int convert_audio_format_2_period_mul(audio_format_t format);
+
+float aml_audio_get_focus_volume_ratio();
 
 static inline void endian16_convert(void *buf, int size)
 {

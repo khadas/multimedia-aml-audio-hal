@@ -248,8 +248,13 @@ typedef enum stream_usecase {
     STREAM_PCM_PATCH        = 5,
     STREAM_RAW_PATCH        = 6,
     STREAM_PCM_MMAP         = 7,
+    STREAM_USECASE_EXT1  = 8,
+    STREAM_USECASE_EXT2  = 9,
+    STREAM_USECASE_EXT3  = 10,
+    STREAM_USECASE_EXT4  = 11,
+    STREAM_USECASE_EXT5  = 12,
 
-    STREAM_USECASE_MAX      = 8,
+    STREAM_USECASE_MAX      = 13,
 } stream_usecase_t;
 
 typedef enum alsa_device {
@@ -595,6 +600,7 @@ struct aml_audio_device {
     uint32_t info_rid;
     int minfo_atmos_flag;
 #endif
+    bool audio_focus_enable;
     /* -End- */
 };
 
@@ -803,6 +809,8 @@ struct aml_stream_out {
     bool alsa_status_changed;
     /*flag indicate the ms12 2ch lock is on*/
     bool ms12_acmod2ch_lock_disable;
+    bool frame_write_sum_updated;
+    uint32_t timer_id;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);
@@ -963,6 +971,20 @@ static inline bool is_bypass_submix_active(struct aml_audio_device *adev)
     return false;
 }
 
+/* called when adev locked */
+static inline int get_mmap_pcm_active_count(struct aml_audio_device *adev)
+{
+    int i = 0;
+    int count = 0;
+    struct aml_stream_out *out = NULL;
+    for (i = 0 ; i < STREAM_USECASE_MAX; i++) {
+        out = adev->active_outputs[i];
+        if (out && audio_is_linear_pcm(out->hal_internal_format) && (out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) {
+            count ++;
+        }
+    }
+    return count;
+}
 
 /*
  *@brief get_output_format get the output format always return the "sink_format" of adev

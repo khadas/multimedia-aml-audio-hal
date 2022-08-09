@@ -679,8 +679,8 @@ const char *audio_port_type_to_str(audio_port_type_t type)
 const char *write_func_strs[MIXER_WRITE_FUNC_MAX] = {
     "OUT_WRITE_NEW",
     "MIXER_AUX_BUFFER_WRITE_SM",
-    "MIXER_MAIN_BUFFER_WRITE_SM,"
-    "MIXER_MMAP_BUFFER_WRITE_SM"
+    "MIXER_MAIN_BUFFER_WRITE_SM",
+    "MIXER_MMAP_BUFFER_WRITE_SM",
     "MIXER_AUX_BUFFER_WRITE",
     "MIXER_MAIN_BUFFER_WRITE",
     "MIXER_APP_BUFFER_WRITE",
@@ -700,10 +700,8 @@ void aml_stream_out_dump(struct aml_stream_out *aml_out, int fd)
         dprintf(fd, "    tv source stream: %d\n", aml_out->tv_src_stream);
         dprintf(fd, "    status: %d\n", aml_out->status);
         dprintf(fd, "    standby: %d\n", aml_out->standby);
-        if (aml_out->is_normal_pcm) {
-            dprintf(fd, "    normal pcm: %s\n",
-                write_func_to_str(aml_out->write_func));
-        }
+        dprintf(fd, "    vol: %f, org vol:%f\n", aml_out->volume_l, aml_out->volume_l_org);
+        dprintf(fd, "    write function: %s\n", write_func_to_str(aml_out->write_func));
     }
 }
 

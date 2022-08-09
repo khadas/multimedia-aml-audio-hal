@@ -31,6 +31,7 @@
 #include "aml_ddp_dec_api.h"
 #include "aml_audio_spdifout.h"
 #include "alsa_config_parameters.h"
+#include "dolby_lib_api.h"
 
 extern unsigned long decoder_apts_lookup(unsigned int offset);
 static void aml_audio_stream_volume_process(struct audio_stream_out *stream, void *buf, int sample_size, int channels, int bytes) {
@@ -319,9 +320,13 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
 
                }
 
-                aml_hw_mixer_mixing(&adev->hw_mixer, dec_data, pcm_len, output_format);
-                if (audio_hal_data_processing(stream, dec_data, pcm_len, &output_buffer, &output_buffer_bytes, output_format) == 0) {
-                    hw_write(stream, output_buffer, output_buffer_bytes, output_format);
+                if (eDolbyMS12Lib == adev->dolby_lib_type_last || !adev->useSubMix) {
+                    aml_hw_mixer_mixing(&adev->hw_mixer, dec_data, pcm_len, output_format);
+                    if (audio_hal_data_processing(stream, dec_data, pcm_len, &output_buffer, &output_buffer_bytes, output_format) == 0) {
+                        hw_write(stream, output_buffer, output_buffer_bytes, output_format);
+                    }
+                } else {
+                    out_write_direct_pcm(stream, dec_data, pcm_len);
                 }
 
             }

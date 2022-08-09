@@ -1,5 +1,5 @@
 
-#define LOG_TAG "audio-subMixingFactory"
+#define LOG_TAG "sub_mixing_factory"
 //#define LOG_NDEBUG 0
 #define __USE_GNU
 
@@ -23,9 +23,14 @@
 #include "audio_aec.h"
 #endif
 #include "aml_audio_timer.h"
+//#include "karaoke_manager.h"
+
+#include "audio_hwsync_wrap.h"
+
 
 //#define DEBUG_TIME
 
+#define WRITE_COUNT_LATENCY_THRESHOLD  (6)
 #define SUBMIX_USECASE_MASK            (0xffffff7e)  /* PCM_NORMAL(0) and PCM_MMAP(7) have been cleared*/
 static int on_notify_cbk(void *data);
 static int on_input_avail_cbk(void *data);
@@ -38,7 +43,7 @@ static int out_flush_subMixingPCM(struct audio_stream_out *stream);
 
 struct pcm *getSubMixingPCMdev(struct subMixing *sm)
 {
-    return sm->pcmDev;
+    return pcm_mixer_get_pcm_handle(sm->mixerData);
 }
 
 static int startMixingThread(struct subMixing *sm)
@@ -51,88 +56,44 @@ static int exitMixingThread(struct subMixing *sm)
     return pcm_mixer_thread_exit(sm->mixerData);
 }
 
-static int initSubMixngOutput(
+static int initSubMixingOutput(
         struct subMixing *sm,
-        struct audioCfg cfg,
         struct aml_audio_device *adev)
 {
-    struct pcm_config pcm_cfg;
-    struct pcm *pcm = NULL;
-    int card = alsa_device_get_card_index();
-    int device = alsa_device_update_pcm_index(PORT_I2S, PLAYBACK);
-    int res = 0;
-
-    if (sm == NULL) {
-        ALOGE("%s(), NULL pointer", __func__);
-        return -EINVAL;
-    }
-    memset(&pcm_cfg, 0, sizeof(struct pcm_config));
-    pcm_cfg.channels = cfg.channelCnt;
-    pcm_cfg.rate = cfg.sampleRate;
-    pcm_cfg.period_size = DEFAULT_PLAYBACK_PERIOD_SIZE;
-    pcm_cfg.period_count = DEFAULT_PLAYBACK_PERIOD_CNT;
-    //pcm_cfg.period_count = PLAYBACK_PERIOD_COUNT;
-    pcm_cfg.start_threshold = pcm_cfg.period_size * pcm_cfg.period_count / 2;
-
-    if (cfg.format == AUDIO_FORMAT_PCM_16_BIT)
-        pcm_cfg.format = PCM_FORMAT_S16_LE;
-    else if (cfg.format == AUDIO_FORMAT_PCM_32_BIT)
-        pcm_cfg.format = PCM_FORMAT_S32_LE;
-    else {
-        ALOGE("%s(), unsupport", __func__);
-        pcm_cfg.format = PCM_FORMAT_S16_LE;
-    }
-    ALOGI("%s(), open ALSA hw:%d,%d", __func__, card, device);
-    sm->pcm_cfg = pcm_cfg;
-    pcm = pcm_open(card, device, PCM_OUT | PCM_MONOTONIC, &pcm_cfg);
-    if ((pcm == NULL) || !pcm_is_ready(pcm)) {
-        ALOGE("cannot open pcm_out driver: %s", pcm_get_error(pcm));
-        pcm_close(pcm);
-        //return -EINVAL;
-    }
-
-    sm->pcmDev = pcm;
-
+    R_CHECK_POINTER_LEGAL(-EINVAL, sm, "");
     if (sm->type == MIXER_LPCM) {
-        struct amlAudioMixer *amixer = NULL;
-        amixer = newAmlAudioMixer(pcm, cfg, adev);
-        if (amixer == NULL) {
-            res = -ENOMEM;
-            goto err;
-        }
-#ifdef ENABLE_AEC_APP
-        int aec_ret = init_aec_reference_config(adev->aec, pcm_cfg);
-        if (aec_ret) {
-            ALOGE("AEC: Speaker config init failed!");
-        }
-#endif
+        struct audioCfg cfg;
+        output_get_default_config(&cfg, adev->is_TV);
+        struct amlAudioMixer *amixer = newAmlAudioMixer(adev, cfg);
+        R_CHECK_POINTER_LEGAL(-ENOMEM, amixer, "newAmlAudioMixer failed");
         sm->mixerData = amixer;
+        /* TV product has EQ DRC and sink gain */
+        //if (adev->eq_drc_inited) {
+        //    ALOGI("%s(), eq data addr %p", __func__, &adev->eq_data);
+        //    subMixingSetEQData(adev, &adev->eq_data);
+        //}
+        if (adev->is_TV) {
+            ALOGI("%s(), sink gain addr %p", __func__, adev->sink_gain);
+            subMixingSetSinkGain(adev, adev->sink_gain);
+        }
         startMixingThread(sm);
     } else if (sm->type == MIXER_MS12) {
         //TODO
-        ALOGW("%s(), not support yet, in TODO list", __func__);
+        AM_LOGW("not support yet, in TODO list");
     } else {
-        ALOGE("%s(), not support", __func__);
-        res = -EINVAL;
-        goto err;
+        AM_LOGE("not support");
+        return -EINVAL;
     }
     return 0;
-err:
-    pcm_close(pcm);
-    return res;
 };
 
 static int releaseSubMixingOutput(struct subMixing *sm)
 {
-    ALOGI("++%s()", __func__);
-    if (!sm) {
-        ALOGE("%s(), null pointer", __func__);
-        return -EINVAL;
-    }
+    R_CHECK_POINTER_LEGAL(-EINVAL, sm, "");
+    AM_LOGI("++");
     exitMixingThread(sm);
     freeAmlAudioMixer(sm->mixerData);
-    pcm_close(sm->pcmDev);
-    sm->pcmDev = NULL;
+    sm->mixerData = NULL;
 
     return 0;
 }
@@ -155,13 +116,13 @@ static ssize_t aml_out_write_to_mixer(struct audio_stream_out *stream, const voi
 
     do {
         ssize_t written = 0;
-        ALOGV("%s(), stream usecase: %s, written_total %zu, bytes %zu",
-            __func__,  usecase2Str(out->usecase), written_total, bytes);
+        AM_LOGV("stream usecase: %s, written_total %zu, bytes %zu",
+            usecase2Str(out->usecase), written_total, bytes);
 
         written = mixer_write_inport(audio_mixer,
                 out->inputPortID, data, bytes - written_total);
         if (written < 0) {
-            ALOGE("%s(), write failed, errno = %zu", __func__, written);
+            AM_LOGE("write failed, errno = %zu", written);
             return written;
         }
 
@@ -175,24 +136,24 @@ static ssize_t aml_out_write_to_mixer(struct audio_stream_out *stream, const voi
             //out->last_frames_postion += written / frame_size - latency_frames;
             //pthread_mutex_unlock(&out->lock);
         }
-        ALOGV("%s(), portindex(%d) written(%zu), written_total(%zu), bytes(%zu)",
-            __func__, out->inputPortID, written, written_total, bytes);
+        AM_LOGV("port index(%d) written(%zu), written_total(%zu), bytes(%zu)",
+            out->inputPortID, written, written_total, bytes);
 
         if (written_total >= bytes) {
-            ALOGV("%s(), exit", __func__);
+            AM_LOGV("exit");
             break;
         }
 
         //usleep((bytes- written_total) * 1000 / 5 / 48);
         //if (out->port_index == 1) {
             ts_wait_time_us(&ts, 5000);
-            ALOGV("-%s() wait....", __func__);
+            AM_LOGV("-wait....");
             pthread_mutex_lock(&out->cond_lock);
             pthread_cond_timedwait(&out->cond, &out->cond_lock, &ts);
-            ALOGV("--%s() wait wakeup", __func__);
+            AM_LOGV("--wait wakeup");
             pthread_mutex_unlock(&out->cond_lock);
         //}
-    } while (!out->exiting);
+    } while (1);
 
     return written_total;
 }
@@ -207,12 +168,9 @@ static int consume_meta_data(void *cookie,
     struct amlAudioMixer *audio_mixer = sm->mixerData;
     struct meta_data_list *mdata_list = aml_audio_calloc(1, sizeof(struct meta_data_list));
 
-    if (!mdata_list) {
-        ALOGE("%s(), no memory", __func__);
-        return -ENOMEM;
-    }
+    R_CHECK_POINTER_LEGAL(-ENOMEM, mdata_list, "no memory");
     if (out->pause_status) {
-        ALOGE("%s(), write in pause status", __func__);
+        AM_LOGE("write in pause status");
     }
 
     mdata_list->mdata.frame_size = frame_size;
@@ -220,17 +178,44 @@ static int consume_meta_data(void *cookie,
     mdata_list->mdata.payload_offset = offset;
 
     if (out->debug_stream) {
-        ALOGD("%s(), frame_size %d, pts %" PRId64 "ms, payload offset %" PRId64 "",
-                __func__, frame_size, pts/1000000, offset);
+        AM_LOGD("frame_size %d, pts %" PRId64 "ms, payload offset %" PRId64 "",
+                frame_size, pts/1000000, offset);
     }
     if (get_mixer_hwsync_frame_size(audio_mixer) != frame_size) {
-        ALOGI("%s(), resize frame_size %d", __func__, frame_size);
+        AM_LOGI("resize frame_size %d", frame_size);
         set_mixer_hwsync_frame_size(audio_mixer, frame_size);
     }
     pthread_mutex_lock(&out->mdata_lock);
     list_add_tail(&out->mdata_list, &mdata_list->list);
     pthread_mutex_unlock(&out->mdata_lock);
     return 0;
+}
+
+void sm_timer_callback_handler(union sigval sigv)
+{
+#if 0
+    struct aml_audio_device *adev = adev_get_handle();
+    struct aml_stream_out *out = NULL;
+    bool is_hwsync_lpcm = false;
+
+    AM_LOGD("func:%s sigv:%d ~~~~~~~~~~", __func__, sigv.sival_int);
+    for (int i = 0 ; i < STREAM_USECASE_MAX; i++) {
+        out = adev->active_outputs[i];
+        if (out && audio_is_linear_pcm(out->hal_internal_format)
+            && (out->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC)) {
+            is_hwsync_lpcm = true;
+            break;
+        }
+    }
+
+    if (out && is_hwsync_lpcm) {
+        out->frame_write_sum_updated = false;
+    }
+    AM_LOGD("%s is_hwsync_lpcm:%d frame_write_sum_updated:%d", __func__, is_hwsync_lpcm, out->frame_write_sum_updated);
+#endif
+    AM_LOGD("func:%s sigv:%d ~~~~~~~~~~", __func__, sigv.sival_int);
+
+    return ;
 }
 
 static int consume_output_data(void *cookie, const void* buffer, size_t bytes)
@@ -252,9 +237,9 @@ static int consume_output_data(void *cookie, const void* buffer, size_t bytes)
     int bResample = 0;
     int channels = audio_channel_count_from_out_mask(out->hal_channel_mask);
 
-    ALOGV("++%s(), bytes = %zu", __func__, bytes);
+    AM_LOGV("++bytes = %zu", bytes);
     if (out->pause_status) {
-        ALOGE("%s(), write in pause status", __func__);
+        AM_LOGE("write in pause status");
     }
 
     clock_gettime(CLOCK_MONOTONIC, &tval);
@@ -273,12 +258,12 @@ static int consume_output_data(void *cookie, const void* buffer, size_t bytes)
     written = aml_out_write_to_mixer(stream, out_buf, out_size);
 
     if (written < 0) {
-        ALOGE("%s(), written failed, %zd", __func__, written);
+        AM_LOGE("written failed, %zd", written);
         goto exit;
     }
 
     /*here may be a problem, after resample, the size write to mixer is changed,
-      to avoid some problem, we assume it is totally wirtten.
+      to avoid some problem, we assume it is totally written.
     */
     if (bResample) {
         written = bytes;
@@ -303,17 +288,17 @@ static int consume_output_data(void *cookie, const void* buffer, size_t bytes)
     //    out->last_frames_postion = out->frame_write_sum - latency_frames;
     //else
     //    out->last_frames_postion = out->frame_write_sum;
-    ALOGV("++%s(), written = %zd", __func__, written);
+    AM_LOGV("++written = %zd", written);
     if (getprop_bool("vendor.media.audiohal.hwsync")) {
         aml_audio_dump_audio_bitstreams("/data/audio/consumeout.raw", buffer, written);
     }
     if (0) {
-        ALOGD("%s(), last_frames_postion(%" PRId64 ") latency_frames(%" PRId64 ")",
-            __func__, out->last_frames_postion, latency_frames);
+        AM_LOGD("last_frames_postion(%" PRId64 ") latency_frames(%" PRId64 ")",
+            out->last_frames_postion, latency_frames);
     }
     throttle_timeus = target_us - us_since_last_write;
     if (throttle_timeus > 0 && throttle_timeus < 200000) {
-        ALOGV("throttle time %" PRId64 " us", throttle_timeus);
+        AM_LOGV("throttle time %" PRId64 " us", throttle_timeus);
         if (throttle_timeus > 1000)
             usleep(throttle_timeus - 1000);
     }
@@ -325,44 +310,20 @@ exit:
     out->lasttimestamp.tv_sec = out->timestamp.tv_sec;
     out->lasttimestamp.tv_nsec = out->timestamp.tv_nsec;
     if (written >= 0) {
-        //TODO
-        //#ifdef ENABLE_BT_A2DP
-        #ifndef BUILD_LINUX
-        if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP)
-            latency_frames = mixer_get_inport_latency_frames(audio_mixer, out->inputPortID)
-                    + a2dp_out_get_latency(adev) * out->hal_rate / 1000;
-        else
-        #endif
-            latency_frames = mixer_get_inport_latency_frames(audio_mixer, out->inputPortID)
-                    + mixer_get_outport_latency_frames(audio_mixer);
         out->frame_write_sum += written / frame_size;
 
-        if (out->frame_write_sum > latency_frames)
-            out->last_frames_postion = out->frame_write_sum - latency_frames;
-        else
-            out->last_frames_postion = 0;//out->frame_write_sum;
+        //start the timer to monitor frame_write_sum_updated
+        uint32_t remaining_time = audio_timer_remaining_time(out->timer_id);
+        if (remaining_time > 0) {
+            audio_timer_stop(out->timer_id);
+        }
+        audio_one_shot_timer_start(out->timer_id, AML_TIMER_CONSUME_DATA_DELAY);
+        out->frame_write_sum_updated = true;
     }
     if (out->debug_stream) {
-        ALOGD("%s(), frames sum %" PRId64 ", last frames %" PRId64 "", __func__, out->frame_write_sum, out->last_frames_postion);
+        AM_LOGD("(frames sum %" PRId64 " - latency_frames:%" PRIu64"), = last frames %" PRId64 "", out->frame_write_sum, latency_frames, out->last_frames_postion);
     }
     return written;
-}
-
-static int set_thread_affinity(void)
-{
-    cpu_set_t cpuSet;
-    int sastat = 0;
-
-    CPU_ZERO(&cpuSet);
-    CPU_SET(2, &cpuSet);
-    CPU_SET(3, &cpuSet);
-    sastat = sched_setaffinity(0, sizeof(cpu_set_t), &cpuSet);
-    if (sastat) {
-        ALOGW("%s(), failed to set cpu affinity", __FUNCTION__);
-        return sastat;
-    }
-
-    return 0;
 }
 
 static ssize_t out_write_hwsync_lpcm(struct audio_stream_out *stream, const void* buffer,
@@ -374,29 +335,54 @@ static ssize_t out_write_hwsync_lpcm(struct audio_stream_out *stream, const void
     size_t channel_count = audio_channel_count_from_out_mask(out->hal_channel_mask);
     size_t frame_size = audio_bytes_per_frame(channel_count, out->hal_format);;
     int written_total = 0;
+    int ret = -1;
     struct timespec ts;
     memset(&ts, 0, sizeof(struct timespec));
 
+    // when connect bt, bt stream maybe open before hdmi stream close,
+    // bt stream mediasync is set to adev->hw_mediasync, and it would be
+    // release in hdmi stream close, so bt stream mediasync is invalid
+    if (out->hwsync->use_mediasync == true && adev->hw_mediasync == NULL) {
+        #if 0
+        adev->hw_mediasync = aml_hwsync_mediasync_create();
+        out->hwsync->use_mediasync = true;
+        out->hwsync->mediasync = adev->hw_mediasync;
+        ret = aml_hwsync_wrap_set_id(out->hwsync, out->hwsync->hwsync_id);
+        if (!ret) {
+            ALOGD("%s: aml_hwsync_wrap_set_id fail: ret=%d, id=%d", __func__, ret, out->hwsync->hwsync_id);
+            ret = aml_hwsync_wrap_get_id(out->hwsync->mediasync, &out->hwsync->hwsync_id);
+            if (ret && ret != -1) {
+                adev->hw_sync_id = out->hwsync->hwsync_id;
+                ret = aml_hwsync_wrap_set_id(out->hwsync, out->hwsync->hwsync_id);
+            }
+        }
+        #endif
+        aml_audio_hwsync_init(out->hwsync, out);
+    }
     if (out->standby) {
-        ALOGI("%s(), start hwsync lpcm stream: %p", __func__, out);
-        set_thread_affinity();
-        out->hwsync_extractor = new_hw_avsync_header_extractor(consume_meta_data,
-                consume_output_data, out);
-        out->first_pts_set = false;
-        out->need_first_sync = false;
-        out->last_pts = 0;
-        out->last_payload_offset = 0;
-        pthread_mutex_init(&out->mdata_lock, NULL);
-        list_init(&out->mdata_list);
-        pthread_mutex_lock(&adev->lock);
-        init_mixer_input_port(sm->mixerData, &out->audioCfg, out->flags,
-            on_notify_cbk, out, on_input_avail_cbk, out,
-            on_meta_data_cbk, out, out->volume_l);
-        pthread_mutex_unlock(&adev->lock);
-        ALOGI("%s(), hwsync port type = %d", __func__,
-                get_input_port_type(&out->audioCfg, out->flags));
+        AM_LOGI("start hwsync lpcm stream: %p", out);
+        aml_audio_set_cpu23_affinity();
+        if (!out->hwsync_extractor) {
+            out->hwsync_extractor = new_hw_avsync_header_extractor(consume_meta_data,
+                    consume_output_data, out);
+            out->first_pts_set = false;
+            out->need_first_sync = false;
+            out->last_pts = 0;
+            out->last_payload_offset = 0;
+            pthread_mutex_init(&out->mdata_lock, NULL);
+            list_init(&out->mdata_list);
+            pthread_mutex_lock(&adev->lock);
+            init_mixer_input_port(sm->mixerData, &out->audioCfg, out->flags,
+                on_notify_cbk, out, on_input_avail_cbk, out,
+                on_meta_data_cbk, out, out->volume_l);
+            pthread_mutex_unlock(&adev->lock);
+            AM_LOGI("hwsync port type = %d",
+                    get_input_port_type(&out->audioCfg, out->flags));
+
+            mixer_set_continuous_output(sm->mixerData, false);
+        }
         out->standby = false;
-        mixer_set_continuous_output(sm->mixerData, false);
+
         /*wait video ready*/
         {
             int vframe_ready_cnt = 0;
@@ -410,29 +396,30 @@ static ssize_t out_write_hwsync_lpcm(struct audio_stream_out *stream, const void
                 }
                 break;
             }
-            ALOGI("/sys/class/video/vframe_ready_cnt is %d delay count=%d", vframe_ready_cnt, delay_count);
+            AM_LOGI("/sys/class/video/vframe_ready_cnt is %d delay count=%d", vframe_ready_cnt, delay_count);
         }
+
     }
     if (out->pause_status) {
-        ALOGW("%s(), write in pause status!!", __func__);
+        AM_LOGW("write in pause status!!");
         out->pause_status = false;
     }
     written_total = header_extractor_write(out->hwsync_extractor, buffer, bytes);
-    ALOGV("%s() bytes %zu, out->last_frames_postion %" PRId64 " frame_sum %" PRId64 "",
-            __func__, bytes, out->last_frames_postion, out->frame_write_sum);
+    AM_LOGV("bytes %zu, out->last_frames_postion %" PRId64 " frame_sum %" PRId64 "",
+            bytes, out->last_frames_postion, out->frame_write_sum);
 
     if (getprop_bool("vendor.media.audiohal.hwsync")) {
         aml_audio_dump_audio_bitstreams("/data/audio/audiomain.raw", buffer, written_total);
     }
 
     if (written_total > 0) {
-        ALOGV("--%s(), out(%p)written %d, write_sum after %" PRId64 "",
-                __func__, out, written_total, out->frame_write_sum);
+        AM_LOGV("--out(%p)written %d, write_sum after %" PRId64 "",
+                out, written_total, out->frame_write_sum);
         if ((size_t)written_total != bytes)
-            ALOGE("--%s(), written %d, but bytes = %zu", __func__, written_total, bytes);
+            AM_LOGE("--written %d, but bytes = %zu", written_total, bytes);
         return written_total;
     } else {
-        ALOGE("--%s(), written %d, but return bytes", __func__, written_total);
+        AM_LOGE("--written %d, but return bytes", written_total);
         //return 1;
         return bytes;
     }
@@ -449,7 +436,7 @@ static ssize_t out_write_system(struct audio_stream_out *stream, const void *buf
     struct amlAudioMixer *audio_mixer = sm->mixerData;
     struct timespec tval, new_tval;
     uint64_t us_since_last_write = 0;
-    //uint64_t begain_time, end_time;
+    //uint64_t begin_time, end_time;
     ssize_t written = 0;
     size_t remain = 0;
     size_t channel_count = audio_channel_count_from_out_mask(out->hal_channel_mask);
@@ -458,12 +445,12 @@ static ssize_t out_write_system(struct audio_stream_out *stream, const void *buf
     int64_t throttle_timeus = 0;//aml_audio_get_throttle_timeus(bytes);
 
     if (out->standby) {
-        ALOGI("%s(), standby to unstandby", __func__);
+        AM_LOGI("standby to unstandby");
         out->standby = false;
     }
 
     if (bytes == 0) {
-        ALOGW("%s(), inval to write bytes 0", __func__);
+        AM_LOGW("inval to write bytes 0");
         usleep(512 * 1000 / 48 / frame_size);
         written = 0;
         goto exit;
@@ -471,19 +458,19 @@ static ssize_t out_write_system(struct audio_stream_out *stream, const void *buf
     }
 
     clock_gettime(CLOCK_MONOTONIC, &tval);
-    //begain_time = get_systime_ns();
+    //begin_time = get_systime_ns();
     written = aml_out_write_to_mixer(stream, buffer, bytes);
     if (written >= 0) {
         remain = bytes - written;
         out->frame_write_sum += written / frame_size;
         if (remain > 0) {
-            ALOGE("INVALID partial written");
+            AM_LOGE("INVALID partial written");
         }
         clock_gettime(CLOCK_MONOTONIC, &new_tval);
         if (tval.tv_sec > new_tval.tv_sec)
-            ALOGE("%s(), FATAL ERROR", __func__);
-        ALOGV("++%s() bytes %zu, out->port_index %d", __func__, bytes, out->inputPortID);
-        //ALOGD(" %lld us, %lld", new_tval.tv_sec, tval.tv_sec);
+            AM_LOGE("FATAL ERROR");
+        AM_LOGV("++bytes %zu, out->port_index %d", bytes, out->inputPortID);
+        //AM_LOGD(" %lld us, %lld", new_tval.tv_sec, tval.tv_sec);
 
         us_since_last_write = (new_tval.tv_sec - out->timestamp.tv_sec) * 1000000 +
                 (new_tval.tv_nsec - out->timestamp.tv_nsec) / 1000;
@@ -493,35 +480,35 @@ static ssize_t out_write_system(struct audio_stream_out *stream, const void *buf
                 (new_tval.tv_nsec - tval.tv_nsec) / 1000;
         int target_us = bytes * 1000 / frame_size / 48;
 
-        ALOGV("time spent on write %" PRId64 " us, written %zd", us_since_last_write, written);
-        ALOGV("used_this_write %d us, target %d us", used_this_write, target_us);
+        AM_LOGV("time spent on write %" PRId64 " us, written %zd", us_since_last_write, written);
+        AM_LOGV("used_this_write %d us, target %d us", used_this_write, target_us);
         throttle_timeus = target_us - us_since_last_write;
         if (throttle_timeus > 0 && throttle_timeus < 200000) {
-            ALOGV("throttle time %" PRId64 " us", throttle_timeus);
+            AM_LOGV("throttle time %" PRId64 " us", throttle_timeus);
             if (throttle_timeus > 1800) {
                 //usleep(throttle_timeus - 1800);
-                ALOGV("actual throttle %" PRId64 " us, since last %" PRId64 " us",
+                AM_LOGV("actual throttle %" PRId64 " us, since last %" PRId64 " us",
                         throttle_timeus, us_since_last_write);
             } else {
-                ALOGV("%" PRId64 " us, but un-throttle", throttle_timeus);
+                AM_LOGV("%" PRId64 " us, but un-throttle", throttle_timeus);
             }
         } else if (throttle_timeus != 0) {
             // first time write, sleep
             //usleep(target_us - 100);
-            ALOGV("invalid throttle time %" PRId64 " us, us since last %" PRId64 " us", throttle_timeus, us_since_last_write);
-            ALOGV("\n\n");
+            AM_LOGV("invalid throttle time %" PRId64 " us, us since last %" PRId64 " us", throttle_timeus, us_since_last_write);
+            AM_LOGV("\n\n");
         }
     } else {
-        ALOGE("%s(), write fail, err = %zd", __func__, written);
+        AM_LOGE("write fail, err = %zd", written);
     }
 
     // TODO: means first write, need check this by method
     if (us_since_last_write > 500000) {
         usleep(bytes * 1000 / 48 / frame_size);
-        ALOGV("%s(), invalid duration %" PRIu64 " us", __func__, us_since_last_write);
-        //ALOGE("last   write %ld s,  %ld ms", out->timestamp.tv_sec, out->timestamp.tv_nsec/1000000);
-        //ALOGE("before write %ld s,  %ld ms", tval.tv_sec, tval.tv_nsec/1000000);
-        //ALOGE("after  write %ld s,  %ld ms", new_tval.tv_sec, new_tval.tv_nsec/1000000);
+        AM_LOGV("invalid duration %" PRIu64 " us", us_since_last_write);
+        //AM_LOGE("last   write %ld s,  %ld ms", out->timestamp.tv_sec, out->timestamp.tv_nsec/1000000);
+        //AM_LOGE("before write %ld s,  %ld ms", tval.tv_sec, tval.tv_nsec/1000000);
+        //AM_LOGE("after  write %ld s,  %ld ms", new_tval.tv_sec, new_tval.tv_nsec/1000000);
     }
 
 exit:
@@ -538,14 +525,14 @@ exit:
             out->last_frames_postion = out->frame_write_sum;
 
         if (0) {
-            ALOGI("last position %" PRId64 ", latency_frames %d", out->last_frames_postion, latency_frames);
+            AM_LOGI("last position %" PRId64 ", latency_frames %d", out->last_frames_postion, latency_frames);
         }
     }
 
     return written;
 }
 
-static ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void *buffer,
+ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void *buffer,
                                     size_t bytes)
 {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
@@ -554,7 +541,7 @@ static ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void 
     struct amlAudioMixer *audio_mixer = sm->mixerData;
     struct timespec tval, new_tval;
     uint64_t us_since_last_write = 0;
-    //uint64_t begain_time, end_time;
+    //uint64_t begin_time, end_time;
     ssize_t written = 0;
     size_t remain = 0;
     int frame_size = 4;
@@ -564,25 +551,24 @@ static ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void 
         init_mixer_input_port(sm->mixerData, &out->audioCfg, out->flags,
             on_notify_cbk, out, on_input_avail_cbk, out,
             NULL, NULL, 1.0);
-        ALOGI("[%s:%d] direct port:%s", __func__, __LINE__,
-                mixerInputType2Str(get_input_port_type(&out->audioCfg, out->flags)));
+        AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(&out->audioCfg, out->flags)));
         out->standby = false;
     }
 
     clock_gettime(CLOCK_MONOTONIC, &tval);
-    //begain_time = get_systime_ns();
+    //begin_time = get_systime_ns();
     written = aml_out_write_to_mixer(stream, buffer, bytes);
     if (written >= 0) {
         remain = bytes - written;
         out->frame_write_sum += written / frame_size;
         if (remain > 0) {
-            ALOGE("INVALID partial written");
+            AM_LOGE("INVALID partial written");
         }
         clock_gettime(CLOCK_MONOTONIC, &new_tval);
         if (tval.tv_sec > new_tval.tv_sec)
-            ALOGE("%s(), FATAL ERROR", __func__);
-        ALOGV("++%s() bytes %zu, out->port_index %d", __func__, bytes, out->inputPortID);
-        //ALOGD(" %lld us, %lld", new_tval.tv_sec, tval.tv_sec);
+            AM_LOGE("FATAL ERROR");
+        AM_LOGV("++bytes %zu, out->port_index %d", bytes, out->inputPortID);
+        //AM_LOGD(" %lld us, %lld", new_tval.tv_sec, tval.tv_sec);
 
         us_since_last_write = (new_tval.tv_sec - out->timestamp.tv_sec) * 1000000 +
                 (new_tval.tv_nsec - out->timestamp.tv_nsec) / 1000;
@@ -592,35 +578,35 @@ static ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void 
                 (new_tval.tv_nsec - tval.tv_nsec) / 1000;
         int target_us = bytes * 1000 / frame_size / 48;
 
-        ALOGV("time spent on write %" PRId64 " us, written %zd", us_since_last_write, written);
-        ALOGV("used_this_write %d us, target %d us", used_this_write, target_us);
+        AM_LOGV("time spent on write %" PRId64 " us, written %zd", us_since_last_write, written);
+        AM_LOGV("used_this_write %d us, target %d us", used_this_write, target_us);
         throttle_timeus = target_us - us_since_last_write;
         if (throttle_timeus > 0 && throttle_timeus < 200000) {
-            ALOGV("throttle time %" PRId64 " us", throttle_timeus);
+            AM_LOGV("throttle time %" PRId64 " us", throttle_timeus);
             if (throttle_timeus > 1800) {
                 usleep(throttle_timeus - 1800);
-                ALOGV("actual throttle %" PRId64 " us, since last %" PRId64 " us",
+                AM_LOGV("actual throttle %" PRId64 " us, since last %" PRId64 " us",
                         throttle_timeus, us_since_last_write);
             } else {
-                ALOGV("%" PRId64 " us, but un-throttle", throttle_timeus);
+                AM_LOGV("%" PRId64 " us, but un-throttle", throttle_timeus);
             }
         } else if (throttle_timeus != 0) {
             // first time write, sleep
             //usleep(target_us - 100);
-            ALOGV("invalid throttle time %" PRId64 " us, us since last %" PRId64 " us", throttle_timeus, us_since_last_write);
-            ALOGV("\n\n");
+            AM_LOGV("invalid throttle time %" PRId64 " us, us since last %" PRId64 " us", throttle_timeus, us_since_last_write);
+            AM_LOGV("\n\n");
         }
     } else {
-        ALOGE("%s(), write fail, err = %zd", __func__, written);
+        AM_LOGE("write fail, err = %zd", written);
     }
 
     // TODO: means first write, need check this by method
     if (us_since_last_write > 500000) {
         usleep(bytes * 1000 / 48 / frame_size);
-        ALOGV("%s(), invalid duration %" PRIu64 " us", __func__, us_since_last_write);
-        //ALOGE("last   write %ld s,  %ld ms", out->timestamp.tv_sec, out->timestamp.tv_nsec/1000000);
-        //ALOGE("before write %ld s,  %ld ms", tval.tv_sec, tval.tv_nsec/1000000);
-        //ALOGE("after  write %ld s,  %ld ms", new_tval.tv_sec, new_tval.tv_nsec/1000000);
+        AM_LOGV("invalid duration %" PRIu64 " us", us_since_last_write);
+        //AM_LOGE("last   write %ld s,  %ld ms", out->timestamp.tv_sec, out->timestamp.tv_nsec/1000000);
+        //AM_LOGE("before write %ld s,  %ld ms", tval.tv_sec, tval.tv_nsec/1000000);
+        //AM_LOGE("after  write %ld s,  %ld ms", new_tval.tv_sec, new_tval.tv_nsec/1000000);
     }
 
 exit:
@@ -637,8 +623,11 @@ exit:
             out->last_frames_postion = out->frame_write_sum;
 
         if (0) {
-            ALOGI("last position %" PRId64 ", latency_frames %d", out->last_frames_postion, latency_frames);
+            AM_LOGI("last position %" PRId64 ", latency_frames %d", out->last_frames_postion, latency_frames);
         }
+    }
+    if (out->status == STREAM_STANDBY) {
+        out->status = STREAM_HW_WRITING;
     }
 
     return written;
@@ -658,43 +647,6 @@ static int on_input_avail_cbk(void *data)
     return 0;
 }
 
-static int out_get_presentation_position_subMixingPCM
-        (const struct audio_stream_out *stream, uint64_t *frames, struct timespec *timestamp)
-{
-    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
-    struct aml_audio_device *aml_dev = aml_out->dev;
-    struct subMixing *sm = aml_dev->sm;
-    struct amlAudioMixer *audio_mixer = sm->mixerData;
-    struct pcm *pcmDev = NULL;
-    unsigned int avail;
-    int ret = -1;
-
-    if (!frames || !timestamp) {
-        return -EINVAL;
-    }
-
-    if (sm->type != MIXER_LPCM) {
-        ALOGW("%s(), sub mixing type not (system)pcm, type is %d", __func__, sm->type);
-        return 0;
-    }
-
-    pcmDev = getSubMixingPCMdev(sm);
-    if (pcm_get_htimestamp(pcmDev, &avail, timestamp) == 0) {
-        size_t kernel_buf_size = sm->pcm_cfg.period_size * sm->pcm_cfg.period_count;
-        int64_t signed_frames = aml_out->frame_write_sum - kernel_buf_size + avail;
-        signed_frames -= mixer_latency_frames(audio_mixer);
-        /* It would be unusual for this value to be negative, but check just in case ... */
-        if (signed_frames >= 0) {
-            *frames = signed_frames;
-            ret = 0;
-        }
-        ALOGV("out_get_presentation_position out %p %"PRIu64", sec = %ld, nanosec = %ld\n",
-                aml_out, *frames, timestamp->tv_sec, timestamp->tv_nsec);
-    }
-
-    return ret;
-}
-
 static int out_get_presentation_position_port(
         const struct audio_stream_out *stream,
         uint64_t *frames,
@@ -704,13 +656,13 @@ static int out_get_presentation_position_port(
     struct aml_audio_device *adev = out->dev;
     struct subMixing *sm = adev->sm;
     struct amlAudioMixer *audio_mixer = sm->mixerData;
-    uint64_t frames_written_hw = out->last_frames_postion;
+    uint64_t frames_written_hw = out->frame_write_sum;
     int ret = 0;
     int tuning_latency_frame= 0;
     int frame_latency = 0;
-    if (!frames || !timestamp) {
-        return -EINVAL;
-    }
+    R_CHECK_POINTER_LEGAL(-EINVAL, frames, "");
+    R_CHECK_POINTER_LEGAL(-EINVAL, timestamp, "");
+    bool is_earc = 0;//(ATTEND_TYPE_EARC == aml_audio_earctx_get_type(adev));
 
     /* add this code for VTS. */
     if (0 == frames_written_hw) {
@@ -720,44 +672,82 @@ static int out_get_presentation_position_port(
     }
 
     if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
-        struct timespec stCurTimestamp;
-        int64_t  curr_nanoseconds = 0;
-        int64_t  pre_nanoseconds = 0;
-        int64_t  time_diff = 0;
-        int drift_frames = 0;
-
-        pre_nanoseconds = (long long)out->timestamp.tv_sec * 1000000000 + (long long)out->timestamp.tv_nsec;
-        clock_gettime(CLOCK_MONOTONIC, &stCurTimestamp);
-        curr_nanoseconds = (long long)stCurTimestamp.tv_sec * 1000000000 + (long long)stCurTimestamp.tv_nsec;
-        time_diff = curr_nanoseconds - pre_nanoseconds;
-        if (time_diff <= 100*1000000) {
-            drift_frames = (time_diff * out->hal_rate) / 1000000000;
-            if (adev->debug_flag > 0)
-                ALOGI("[%s:%d] normal time diff=%" PRId64 " drift_frames=%d", __func__, __LINE__,time_diff, drift_frames);
-        } else {
-            if (adev->debug_flag > 0)
-                ALOGW("[%s:%d] big time diff:%" PRId64 "", __func__, __LINE__, time_diff);
-            time_diff = 0;
-            drift_frames = 0;
+        ret = mixer_get_presentation_position(audio_mixer, out->inputPortID, frames, timestamp);
+        struct timespec adjusted_timestamp;
+        // libaudioclient code expects HAL position to lag behind server position.
+        // If the two are the same, it resets timestamp to the current time.
+        // As a temporary work-around, get around this by subtracting one
+        // frame from both position and timestamp.
+        int64_t frame_diff_for_client = 1;
+        int64_t time_diff_for_client = NSEC_PER_SEC / out->hal_rate;
+        int64_t adjusted_nanos = (long long)timestamp->tv_sec * NSEC_PER_SEC + (long long)timestamp->tv_nsec - time_diff_for_client;
+        int64_t pre_time_nanos = out->last_timestamp_reported.tv_sec * NSEC_PER_SEC + out->last_timestamp_reported.tv_nsec;
+        if (adjusted_nanos < 0) {
+           adjusted_nanos = 0;
+        } else if (adjusted_nanos < pre_time_nanos) {
+            adjusted_nanos = pre_time_nanos;
         }
-        *frames = frames_written_hw + drift_frames;
-        *timestamp = out->timestamp;
+        adjusted_timestamp.tv_sec = adjusted_nanos / NSEC_PER_SEC;
+        adjusted_timestamp.tv_nsec = adjusted_nanos % NSEC_PER_SEC;
+        AM_LOGV("adjusted_nanos: %" PRId64 ", frame drift: %" PRId64 ", hal_rate: %u", adjusted_nanos, frame_diff_for_client, out->hal_rate);
+        if (*frames > frame_diff_for_client) {
+            *frames -= frame_diff_for_client;
+        }
+        *timestamp = adjusted_timestamp;
     } else if (!adev->audio_patching) {
-        ret = mixer_get_presentation_position(audio_mixer,
-                out->inputPortID, frames, timestamp);
-        tuning_latency_frame = aml_audio_get_pcm_latency_offset(adev->sink_format, adev->is_netflix, out->usecase)*48;
-        ALOGV("%s  usecase:%s tuning_latency_frame:%d", __func__, usecase2Str(out->usecase), tuning_latency_frame);
-        if (tuning_latency_frame > 0 && *frames < (uint64_t)tuning_latency_frame) {
-            *frames = 0;
-        } else {
-            *frames = *frames - tuning_latency_frame;
-        }
+        if (out->hw_sync_mode || out->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
+            if (!out->frame_write_sum_updated || out->pause_status || out->standby) {
+                *frames = frames_written_hw;
+                *timestamp = out->timestamp;
+            } else {
+                if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP)
+                    frame_latency = mixer_get_inport_latency_frames(audio_mixer, out->inputPortID)
+                            + a2dp_out_get_latency(adev) * out->hal_rate / 1000;
+                else
+                    frame_latency = mixer_get_inport_latency_frames(audio_mixer, out->inputPortID)
+                            + mixer_get_outport_latency_frames(audio_mixer);
 
-        if (ret == 0) {
-            out->last_frames_postion = *frames;
+                AM_LOGV("%s latency_frames:%d, inport latency:%u, outport latency:%u", __func__, frame_latency,
+                    mixer_get_inport_latency_frames(audio_mixer, out->inputPortID), mixer_get_outport_latency_frames(audio_mixer));
+
+                /*add this line calculation to simulate really latency,
+                **when start playing. Fixed TunneledAudioTimestamp/ptsGaps of SWPL-72028 jira.
+                */
+                if (out->write_count < WRITE_COUNT_LATENCY_THRESHOLD) { // 6 --> 4
+                    frame_latency = frame_latency / (WRITE_COUNT_LATENCY_THRESHOLD - out->write_count);
+                }
+                if (out->frame_write_sum > frame_latency) {
+                    if (out->last_frames_postion < (out->frame_write_sum - frame_latency)) {
+                        out->last_frames_postion = out->frame_write_sum - frame_latency;
+                    } else {
+                        out->last_frames_postion += 8*48; //add 8ms data for latency not exact when just start play.
+                        AM_LOGD("%s  tunning frames position for unstable latency when just start play", __func__);
+                    }
+                } else {
+                    out->last_frames_postion = 0;
+                }
+
+                *frames = out->last_frames_postion;
+                *timestamp = out->timestamp;
+            }
+            AM_LOGV("%s out->standby:%d pause_status:%d frame_write_sum_updated:%d, frames:%" PRIu64" = (frame_write_sum:%" PRIu64" - latency_frames:%d)", __func__, out->standby, out->pause_status, out->frame_write_sum_updated, *frames, out->frame_write_sum, frame_latency);
         } else {
-            *frames = out->last_frames_postion;
-            ALOGW("%s(), pts not valid yet", __func__);
+            ret = mixer_get_presentation_position(audio_mixer,
+                    out->inputPortID, frames, timestamp);
+            tuning_latency_frame = aml_audio_get_pcm_latency_offset(adev->sink_format, adev->is_netflix, out->usecase)*48;
+            AM_LOGV("usecase:%s tuning_latency_frame:%d", usecase2Str(out->usecase), tuning_latency_frame);
+            if (tuning_latency_frame > 0 && *frames < (uint64_t)tuning_latency_frame) {
+                *frames = 0;
+            } else {
+                *frames = *frames - tuning_latency_frame;
+            }
+
+            if (ret == 0) {
+                out->last_frames_postion = *frames;
+            } else {
+                *frames = out->last_frames_postion;
+                AM_LOGW("pts not valid yet");
+            }
         }
     } else {
         *frames = frames_written_hw;
@@ -770,28 +760,28 @@ static int out_get_presentation_position_port(
                                                          out->hal_internal_format,
                                                          adev->sink_format,
                                                          adev->ms12.dolby_ms12_enable);
-        frame_latency = latency_ms * (out->hal_rate / 1000);
+        frame_latency = latency_ms * (out->hal_rate / MSEC_PER_SEC);
         *frames += frame_latency ;
     }
     if (adev->debug_flag) {
-         ALOGI("tunned_latency_ms %d ",latency_ms);
+         AM_LOGI("tunning_latency_ms %d, frame_latency:%d", latency_ms, frame_latency);
     }
 
     if (adev->debug_flag) {
-        ALOGI("%s() out %p %"PRIu64", sec = %ld, nanosec = %ld\n", __func__, out, *frames, timestamp->tv_sec, timestamp->tv_nsec);
-        int64_t  frame_diff_ms =  (*frames - out->last_frame_reported) * 1000 / out->hal_rate;
-        int64_t  system_time_ms = 0;
-        if (timestamp->tv_nsec < out->last_timestamp_reported.tv_nsec) {
-            system_time_ms = (timestamp->tv_nsec + 1000000000 - out->last_timestamp_reported.tv_nsec)/1000000;
+        AM_LOGI("out %p %"PRIu64", sec = %ld, nanosec = %ld\n", out, *frames, timestamp->tv_sec, timestamp->tv_nsec);
+        int64_t  frame_diff_ms =  (*frames - out->last_frame_reported) * MSEC_PER_SEC / out->hal_rate;
+        int64_t pre_time_nanos = (long long)out->last_timestamp_reported.tv_sec * NSEC_PER_SEC + (long long)out->last_timestamp_reported.tv_nsec;
+        int64_t cur_time_nanos = (long long)timestamp->tv_sec * NSEC_PER_SEC + (long long)timestamp->tv_nsec;
+        if (cur_time_nanos < pre_time_nanos) {
+            AM_LOGW("timestamp loopback. pre_time:%" PRId64 " ms, cur_time:%" PRId64 "ms", pre_time_nanos / NSEC_PER_MSEC, cur_time_nanos / NSEC_PER_MSEC);
         }
-        else
-            system_time_ms = (timestamp->tv_nsec - out->last_timestamp_reported.tv_nsec)/1000000;
+        int64_t system_time_ms = (cur_time_nanos - pre_time_nanos) / NSEC_PER_MSEC;
         int64_t jitter_diff = llabs(frame_diff_ms - system_time_ms);
         if  (jitter_diff > JITTER_DURATION_MS) {
-            ALOGI("%s jitter out last pos info: %p %"PRIu64", sec = %ld, nanosec = %ld\n",__func__,out, out->last_frame_reported,
+            AM_LOGI("jitter out last pos info: %p %"PRIu64", sec:%ld, nanosec:%ld\n", out, out->last_frame_reported,
                 out->last_timestamp_reported.tv_sec, out->last_timestamp_reported.tv_nsec);
-            ALOGI("%s jitter  system time diff %"PRIu64" ms, position diff %"PRIu64" ms, jitter %"PRIu64" ms \n",
-                __func__,system_time_ms,frame_diff_ms,jitter_diff);
+            AM_LOGI("jitter system time diff %"PRIu64" ms, position diff %"PRIu64" ms, jitter %"PRIu64" ms \n",
+                system_time_ms,frame_diff_ms,jitter_diff);
         }
         out->last_frame_reported = *frames;
         out->last_timestamp_reported = *timestamp;
@@ -800,6 +790,7 @@ static int out_get_presentation_position_port(
     return ret;
 }
 
+static int out_standby_subMixingPCM(struct audio_stream *stream);
 static int initSubMixingInputPcm(
         struct audio_config *config,
         struct aml_stream_out *out)
@@ -812,23 +803,24 @@ static int initSubMixingInputPcm(
 
     hwsync_lpcm = (flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC && config->sample_rate <= 48000 &&
                audio_is_linear_pcm(config->format) && channel_count <= 2);
-    ALOGI("++%s(), out %p, flags %#x, hwsync lpcm %d, out format %#x",
-            __func__, out, flags, hwsync_lpcm, sm->outputCfg.format);
+    AM_LOGI("++out %p, flags %#x, hwsync lpcm %d", out, flags, hwsync_lpcm);
     out->audioCfg = *config;
-    out->stream.write = out_write_subMixingPCM;
-    out->stream.pause = out_pause_subMixingPCM;
-    out->stream.resume = out_resume_subMixingPCM;
-    out->stream.flush = out_flush_subMixingPCM;
-    out->stream.common.standby = out_standby_subMixingPCM;
-    if (flags & AUDIO_OUTPUT_FLAG_PRIMARY) {
-        /* using subMixing clac function for system sound */
-        //out->stream.get_presentation_position = out_get_presentation_position_subMixingPCM;
-        ALOGI("%s(), primary presentation", __func__);
-        out->stream.get_presentation_position = out_get_presentation_position_port;
+
+    if (!out->tv_src_stream) {
+        out->stream.write = out_write_subMixingPCM;
+        out->stream.pause = out_pause_subMixingPCM;
+        out->stream.resume = out_resume_subMixingPCM;
+        out->stream.flush = out_flush_subMixingPCM;
+        out->stream.common.standby = out_standby_subMixingPCM;
+        if (flags & AUDIO_OUTPUT_FLAG_PRIMARY) {
+            AM_LOGI("primary presentation");
+            out->stream.get_presentation_position = out_get_presentation_position_port;
+        }
     }
+
     list_init(&out->mdata_list);
     if (hwsync_lpcm) {
-        ALOGI("%s(), lpcm case", __func__);
+        AM_LOGI("lpcm case");
         mixer_set_continuous_output(sm->mixerData, true);
     }
     return 0;
@@ -847,10 +839,7 @@ static int deleteSubMixingInputPcm(struct aml_stream_out *out)
     hwsync_lpcm = (flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC && config->sample_rate <= 48000 &&
                audio_is_linear_pcm(config->format) && channel_count <= 2);
 
-    ALOGI("%s(), cnt_stream_using_mixer %d",
-            __func__, sm->cnt_stream_using_mixer);
-    delete_mixer_input_port(audio_mixer, out->inputPortID);
-
+    AM_LOGI("cnt_stream_using_mixer %d", sm->cnt_stream_using_mixer);
     struct meta_data_list *mdata_list;
     struct listnode *item;
 
@@ -860,14 +849,14 @@ static int deleteSubMixingInputPcm(struct aml_stream_out *out)
             item = list_head(&out->mdata_list);
             mdata_list = node_to_item(item, struct meta_data_list, list);
             list_remove(item);
-            //ALOGI("free medata list=%p", mdata_list);
+            //AM_LOGI("free meta data list=%p", mdata_list);
             aml_audio_free(mdata_list);
         }
         pthread_mutex_unlock(&out->mdata_lock);
     }
 
     if (hwsync_lpcm) {
-        ALOGI("%s(), lpcm case", __func__);
+        AM_LOGI("lpcm case");
         mixer_set_continuous_output(sm->mixerData, false);
     }
     return 0;
@@ -876,21 +865,17 @@ static int deleteSubMixingInputPcm(struct aml_stream_out *out)
 int initSubMixingInput(struct aml_stream_out *out,
         struct audio_config *config)
 {
+    R_CHECK_POINTER_LEGAL(-EINVAL, out, "");
+    R_CHECK_POINTER_LEGAL(-EINVAL, config, "");
     struct aml_audio_device *adev = out->dev;
     struct subMixing *sm = adev->sm;
     int ret = 0;
-
-    if (out == NULL || config == NULL) {
-        ALOGE("%s(), null pointer", __func__);
-        return -EINVAL;
-    }
-    ALOGI("++%s()", __func__);
 
     if (sm->type == MIXER_LPCM) {
         ret = initSubMixingInputPcm(config, out);
     } else if (sm->type == MIXER_MS12) {
         //ret = initSubMixingInputMS12(sm, config, out);
-        ALOGE("%s(), MS12 not supported yet", __func__);
+        AM_LOGE("MS12 not supported yet");
         ret = -1;
     }
 
@@ -899,21 +884,16 @@ int initSubMixingInput(struct aml_stream_out *out,
 
 int deleteSubMixingInput(struct aml_stream_out *out)
 {
+    R_CHECK_POINTER_LEGAL(-EINVAL, out, "");
     struct aml_audio_device *adev = out->dev;
     struct subMixing *sm = adev->sm;
     int ret = 0;
-
-    ALOGI("++%s()", __func__);
-    if (out == NULL) {
-        ALOGE("%s(), null pointer", __func__);
-        return -EINVAL;
-    }
 
     if (sm->type == MIXER_LPCM) {
         ret = deleteSubMixingInputPcm(out);
     } else if (sm->type == MIXER_MS12) {
         //ret = deleteSubMixingInputMS12(out);
-        ALOGE("%s(), MS12 not supported yet", __func__);
+        AM_LOGE("MS12 not supported yet");
         ret = -1;
     }
 
@@ -932,7 +912,7 @@ int subMixerWriteInport(
         ret = mixer_write_inport(sm->mixerData, port_index, buf, bytes);
     } else {
         ret = -EINVAL;
-        ALOGE("not support");
+        AM_LOGE("not support");
     }
 
     return 0;
@@ -964,34 +944,20 @@ int sysWriteMS12(
 static int newSubMixingFactory(
             struct subMixing **smixer,
             enum MIXER_TYPE type,
-            struct audioCfg cfg,
             void *data)
 {
     (void *)data;
     struct subMixing *sm = NULL;
     int res = 0;
 
-    ALOGI("%s(), type %d", __func__, type);
-    /* check output config */
-    if ((cfg.channelCnt != 2 && cfg.channelCnt != 8) || cfg.sampleRate != 48000
-        || ((cfg.format != AUDIO_FORMAT_PCM_16_BIT) && (cfg.format != AUDIO_FORMAT_PCM_32_BIT))) {
-        ALOGE("%s(), unsupport config, chCnt %d, rate %d, fmt %#x",
-                __func__, cfg.channelCnt, cfg.sampleRate, cfg.format);
-        res = -EINVAL;
-        goto exit;
-    }
+    AM_LOGI("type %d", type);
     sm = aml_audio_calloc(1, sizeof(struct subMixing));
-    if (sm == NULL) {
-        ALOGE("%s(), No mem!", __func__);
-        res = -ENOMEM;
-        goto exit;
-    }
+    R_CHECK_POINTER_LEGAL(-ENOMEM, sm, "No mem!");
 
     switch (type) {
     case MIXER_LPCM:
         sm->type = MIXER_LPCM;
         strncpy(sm->name, "LPCM", 16);
-        sm->outputCfg = cfg;
         //sm->writeMain = mainWritePCM;
         //sm->writeSys = sysWritePCM;
         //sm->mixerData = data;
@@ -999,13 +965,12 @@ static int newSubMixingFactory(
     case MIXER_MS12:
         sm->type = MIXER_MS12;
         strncpy(sm->name, "MS12", 16);
-        sm->outputCfg = cfg;
         //sm->writeMain = mainWriteMS12;
         //sm->writeSys = sysWriteMS12;
         //sm->mixerData = data;
         break;
     default:
-        ALOGE("%s(), type %d not support!", __func__, type);
+        AM_LOGE("type %d not support!", type);
         break;
     };
 
@@ -1016,29 +981,10 @@ exit:
 
 static void deleteSubMixing(struct subMixing *sm)
 {
-    ALOGI("++%s()", __func__);
+    AM_LOGI("++");
     if (sm != NULL) {
         aml_audio_free(sm);
     }
-}
-
-static int initAudioConfig(struct audioCfg *cfg, bool isTV)
-{
-    if (cfg == NULL) {
-        ALOGE("%s(), NULL pointer", __func__);
-        return -EINVAL;
-    }
-
-    cfg->sampleRate = 48000;
-    if (isTV) {
-        cfg->format = AUDIO_FORMAT_PCM_32_BIT;
-        cfg->channelCnt = 8;
-    } else {
-        cfg->format = AUDIO_FORMAT_PCM_16_BIT;
-        cfg->channelCnt = 2;
-    }
-    cfg->frame_size = cfg->channelCnt * audio_bytes_per_sample(cfg->format);
-    return 0;
 }
 
 int initHalSubMixing(struct subMixing **smixer,
@@ -1046,28 +992,20 @@ int initHalSubMixing(struct subMixing **smixer,
         struct aml_audio_device *adev,
         bool isTV)
 {
-    struct audioCfg outCfg;
     int ret = 0;
 
-    ALOGI("%s(), type %d, isTV %d", __func__, type, isTV);
-    if (smixer == NULL) {
-        ALOGE("%s(), NULL pointer", __func__);
-    }
-    initAudioConfig(&outCfg, isTV);
-    ret = newSubMixingFactory(smixer, type, outCfg, NULL);
+    ALOGI("type %d, isTV %d", type, isTV);
+    R_CHECK_POINTER_LEGAL(-EINVAL, smixer, "");
+    ret = newSubMixingFactory(smixer, type, NULL);
+    R_CHECK_RET(ret, "fail to new mixer");
+    ret = initSubMixingOutput(*smixer, adev);
     if (ret < 0) {
-        ALOGE("%s(), fail to new mixer", __func__);
-        goto err;
-    }
-    ret = initSubMixngOutput(*smixer, outCfg, adev);
-    if (ret < 0) {
-        ALOGE("%s(), fail to init mixer", __func__);
+        AM_LOGE("fail to init mixer");
         goto err1;
     }
     return 0;
 err1:
     deleteSubMixing(*smixer);
-err:
     return ret;
 }
 
@@ -1134,17 +1072,17 @@ ssize_t mixer_main_buffer_write_sm (struct audio_stream_out *stream, const void 
     ssize_t                     write_bytes = 0;
 
     if (buffer == NULL || bytes == 0) {
-        ALOGW("[%s:%d] stream:%p, buffer is null, or bytes:%zu invalid", __func__, __LINE__, stream, bytes);
+        AM_LOGW("stream:%p, buffer is null, or bytes:%zu invalid", stream, bytes);
         return -1;
     }
 
     if (adev->debug_flag) {
-        ALOGD("[%s:%d] stream:%p, out_device:%#x, bytes:%zu, format:%#x, hw_sync_mode:%d", __func__, __LINE__,
+        AM_LOGD("stream:%p, out_device:%#x, bytes:%zu, format:%#x, hw_sync_mode:%d",
             stream, aml_out->out_device, bytes, aml_out->hal_internal_format, aml_out->hw_sync_mode);
     }
 
     if (popcount(adev->usecase_masks & SUBMIX_USECASE_MASK) > 1) {
-        ALOGE("[%s:%d] usemask:%#x, not support two direct stream", __func__, __LINE__, adev->usecase_masks);
+        AM_LOGE("use mask:%#x, not support two direct stream", adev->usecase_masks);
         return bytes;
     }
 
@@ -1159,6 +1097,10 @@ ssize_t mixer_main_buffer_write_sm (struct audio_stream_out *stream, const void 
         aml_out->input_bytes_size += write_bytes;
     }
 
+    if (aml_out->status == STREAM_STANDBY) {
+        aml_out->status = STREAM_HW_WRITING;
+    }
+
     return bytes;
 }
 
@@ -1170,6 +1112,8 @@ ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, const void *b
     struct subMixing            *sm = adev->sm;
     size_t                      in_frames = bytes / audio_stream_out_frame_size(stream);
     ssize_t                     bytes_written = 0;
+    int channels = audio_channel_count_from_out_mask(aml_out->hal_channel_mask);
+    uint16_t *in_buf_16 = (uint16_t *)buffer;
 #ifdef DEBUG_TIME
     uint64_t                    us_since_last_write = 0;
     struct timespec             tval_begin, tval_end;
@@ -1178,23 +1122,23 @@ ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, const void *b
 #endif
 
     if (buffer == NULL || bytes == 0) {
-        ALOGW("[%s:%d] stream:%p, buffer is null, or bytes:%zu invalid", __func__, __LINE__, stream, bytes);
+        AM_LOGW("stream:%p, buffer is null, or bytes:%zu invalid", stream, bytes);
         return -1;
     }
 
     if (adev->debug_flag) {
-        ALOGD("[%s:%d] stream:%p, out_device:%#x, bytes:%zu", __func__, __LINE__,
+        AM_LOGD("stream:%p, out_device:%#x, bytes:%zu",
             stream, aml_out->out_device, bytes);
     }
 
     if (adev->out_device != aml_out->out_device) {
-        ALOGD("[%s:%d] stream:%p, switch from device:%#x to device:%#x", __func__, __LINE__,
+        AM_LOGD("stream:%p, switch from device:%#x to device:%#x",
              stream, adev->out_device, aml_out->out_device);
         aml_out->out_device = adev->out_device;
         aml_out->stream.common.standby(&aml_out->stream.common);
         goto exit;
     } else if (aml_out->out_device == 0) {
-        ALOGW("[%s:%d] output device is none", __func__, __LINE__);
+        AM_LOGW("output device is none");
         goto exit;
     }
 
@@ -1211,7 +1155,7 @@ ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, const void *b
             on_notify_cbk, aml_out, on_input_avail_cbk, aml_out,
             NULL, NULL, 1.0);
 
-        ALOGI("[%s:%d] stream %p input port:%s", __func__, __LINE__, stream,
+        AM_LOGI("stream %p input port:%s", stream,
             mixerInputType2Str(get_input_port_type(&aml_out->audioCfg, aml_out->flags)));
         aml_out->standby = false;
 #ifdef ENABLE_AEC_APP
@@ -1219,18 +1163,18 @@ ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, const void *b
 #endif
         /* start padding zero to fill padding data to alsa buffer*/
         padding_buf = aml_audio_calloc(1, MIXER_FRAME_COUNT * 4);
-        if (padding_buf == NULL) {
-            ALOGE("%s(), no memory", __func__);
-            return -ENOMEM;
-        }
+        R_CHECK_POINTER_LEGAL(-ENOMEM, padding_buf, "no memory");
         mixer_set_padding_size(sm->mixerData, aml_out->inputPortID, padding_bytes);
         while (padding_bytes > 0) {
-            ALOGI("padding_bytes %d", padding_bytes);
+            AM_LOGI("padding_bytes %d", padding_bytes);
             aml_out_write_to_mixer(stream, padding_buf, MIXER_FRAME_COUNT * 4);
             padding_bytes -= MIXER_FRAME_COUNT * 4;
         }
         aml_audio_free(padding_buf);
     }
+    apply_volume_fade(aml_out->last_volume_l, aml_out->volume_l, in_buf_16, sizeof(uint16_t), channels, bytes);
+    aml_out->last_volume_l = aml_out->volume_l;
+    aml_out->last_volume_r = aml_out->volume_r;
 
     bytes_written = aml_out_write_to_mixer(stream, buffer, bytes);
 
@@ -1242,46 +1186,31 @@ ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, const void *b
             (tval_end.tv_nsec - tval_begin.tv_nsec) / 1000;
     int target_us = in_frames * 1000 / 48;
 
-    ALOGV("time spent on write %" PRId64 " us, written %d", us_since_last_write, bytes_written);
-    ALOGV("used_this_write %d us, target %d us", used_this_write, target_us);
+    AM_LOGV("time spent on write %" PRId64 " us, written %d", us_since_last_write, bytes_written);
+    AM_LOGV("used_this_write %d us, target %d us", used_this_write, target_us);
     throttle_timeus = target_us - us_since_last_write;
 
     if (throttle_timeus > 0 && throttle_timeus < 200000) {
-        ALOGV("throttle time %" PRId64 " us", throttle_timeus);
+        AM_LOGV("throttle time %" PRId64 " us", throttle_timeus);
         if (throttle_timeus > 1800 && aml_out->us_used_last_write < (uint64_t)target_us/2) {
             usleep(throttle_timeus - 1800);
-            ALOGV("actual throttle %" PRId64 " us3, since last %" PRId64 " us",
+            AM_LOGV("actual throttle %" PRId64 " us3, since last %" PRId64 " us",
                     throttle_timeus, us_since_last_write);
         } else {
-            ALOGV("%" PRId64 " us, but un-throttle", throttle_timeus);
+            AM_LOGV("%" PRId64 " us, but un-throttle", throttle_timeus);
         }
     } else if (throttle_timeus != 0) {
-        ALOGV("invalid throttle time %" PRId64 " us, us since last %" PRId64 " us \n\n", throttle_timeus, us_since_last_write);
+        AM_LOGV("invalid throttle time %" PRId64 " us, us since last %" PRId64 " us \n\n", throttle_timeus, us_since_last_write);
     }
     aml_out->us_used_last_write = us_since_last_write;
 #endif
 exit:
     aml_out->frame_write_sum += in_frames;
+    aml_out->last_frames_postion = aml_out->frame_write_sum;
     clock_gettime(CLOCK_MONOTONIC, &aml_out->timestamp);
     aml_out->lasttimestamp.tv_sec = aml_out->timestamp.tv_sec;
     aml_out->lasttimestamp.tv_nsec = aml_out->timestamp.tv_nsec;
-
-    //#ifdef ENABLE_BT_A2DP
-    #ifndef BUILD_LINUX
-    if (aml_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
-        uint64_t latency_frames = mixer_get_inport_latency_frames(sm->mixerData, aml_out->inputPortID)
-                + a2dp_out_get_latency(adev) * aml_out->hal_rate / 1000;
-        if (aml_out->frame_write_sum > latency_frames)
-            aml_out->last_frames_postion = aml_out->frame_write_sum - latency_frames;
-        else
-            aml_out->last_frames_postion = 0;
-    } else
-    #endif
-    {
-        aml_out->last_frames_postion = aml_out->frame_write_sum;
-    }
-
-    ALOGV("%s(), frame write sum %" PRId64 "", __func__, aml_out->frame_write_sum);
+    AM_LOGV("frame write sum %" PRId64 "", aml_out->frame_write_sum);
     return bytes;
 }
 
@@ -1291,34 +1220,41 @@ ssize_t mixer_mmap_buffer_write_sm(struct audio_stream_out *stream, const void *
    struct aml_audio_device  *adev = aml_out->dev;
    struct subMixing         *pstSubMixing = adev->sm;
    ssize_t                  bytes_written = 0;
+   int channels = audio_channel_count_from_out_mask(aml_out->hal_channel_mask);
+   uint16_t *in_buf_16 = (uint16_t *)buffer;
 
    if (adev->debug_flag) {
-       ALOGD("[%s:%d] stream:%p, out_device:%#x, bytes:%zu", __func__, __LINE__,
+       AM_LOGD("stream:%p, out_device:%#x, bytes:%zu",
            stream, aml_out->out_device, bytes);
    }
 
    if (adev->out_device != aml_out->out_device) {
-       ALOGD("[%s:%d] stream:%p, switch from device:%#x to device:%#x", __func__, __LINE__,
+       AM_LOGD("stream:%p, switch from device:%#x to device:%#x",
             stream, adev->out_device, aml_out->out_device);
        aml_out->out_device = adev->out_device;
        aml_out->stream.common.standby(&aml_out->stream.common);
        return bytes;
    } else if (aml_out->out_device == 0) {
-       ALOGW("[%s:%d] output device is none", __func__, __LINE__);
+       AM_LOGW("output device is none");
        return bytes;
    }
 
    if (aml_out->standby) {
        init_mixer_input_port(pstSubMixing->mixerData, &aml_out->audioCfg, aml_out->flags,
            on_notify_cbk, aml_out, on_input_avail_cbk, aml_out, NULL, NULL, 1.0);
-       ALOGI("[%s:%d] stream:%p, port_index:%s", __func__, __LINE__,
+       AM_LOGI("stream:%p, port_index:%s",
             aml_out, mixerInputType2Str(get_input_port_type(&aml_out->audioCfg, aml_out->flags)));
        aml_out->standby = false;
    }
 
+   apply_volume_fade(aml_out->last_volume_l, aml_out->volume_l, in_buf_16, sizeof(uint16_t), channels, bytes);
+   aml_out->last_volume_l = aml_out->volume_l;
+   aml_out->last_volume_r = aml_out->volume_r;
+
+
    bytes_written = aml_out_write_to_mixer(stream, buffer, bytes);
    if (bytes_written != bytes) {
-       ALOGW("[%s:%d] write to mixer error, written:%zd, bytes:%zu", __func__, __LINE__, bytes_written, bytes);
+       AM_LOGW("write to mixer error, written:%zd, bytes:%zu", bytes_written, bytes);
    }
 
 exit:
@@ -1334,10 +1270,7 @@ static int usecase_change_validate_l_sm(struct aml_stream_out *aml_out, bool is_
     bool hw_mix;
 
     if (is_standby) {
-        ALOGI("[%s:%d] cur dev masks:%#x, delete out usecase:%s",
-            __func__,  __LINE__,
-            aml_dev->usecase_masks,
-            usecase2Str(aml_out->usecase));
+        AM_LOGI("cur dev masks:%#x, delete out usecase:%s", aml_dev->usecase_masks, usecase2Str(aml_out->usecase));
         /**
          * If called by standby, reset out stream's usecase masks and clear the aml_dev usecase masks.
          * So other active streams could know that usecase have been changed.
@@ -1347,7 +1280,7 @@ static int usecase_change_validate_l_sm(struct aml_stream_out *aml_out, bool is_
         aml_out->write = NULL;
         aml_dev->usecase_cnt[aml_out->usecase]--;
         if (aml_dev->usecase_cnt[aml_out->usecase] <= 0) {
-            ALOGI("%s(), standby unmask usecase %s", __func__, usecase2Str(aml_out->usecase));
+            AM_LOGI("standby unmask usecase %s", usecase2Str(aml_out->usecase));
             aml_dev->usecase_masks &= ~(1 << aml_out->usecase);
         }
         return 0;
@@ -1356,26 +1289,24 @@ static int usecase_change_validate_l_sm(struct aml_stream_out *aml_out, bool is_
     /* No usecase changes, do nothing */
     if (((aml_dev->usecase_masks == aml_out->dev_usecase_masks) && aml_dev->usecase_masks) && (aml_dev->continuous_audio_mode == 0)) {
         if ((STREAM_PCM_NORMAL == aml_out->usecase) && (aml_out->write_func == PROCESS_BUFFER_WRITE)) {
-            ALOGE("%s wrong write function reset it", __func__);
+            AM_LOGE("wrong write function reset it");
         } else {
             return 0;
         }
     }
 
-    ALOGV("++[%s:%d] dev masks:%#x, out masks:%#x, out usecase:%s", __func__,  __LINE__,
+    AM_LOGV("++dev masks:%#x, out masks:%#x, out usecase:%s",
            aml_dev->usecase_masks, aml_out->dev_usecase_masks, usecase2Str(aml_out->usecase));
 
     /* check the usecase validation */
     if (popcount(aml_dev->usecase_masks & SUBMIX_USECASE_MASK) > 1) {
-        ALOGW("[%s:%d], invalid dev masks:%#x, out usecase %s!", __func__,  __LINE__,
+        AM_LOGW("invalid dev masks:%#x, out usecase %s!",
               aml_dev->usecase_masks, usecase2Str(aml_out->usecase));
         //return -EINVAL;
     }
 
-    if (((aml_dev->continuous_audio_mode == 1) && (aml_dev->debug_flag > 1)) || \
-        (aml_dev->continuous_audio_mode == 0)) {
-        ALOGI("++++[%s:%d],continuous:%d dev masks:%#x, out masks:%#x, out usecase %s",
-            __func__,  __LINE__,
+    if (aml_dev->debug_flag > 1) {
+        AM_LOGI("++++continuous:%d dev masks:%#x, out masks:%#x, out usecase %s",
             aml_dev->continuous_audio_mode, aml_dev->usecase_masks,
             aml_out->dev_usecase_masks, usecase2Str(aml_out->usecase));
     }
@@ -1383,51 +1314,50 @@ static int usecase_change_validate_l_sm(struct aml_stream_out *aml_out, bool is_
     /* new output case entered, so no masks has been set to the out stream */
     if (!aml_out->dev_usecase_masks) {
         aml_dev->usecase_cnt[aml_out->usecase]++;
-        ALOGI("%s(), add usecase %s, cnt %d", __func__, usecase2Str(aml_out->usecase),
+        AM_LOGI("add usecase %s, cnt %d", usecase2Str(aml_out->usecase),
                 aml_dev->usecase_cnt[aml_out->usecase]);
         if ((1 << aml_out->usecase) & aml_dev->usecase_masks) {
-            ALOGW("[%s:%d], usecase: %s already exists!!", __func__,  __LINE__, usecase2Str(aml_out->usecase) );
+            AM_LOGW("usecase: %s already exists!!", usecase2Str(aml_out->usecase) );
             //return -EINVAL;
         }
 
         if (popcount((aml_dev->usecase_masks | (1 << aml_out->usecase)) & SUBMIX_USECASE_MASK) > 1) {
-            ALOGE("[%s:%d], usecase masks:%#x, couldn't add new out usecase %s!", __func__,  __LINE__,
+            AM_LOGE("usecase masks:%#x, couldn't add new out usecase %s!",
                   aml_dev->usecase_masks, usecase2Str(aml_out->usecase));
             return -EINVAL;
         }
         if (aml_dev->usecase_cnt[aml_out->usecase] == 1) {
-            ALOGD("[%s:%d] cur dev masks:%#x, add out usecase:%s", __func__,  __LINE__,
-                  aml_dev->usecase_masks, usecase2Str(aml_out->usecase));
+            AM_LOGD("cur dev masks:%#x, add out usecase:%s", aml_dev->usecase_masks, usecase2Str(aml_out->usecase));
             /* add the new output usecase to aml_dev usecase masks */
             aml_dev->usecase_masks |= 1 << aml_out->usecase;
         }
     }
 
     if (STREAM_PCM_NORMAL == aml_out->usecase) {
-        if (aml_dev->audio_patching) {
-            ALOGV("%s(), tv patching, mixer_aux_buffer_write!", __FUNCTION__);
+        //if (aml_dev->audio_patching) {
+        if (0) {
+            AM_LOGD("tv patching, mixer_aux_buffer_write!");
             aml_out->write = mixer_aux_buffer_write;
             aml_out->write_func = MIXER_AUX_BUFFER_WRITE;
         } else {
             aml_out->write = mixer_aux_buffer_write_sm;
             aml_out->write_func = MIXER_AUX_BUFFER_WRITE_SM;
-            ALOGV("%s(), mixer_aux_buffer_write_sm !", __FUNCTION__);
+            AM_LOGV("mixer_aux_buffer_write_sm !");
         }
     } else if (STREAM_PCM_MMAP == aml_out->usecase) {
         aml_out->write = mixer_mmap_buffer_write_sm;
         aml_out->write_func = MIXER_MMAP_BUFFER_WRITE_SM;
-        ALOGV("%s(), mixer_mmap_buffer_write_sm !", __FUNCTION__);
+        AM_LOGV("mixer_mmap_buffer_write_sm !");
     } else {
         aml_out->write = mixer_main_buffer_write_sm;
         aml_out->write_func = MIXER_MAIN_BUFFER_WRITE_SM;
-        ALOGV("%s(), mixer_main_buffer_write_sm !", __FUNCTION__);
+        AM_LOGV("mixer_main_buffer_write_sm !");
     }
 
     /* store the new usecase masks in the out stream */
     aml_out->dev_usecase_masks = aml_dev->usecase_masks;
-    if (((aml_dev->continuous_audio_mode == 1) && (aml_dev->debug_flag > 1)) || \
-        (aml_dev->continuous_audio_mode == 0))
-        ALOGI("----[%s:%d], continuous:%d dev masks:%#x, out masks:%#x, out usecase %s", __func__,  __LINE__,
+    if (aml_dev->debug_flag > 1)
+        AM_LOGI("----continuous:%d dev masks:%#x, out masks:%#x, out usecase %s",
             aml_dev->continuous_audio_mode, aml_dev->usecase_masks, aml_out->dev_usecase_masks, usecase2Str(aml_out->usecase));
     return 0;
 }
@@ -1442,16 +1372,25 @@ static ssize_t out_write_subMixingPCM(struct audio_stream_out *stream,
     ssize_t ret = 0;
     //write_func  write_func_p = NULL;
 
-    ALOGV("%s: out_stream(%p) position(%zu)", __func__, stream, bytes);
+    AM_LOGV("out_stream(%p) position(%zu)", stream, bytes);
     aml_audio_trace_int("out_write_subMixingPCM", bytes);
 
     if (aml_audio_trace_debug_level() > 0) {
         if (false == aml_out->pause_status  &&  aml_out->write_count < 2) {
             aml_out->write_time = aml_audio_get_systime() / 1000; //us --> ms
-            ALOGD("%s: out_stream(%p) bytes(%zu), write_time:%llu, count:%d", __func__,
+            AM_LOGD("out_stream(%p) bytes(%zu), write_time:%" PRIu64 ", count:%d",
                        stream, bytes, aml_out->write_time, aml_out->write_count);
         }
-        aml_out->write_count++;
+    }
+    aml_out->write_count++;
+
+    if (aml_out->standby) {
+        uint8_t *temp_buf = (uint8_t *)buffer;
+        bool is_hwsync_header = hwsync_header_valid(temp_buf);
+        //tunnel stream and hwsync is null, prepare the tunnel resource.
+        //if (is_hwsync_header && aml_out->hwsync == NULL) {
+        //    output_stream_hwsync_prepare(aml_out, adev->hw_sync_id);
+        //}
     }
 
     /**
@@ -1463,26 +1402,91 @@ static ssize_t out_write_subMixingPCM(struct audio_stream_out *stream,
     pthread_mutex_lock(&adev->lock);
     ret = usecase_change_validate_l_sm(aml_out, false);
     if (ret < 0) {
-        ALOGE("%s() failed", __func__);
+        AM_LOGE("failed");
         pthread_mutex_unlock(&adev->lock);
         aml_audio_trace_int("out_write_subMixingPCM", 0);
         return ret;
     }
-    adev->active_outputs[aml_out->usecase] = aml_out;
+
+    //find a proper slot to record stream handle
+    {
+        bool b_find = false;
+        int i = 0;
+        if (adev->active_outputs[aml_out->usecase] == aml_out) {
+            b_find = true;
+        } else {
+            for (i = STREAM_USECASE_EXT1; i < STREAM_USECASE_MAX; i++) {
+                if (adev->active_outputs[i] == aml_out) {
+                    b_find = true;
+                    break;
+                }
+            }
+        }
+
+        if (!b_find) {
+            if (adev->active_outputs[aml_out->usecase] == NULL) {
+                i = aml_out->usecase;
+            } else {
+                for (i = STREAM_USECASE_EXT1; i < STREAM_USECASE_MAX; i++) {
+                    if (adev->active_outputs[i] == NULL || adev->active_outputs[i] == aml_out) {
+                        break;
+                    }
+                }
+            }
+            if (i < STREAM_USECASE_MAX) {
+                adev->active_outputs[i] = aml_out;
+                AM_LOGI("out_stream(%p) I: %d", stream, i);
+            } else {
+                ALOGE("can find free PCM_DIRECT index, corrent cnt is %d, please check!!", adev->usecase_cnt[aml_out->usecase]);
+            }
+        }
+    }
     pthread_mutex_unlock(&adev->lock);
     if (aml_out->write) {
         ret = aml_out->write(stream, buffer, bytes);
     } else {
-        ALOGE("%s(), NULL write function", __func__);
+        AM_LOGE("NULL write function");
     }
     if (ret > 0) {
         aml_out->total_write_size += ret;
     }
     if (adev->debug_flag > 1) {
-        ALOGI("-%s() ret %zd,%p %"PRIu64"\n", __func__, ret, stream, aml_out->total_write_size);
+        AM_LOGI("- aml_out->write_count:%d,  ret %zd,%p %"PRIu64"\n", aml_out->write_count, ret, stream, aml_out->total_write_size);
     }
     aml_audio_trace_int("out_write_subMixingPCM", 0);
     return ret;
+}
+
+int out_standby_subMixingPCM_l(struct audio_stream *stream)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev = aml_out->dev;
+    struct subMixing *sm = adev->sm;
+    struct amlAudioMixer *audio_mixer = sm->mixerData;
+    ssize_t ret = 0;
+
+#ifdef ENABLE_AEC_APP
+    aec_set_spk_running(adev->aec, false);
+#endif
+    if (aml_out->inputPortID != -1) {
+        delete_mixer_input_port(audio_mixer, aml_out->inputPortID);
+        aml_out->inputPortID = -1;
+    }
+#if 0
+    if ((aml_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) && adev->a2dp_hal
+        && get_mixer_inport_count(audio_mixer) == 0) {
+        a2dp_out_standby(adev);
+    }
+#endif
+    if (aml_out->hwsync_extractor) {
+        delete_hw_avsync_header_extractor(aml_out->hwsync_extractor);
+        aml_out->hwsync_extractor = NULL;
+    }
+
+    if (adev->debug_flag > 1) {
+        AM_LOGI("-ret %zd,%p %"PRIu64"\n", ret, stream, aml_out->total_write_size);
+    }
+    return 0;
 }
 
 int out_standby_subMixingPCM(struct audio_stream *stream)
@@ -1493,7 +1497,7 @@ int out_standby_subMixingPCM(struct audio_stream *stream)
     struct amlAudioMixer *audio_mixer = sm->mixerData;
     ssize_t ret = 0;
 
-    ALOGD("%s: out_stream(%p) usecase: %s", __func__, stream, usecase2Str(aml_out->usecase));
+    AM_LOGD("out_stream(%p) usecase: %s", stream, usecase2Str(aml_out->usecase));
     /**
      * deal with the device output changes
      * pthread_mutex_lock(&aml_out->lock);
@@ -1509,23 +1513,27 @@ int out_standby_subMixingPCM(struct audio_stream *stream)
 
     ret = usecase_change_validate_l_sm(aml_out, true);
     if (ret < 0) {
-        ALOGE("%s() failed", __func__);
+        AM_LOGE("failed");
         goto exit;
     }
 
+    out_standby_subMixingPCM_l(stream);
     aml_out->status = STREAM_STANDBY;
     aml_out->standby = true;
 #ifdef ENABLE_AEC_APP
     aec_set_spk_running(adev->aec, false);
 #endif
-    delete_mixer_input_port(audio_mixer, aml_out->inputPortID);
-//#ifdef ENABLE_BT_A2DP
-#ifndef BUILD_LINUX
-    if ((aml_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) && adev->a2dp_hal)
-        a2dp_out_standby(adev);
-#endif
+    if (aml_out->inputPortID != -1) {
+        delete_mixer_input_port(audio_mixer, aml_out->inputPortID);
+        aml_out->inputPortID = -1;
+    }
+    if (aml_out->hwsync_extractor) {
+        delete_hw_avsync_header_extractor(aml_out->hwsync_extractor);
+        aml_out->hwsync_extractor = NULL;
+    }
+
     if (adev->debug_flag > 1) {
-        ALOGI("-%s() ret %zd,%p %"PRIu64"\n", __func__, ret, stream, aml_out->total_write_size);
+        AM_LOGI("-ret %zd,%p %"PRIu64"\n", ret, stream, aml_out->total_write_size);
     }
 exit:
     pthread_mutex_unlock(&adev->lock);
@@ -1540,34 +1548,30 @@ static int out_pause_subMixingPCM(struct audio_stream_out *stream)
     struct subMixing *sm = aml_dev->sm;
     struct amlAudioMixer *audio_mixer = NULL;
 
-    ALOGI("+%s(), stream %p, standby %d, pause status %d, usecase: %s",
-            __func__,
-            aml_out,
-            aml_out->standby,
-            aml_out->pause_status,
-            usecase2Str(aml_out->usecase));
+    AM_LOGI("+stream %p, standby %d, pause status %d, usecase: %s",
+            aml_out, aml_out->standby, aml_out->pause_status, usecase2Str(aml_out->usecase));
 
     aml_audio_trace_int("out_pause_subMixingPCM", 1);
+    aml_out->write_count = 0;
     if (aml_audio_trace_debug_level() > 0)
     {
-        aml_out->write_count = 0;
         aml_out->pause_time = aml_audio_get_systime() / 1000; //us --> ms
         if (aml_out->pause_time > aml_out->write_time && (aml_out->pause_time - aml_out->write_time < 5*1000)) { //continually write time less than 5s, audio gap
-            ALOGD("%s: out_stream(%p) AudioGap pause_time:%llu,  diff_time(pause - write):%llu ms", __func__,
+            AM_LOGD("out_stream(%p) AudioGap pause_time:%" PRIu64 ",  diff_time(pause - write):%" PRIu64 " ms",
                    stream, aml_out->pause_time, aml_out->pause_time - aml_out->write_time);
         } else {
-            ALOGD("%s:  -------- pause ----------", __func__);
+            AM_LOGD("-------- pause ----------");
         }
     }
 
     if (aml_out->standby || aml_out->pause_status) {
-        ALOGW("%s(), stream already paused", __func__);
+        AM_LOGW("stream already paused");
         aml_audio_trace_int("out_pause_subMixingPCM", 0);
         return INVALID_STATE;
     }
 
     if (sm->type != MIXER_LPCM) {
-        ALOGW("%s(), sub mixing type not pcm, type is %d", __func__, sm->type);
+        AM_LOGW("sub mixing type not pcm, type is %d", sm->type);
         aml_audio_trace_int("out_pause_subMixingPCM", 0);
         return 0;
     }
@@ -1576,12 +1580,7 @@ static int out_pause_subMixingPCM(struct audio_stream_out *stream)
     send_mixer_inport_message(audio_mixer, aml_out->inputPortID, MSG_PAUSE);
 
     aml_out->pause_status = true;
-    //#ifdef ENABLE_BT_A2DP
-    #ifndef BUILD_LINUX
-    if (aml_out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP)
-        a2dp_out_standby(aml_dev);
-    #endif
-    ALOGI("-%s()", __func__);
+    AM_LOGI("-");
     aml_audio_trace_int("out_pause_subMixingPCM", 0);
     return 0;
 }
@@ -1594,21 +1593,17 @@ static int out_resume_subMixingPCM(struct audio_stream_out *stream)
     struct amlAudioMixer *audio_mixer = NULL;
     int ret = 0;
 
-    ALOGI("+%s(), stream %p, standby %d, pause status %d, usecase: %s",
-            __func__,
-            aml_out,
-            aml_out->standby,
-            aml_out->pause_status,
-            usecase2Str(aml_out->usecase));
+    AM_LOGI("+stream %p, standby %d, pause status %d, usecase: %s",
+            aml_out, aml_out->standby,  aml_out->pause_status, usecase2Str(aml_out->usecase));
     aml_audio_trace_int("out_resume_subMixingPCM", 1);
     if (!aml_out->pause_status) {
-        ALOGW("%s(), steam not in pause status", __func__);
+        AM_LOGW("steam not in pause status");
         aml_audio_trace_int("out_resume_subMixingPCM", 0);
         return INVALID_STATE;
     }
 
     if (sm->type != MIXER_LPCM) {
-        ALOGW("%s(), sub mixing type not pcm, type is %d", __func__, sm->type);
+        AM_LOGW("sub mixing type not pcm, type is %d", sm->type);
         aml_audio_trace_int("out_resume_subMixingPCM", 0);
         return 0;
     }
@@ -1618,7 +1613,7 @@ static int out_resume_subMixingPCM(struct audio_stream_out *stream)
 
     aml_out->pause_status = false;
     aml_out->need_first_sync = true;
-    ALOGI("-%s()", __func__);
+    AM_LOGI("-");
     aml_audio_trace_int("out_resume_subMixingPCM", 0);
     return 0;
 }
@@ -1632,16 +1627,12 @@ static int out_flush_subMixingPCM(struct audio_stream_out *stream)
     struct amlAudioMixer *audio_mixer = NULL;
     int ret = 0;
 
-    ALOGI("+%s(), stream %p, standby %d, pause status %d, usecase: %s",
-            __func__,
-            aml_out,
-            aml_out->standby,
-            aml_out->pause_status,
-            usecase2Str(aml_out->usecase));
+    AM_LOGI("+stream %p, standby %d, pause status %d, usecase: %s",
+            aml_out,  aml_out->standby, aml_out->pause_status, usecase2Str(aml_out->usecase));
 
     aml_audio_trace_int("out_flush_subMixingPCM", 1);
     if (sm->type != MIXER_LPCM) {
-        ALOGW("%s(), sub mixing type not pcm, type is %d", __func__, sm->type);
+        AM_LOGW("sub mixing type not pcm, type is %d", sm->type);
         aml_audio_trace_int("out_flush_subMixingPCM", 0);
         return 0;
     }
@@ -1680,12 +1671,12 @@ static int out_flush_subMixingPCM(struct audio_stream_out *stream)
         //aml_out->pause_status = false;
         //aml_out->standby = true;
     } else {
-        ALOGW("%s(), line %d. Need check this case!", __func__, __LINE__);
+        AM_LOGW("Need check this case!");
         aml_audio_trace_int("out_flush_subMixingPCM", 0);
         return 0;
     }
 
-    ALOGI("-%s()", __func__);
+    AM_LOGI("-");
     aml_audio_trace_int("out_flush_subMixingPCM", 0);
     return 0;
 }
@@ -1700,13 +1691,10 @@ int subMixingOutputRestart(struct aml_audio_device *adev)
 
 int switchNormalStream(struct aml_stream_out *aml_out, bool on)
 {
-    ALOGI("+%s() stream %p, on = %d", __func__, aml_out, on);
-    if (aml_out == NULL) {
-        ALOGE("%s(), stream is null", __func__);
-        return -EINVAL;
-    }
+    AM_LOGI("+stream %p, on = %d", aml_out, on);
+    R_CHECK_POINTER_LEGAL(-EINVAL, aml_out, "");
     if (!aml_out->is_normal_pcm) {
-        ALOGE("%s(), not normal pcm stream", __func__);
+        AM_LOGE("not normal pcm stream");
         return -EINVAL;
     }
     if (on) {
@@ -1733,3 +1721,45 @@ void subMixingDump(int s32Fd, const struct aml_audio_device *pstAmlDev)
     dprintf(s32Fd, "[AML_HAL]\n");
     mixer_dump(s32Fd, pstAmlDev);
 }
+
+#if 0
+int subMixingSetKaraoke(struct aml_audio_device *adev, struct kara_manager *kara)
+{
+    struct subMixing *sm = adev->sm;
+    struct amlAudioMixer *audio_mixer = sm->mixerData;
+
+    return mixer_set_karaoke(audio_mixer, kara);
+}
+#endif
+static int subMixingOutMsg(struct aml_audio_device *adev, PORT_MSG msg, void *info, int info_len)
+{
+    struct subMixing *sm = adev->sm;
+    struct amlAudioMixer *audio_mixer = NULL;
+    int ret = 0;
+
+    audio_mixer = sm->mixerData;
+    send_mixer_outport_message(audio_mixer, MIXER_OUTPUT_PORT_STEREO_PCM, msg, info, info_len);
+
+    return 0;
+}
+
+int subMixingSetSinkGain(struct aml_audio_device *adev, void *sink_gain)
+{
+    return subMixingOutMsg(adev, MSG_SINK_GAIN, &sink_gain, sizeof(sink_gain));
+}
+
+int subMixingSetEQData(struct aml_audio_device *adev, void *eq_data)
+{
+    return subMixingOutMsg(adev, MSG_EQ_DATA, &eq_data, sizeof(eq_data));
+}
+
+int subMixingSetSrcGain(struct aml_audio_device *adev, float gain)
+{
+    return subMixingOutMsg(adev, MSG_SRC_GAIN, &gain, sizeof(gain));
+}
+
+int subMixingSetAudioPostprocess(struct aml_audio_device *adev, void **postprocess)
+{
+    return subMixingOutMsg(adev, MSG_EFFECT, postprocess, sizeof(void *));
+}
+

@@ -23,6 +23,9 @@
 #include <sound/asound.h>
 #include <tinyalsa/asoundlib.h>
 #include <hardware/audio.h>
+#include <signal.h>
+
+//#include <alsa_device_profile.h>
 #include "audio_data_process.h"
 enum MIXER_TYPE {
     MIXER_LPCM = 1,
@@ -32,6 +35,7 @@ enum MIXER_TYPE {
 struct subMixing;
 struct aml_stream_out;
 struct aml_audio_device;
+struct kara_manager;
 
 typedef int (*writeSubMixing_t)(
             struct subMixing *sm,
@@ -60,11 +64,6 @@ struct subMixing {
     writeSysBuf_t writeSys;
     struct audioCfg sysCfg;
     void *sysData;
-    /* output device related */
-    struct audioCfg outputCfg;
-    /* ALSA pcm configs */
-    struct pcm_config pcm_cfg;
-    struct pcm *pcmDev;
     // which mixer is using, ms12 or pcm mixer
     void *mixerData;
     struct aml_audio_device *adev;
@@ -80,11 +79,26 @@ int deleteHalSubMixing(struct subMixing *smixer);
 int initSubMixingInput(struct aml_stream_out *out,
         struct audio_config *config);
 int deleteSubMixingInput(struct aml_stream_out *out);
-int out_standby_subMixingPCM(struct audio_stream *stream);
+int out_standby_subMixingPCM_l(struct audio_stream *stream);
 int switchNormalStream(struct aml_stream_out *aml_out, bool on);
 struct pcm *getSubMixingPCMdev(struct subMixing *sm);
 int subMixingOutputRestart(struct aml_audio_device *adev);
 
 void subMixingDump(int s32Fd, const struct aml_audio_device *pstAmlDev);
+ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, const void *buffer,
+                               size_t bytes);
+ssize_t mixer_main_buffer_write_sm(struct audio_stream_out *stream, const void *buffer,
+                               size_t bytes);
+
+int subMixingSetSinkGain(struct aml_audio_device *adev, void *sink_gain);
+int subMixingSetEQData(struct aml_audio_device *adev, void *eq_data);
+int subMixingSetSrcGain(struct aml_audio_device *adev, float gain);
+int subMixingSetAudioPostprocess(struct aml_audio_device *adev, void **postprocess);
+ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void *buffer, size_t bytes);
+
+/* set karaoke to submixer*/
+//int subMixingSetKaraoke(struct aml_audio_device *adev, struct kara_manager *kara);
+/* timer callback function */
+void sm_timer_callback_handler(union sigval sigv);
 
 #endif /* _SUB_MIXING_FACTORY_H_ */

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "aml_audio_flac_dec"
+
 #include <dlfcn.h>
 #include <cutils/log.h>
 #include <cutils/properties.h>
@@ -21,7 +23,6 @@
 #include "audio_data_process.h"
 #include "aml_malloc_debug.h"
 
-#define LOG_TAG "aml_audio_flac_dec"
 #define FLAC_LIB_PATH "/usr/lib/libflac-aml.so"
 #define FLAC_MAX_LENGTH (1024 * 64)
 #define FLAC_REMAIN_BUFFER_SIZE (4096 * 10)

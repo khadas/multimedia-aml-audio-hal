@@ -223,7 +223,7 @@ target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-de
 
 target_link_libraries(audio_hal
 	audioprocessing spdifenc ms12v2
-	-lcutils -lamaudioutils -llog -lexpat -lpthread -ldl -lstdc++ -Wl,-z,defs)
+	-lcutils -lamaudioutils -llog -lexpat -lpthread -ldl -lstdc++ -lrt -Wl,-z,defs)
 
 if(USE_EQ_DRC)
 	target_include_directories(audio_hal PRIVATE

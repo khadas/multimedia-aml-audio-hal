@@ -795,11 +795,6 @@ int aml_audio_get_ddp_frame_size()
     return frame_size;
 }
 
-bool is_stream_using_mixer(struct aml_stream_out *out)
-{
-    return is_inport_valid(out->inputPortID);
-}
-
 uint32_t out_get_outport_latency(const struct audio_stream_out *stream)
 {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
@@ -807,13 +802,12 @@ uint32_t out_get_outport_latency(const struct audio_stream_out *stream)
     struct subMixing *sm = adev->sm;
     struct amlAudioMixer *audio_mixer = sm->mixerData;
     int frames = 0, latency_ms = 0;
-//#ifdef ENABLE_BT_A2DP
-#ifndef BUILD_LINUX
+#if 0
     if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
         return a2dp_out_get_latency(adev);
     }
 #endif
-    if (is_stream_using_mixer(out)) {
+    if (out->inputPortID >=0 && out->inputPortID < NR_INPORTS) {
         int outport_latency_frames = mixer_get_outport_latency_frames(audio_mixer);
 
         if (outport_latency_frames <= 0)
@@ -1796,6 +1790,16 @@ const char* mixerInputType2Str(aml_mixer_input_port_type_e type)
     ENUM_TYPE_TO_STR(AML_MIXER_INPUT_PORT_BUTT)
     ENUM_TYPE_TO_STR_END
 }
+
+const char* mixerOutputType2Str(MIXER_OUTPUT_PORT type)
+{
+    ENUM_TYPE_TO_STR_START("MIXER_OUTPUT_PORT_");
+    ENUM_TYPE_TO_STR(MIXER_OUTPUT_PORT_INVAL)
+    ENUM_TYPE_TO_STR(MIXER_OUTPUT_PORT_STEREO_PCM)
+    ENUM_TYPE_TO_STR(MIXER_OUTPUT_PORT_MULTI_PCM)
+    ENUM_TYPE_TO_STR_END
+}
+
 const char* mediasyncAudiopolicyType2Str(audio_policy type)
 {
     ENUM_TYPE_TO_STR_START("MEDIASYNC_AUDIO_");
@@ -1860,6 +1864,16 @@ const char* hdmiFormat2Str(AML_HDMI_FORMAT_E type)
     ENUM_TYPE_TO_STR(AML_HDMI_FORMAT_WMAPRO)
     ENUM_TYPE_TO_STR_END
 }
+/* Returns the position of each bit, counting from right to left.
+ * Can be called repeatedly to iterate over.
+ */
+uint8_t get_bit_position_in_mask(uint8_t max_position, uint32_t *p_mask)
+{
+    uint32_t right_zeros = __builtin_ctz(*p_mask);
+    R_CHECK_PARAM_LEGAL(0, right_zeros, 0, max_position, "max_position:%d, mask:%#x", max_position, *p_mask);
+    *p_mask &= ~(1 << right_zeros);
+    return right_zeros;
+}
 
 int convert_audio_format_2_period_mul(audio_format_t format)
 {
@@ -1923,4 +1937,22 @@ int aml_audio_trace_int(char *name, int value)
     }
     #endif
     return 0;
+}
+
+float aml_audio_get_focus_volume_ratio()
+{
+    int ratio = 50;
+    char buf[PROPERTY_VALUE_MAX];
+    int ret = -1;
+    char *prop_name = "audio.focus.volume.ratio";
+    ret = property_get(prop_name, buf, NULL);
+    if (ret > 0) {
+        ratio = atoi(buf);
+    }
+
+    if (ratio == 0) {
+        ratio = 1;
+    }
+
+    return ratio/100.0L;
 }

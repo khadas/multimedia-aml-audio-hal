@@ -52,6 +52,9 @@ void hwsync_header_extract(struct hw_avsync_header *header)
 {
     uint32_t frame_size = deserialize_bytes_to_int32(&header->header[4]);
     uint64_t pts = deserialize_bytes_to_int64(&header->header[8]);
+    int header_sub_version = header->header[2];
+    if (!header_sub_version)
+        pts = pts * 90 / 1000000;
     hwsync_header_set_frame_size(header, frame_size);
     hwsync_header_set_pts(header, pts);
 }
@@ -147,8 +150,8 @@ int hwsync_write_header_byte(struct hw_avsync_header *header, uint8_t byte)
         return -EINVAL;
     }
     ALOGV("header->bytes_written:%zu byte:%0x",header->bytes_written,byte);
-    if (header->bytes_written < (HW_SYNC_VERSION_SIZE - 1) &&
-        byte == HW_AVSYNC_HEADER_V2[header->bytes_written]) {
+    if (header->bytes_written < (HW_SYNC_VERSION_SIZE - 1) /*&&
+        byte == HW_AVSYNC_HEADER_V2[header->bytes_written]*/) {
         header->header[header->bytes_written++] = byte;
     } else if (header->bytes_written == (HW_SYNC_VERSION_SIZE - 1)) {
         header->header[header->bytes_written++] = byte;

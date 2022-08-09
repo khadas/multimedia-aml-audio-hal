@@ -463,7 +463,7 @@ static int mad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
             apply_volume(ad_mixing_coefficient, ad_dec_pcm_data->buf, sizeof(uint16_t), ad_dec_pcm_data->data_len);
 
             frames_written = do_mixing_2ch(dec_pcm_data->buf, ad_dec_pcm_data->buf ,
-                dec_pcm_data->data_len / 4 , data_cfg, data_cfg);
+                dec_pcm_data->data_len / 4 , AUDIO_FORMAT_PCM_16_BIT, AUDIO_FORMAT_PCM_16_BIT);
             ALOGV("frames_written %d dec_pcm_data->data_len %d",frames_written, dec_pcm_data->data_len);
             dec_pcm_data->data_len = frames_written * 4;
         }

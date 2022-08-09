@@ -18,7 +18,12 @@
 #ifndef _AUDIO_DATA_PROCESS_H_
 #define _AUDIO_DATA_PROCESS_H_
 
+#include <system/audio.h>
+
 struct audioCfg {
+    int card;
+    int device;
+    int is_tv;
     uint32_t sampleRate;
     uint32_t channelCnt;
     audio_format_t format;
@@ -28,10 +33,12 @@ int processing_and_convert(void *data_mixed,
         void *data_sys, size_t frames, struct audioCfg inCfg, struct audioCfg mixerCfg);
 int do_mixing_2ch(void *data_mixed,
         void *data_in, size_t frames,
-        struct audioCfg inCfg, struct audioCfg mixerCfg);
+        audio_format_t in_format, audio_format_t out_format);
 int extend_channel_2_8(void *data_out, void *data_in,
         size_t frames, int ch_cnt_out, int ch_cnt_in);
 int extend_channel_5_8(void *data_out, void *data_in,
         size_t frames, int ch_cnt_out, int ch_cnt_in);
+
+void channel_layout_swap_center_lfe(void * data, int size, int channels);
 
 #endif

@@ -318,6 +318,8 @@ static int adev_get_microphones(const struct audio_hw_device* dev,
 static void get_mic_characteristics(struct audio_microphone_characteristic_t* mic_data,
                                     size_t* mic_count);
 
+static int aml_audio_focus(struct aml_audio_device *adev, bool on);
+
 static inline bool need_hw_mix(usecase_mask_t masks)
 {
     return (masks > 1);
@@ -1423,7 +1425,7 @@ static uint32_t out_get_alsa_latency (const struct audio_stream_out *stream)
     return (frames * 1000) / out->config.rate;
 }
 
-static int out_set_volume (struct audio_stream_out *stream, float left, float right)
+static int out_set_volume_l (struct audio_stream_out *stream, float left, float right)
 {
     struct aml_stream_out *out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = out->dev;
@@ -1509,6 +1511,19 @@ static int out_set_volume (struct audio_stream_out *stream, float left, float ri
     return 0;
 }
 
+static int out_set_volume (struct audio_stream_out *stream, float left, float right)
+{
+    struct aml_stream_out *out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev = out->dev;
+
+    if (adev->audio_focus_enable) {
+        if (get_mmap_pcm_active_count(adev)) {
+            left *= aml_audio_get_focus_volume_ratio();
+            right *= aml_audio_get_focus_volume_ratio();
+        }
+    }
+    return out_set_volume_l(stream, left, right);
+}
 
 static int out_pause (struct audio_stream_out *stream)
 {
@@ -3376,6 +3391,13 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->out_device = devices;
     out->volume_l_org = 1.0;//stream volume
     out->volume_r_org = 1.0;
+    if (adev->audio_focus_enable) {
+        if (get_mmap_pcm_active_count(adev) >= 1 && !(flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) {
+            ALOGI("TTS sound is playing, set volume ratio!!");
+            out->volume_l_org = out->volume_l_org * aml_audio_get_focus_volume_ratio();
+            out->volume_r_org = out->volume_l_org;
+        }
+    }
     out->volume_l = adev->master_volume * out->volume_l_org;//out volume
     out->volume_r = adev->master_volume * out->volume_r_org;
     out->last_volume_l = 0.0;
@@ -3402,6 +3424,13 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         outMmapInit(out);
     }
 #endif
+
+    if (adev->audio_focus_enable) {
+         if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ && (get_mmap_pcm_active_count(adev) == 0)) {
+            ALOGI("first TTS sound open, set sound volume ratio for other stream");
+            aml_audio_focus(adev, true);
+         }
+    }
     //aml_audio_hwsync_init(out->hwsync,out);
     /* FIXME: when we support multiple output devices, we will want to
      * do the following:
@@ -3527,15 +3556,8 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         aml_audio_hwsync_msync_unblock_start(out);
     }
 
+    stream->common.standby(&stream->common);
 
-    if (adev->useSubMix) {
-        if (out->usecase == STREAM_PCM_NORMAL || out->usecase == STREAM_PCM_HWSYNC)
-            out_standby_subMixingPCM(&stream->common);
-        else
-            out_standby_new(&stream->common);
-    } else {
-        out_standby_new(&stream->common);
-    }
 
     if (out->dev_usecase_masks) {
         adev->usecase_masks &= ~(1 << out->usecase);
@@ -3580,7 +3602,12 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         outMmapDeInit(out);
     }
 #endif
-
+    if (adev->audio_focus_enable) {
+        if (out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ && (get_mmap_pcm_active_count(adev) == 0)) {
+           ALOGI("last TTS sound closed, set other sound volume as orignal of itself");
+           aml_audio_focus(adev, false);
+        }
+    }
     if (out->restore_hdmitx_selection) {
         /* switch back to spdifa when the dual stream is done */
         aml_audio_select_spdif_to_hdmi(AML_SPDIF_A_TO_HDMITX);
@@ -5434,7 +5461,7 @@ static int adev_set_master_volume (struct audio_hw_device *dev, float volume)
        struct aml_stream_out *aml_out = adev->active_outputs[i];
        struct audio_stream_out *out = (struct audio_stream_out *)aml_out;
        if (aml_out) {
-            out_set_volume (out, aml_out->volume_l_org, aml_out->volume_r_org);
+            out_set_volume_l(out, aml_out->volume_l_org, aml_out->volume_r_org);
        }
     }
     ALOGI("%s() volume = %f, active_outport = %d", __FUNCTION__, volume, adev->active_outport);
@@ -6006,6 +6033,10 @@ int do_output_standby_l(struct audio_stream *stream)
             aml_out->spdifout2_handle = NULL;
         }
     }
+
+    if (eDolbyMS12Lib != adev->dolby_lib_type_last && adev->useSubMix)
+       out_standby_subMixingPCM_l(stream);
+
     aml_out->status = STREAM_STANDBY;
     aml_out->standby= 1;
     aml_out->continuous_mode_check = true;
@@ -7376,7 +7407,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, const void *buf
         return -1;
     }
 
-    if (aml_out->standby) {
+    if (aml_out->standby && (eDolbyMS12Lib == adev->dolby_lib_type_last || !adev->useSubMix)) {
         ALOGI("%s(), standby to unstandby", __func__);
         aml_out->standby = false;
     }
@@ -8680,13 +8711,16 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
                     ALOGE("initSub mixing input failed");
                 }
             }
-        } else {
-            aml_out->bypass_submix = true;
-            ALOGI("%s(), direct usecase: %s", __func__, usecase2Str(aml_out->usecase));
-            if (adev->is_TV) {
-                aml_out->stream.write = out_write_new;
-                aml_out->stream.common.standby = out_standby_new;
+             //this is for STREAM_PCM_HWSYNC
+            if (aml_out->usecase == STREAM_PCM_HWSYNC) {
+                aml_out->timer_id = aml_audio_timer_create(sm_timer_callback_handler);
+                AM_LOGD("func:%s  timer_id:%d", __func__, aml_out->timer_id);
             }
+        } else {
+            //aml_out->bypass_submix = true;
+            ALOGI("%s(), direct usecase: %s", __func__, usecase2Str(aml_out->usecase));
+            aml_out->stream.write = out_write_new;
+            aml_out->stream.common.standby = out_standby_new;
         }
     } else {
         aml_out->stream.write = out_write_new;
@@ -8708,7 +8742,7 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
     aml_out->codec_type = get_codec_type(aml_out->hal_internal_format);
     aml_out->continuous_mode_check = true;
     /*In order to avoid the invalid adjustment of mastervol when there is no stream */
-    out_set_volume ((struct audio_stream_out *)aml_out, aml_out->volume_l_org, aml_out->volume_r_org);
+    out_set_volume_l((struct audio_stream_out *)aml_out, aml_out->volume_l_org, aml_out->volume_r_org);
 
     /* init ease for stream */
     if (aml_audio_ease_init(&aml_out->audio_stream_ease) < 0) {
@@ -8749,15 +8783,29 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
     /* call legacy close to reuse codes */
     if (adev->active_outputs[aml_out->usecase] == aml_out) {
         adev->active_outputs[aml_out->usecase] = NULL;
+    } else {
+        for (int i = STREAM_USECASE_EXT1; i < STREAM_USECASE_MAX; i++) {
+            if (adev->active_outputs[i] == aml_out) {
+                adev->active_outputs[i] = NULL;
+                break;
+            }
+        }
     }
+
     if (adev->useSubMix) {
         if (aml_out->is_normal_pcm ||
             aml_out->usecase == STREAM_PCM_HWSYNC ||
-            aml_out->usecase == STREAM_PCM_MMAP) {
+            aml_out->usecase == STREAM_PCM_MMAP ||
+            aml_out->usecase == STREAM_PCM_DIRECT) {
             if (!aml_out->bypass_submix) {
                 deleteSubMixingInput(aml_out);
             }
         }
+        if (aml_out->usecase == STREAM_PCM_HWSYNC) {
+            int ret = aml_audio_timer_delete(aml_out->timer_id);
+            ALOGD("func:%s timer_id:%d  ret:%d",__func__, aml_out->timer_id, ret);
+        }
+
     }
     /* when switch hdmi output to a2dp output, close hdmi stream maybe after open a2dp stream,
      * and here set audio stop would cause audio stuck
@@ -9958,6 +10006,7 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
         aml_dev->sink_gain[OUTPORT_SPEAKER], aml_dev->sink_gain[OUTPORT_HDMI]);
     dprintf(fd, "[AML_HAL]      ms12 main volume: %10f\n", aml_dev->ms12.main_volume);
     dprintf(fd, "[AML_HAL]      dolby_lib: %d\n", aml_dev->dolby_lib_type);
+    dprintf(fd, "[AML_HAL]      master volume: %10f, mute: %d\n", aml_dev->master_volume, aml_dev->master_mute);
     dprintf(fd, "\n[AML_HAL]      usecase_masks: %#x\n", aml_dev->usecase_masks);
     dprintf(fd, "\nAML stream outs:\n");
 
@@ -10296,6 +10345,33 @@ static int adev_remove_device_effect(struct audio_hw_device *dev,
     return 0;
 }
 
+static int aml_audio_focus(struct aml_audio_device *adev, bool on)
+{
+    float volume = 0.0f;
+    if (!adev)
+        return -1;
+
+    pthread_mutex_lock (&adev->lock);
+    for (int i = 0; i < STREAM_USECASE_MAX; i++) {
+       struct aml_stream_out *aml_out = adev->active_outputs[i];
+       struct audio_stream_out *out = (struct audio_stream_out *)aml_out;
+       if (aml_out && !(aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) {
+            if (on) {
+                volume = aml_out->volume_l_org * aml_audio_get_focus_volume_ratio();
+            } else {
+                volume = aml_out->volume_l_org / aml_audio_get_focus_volume_ratio();
+                if (volume > 1.0f)
+                    volume = 1.0f;
+            }
+            out_set_volume_l(out, volume, volume);
+        }
+    }
+    pthread_mutex_unlock (&adev->lock);
+
+    return 0;
+}
+
+
 #define MAX_SPK_EXTRA_LATENCY_MS (100)
 #define DEFAULT_SPK_EXTRA_LATENCY_MS (15)
 
@@ -10304,6 +10380,8 @@ static int adev_remove_device_effect(struct audio_hw_device *dev,
 #define DUAL_SPDIF "Dual_Spdif_Support"
 #define FORCE_DDP "Ms12_Force_Ddp_Out"
 #define AUDIO_DELAY_MAX "Audio_Delay_Max"
+#define USE_SUB_MIX "Sub_Mix_Enable"
+#define Audio_Focus_Enable "Audio_Focus_Enable"
 
 static int adev_open(const hw_module_t* module, const char* name, hw_device_t** device)
 {
@@ -10321,7 +10399,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     int disable_continuous = 1;
     audio_effect_t *audio_effect;
 
-    ALOGD("%s: enter", __func__);
+    ALOGD("%s: enter, ver:%s", __func__, libVersion_audio_hal);
     pthread_mutex_lock(&adev_mutex);
     if (strcmp(name, AUDIO_HARDWARE_INTERFACE) != 0) {
         ret = -EINVAL;
@@ -10641,8 +10719,13 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     // FIXME: current MS12 is not compatible with SUBMIXER, when MS12 lib exists, use ms12 system.
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         adev->useSubMix = false;
-        ALOGI("%s(), MS12 is not compatible with SUBMIXER currently, set useSubMix to FALSE", __func__);
+    } else if (aml_get_jason_int_value(USE_SUB_MIX, 0)) {
+        adev->useSubMix = true;
     }
+
+    adev->audio_focus_enable = aml_get_jason_int_value(Audio_Focus_Enable, 0);
+    ALOGI("%s(), set useSubMix %s, audio focus: %s", __func__, adev->useSubMix ? "TRUE": "FALSE",
+        adev->audio_focus_enable ? "TRUE": "FALSE");
 
     if (adev->useSubMix) {
         ret = initHalSubMixing(&adev->sm, MIXER_LPCM, adev, adev->is_TV);
@@ -10679,7 +10762,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     pthread_mutex_init(&adev->cap_buffer_lock, NULL);
 #endif
     memset(&(adev->hdmi_descs), 0, sizeof(struct aml_arc_hdmi_desc));
-    ALOGD("%s adev->dolby_lib_type:%d  !adev->is_TV:%d", __func__, adev->dolby_lib_type, !adev->is_TV);
+    ALOGD("%s adev->dolby_lib_type:%d adev->is_TV:%d", __func__, adev->dolby_lib_type, adev->is_TV);
     /* create thread for communication between Audio Hal and MS12 */
     if ((eDolbyMS12Lib == adev->dolby_lib_type)) {
         ret = ms12_mesg_thread_create(&adev->ms12);
