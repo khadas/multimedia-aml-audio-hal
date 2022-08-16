@@ -236,7 +236,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
         }
         if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
         {
-            ms12_delayms = aml_audio_get_cur_ms12_latencyes(stream);
+            ms12_delayms = aml_audio_get_ms12_tunnel_latency(stream)/48;
             aml_out->hwsync->es_mediasync.cur_outapts = aml_out->hwsync->es_mediasync.out_start_apts - ms12_delayms * 90;
             aml_hwsynces_ms12_get_policy(stream);
         }
@@ -316,7 +316,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                     }
                     if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
                     {
-                         ms12_delayms = aml_audio_get_cur_ms12_latencyes(stream);
+                         ms12_delayms = (aml_audio_get_ms12_tunnel_latency(stream)+out_frames)/48;
                          aml_out->hwsync->es_mediasync.cur_outapts = aml_dec->out_frame_pts - ms12_delayms * 90;//need consider the alsa delay
                          if (adev->debug_flag)
                              ALOGI("esmodesync->cur_outapts %llx,ms12_delayms %d,out_frames %d,decin %llx,decout %llx,data_sr %d\n", aml_out->hwsync->es_mediasync.cur_outapts,ms12_delayms,out_frames,aml_dec->in_frame_pts,aml_dec->out_frame_pts,dec_pcm_data->data_sr);

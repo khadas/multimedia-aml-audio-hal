@@ -630,8 +630,13 @@ dtvsync_process_res  aml_dtvsync_nonms12_process(struct audio_stream_out *stream
                 aml_dec->out_frame_pts, patch->dtvsync->cur_outapts,
                 patch->output_thread_exit);
 
-        if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD)
-            usleep(15*1000);
+        if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
+            if (m_audiopolicy.param1 == -1) {
+                usleep(15000);
+            } else {
+              usleep(m_audiopolicy.param1);
+            }
+        }
 
         if (patch->output_thread_exit == 1) {
                 ALOGI("input exit, break now\n");
@@ -683,8 +688,13 @@ void aml_dtvsync_ms12_get_policy(struct audio_stream_out *stream)
                 m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
                 m_audiopolicy.param1, m_audiopolicy.param2,
                 patch->cur_package->pts, patch->dtvsync->cur_outapts);
-        if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD)
-            usleep(15*1000);
+        if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
+            if (m_audiopolicy.param1 == -1) {
+                usleep(15000);
+            } else {
+              usleep(m_audiopolicy.param1);
+            }
+        }
 
         if (patch->output_thread_exit == 1) {
             ALOGI("input exit, break now\n");
