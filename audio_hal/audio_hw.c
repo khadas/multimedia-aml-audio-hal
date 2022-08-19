@@ -10688,6 +10688,8 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
             goto Err_MS12_MesgThreadCreate;
         }
     }
+    //set msync log level
+    log_set_level(LOG_INFO);
 
     ALOGD("%s: exit  dual_spdif_support(%d)", __func__, adev->dual_spdif_support);
     return 0;
