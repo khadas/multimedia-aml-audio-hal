@@ -1406,7 +1406,6 @@ int dolby_ms12_system_process(
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    audio_channel_mask_t mixer_default_channelmask = AUDIO_CHANNEL_OUT_STEREO;
     int mixer_default_samplerate = 48000;
     int dolby_ms12_input_bytes = 0;
     int ms12_output_size = 0;
@@ -1424,7 +1423,7 @@ int dolby_ms12_system_process(
                 , buffer
                 , bytes
                 , AUDIO_FORMAT_PCM_16_BIT
-                , audio_channel_count_from_out_mask(mixer_default_channelmask)
+                , aml_out->hal_ch
                 , mixer_default_samplerate);
         if (dolby_ms12_input_bytes > 0) {
             *use_size = dolby_ms12_input_bytes;
@@ -1440,7 +1439,7 @@ int dolby_ms12_system_process(
     pthread_mutex_unlock(&ms12->lock);
 
     /* Netflix UI mixer output has flow control so need skip flow control here */
-    if ((adev->continuous_audio_mode == 1) && (!adev->is_netflix)) {
+    if ((adev->continuous_audio_mode == 1) && (!adev->is_netflix) && (aml_out->hal_ch == 2)) {
         uint64_t input_ns = 0;
         input_ns = (uint64_t)(*use_size) * NANO_SECOND_PER_SECOND / 4 / mixer_default_samplerate;
 
