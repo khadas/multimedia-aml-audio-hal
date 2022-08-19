@@ -34,7 +34,7 @@ option(USE_SC2 "Current platform is sc2" OFF)
 option(NO_USE_CAP_MUTE_HDMI "Don't support audio capture mute for HDMI INPUT" OFF)
 option(USE_APP_MIXING "Support appsound mixing" ON)
 option(USE_DIAG_LOG "Support diagnostic logging for RDK" OFF)
-option(USE_MEDIA_INFO "Support media info API reporting" ON)
+option(USE_MEDIA_INFO "Support media info API reporting" OFF)
 
 
 if(USE_DTV)
