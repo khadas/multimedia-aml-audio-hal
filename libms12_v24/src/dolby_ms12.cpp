@@ -299,7 +299,7 @@ extern "C" void dolby_ms12_flush_app_input_buffer(void)
 
 extern "C" void dolby_ms12_set_main_dummy(int type, int dummy)
 {
-    ALOGI("%s()\n", __FUNCTION__);
+    ALOGI("%s() %d, %d\n", __FUNCTION__, type, dummy);
     android::DolbyMS12* dolby_ms12_instance = getInstance();
     if (dolby_ms12_instance) {
         dolby_ms12_instance->DolbyMS12SetMainDummy(type, dummy);

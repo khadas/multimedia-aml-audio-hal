@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "audio_hw_primary"
+#define LOG_TAG "audio_hw_ms12_v2"
 //#define LOG_NDEBUG 0
 #define __USE_GNU
 
@@ -1281,9 +1281,8 @@ MAIN_INPUT:
                                                 , main_sample_rate);
 
             if (adev->debug_flag >= 2)
-                ALOGI("%s line %d main_frame_size %d ret dolby_ms12 input_bytes %d",
-                    __func__, __LINE__, main_frame_size, dolby_ms12_input_bytes);
-
+                ALOGI("%s line %d main_frame_size %d ret dolby_ms12 input_bytes %d,%x,%d,%d",
+                    __func__, __LINE__, main_frame_size, dolby_ms12_input_bytes, main_format, main_channel_num, main_sample_rate);
             if (adev->continuous_audio_mode == 0) {
                 dolby_ms12_scheduler_run(ms12->dolby_ms12_ptr);
             }
@@ -1960,7 +1959,7 @@ static int ms12_output_master(void *buffer, void *priv_data, size_t size, audio_
 
     if (adev->continuous_audio_mode) {
         uint32_t sample_rate = ms12->main_input_rate ? ms12->main_input_rate : DDP_OUTPUT_SAMPLE_RATE;
-        uint64_t ms12_dec_out_nframes = dolby_ms12_get_decoder_nframes_pcm_output(adev->ms12.dolby_ms12_ptr, aml_out->hal_internal_format, MAIN_INPUT_STREAM);
+        uint64_t ms12_dec_out_nframes = dolby_ms12_get_decoder_nframes_pcm_output(adev->ms12.dolby_ms12_ptr, ms12_get_audio_hal_format(aml_out->hal_internal_format), MAIN_INPUT_STREAM);
         ms12->main_output_ns = ms12_dec_out_nframes * NANO_SECOND_PER_SECOND / sample_rate;
         ALOGV("format = 0x%x ms12_dec_out_nframes=%" PRId64 "", aml_out->hal_internal_format, ms12_dec_out_nframes);
     }

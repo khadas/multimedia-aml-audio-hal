@@ -3628,14 +3628,12 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         /*after ms12 lock, dolby_ms12_enable may be cleared with clean up function*/
         if (adev->ms12.dolby_ms12_enable) {
             if (adev->ms12_main1_dolby_dummy == false
-            && !audio_is_linear_pcm(out->hal_internal_format)) {
+            && (!audio_is_linear_pcm(out->hal_internal_format) && is_dolby_ms12_support_compression_format(out->hal_internal_format))) {
                 dolby_ms12_set_main_dummy(0, true);
                 adev->ms12_main1_dolby_dummy = true;
                 ALOGI("%s set main dd+ dummy", __func__);
             } else if (adev->ms12_ott_enable == true
-               && audio_is_linear_pcm(out->hal_internal_format)
-               && (out->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC || out->flags & AUDIO_OUTPUT_FLAG_DIRECT)) {
-
+               && (audio_is_linear_pcm(out->hal_internal_format) || !is_dolby_ms12_support_compression_format(out->hal_internal_format))) {
                 dolby_ms12_set_main_dummy(1, true);
                 adev->ms12_ott_enable = false;
                 ALOGI("%s set ott dummy", __func__);
