@@ -48,7 +48,7 @@
 #include "aml_audio_matparser.h"
 #include "aml_audio_spdifout.h"
 #include "aml_malloc_debug.h"
-
+#include "aml_esmode_sync.h"
 
 #define DOLBY_DRC_LINE_MODE 0
 #define DOLBY_DRC_RF_MODE   1

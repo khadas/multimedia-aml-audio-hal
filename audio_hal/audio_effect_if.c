@@ -35,7 +35,7 @@ int audio_effect_load_interface(audio_hw_device_t *dev, audio_effect_t **effect)
     }
     r = load(dev);
     if (r) {
-        ALOGE("call %s fail %s", "EffectLoad");
+        ALOGE("call %s fail", "EffectLoad");
         r = -1;
         goto out;
     }

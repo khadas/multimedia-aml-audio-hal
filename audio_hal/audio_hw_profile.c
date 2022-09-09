@@ -563,7 +563,10 @@ int  aml_hdmi_audio_profile_parser() {
     }
     memset(&hdmi_audio_profile, 0, sizeof(struct hdmi_audio_profile_t));
     /*skip the first line*/
-    fgets(infobuf, buf_len, file);
+    if (NULL == fgets(infobuf, buf_len, file))
+    {
+        ALOGE("%s fgets fail\n", __func__);
+    }
     while (NULL != fgets(infobuf, buf_len, file)) {
         bool duplicated = false;
         ALOGV("%s***************************************\n", __func__);

@@ -231,10 +231,14 @@ int get_sysfs_uint(const char *path, uint32_t *value)
     int fd;
     char valstr[64];
     uint32_t val = 0;
+    int ret = 0;
     fd = open(path, O_RDONLY);
     if (fd >= 0) {
         memset(valstr, 0, 64);
-        read(fd, valstr, 64 - 1);
+        ret = read(fd, valstr, 64 - 1);
+        if (ret < 0) {
+            ALOGE("%s(), fail to read", __func__);
+        }
         valstr[strlen(valstr)] = '\0';
         close(fd);
     } else {
@@ -269,10 +273,14 @@ int sysfs_set_sysfs_str(const char *path, const char *val)
 int sysfs_get_sysfs_str(const char *path, char *valstr, int size)
 {
     int fd;
+    int ret = 0;
     fd = open(path, O_RDONLY);
     if (fd >= 0) {
         memset(valstr,0,size);
-        read(fd, valstr, size - 1);
+        ret = read(fd, valstr, size - 1);
+        if (ret < 0) {
+            ALOGE("%s(), fail to read", __func__);
+        }
         valstr[strlen(valstr)] = '\0';
         close(fd);
     } else {
@@ -287,10 +295,14 @@ int sysfs_get_sysfs_str(const char *path, char *valstr, int size)
 int get_sysfs_int(const char *path)
 {
     int val = 0;
+    int ret=0;
     int fd = open(path, O_RDONLY);
     if (fd >= 0) {
         char bcmd[16];
-        read(fd, bcmd, sizeof(bcmd));
+        ret = read(fd, bcmd, sizeof(bcmd));
+        if (ret < 0) {
+            ALOGE("%s(), fail to read", __func__);
+        }
         val = strtol(bcmd, NULL, 10);
         close(fd);
     } else {
@@ -303,10 +315,14 @@ int set_sysfs_int(const char *path, int value)
 {
     char buf[16];
     int fd = open(path, O_WRONLY);
+    int ret = 0;
     if (fd >= 0) {
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf), "%d", value);
-        write(fd, buf, sizeof(buf));
+        ret = write(fd, buf, sizeof(buf));
+        if (ret < 0) {
+            ALOGE("%s(), fail to write", __func__);
+        }
         close(fd);
     } else {
         ALOGI("[%s]open %s node failed! return 0\n", __FUNCTION__, path);
@@ -363,13 +379,17 @@ int find_offset_in_file_strstr(char *mystr, char *substr)
 void set_codec_type(int type)
 {
     char buf[16];
+    int ret = 0;
     int fd = open("/sys/class/audiodsp/digital_codec", O_WRONLY);
 
     if (fd >= 0) {
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf), "%d", type);
 
-        write(fd, buf, sizeof(buf));
+        ret = write(fd, buf, sizeof(buf));
+        if (ret < 0) {
+            ALOGE("%s(), fail to write", __func__);
+        }
         close(fd);
     }
 }

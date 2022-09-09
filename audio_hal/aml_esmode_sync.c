@@ -38,6 +38,7 @@
 #include "audio_hw.h"
 #include "alsa_config_parameters.h"
 #include "audio_hwsync.h"
+#include "aml_esmode_sync.h"
 
 #define DD_MUTE_FRAME_SIZE 1536
 #define EAC3_IEC61937_FRAME_SIZE 24576

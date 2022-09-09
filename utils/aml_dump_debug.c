@@ -37,6 +37,7 @@ void DoDumpData(const void *data_buf, int size, int aud_src_type) {
     int tmp_type = -1;
     char prop_value[PROPERTY_VALUE_MAX] = { 0 };
     char file_path[PROPERTY_VALUE_MAX] = { 0 };
+    int ret = 0;
 
     memset(prop_value, '\0', PROPERTY_VALUE_MAX);
     property_get("vendor.media.audiohal.dumpdata.en", prop_value, "null");
@@ -90,7 +91,10 @@ void DoDumpData(const void *data_buf, int size, int aud_src_type) {
     }
 
     if (gDumpDataFd >= 0) {
-        write(gDumpDataFd, data_buf, size);
+        ret = write(gDumpDataFd, data_buf, size);
+        if (ret < 0) {
+            ALOGE("%s(), fail to write", __func__);
+        }
     }
     return;
 }

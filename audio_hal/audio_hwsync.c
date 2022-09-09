@@ -43,6 +43,8 @@
 
 #include "tinyalsa_ext.h"
 
+#include "aml_android_utils.h"
+
 static int aml_audio_get_hwsync_flag()
 {
     char buf[PROPERTY_VALUE_MAX];
@@ -221,6 +223,7 @@ int aml_hwsync_get_tsync_pts_by_handle(int fd, uint32_t *pts)
     ALOGI("%s", __func__);
     char valstr[64];
     uint32_t val = 0;
+    int ret = 0;
 
     if (!pts) {
         ALOGE("%s(), NULL pointer", __func__);
@@ -230,7 +233,10 @@ int aml_hwsync_get_tsync_pts_by_handle(int fd, uint32_t *pts)
     if (fd >= 0) {
         memset(valstr, 0, 64);
         lseek(fd, 0, SEEK_SET);
-        read(fd, valstr, 64 - 1);
+        ret = read(fd, valstr, 64 - 1);
+        if (ret < 0) {
+            ALOGE("%s(), fail to read", __func__);
+        }
         valstr[strlen(valstr)] = '\0';
     } else {
         ALOGE("invalid fd\n");
@@ -251,6 +257,7 @@ static int aml_audio_hwsync_get_pcr(audio_hwsync_t *p_hwsync, uint32_t *value)
     char valstr[64];
     uint32_t val = 0;
     off_t offset;
+    int ret = 0;
     if (!p_hwsync) {
         ALOGE("invalid pointer %s", __func__);
         return -1;
@@ -265,7 +272,10 @@ static int aml_audio_hwsync_get_pcr(audio_hwsync_t *p_hwsync, uint32_t *value)
     if (fd >= 0) {
         memset(valstr, 0, 64);
         offset = lseek(fd, 0, SEEK_SET);
-        read(fd, valstr, 64 - 1);
+        ret = read(fd, valstr, 64 - 1);
+        if (ret < 0) {
+            ALOGE("%s(), fail to read", __func__);
+        }
         valstr[strlen(valstr)] = '\0';
     } else {
         ALOGE("%s unable to open file %s\n", __func__, TSYNC_PCRSCR);
@@ -579,7 +589,7 @@ static inline uint32_t abs32(int32_t a)
 */
 int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int frame_len, int *p_adjust_ms)
 {
-    uint32_t apts = 0;
+    uint64_t apts = 0;
     int ret = 0;
     //*p_adjust_ms = 0;
     uint32_t pcr = 0;
@@ -628,7 +638,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         !adev->gap_ignore_pts &&
         ((int)(offset - (adev->gap_offset & 0xffffffff)) >= 0)) {
         /* when PTS gap exists (Netflix specific), skip APTS reset between [adev->gap_pts, adev->gap_pts + 500ms] */
-        ALOGI("gap_pts = 0x%x", apts);
+        ALOGI("gap_pts = 0x%llx", apts);
         adev->gap_pts = apts;
         adev->gap_ignore_pts = true;
     }
@@ -678,14 +688,14 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     if (p_hwsync->use_mediasync) {
     } else {
         if (p_hwsync->first_apts_flag == false && offset > 0 && (apts >= latency_pts) && AVSYNC_TYPE_TSYNC == p_hwsync->aout->avsync_type) {
-            ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
-            ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
+            ALOGI("%s apts = 0x%llx (%llu ms) latency=0x%x (%u ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
+            ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%llx (%llu ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
             aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);
         }
 
         if (p_hwsync->first_apts_flag == false && AVSYNC_TYPE_MSYNC == p_hwsync->aout->avsync_type) {
-            ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
-            ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
+            ALOGI("%s apts = 0x%llx (%llu ms) latency=0x%x (%u ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
+            ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%llx (%llu ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
             aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);
             p_hwsync->last_lookup_apts = apts;
             adev->ms12.ms12_main_input_size = 0;
@@ -706,7 +716,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                     gap = get_pts_gap(pcr, apts);
                     gap_ms = gap / 90;
                     if (debug_enable) {
-                        ALOGI("%s pcr 0x%x,apts 0x%x,gap 0x%x,gap duration %d ms", __func__, pcr, apts, gap, gap_ms);
+                        ALOGI("%s pcr 0x%x,apts 0x%llx,gap 0x%x,gap duration %d ms", __func__, pcr, apts, gap, gap_ms);
                     }
                     /*resume from pause status, we can sync it exactly*/
                     if (adev->ms12.need_resync) {
@@ -727,7 +737,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                                 ALOGE("pcr has been reset\n");
                             }
                         } else {
-                            ALOGI("tsync -> reset pcrscr 0x%x -> 0x%x, %s big,diff %"PRIx64" ms",
+                            ALOGI("tsync -> reset pcrscr 0x%x -> 0x%llx, %s big,diff %"PRIx64" ms",
                                 pcr, apts, apts > pcr ? "apts" : "pcr", get_pts_gap(apts, pcr) / 90);
                             int ret_val = aml_hwsync_reset_tsync_pcrscr(p_hwsync, apts);
                             if (ret_val == -1) {
@@ -735,7 +745,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                             }
                         }
                     } else if (gap > APTS_DISCONTINUE_THRESHOLD_MAX) {
-                        ALOGE("%s apts exceed the adjust range,need check apts 0x%x,pcr 0x%x",
+                        ALOGE("%s apts exceed the adjust range,need check apts 0x%llx,pcr 0x%x",
                             __func__, apts, pcr);
                     }
                 }
@@ -794,7 +804,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                     unsigned long hw_ptr = 0;
                     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
                     pcm_get_hw_ptr(adev->pcm_handle[I2S_DEVICE], &hw_ptr, &hw_ptr_ts);
-                    ALOGI("PTSLOG [%lld.%.9ld] injected %" PRIu64 ", offset:%d" PRIu64 ", lookup_pts:%u, latency_pts:%u, apts:%u, action:%d, hw_ptr[%lld.%.9ld:%lu]",
+                    ALOGI("PTSLOG [%lld.%.9ld] injected %" PRIu64 ", offset:%d" PRIu64 ", lookup_pts:%u, latency_pts:%u, apts:%llu, action:%d, hw_ptr[%lld.%.9ld:%lu]",
                           (long long)ts.tv_sec, ts.tv_nsec,
                           out->total_write_size, offset,
                           apts_save, latency_pts, apts, out->msync_action,
@@ -847,7 +857,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                     av_sync_get_clock(out->msync_session, &pcr);
                     gap = get_pts_gap(pcr, apts);
                     gap_ms = gap / 90;
-                    ALOGI("%s pcr 0x%x, apts 0x%x, gap %d(%d) ms, offset %d, apts_lookup=%d, latency=%d",
+                    ALOGI("%s pcr 0x%x, apts 0x%llx, gap %d(%d) ms, offset %d, apts_lookup=%d, latency=%d",
                         __func__, pcr, apts, gap, gap_ms, offset, apts_save / 90, latency_pts / 90);
                 }
             }

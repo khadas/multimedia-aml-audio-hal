@@ -22,7 +22,7 @@
 #include <pthread.h>
 #include <cutils/log.h>
 #include <aml_volume_utils.h>
-
+#include <cutils/properties.h>
 
 #include "audio_hw.h"
 #include "audio_hw_utils.h"
@@ -32,6 +32,9 @@
 #include "aml_audio_spdifout.h"
 #include "alsa_config_parameters.h"
 #include "dolby_lib_api.h"
+#include "aml_esmode_sync.h"
+
+
 
 extern unsigned long decoder_apts_lookup(unsigned int offset);
 static void aml_audio_stream_volume_process(struct audio_stream_out *stream, void *buf, int sample_size, int channels, int bytes) {

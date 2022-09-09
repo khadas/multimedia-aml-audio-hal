@@ -93,12 +93,16 @@ void aml_property_decrease(char *string, char *str2)
 int aml_sysfs_get_int (const char *path)
 {
 	int val = 0;
-	int fd = open (path, O_RDONLY);
+	int ret = 0;
+	int fd = open(path, O_RDONLY);
 	if (fd >= 0) {
 		char bcmd[16];
-		read (fd, bcmd, sizeof (bcmd));
-		val = strtol (bcmd, NULL, 10);
-		close (fd);
+		ret = read(fd, bcmd, sizeof (bcmd));
+		if (ret < 0) {
+			ALOGE("%s(), fail to read", __func__);
+		}
+		val = strtol(bcmd, NULL, 10);
+		close(fd);
 	} else {
 		ALOGE("%s: open %s node failed! return 0, err: %s\n", __func__, path, strerror(errno));
 	}
@@ -111,11 +115,15 @@ int aml_sysfs_get_int16(const char *path,unsigned *value)
 	int fd;
 	char valstr[64];
 	unsigned  val = 0;
+	int ret = 0;
 
 	fd = open(path, O_RDONLY);
 	if (fd >= 0) {
 		memset(valstr, 0, 64);
-		read(fd, valstr, 64 - 1);
+		ret = read(fd, valstr, 64 - 1);
+		if (ret < 0) {
+			ALOGE("%s(), fail to read", __func__);
+		}
 		valstr[strlen(valstr)] = '\0';
 		close(fd);
 	} else {

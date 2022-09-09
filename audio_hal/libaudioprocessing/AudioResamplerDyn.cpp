@@ -88,6 +88,7 @@ void AudioResamplerDyn<TC, TI, TO>::InBuffer::resize(int CHANNELS, int halfNumCo
 {
     // calculate desired state size
     size_t stateCount = halfNumCoefs * CHANNELS * 2 * kStateSizeMultipleOfFilterLength;
+    int ret = 0;
 
     // check if buffer needs resizing
     if (mState
@@ -98,10 +99,11 @@ void AudioResamplerDyn<TC, TI, TO>::InBuffer::resize(int CHANNELS, int halfNumCo
 
     // create new buffer
     TI* state = NULL;
-    (void)posix_memalign(
+    ret = posix_memalign(
             reinterpret_cast<void **>(&state),
             CACHE_LINE_SIZE /* alignment */,
             stateCount * sizeof(*state));
+    ALOG_ASSERT(ret == 0);
     memset(state, 0, stateCount*sizeof(*state));
 
     // attempt to preserve state

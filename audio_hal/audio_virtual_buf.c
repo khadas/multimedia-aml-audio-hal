@@ -65,10 +65,8 @@ int audio_virtual_buf_open(void ** pphandle, char * buf_name, uint64_t buf_ns_be
         if (name_length >= (MAX_NAME_LENGHT - 1)) {
             name_length = (MAX_NAME_LENGHT - 1);
         }
-
-        strncpy(phandle->buf_name, buf_name, name_length);
+        strncpy(phandle->buf_name, buf_name, sizeof(phandle->buf_name) - 1);
         phandle->buf_name[name_length] = '\0';
-
     } else {
         ALOGE("buf name is NULL\n");
         aml_audio_free(phandle);

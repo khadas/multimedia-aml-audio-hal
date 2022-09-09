@@ -308,7 +308,7 @@ void appply_tone_16bit2ch(unsigned char* buf, int datalen)
 {
     int ii =0;
     for (ii=0;ii< datalen;) {
-        signed short *pL = &buf[ii];
+        signed short *pL = (signed short *)(&buf[ii]);
         signed short *pR = pL + 1;
         *pL = sinetonedata[jj];
         *pR = sinetonedata[jj];

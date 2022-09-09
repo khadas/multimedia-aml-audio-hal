@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #define LOG_TAG "aml_audio_vorbis_dec"
 #include <dlfcn.h>
 #include <cutils/log.h>
@@ -20,6 +21,7 @@
 #include "aml_dec_api.h"
 #include "audio_data_process.h"
 #include "aml_malloc_debug.h"
+
 
 #define VORBIS_LIB_PATH "/usr/lib/libvorbis-ahal.so"
 #define VORBIS_MAX_LENGTH (1024 * 64)

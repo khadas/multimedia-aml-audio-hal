@@ -207,7 +207,7 @@ target_include_directories(audio_hal PRIVATE
 	./aml_resampler/include
 	./aml_resampler
 	./aml_adecs/include
-	./aml_adecs/
+	./aml_adecs
 	./aml_parser/include
 	./aml_parser
 	./utils/include

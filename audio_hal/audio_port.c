@@ -35,6 +35,7 @@
 #include "aml_malloc_debug.h"
 //#include "karaoke_manager.h"
 #include "aml_dump_debug.h"
+#include "alsa_manager.h"
 
 #ifdef ENABLE_AEC_APP
 #include "audio_aec.h"

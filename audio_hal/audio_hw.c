@@ -36,6 +36,9 @@
 #include <hardware/hardware.h>
 #include <system/audio.h>
 #include <audio_utils/channels.h>
+#include <memory.h>
+
+#include "aml_dec_api.h"
 
 #if ANDROID_PLATFORM_SDK_VERSION >= 25 //8.0
 #include <system/audio-base.h>
@@ -1238,7 +1241,7 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
     ret = str_parms_get_str (parms, "hw_av_sync", value, sizeof(value));
     if (ret >= 0) {
         int hw_sync_id = atoi(value);
-        unsigned char sync_enable = 0;
+        int sync_enable = 0;
         void *msync_session;
 
         if (hw_sync_id < 0) {
@@ -1398,7 +1401,7 @@ static char *out_get_parameters(const struct audio_stream *stream, const char *k
         sprintf (temp_buf, "period_cnt=%d;period_sz=%d", aml_out->config.period_count, aml_out->config.period_size);
         return strdup (temp_buf);
     } else if (strstr (keys, "get_buffer_avail")) {
-        if ((is_dolby_ms12_support_compression_format(aml_out->hal_internal_format) || is_multi_channel_pcm(stream))) {
+        if ((is_dolby_ms12_support_compression_format(aml_out->hal_internal_format) || is_multi_channel_pcm((struct audio_stream_out *)stream))) {
             sprintf (temp_buf, "remain_frame=%d", (dolby_ms12_get_main_buffer_avail(NULL)));
             return strdup (temp_buf);
         }
@@ -2564,8 +2567,8 @@ static char * in_get_parameters (const struct audio_stream *stream, const char *
         sprintf (temp_buf, "period_cnt=%d;period_sz=%d", in->config.period_count, in->config.period_size);
         return strdup (temp_buf);
     } else if (strstr (keys, "get_aml_source_latency")) {
-        sprintf (temp_buf, "aml_source_latency_ms=%zu", in_get_latency_frames(in));
-        ALOGI ("in_get_parameters %zu", in_get_latency_frames(in));
+        sprintf (temp_buf, "aml_source_latency_ms=%zu", in_get_latency_frames((const struct audio_stream_in *)in));
+        ALOGI ("in_get_parameters %zu", in_get_latency_frames((const struct audio_stream_in *)in));
         return strdup (temp_buf);
     }
     return strdup ("");
@@ -3139,8 +3142,9 @@ static void get_mic_characteristics (struct audio_microphone_characteristic_t* m
                                     size_t* mic_count) {
     *mic_count = 1;
     memset(mic_data, 0, sizeof(struct audio_microphone_characteristic_t));
-    strlcpy(mic_data->device_id, "builtin_mic", AUDIO_MICROPHONE_ID_MAX_LEN - 1);
-    strlcpy(mic_data->address, "top", AUDIO_DEVICE_MAX_ADDRESS_LEN - 1);
+    strncpy(mic_data->device_id, "builtin_mic", sizeof("builtin_mic"));
+    strncpy(mic_data->address, "top", sizeof("top"));
+
     memset(mic_data->channel_mapping, AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED,
            sizeof(mic_data->channel_mapping));
     mic_data->device = AUDIO_DEVICE_IN_BUILTIN_MIC;
@@ -5025,7 +5029,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     }
     ret = str_parms_get_str(parms, "prim_mixgain", value, sizeof(value));
     if (ret >= 0) {
-        char parm[12] = "";
+        char parm[40] = "";
         int gain = atoi(value);
         if ((gain <= 0) && (gain >= -96)) {
             sprintf(parm, "-sys_prim_mixgain %d,200,0", gain << 7);
@@ -5040,7 +5044,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     }
     ret = str_parms_get_str(parms, "apps_mixgain", value, sizeof(value));
     if (ret >= 0) {
-        char parm[12] = "";
+        char parm[40] = "";
         int gain = atoi(value);
         if ((gain <= 0) && (gain >= -96)) {
             int after_master_gain;
@@ -5064,7 +5068,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     }
     ret = str_parms_get_str(parms, "syss_mixgain", value, sizeof(value));
     if (ret >= 0) {
-        char parm[12] = "";
+        char parm[40] = "";
         int gain = atoi(value);
         if ((gain <= 0) && (gain >= -96)) {
             int after_master_gain;
@@ -5173,8 +5177,8 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     ret = str_parms_get_str(parms, "pts_gap", value, sizeof(value));
     if (ret >= 0) {
         unsigned long long offset, duration;
-        if (sscanf(value, "%llu,%d", &offset, &duration) == 2) {
-            ALOGI("pts_gap %llu %d", offset, duration);
+        if (sscanf(value, "%llu,%lld", &offset, &duration) == 2) {
+            ALOGI("pts_gap %llu %lld", offset, duration);
             adev->gap_offset = offset;
             adev->gap_ignore_pts = false;
             adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_SET;
@@ -5427,7 +5431,7 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
     }
 #endif
     else if (strstr (keys, "codecsupport")) {
-        return strdup(aml_get_codec_support(&keys[strlen("codecsupport") + 1])? "true": "false");
+        return strdup(aml_get_codec_support((char*)(&keys[strlen("codecsupport") + 1]))? "true": "false");
     } else if (strstr(keys, "dolby_lib_type")) {
         ALOGI("dolby_lib_type: %d", adev->dolby_lib_type);
         sprintf(temp_buf, "dolby_lib_type=%d", adev->dolby_lib_type);
@@ -8008,7 +8012,7 @@ hwsync_rewrite:
         if ((AVSYNC_TYPE_MSYNC == aml_out->avsync_type) &&
             (aml_out->msync_action == AV_SYNC_AA_DROP) && (!hw_sync->first_apts_flag)) {
             /* start dropping */
-            ALOGI("MSYNC start dropping @0x%x, %d bytes", hw_sync->first_apts, write_bytes);
+            ALOGI("MSYNC start dropping @0x%llx, %d bytes", hw_sync->first_apts, write_bytes);
             goto exit;
         }
 
@@ -9501,7 +9505,7 @@ static struct audio_patch_set *register_audio_patch(struct audio_hw_device *dev,
 
     patch_new = &patch_set_new->audio_patch;
     #ifdef BUILD_LINUX
-    patch_handle = (audio_patch_handle_t) atomic_inc(&aml_dev->next_unique_ID);
+    patch_handle = (audio_patch_handle_t) atomic_inc((atomic_t *)(&aml_dev->next_unique_ID));
     #else
     patch_handle = (audio_patch_handle_t) android_atomic_inc(&aml_dev->next_unique_ID);
     #endif
@@ -9975,6 +9979,7 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     int i;
     int size;
     char *string = NULL;
+    int ret = 0;
 
 #ifdef BUILD_LINUX
     fd = open("/tmp/haldump", O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
@@ -10043,7 +10048,10 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     string = aml_audio_calloc(size + 1, 1);
     if (string) {
         lseek(fd, 0, SEEK_SET);
-        read(fd, string, size);
+        ret = read(fd, string, size);
+        if (ret < 0) {
+            ALOGE("%s(), fail to read", __func__);
+        }
     }
 
     close(fd);

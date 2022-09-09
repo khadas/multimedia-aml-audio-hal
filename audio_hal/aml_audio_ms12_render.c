@@ -33,6 +33,9 @@
 #include "aml_audio_timer.h"
 #include "alsa_config_parameters.h"
 
+#include "aml_audio_ms12_sync.h"
+#include "aml_esmode_sync.h"
+
 #define MS12_MAIN_WRITE_LOOP_THRESHOLD                  (2000)
 #define AUDIO_IEC61937_FRAME_SIZE 4
 
