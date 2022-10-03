@@ -10770,7 +10770,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         }
     }
     //set msync log level
-    log_set_level(LOG_INFO);
+    log_set_level(AVS_LOG_INFO);
 
     ALOGD("%s: exit  dual_spdif_support(%d)", __func__, adev->dual_spdif_support);
     return 0;
