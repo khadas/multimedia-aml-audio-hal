@@ -127,8 +127,6 @@ int update_dolby_atmos_decoding_and_rendering_cap_for_ddp_sad(
     , bool is_joc_supported)
 {
     char *ddp_sad = NULL;
-    int bit_for_acmod_28 = 1; // bytes3 bit1
-    int bit_for_joc = 0; //bytes3 bit0
     int ret = -1;
     if (!array || (count < SAD_SIZE)) {
         ALOGE("%s line %d array %p count %d\n", __func__, __LINE__, array, count);
@@ -139,12 +137,11 @@ int update_dolby_atmos_decoding_and_rendering_cap_for_ddp_sad(
     //ALOGV("%s line %d ddp sad [%#x %#x %#x]\n", __func__, __LINE__, ddp_sad[0], ddp_sad[1], ddp_sad[2]);
 
     if (DOLBY_DIGITAL_PLUS == ((ddp_sad[0] >> AUDIO_FORMAT_CODE_BYTE1_BIT3)&0xF)) {
-        if (is_acmod_28_supported) {
-            ddp_sad[2] |= (0x1<<bit_for_acmod_28);
-        }
-        if (is_joc_supported) {
-            ddp_sad[2] |= (0x1<<bit_for_joc);
-        }
+        int value = (is_acmod_28_supported << 1) | is_joc_supported;
+
+        ddp_sad[2] &= 0xFC;
+        ddp_sad[2] |= value;
+
         ret = 0;
     }
     else
@@ -310,22 +307,6 @@ static char *get_audio_format_code_name_by_id(int fmt_id)
  *Bytes[4 ~ 7] = EDID audio length(3*n)
  *Bytes[8 ~ 38] = SAD1(3Bytes) + SAD2(3Bytes)...+SADn(3Bytes)
  */
-static void padding_edid_array_to_protocol_array(
-    char *edid_array
-    , int edid_array_len
-    , char *protocol_array
-    , int *protocol_array_len)
-{
-    unsigned int *protocol_ptr = (unsigned int *)protocol_array;
-
-    protocol_ptr[0] = 0;
-    protocol_ptr[1] = (unsigned int)edid_array_len;
-
-    *protocol_array_len = TLV_HEADER_SIZE;
-
-    memcpy(protocol_array + TLV_HEADER_SIZE, edid_array, edid_array_len);
-    *protocol_array_len += edid_array_len;
-}
 
 int update_edid_after_edited_audio_sad(struct aml_audio_device *adev, struct format_desc *fmt_desc)
 {
@@ -336,8 +317,6 @@ int update_edid_after_edited_audio_sad(struct aml_audio_device *adev, struct for
     }
 
     if (BYPASS == adev->hdmi_format) {
-        /* first step, reset the audio default EDID */
-        update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
         /* update the AVR's EDID */
         update_edid(adev, false, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
     }
@@ -345,18 +324,16 @@ int update_edid_after_edited_audio_sad(struct aml_audio_device *adev, struct for
         if (!fmt_desc->is_support) {
             /* first step, reset the audio default EDID */
             update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
-            //if DDP is not in EDID, should update ARV's EDID
-            update_edid(adev, false, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
         }
         else {
             /* reset the EDID as default */
-            update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
+            //update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
             /*Fixme:
              *this is an patch, when switch from Passthrough-Mode to AUTO-Mode,
              *MAT SAD in EDID is lost, but after update the default EDID one more,
              *MAT SAD can be restored back.
              */
-            update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
+            //update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
 
             /* get the current EDID audio array */
             char EDID_cur_array[EDID_ARRAY_MAX_LEN] = {0};
@@ -387,12 +364,18 @@ int update_edid_after_edited_audio_sad(struct aml_audio_device *adev, struct for
             }
 
             /* That array, sent to HDMIRX with amixer AML_MIXER_ID_HDMIIN_AUDIO_EDID, has an special format. */
-            char EDID_final_array[EDID_ARRAY_MAX_LEN] = {0};
-            int edid_final_len = 0;
-            padding_edid_array_to_protocol_array(EDID_cur_array, available_edid_len, EDID_final_array, &edid_final_len);
+
+            memmove(EDID_cur_array + TLV_HEADER_SIZE - SAD_SIZE, EDID_cur_array, available_edid_len);
+
+            available_edid_len -= SAD_SIZE;
+
+            unsigned int *protocol_ptr = (unsigned int *)EDID_cur_array;
+
+            protocol_ptr[0] = 0;
+            protocol_ptr[1] = (unsigned int)available_edid_len;
 
             /* update the EDID after editing*/
-            update_edid(adev, false, (void *)EDID_final_array, available_edid_len);
+            update_edid(adev, false, (void *)EDID_cur_array, available_edid_len);
         }
     }
     else {
