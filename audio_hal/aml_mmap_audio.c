@@ -363,7 +363,7 @@ int outMmapInit(struct aml_stream_out *out)
         ALOGE("[%s:%d] ion_query_heap_cnt fail! no ion heaps for alloc!!! ret:%#x", __func__, __LINE__, ret);
         return -ENOMEM;
     }
-    struct ion_heap_data * const heaps = (struct ion_heap_data *) malloc (num_heaps * sizeof(struct ion_heap_data));
+    struct ion_heap_data * const heaps = (struct ion_heap_data *) aml_audio_malloc (num_heaps * sizeof(struct ion_heap_data));
     if (num_heaps <= 0 || heaps == NULL) {
         ALOGE("[%s:%d] heaps is NULL or no heaps, num_heaps:%d", __func__, __LINE__, num_heaps);
         return -ENOMEM;
@@ -386,7 +386,7 @@ int outMmapInit(struct aml_stream_out *out)
             break;
         }
     }
-    free(heaps);
+    aml_audio_free(heaps);
     if (heap_mask == 0) {
         ALOGE("[%s:%d] don't find match heap!!!", __func__, __LINE__);
         return -ENOMEM;

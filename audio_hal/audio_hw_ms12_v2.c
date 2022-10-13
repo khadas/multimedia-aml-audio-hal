@@ -47,6 +47,7 @@
 #include "aml_audio_spdifdec.h"
 #include "aml_audio_matparser.h"
 #include "aml_audio_spdifout.h"
+#include "aml_malloc_debug.h"
 
 
 #define DOLBY_DRC_LINE_MODE 0
@@ -750,7 +751,7 @@ int get_the_dolby_ms12_prepared(
     /*************************************/
     if (continous_mode(adev)) {
         // TODO: zz: Might have memory leak, not clear route to release this pointer
-        out = (struct aml_stream_out *)calloc(1, sizeof(struct aml_stream_out));
+        out = (struct aml_stream_out *)aml_audio_calloc(1, sizeof(struct aml_stream_out));
         if (!out) {
             ALOGE("%s malloc stream failed", __func__);
             goto Err;
@@ -761,14 +762,14 @@ int get_the_dolby_ms12_prepared(
             out->is_tv_platform  = 1;
             out->config.channels = 8;
             out->config.format = PCM_FORMAT_S16_LE;
-            out->tmp_buffer_8ch = malloc(out->config.period_size * 4 * 8);
+            out->tmp_buffer_8ch = aml_audio_malloc(out->config.period_size * 4 * 8);
             if (out->tmp_buffer_8ch == NULL) {
                 ALOGE("%s cannot malloc memory for out->tmp_buffer_8ch", __func__);
                 goto Err_tmp_buf_8ch;
 
             }
             out->tmp_buffer_8ch_size = out->config.period_size * 4 * 8;
-            out->audioeffect_tmp_buffer = malloc(out->config.period_size * 6);
+            out->audioeffect_tmp_buffer = aml_audio_malloc(out->config.period_size * 6);
             if (out->audioeffect_tmp_buffer == NULL) {
                 ALOGE("%s cannot malloc memory for audioeffect_tmp_buffer", __func__);
                 goto Err_audioeffect_tmp_buf;
@@ -898,7 +899,7 @@ int get_the_dolby_ms12_prepared(
     aml_spdif_decoder_open(&ms12->spdif_dec_handle);
     aml_ms12_bypass_open(&ms12->ms12_bypass_handle);
     ring_buffer_init(&ms12->spdif_ring_buffer, ms12->dolby_ms12_out_max_size);
-    ms12->lpcm_temp_buffer = (unsigned char*)malloc(ms12->dolby_ms12_out_max_size);
+    ms12->lpcm_temp_buffer = (unsigned char*)aml_audio_malloc(ms12->dolby_ms12_out_max_size);
     if (!ms12->lpcm_temp_buffer) {
         ALOGE("%s malloc lpcm_temp_buffer failed", __func__);
         if (continous_mode(adev))
@@ -921,13 +922,13 @@ Err_dolby_ms12_thread:
             ms12->dolby_ms12_thread_exit = true;
             ms12->dolby_ms12_threadID = 0;
         }
-        free(out->audioeffect_tmp_buffer);
+        aml_audio_free(out->audioeffect_tmp_buffer);
     }
 
 Err_audioeffect_tmp_buf:
-    free(out->tmp_buffer_8ch);
+    aml_audio_free(out->tmp_buffer_8ch);
 Err_tmp_buf_8ch:
-    free(out);
+    aml_audio_free(out);
 Err:
     if (ms12->iec61937_ddp_buf) {
         aml_audio_free(ms12->iec61937_ddp_buf);
@@ -1579,7 +1580,7 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12, bool set_non_continuous
     ms12->spdif_dec_handle = NULL;
     ring_buffer_release(&ms12->spdif_ring_buffer);
     if (ms12->lpcm_temp_buffer) {
-        free(ms12->lpcm_temp_buffer);
+        aml_audio_free(ms12->lpcm_temp_buffer);
         ms12->lpcm_temp_buffer = NULL;
     }
     aml_ms12_bypass_close(ms12->ms12_bypass_handle);

@@ -536,7 +536,7 @@ int get_the_dolby_ms12_prepared(
     aml_ms12_bypass_open(&ms12->ms12_bypass_handle);
     aml_spdif_decoder_open(&ms12->spdif_dec_handle);
     ring_buffer_init(&ms12->spdif_ring_buffer, ms12->dolby_ms12_out_max_size);
-    ms12->lpcm_temp_buffer = (unsigned char*)malloc(ms12->dolby_ms12_out_max_size);
+    ms12->lpcm_temp_buffer = (unsigned char*)aml_audio_malloc(ms12->dolby_ms12_out_max_size);
     if (!ms12->lpcm_temp_buffer) {
         ALOGE("%s malloc lpcm_temp_buffer failed", __func__);
         if (continous_mode(adev))
@@ -1202,7 +1202,7 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12, bool set_non_continuous
     ms12->spdif_dec_handle = NULL;
     ring_buffer_release(&ms12->spdif_ring_buffer);
     if (ms12->lpcm_temp_buffer) {
-        free(ms12->lpcm_temp_buffer);
+        aml_audio_free(ms12->lpcm_temp_buffer);
         ms12->lpcm_temp_buffer = NULL;
     }
     aml_ms12_bypass_close(ms12->ms12_bypass_handle);

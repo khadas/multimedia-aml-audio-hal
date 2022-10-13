@@ -27,6 +27,7 @@
 #include <log/log.h>
 
 #include <tinyalsa/asoundlib.h>
+#include "aml_malloc_debug.h"
 
 #define BUF_SIZE 1024
 //#define MIXER_XML_PATH "/system/etc/mixer_paths.xml"
@@ -161,19 +162,19 @@ static void path_free(struct audio_route *ar)
     unsigned int i;
 
     for (i = 0; i < ar->num_mixer_paths; i++) {
-        free(ar->mixer_path[i].name);
+        aml_audio_free(ar->mixer_path[i].name);
         if (ar->mixer_path[i].setting) {
             size_t j;
             for (j = 0; j < ar->mixer_path[i].length; j++) {
-                free(ar->mixer_path[i].setting[j].value.ptr);
+                aml_audio_free(ar->mixer_path[i].setting[j].value.ptr);
             }
-            free(ar->mixer_path[i].setting);
+            aml_audio_free(ar->mixer_path[i].setting);
             ar->mixer_path[i].size = 0;
             ar->mixer_path[i].length = 0;
             ar->mixer_path[i].setting = NULL;
         }
     }
-    free(ar->mixer_path);
+    aml_audio_free(ar->mixer_path);
     ar->mixer_path = NULL;
     ar->mixer_path_size = 0;
     ar->num_mixer_paths = 0;
@@ -207,7 +208,7 @@ static struct mixer_path *path_create(struct audio_route *ar, const char *name)
         else
             ar->mixer_path_size *= 2;
 
-        new_mixer_path = realloc(ar->mixer_path, ar->mixer_path_size *
+        new_mixer_path = aml_audio_realloc(ar->mixer_path, ar->mixer_path_size *
                                  sizeof(struct mixer_path));
         if (new_mixer_path == NULL) {
             ALOGE("Unable to allocate more paths");
@@ -251,7 +252,7 @@ static int alloc_path_setting(struct mixer_path *path)
         else
             path->size *= 2;
 
-        new_path_setting = realloc(path->setting,
+        new_path_setting = aml_audio_realloc(path->setting,
                                    path->size * sizeof(struct mixer_setting));
         if (new_path_setting == NULL) {
             ALOGE("Unable to allocate more path settings");
@@ -295,7 +296,7 @@ static int path_add_setting(struct audio_route *ar, struct mixer_path *path,
 
     size_t value_sz = sizeof_ctl_type(setting->type);
 
-    path->setting[path_index].value.ptr = calloc(setting->num_values, value_sz);
+    path->setting[path_index].value.ptr = aml_audio_calloc(setting->num_values, value_sz);
     /* copy all values */
     memcpy(path->setting[path_index].value.ptr, setting->value.ptr,
            setting->num_values * value_sz);
@@ -339,7 +340,7 @@ static int path_add_value(struct audio_route *ar, struct mixer_path *path,
         path->setting[path_index].type = type;
 
         size_t value_sz = sizeof_ctl_type(type);
-        path->setting[path_index].value.ptr = calloc(num_values, value_sz);
+        path->setting[path_index].value.ptr = aml_audio_calloc(num_values, value_sz);
         if (path->setting[path_index].type == MIXER_CTL_TYPE_BYTE)
             path->setting[path_index].value.bytes[0] = mixer_value->value;
         else if (path->setting[path_index].type == MIXER_CTL_TYPE_ENUM)
@@ -597,7 +598,7 @@ static int alloc_mixer_state(struct audio_route *ar)
     enum mixer_ctl_type type;
 
     ar->num_mixer_ctls = mixer_get_num_ctls(ar->mixer);
-    ar->mixer_state = calloc(ar->num_mixer_ctls, sizeof(struct mixer_state));
+    ar->mixer_state = aml_audio_calloc(ar->num_mixer_ctls, sizeof(struct mixer_state));
     if (!ar->mixer_state)
         return -1;
 
@@ -621,9 +622,9 @@ static int alloc_mixer_state(struct audio_route *ar)
         }
 
         size_t value_sz = sizeof_ctl_type(type);
-        ar->mixer_state[i].old_value.ptr = calloc(num_values, value_sz);
-        ar->mixer_state[i].new_value.ptr = calloc(num_values, value_sz);
-        ar->mixer_state[i].reset_value.ptr = calloc(num_values, value_sz);
+        ar->mixer_state[i].old_value.ptr = aml_audio_calloc(num_values, value_sz);
+        ar->mixer_state[i].new_value.ptr = aml_audio_calloc(num_values, value_sz);
+        ar->mixer_state[i].reset_value.ptr = aml_audio_calloc(num_values, value_sz);
 
         if (type == MIXER_CTL_TYPE_ENUM)
             ar->mixer_state[i].old_value.enumerated[0] = mixer_ctl_get_value(ctl, 0);
@@ -647,12 +648,12 @@ static void free_mixer_state(struct audio_route *ar)
         if (!is_supported_ctl_type(type))
             continue;
 
-        free(ar->mixer_state[i].old_value.ptr);
-        free(ar->mixer_state[i].new_value.ptr);
-        free(ar->mixer_state[i].reset_value.ptr);
+        aml_audio_free(ar->mixer_state[i].old_value.ptr);
+        aml_audio_free(ar->mixer_state[i].new_value.ptr);
+        aml_audio_free(ar->mixer_state[i].reset_value.ptr);
     }
 
-    free(ar->mixer_state);
+    aml_audio_free(ar->mixer_state);
     ar->mixer_state = NULL;
 }
 
@@ -919,7 +920,7 @@ struct audio_route *audio_route_init(unsigned int card, const char *xml_path)
     void *buf;
     struct audio_route *ar;
 
-    ar = calloc(1, sizeof(struct audio_route));
+    ar = aml_audio_calloc(1, sizeof(struct audio_route));
     if (!ar)
         goto err_calloc;
 
@@ -997,7 +998,7 @@ err_fopen:
 err_mixer_state:
     mixer_close(ar->mixer);
 err_mixer_open:
-    free(ar);
+    aml_audio_free(ar);
     ar = NULL;
 err_calloc:
     return NULL;
@@ -1008,6 +1009,6 @@ void audio_route_free(struct audio_route *ar)
     free_mixer_state(ar);
     mixer_close(ar->mixer);
     path_free(ar);
-    free(ar);
+    aml_audio_free(ar);
 }
 #endif

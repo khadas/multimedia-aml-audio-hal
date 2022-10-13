@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include "aml_config_parser.h"
 #include <cutils/log.h>
+#include "aml_malloc_debug.h"
 
 
 #define AML_CONFIG_FILE_PATH "/etc/halaudio/aml_audio_config.json"
@@ -59,7 +60,7 @@ static cJSON *aml_createJsonRoot(const char *filename)
 
     fseek(fp, 0, SEEK_SET);
 
-    input = (char *)malloc(len + 10);
+    input = (char *)aml_audio_malloc(len + 10);
     if (input == NULL) {
         ALOGD("Cannot malloc the address size = %d\n", len);
         fclose(fp);
@@ -70,7 +71,7 @@ static cJSON *aml_createJsonRoot(const char *filename)
     temp = cJSON_Parse(input);
 
     fclose(fp);
-    free(input);
+    aml_audio_free(input);
 
     return temp;
 }

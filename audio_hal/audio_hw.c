@@ -1940,7 +1940,7 @@ static int insert_output_bytes_direct (struct aml_stream_out *out, size_t size)
     int ret = 0;
     size_t insert_size = size;
     size_t once_write_size = 0;
-    char *insert_buf = (char*) malloc (8192);
+    char *insert_buf = (char*) aml_audio_malloc (8192);
 
     if (insert_buf == NULL) {
         ALOGE ("malloc size failed \n");
@@ -1965,7 +1965,7 @@ static int insert_output_bytes_direct (struct aml_stream_out *out, size_t size)
     }
 
 exit:
-    free (insert_buf);
+    aml_audio_free (insert_buf);
     return ret;
 }
 
@@ -6351,7 +6351,7 @@ ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream,
             }
             /* nchannels 32 bit --> 8 channel 32 bit mapping */
             if (aml_out->tmp_buffer_8ch_size < out_frames * 4*adev->default_alsa_ch) {
-                aml_out->tmp_buffer_8ch = realloc(aml_out->tmp_buffer_8ch, out_frames * 4*adev->default_alsa_ch);
+                aml_out->tmp_buffer_8ch = aml_audio_realloc(aml_out->tmp_buffer_8ch, out_frames * 4*adev->default_alsa_ch);
                 if (!aml_out->tmp_buffer_8ch) {
                     ALOGE("%s: realloc tmp_buffer_8ch buf failed size = %zu format = %#x",
                         __func__, 8 * bytes, output_format);
@@ -6505,7 +6505,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     return -ENOMEM;
                 }
                 // 16bit -> 32bit, need realloc
-                adev->spdif_output_buf = realloc(adev->spdif_output_buf, bytes * 2);
+                adev->spdif_output_buf = aml_audio_realloc(adev->spdif_output_buf, bytes * 2);
                 if (!adev->spdif_output_buf) {
                     ALOGE ("realloc spdif buf failed size %zu format = %#x", bytes, output_format);
                     return -ENOMEM;
@@ -10031,7 +10031,7 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
 
 #ifdef BUILD_LINUX
     size = lseek(fd, 0, SEEK_CUR);
-    string = calloc(size + 1, 1);
+    string = aml_audio_calloc(size + 1, 1);
     if (string) {
         lseek(fd, 0, SEEK_SET);
         read(fd, string, size);
@@ -10093,7 +10093,7 @@ static int adev_close(hw_device_t *device)
         aml_audio_free(adev->spk_output_buf);
     }
     if (adev->spdif_output_buf) {
-        free(adev->spdif_output_buf);
+        aml_audio_free(adev->spdif_output_buf);
     }
     #ifdef USE_EQ_DRC
     if (adev->aml_ng_handle) {

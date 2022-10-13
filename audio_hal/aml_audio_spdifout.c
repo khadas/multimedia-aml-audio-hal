@@ -354,7 +354,7 @@ int aml_audio_spdifout_insert_pause(void *phandle, int frames)
     device_id = spdifout_phandle->device_id;
     alsa_handle = aml_dev->alsa_handle[device_id];
 
-    tmp = calloc(1, frames * 4);
+    tmp = aml_audio_calloc(1, frames * 4);
     if (tmp) {
         unsigned short *p = (unsigned short *)tmp;
         p[0] = 0xf872;    /* Pa */
@@ -363,7 +363,7 @@ int aml_audio_spdifout_insert_pause(void *phandle, int frames)
         p[3] = 4;         /* Payload of 32 bits */
                           /* with unspecified gap length */
         ret = aml_alsa_output_write_new(alsa_handle, tmp, frames * 4);
-        free(tmp);
+        aml_audio_free(tmp);
     }
 
     return ret;
