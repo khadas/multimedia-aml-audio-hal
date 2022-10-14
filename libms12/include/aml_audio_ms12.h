@@ -142,6 +142,20 @@ struct dolby_ms12_desc {
     struct aml_stream_out *ms12_main_stream_out;
     struct aml_stream_out *ms12_app_stream_out; /*Reserve for extension*/
     float  main_volume;
+    uint64_t first_in_frame_pts;
+    uint64_t last_synced_frame_pts;
+    uint64_t out_synced_frame_count;
+    bool debug_synced_frame_pts_flag;
+    bool     is_muted;
+    bool     do_easing;
+    uint64_t dtv_decoder_offset_base;   /*save the dtv input offset, which is realted with PTS*/
+    bool tv_tuning_flag;
+    int ms12_scheduler_state;
+    int last_scheduler_state;
+    int ms12_resume_state;
+    bool need_ms12_resume;
+    uint32_t ms12_timer_id;
+    bool sys_data_write2alsa_status;
 };
 
 /*

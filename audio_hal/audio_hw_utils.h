@@ -77,6 +77,10 @@
         AM_LOGE("%s is null pointer " fmt, #pointer, ##__VA_ARGS__);                            \
         return ret;                                                                             \
     }
+
+#define AVSYNC_NONMS12_AUDIO_HAL_EARC_LATENCY_DDP_PROPERTY "vendor.media.audio.hal.nonms12.earc_latency.ddp"
+#define AVSYNC_NONMS12_AUDIO_HAL_EARC_LATENCY_DDP (-40)
+
 int64_t aml_gettime(void);
 int get_sysfs_uint(const char *path, uint32_t *value);
 int sysfs_set_sysfs_str(const char *path, const char *val);
@@ -112,9 +116,9 @@ void ts_wait_time_us(struct timespec *ts, uint32_t time_us);
 int cpy_16bit_data_with_gain(int16_t *dst, int16_t *src, int size_in_bytes, float vol);
 uint64_t get_systime_ns(void);
 int aml_audio_get_hdmi_latency_offset(audio_format_t source_format,
-	                                  audio_format_t sink_format,int ms12_enable);
+                                      audio_format_t sink_format,int ms12_enable);
 int aml_audio_get_latency_offset(enum OUT_PORT port,audio_format_t source_format,
-	                                  audio_format_t sink_format,int ms12_enable);
+                                 audio_format_t sink_format,int ms12_enable,int is_eARC);
 uint32_t tspec_diff_to_us(struct timespec tval_old,
         struct timespec tval_new);
 int aml_audio_get_dolby_drc_mode(int *drc_mode, int *drc_cut, int *drc_boost);

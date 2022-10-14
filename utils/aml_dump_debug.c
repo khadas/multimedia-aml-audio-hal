@@ -27,6 +27,8 @@
 #include <cutils/properties.h>
 
 #include <aml_dump_debug.h>
+#include <aml_android_utils.h>
+#include "aml_malloc_debug.h"
 
 #undef  LOG_TAG
 #define LOG_TAG "aml_dump_debug"
@@ -98,3 +100,29 @@ void DoDumpData(const void *data_buf, int size, int aud_src_type) {
     }
     return;
 }
+typedef struct aml_dump_debug {
+    pthread_t    threadid;
+    bool         bexit;
+    dump_debug_item_t  *items;
+
+} aml_dump_debug_t;
+
+static aml_dump_debug_t * g_debug_handle = NULL;
+/*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ *this table sequence must match with enum AML_DUMP_DEBUG_INFO
+ *!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ */
+dump_debug_item_t aml_debug_items[AML_DEBUG_DUMP_MAX] = {
+    {AML_DEBUG_AUDIOHAL_DEBUG_PROPERTY,                 0},    //AML_DEBUG_AUDIOHAL_DEBUG
+    {AML_DEBUG_AUDIOHAL_LEVEL_DETECT_PROPERTY,          0},    //AML_DEBUG_AUDIOHAL_LEVEL_DETECT
+    {AML_DEBUG_AUDIOHAL_HW_SYNC_PROPERTY,               0},    //AML_DEBUG_AUDIOHAL_HW_SYNC
+    {AML_DEBUG_AUDIOHAL_ALSA_PROPERTY,                  0},    //AML_DEBUG_AUDIOHAL_ALSA
+    {AML_DUMP_AUDIOHAL_MS12_PROPERTY,                   0},    //AML_DUMP_AUDIOHAL_MS12
+    {AML_DUMP_AUDIOHAL_ALSA_PROPERTY,                   0},    //AML_DUMP_AUDIOHAL_ALSA
+    {AML_DEBUG_AUDIOHAL_SYNCPTS_PROPERTY,               0},   //AML_DEBUG_AUDIOHAL_SYNCPTS
+    {AML_DUMP_AUDIOHAL_TV_PROPERTY,                     0},    //AML_DUMP_AUDIOHAL_TV_PATH
+    {AML_DEBUG_AUDIOHAL_MATENC_PROPERTY,                0},    //AML_DEBUG_AUDIOHAL_MATENC
+    {AML_DEBUG_AUDIOHAL_TRACE_PROPERTY,                 0},    //AML_DEBUG_AUDIOHAL_TRACE
+    {AML_DEBUG_AUDIOINFO_REPORT_PROPERTY,               0},    //AML_DEBUG_AUDIOINFO_REPORT
+    {AML_DUMP_AUDIO_STREAM_PROPERTY,                    0},    //AML_DEBUG_AUDIOINFO_REPORT
+};

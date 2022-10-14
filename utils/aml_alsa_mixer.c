@@ -80,9 +80,26 @@ static struct aml_mixer_list gAmlMixerList[] = {
     {AML_MIXER_ID_CHANGE_I2S_PLL,       "TDM MCLK Fine Setting"},
     {AML_MIXER_ID_SPDIF_IN_SAMPLERATE,  "SPDIFIN audio samplerate"},
     {AML_MIXER_ID_HW_RESAMPLE_SOURCE,   "Hw resample module"},
+    {AML_MIXER_ID_EARCRX_AUDIO_CODING_TYPE,   "eARC_RX Audio Coding Type"},
     {AML_MIXER_ID_AUDIO_HAL_FORMAT,     "Audio HAL Format"},
     {AML_MIXER_ID_HDMIIN_AUDIO_EDID,    "HDMIIN AUDIO EDID"},
+    {AML_MIXER_ID_EARC_TX_ATTENDED_TYPE, "eARC_TX attended type"},
+    {AML_MIXER_ID_EARC_TX_AUDIO_TYPE,   "eARC_TX Audio Coding Type"},
+    {AML_MIXER_ID_EARC_TX_EARC_MODE,    "eARC_TX eARC Mode"},
+    {AML_MIXER_ID_ARC_EARC_TX_ENABLE, "ARC eARC TX enable"},
+    {AML_MIXER_ID_EARCTX_CDS,           "eARC_TX CDS"},
+    {AML_MIXER_ID_EARC_TX_LATENCY,      "eARC_TX Latency"},
+    {AML_MIXER_ID_EARC_TX_CA,           "eARC_TX Channel Allocation"},
+    {AML_MIXER_ID_AML_CHIP_ID,          "AML chip id"},
+    {AML_MIXER_ID_TVIN_VIDEO_DELAY,     "TVIN VIDEO DELAY"},
+    {AML_MIXER_ID_TVIN_VIDEO_MIN_DELAY, "TVIN VIDEO MIN DELAY"},
+    {AML_MIXER_ID_TVIN_VIDEO_MAX_DELAY, "TVIN VIDEO MAX DELAY"},
+    {AML_MIXER_ID_SPDIF_B_OUT_CHANNEL_STATUS, "spdif_b out channel status"},
+    {AML_MIXER_ID_MEDIA_VIDEO_DELAY,    "Media Video Delay"},
     {AML_MIXER_ID_HDMIIN_AUDIO_MODE,    "HDMIIN Audio output mode"},
+    {AML_MIXER_ID_VAD_ENABLE,           "VAD enable"},
+    {AML_MIXER_ID_VAD_SOURCE_SEL,       "VAD Source sel"},
+    {AML_MIXER_ID_VAD_SWITCH,           "VAD Switch"},
 };
 
 static char *get_mixer_name_by_id(int mixer_id)
@@ -183,7 +200,7 @@ int aml_mixer_ctrl_get_int(struct aml_mixer_handle *mixer_handle, int mixer_id)
     pthread_mutex_lock(&mixer_handle->lock);
     pCtrl = get_mixer_ctl_handle(pMixer, mixer_id);
     if (pCtrl == NULL) {
-        ALOGE("[%s:%d] Failed to open mixer %s\n", __FUNCTION__, __LINE__,
+        ALOGV("[%s:%d] Failed to open mixer %s\n", __FUNCTION__, __LINE__,
               get_mixer_name_by_id(mixer_id));
         pthread_mutex_unlock(&mixer_handle->lock);
         return -1;

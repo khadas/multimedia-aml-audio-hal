@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 const char libVersion_audio_hal[]=
-"MM-module-name:aml_audio_hal,version:1.0.1-r675-gefe12f53";
+"MM-module-name:aml_audio_hal,version:1.1.0-r675-gefe12f53";
 
 #ifdef  __cplusplus
 }

@@ -41,7 +41,14 @@ typedef struct spdifout_handle {
     bool spdif_enc_init;
     void *spdif_enc_handle;
     bool b_mute;
+    int  out_data_ch;        // it is used for alsa channel
+    int  in_data_ch;         //save the input data channel
     audio_channel_mask_t channel_mask;
+    bool spdif_mute;
+    uint32_t sample_rate;
+    bool need_extend_channel;
+    size_t buf_size;
+    void * temp_buf;
 } spdifout_handle_t;
 
 
@@ -77,21 +84,44 @@ static int select_digital_device(struct spdifout_handle *phandle) {
         }
     } else {
         if (aml_dev->dual_spdif_support) {
-            /*TV spdif_a support arc/spdif, spdif_b only support spdif
-             *ddp always used spdif_a
-             */
-            if (phandle->audio_format == AUDIO_FORMAT_E_AC3) {
-                device_id = DIGITAL_DEVICE;
-            } else if (phandle->audio_format == AUDIO_FORMAT_AC3) {
-                if (aml_dev->optical_format == AUDIO_FORMAT_E_AC3) {
-                    /*it has dual output, then dd use spdif_b for spdif only*/
-                    device_id = DIGITAL_DEVICE2;
+            int device_index = alsa_device_update_pcm_index(PORT_EARC, PLAYBACK);
+            /*we have arc/earc port*/
+            if (device_index != -1) {
+                /*TV spdif_a support arc/spdif, spdif_b only support spdif
+                 *ddp always used spdif_a
+                 */
+                if (phandle->audio_format == AUDIO_FORMAT_E_AC3 ||
+                    phandle->audio_format == AUDIO_FORMAT_MAT ||
+                    (audio_is_linear_pcm(phandle->audio_format) && (phandle->in_data_ch == 8 || phandle->in_data_ch == 6))) {
+                    device_id = EARC_DEVICE;
+                } else if (phandle->audio_format == AUDIO_FORMAT_AC3) {
+                    if (aml_dev->optical_format == AUDIO_FORMAT_E_AC3) {
+                        /*it has dual output, then dd use spdif_b for spdif only*/
+                        device_id = DIGITAL_DEVICE2;
+                    } else {
+                        /*it doesn't have dual output, then dd use spdif_a for arc/spdif*/
+                        device_id = DIGITAL_DEVICE;
+                    }
                 } else {
-                    /*it doesn't have dual output, then dd use spdif_a for arc/spdif*/
                     device_id = DIGITAL_DEVICE;
                 }
             } else {
-                device_id = DIGITAL_DEVICE;
+                /*TV spdif_a support arc/spdif, spdif_b only support spdif
+                 *ddp always used spdif_a
+                 */
+                if (phandle->audio_format == AUDIO_FORMAT_E_AC3) {
+                    device_id = DIGITAL_DEVICE;
+                } else if (phandle->audio_format == AUDIO_FORMAT_AC3) {
+                    if (aml_dev->optical_format == AUDIO_FORMAT_E_AC3) {
+                        /*it has dual output, then dd use spdif_b for spdif only*/
+                        device_id = DIGITAL_DEVICE2;
+                    } else {
+                        /*it doesn't have dual output, then dd use spdif_a for arc/spdif*/
+                        device_id = DIGITAL_DEVICE;
+                    }
+                } else {
+                    device_id = DIGITAL_DEVICE;
+                }
             }
 
         } else {
@@ -101,6 +131,40 @@ static int select_digital_device(struct spdifout_handle *phandle) {
     }
 
     return device_id;
+}
+
+static eMixerEARC_Channel_Allocation convert_chmask_to_ca(int channel_mask) {
+    eMixerEARC_Channel_Allocation earc_ca = AML_EARC_CHANNEL_REFER_TO_CHANNEL_INDEX;
+    switch (channel_mask) {
+        case AUDIO_CHANNEL_OUT_STEREO: {
+            earc_ca = AML_EARC_CHANNEL_FL_FR;
+            break;
+        }
+        case AUDIO_CHANNEL_OUT_2POINT1: {
+            earc_ca = AML_EARC_CHANNEL_FL_FR_LFE1;
+            break;
+        }
+        case AUDIO_CHANNEL_OUT_TRI: {
+            earc_ca = AML_EARC_CHANNEL_FL_FR_FC;
+            break;
+        }
+        case AUDIO_CHANNEL_OUT_3POINT1: {
+            earc_ca = AML_EARC_CHANNEL_FL_FR_LFE1_FC;
+            break;
+        }
+        case AUDIO_CHANNEL_OUT_5POINT1: {
+            earc_ca = AML_EARC_CHANNEL_FL_FR_LFE1_FC_LS_RS;
+            break;
+        }
+        case AUDIO_CHANNEL_OUT_7POINT1: {
+            earc_ca = AML_EARC_CHANNEL_FL_FR_LFE1_FC_LS_RS_RLC_RRC;
+            break;
+        }
+        default:
+            ALOGE("%s unsupport channel mask = 0x%x", __func__, channel_mask);
+            break;
+    }
+    return earc_ca;
 }
 
 int aml_audio_get_spdif_port(eMixerSpdif_Format spdif_format)
@@ -232,6 +296,7 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
     int device_id = 0;
     int aml_spdif_format = AML_STEREO_PCM;
     audio_format_t audio_format = AUDIO_FORMAT_PCM_16_BIT;
+    int aml_arc_format = AML_AUDIO_CODING_TYPE_STEREO_LPCM;
 
     if (spdif_config == NULL) {
         ALOGE("%s spdif_config is NULL", __func__);
@@ -282,6 +347,20 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
         memset(&device_config, 0, sizeof(aml_device_config_t));
         /*config stream info*/
         stream_config.config.channel_mask = spdif_config->channel_mask;
+        /*earc only supports 8 channel multi channel, if the channel is not 2 and 8, we need convert it to 8 channel*/
+        if (EARC_DEVICE == device_id) {
+            if (spdif_config->data_ch == 2 || spdif_config->data_ch == 8) {
+                stream_config.config.channel_mask = audio_channel_out_mask_from_count(spdif_config->data_ch);
+            } else if (spdif_config->data_ch > 2 && spdif_config->data_ch < 8) {
+                stream_config.config.channel_mask = audio_channel_out_mask_from_count(8);
+                phandle->out_data_ch = 8;
+                phandle->need_extend_channel = true;
+            } else {
+                ALOGE("%s EARC not support channel %d", __func__, spdif_config->data_ch);
+                goto error;
+            }
+
+        }
         stream_config.config.sample_rate  = spdif_config->rate;
         stream_config.config.format       = AUDIO_FORMAT_IEC61937;
         stream_config.config.offload_info.format = audio_format;
@@ -290,6 +369,13 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
         phandle->spdif_port       = device_config.device_port;
 
         aml_spdif_format = halformat_convert_to_spdif(audio_format, stream_config.config.channel_mask);
+        aml_arc_format   = halformat_convert_to_arcformat(audio_format, stream_config.config.channel_mask);
+
+        /*for dts cd , we can't set the format as dts, we should set it as pcm*/
+        if (aml_spdif_format == AML_DTS && spdif_config->is_dtscd) {
+            aml_spdif_format = AML_STEREO_PCM;
+        }
+        ALOGI("%s channel =0x%x spdif format =0x%x spdif_port=0x%x", __func__, spdif_config->channel_mask, aml_spdif_format, phandle->spdif_port);
         /*set spdif format*/
         if (phandle->spdif_port == PORT_SPDIF || phandle->spdif_port == PORT_I2S2HDMI) {
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_FORMAT, aml_spdif_format);
@@ -298,6 +384,19 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_B_FORMAT, aml_spdif_format);
             aml_audio_select_spdif_to_hdmi(AML_SPDIF_B_TO_HDMITX);
             ALOGI("%s set spdif_b format 0x%x", __func__, aml_spdif_format);
+        } else if (phandle->spdif_port == PORT_EARC) {
+
+            if (aml_arc_format == AML_AUDIO_CODING_TYPE_DTS && spdif_config->is_dtscd) {
+                aml_arc_format = AML_AUDIO_CODING_TYPE_STEREO_LPCM;
+            }
+            aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_EARC_TX_AUDIO_TYPE, aml_arc_format);
+            if (aml_arc_format == AML_AUDIO_CODING_TYPE_MULTICH_8CH_LPCM) {
+                eMixerEARC_Channel_Allocation earc_ca = convert_chmask_to_ca(spdif_config->channel_mask);
+                ALOGI("%s earc channel mask =0x%x earc_ca =0x%x", __func__, spdif_config->channel_mask, earc_ca);
+                aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_EARC_TX_CA, earc_ca);
+            }
+
+            ALOGI("%s set EARC/ARC format 0x%x", __func__, aml_arc_format);
         } else {
             ALOGI("%s not set spdif format", __func__);
         }
@@ -543,5 +642,27 @@ int aml_audio_spdifout_get_delay(void *phandle) {
         return -1;
     }
     return delay_ms;
+}
+
+int aml_audio_spdifout_config_earc_ca(void *phandle, int channel_mask) {
+    int ret = 0;
+    struct spdifout_handle *spdifout_phandle = (struct spdifout_handle *)phandle;
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *)adev_get_handle();
+    int device_id = -1;
+    void *alsa_handle = NULL;
+    if (phandle == NULL) {
+        ALOGE("[%s:%d] invalid param, phandle:%p", __func__, __LINE__, phandle);
+        return -1;
+    }
+    if ((spdifout_phandle->channel_mask != channel_mask)
+        && (spdifout_phandle->spdif_port == PORT_EARC)
+        && (spdifout_phandle->out_data_ch == 8)) {
+        eMixerEARC_Channel_Allocation earc_ca = convert_chmask_to_ca(channel_mask);
+        ALOGI("%s earc new channel mask =0x%x earc_ca =0x%x", __func__, channel_mask, earc_ca);
+        aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_EARC_TX_CA, earc_ca);
+        spdifout_phandle->channel_mask = channel_mask;
+    }
+
+    return ret;
 }
 

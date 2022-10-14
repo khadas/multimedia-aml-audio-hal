@@ -76,6 +76,14 @@ static audio_format_t get_sink_capability (struct aml_audio_device *adev)
         if (cap) {
             if ((strstr(cap, "AUDIO_FORMAT_MAT_2_0") != NULL) || (strstr(cap, "AUDIO_FORMAT_MAT_2_1") != NULL)) {
                 sink_capability = AUDIO_FORMAT_MAT;
+            }
+            /*
+             * Dolby MAT 1.0(TRUEHD inside) vs DDP+DD
+             * Dolby MS12 prefers to output DDP.
+             * But set sink as TrueHD, then TrueHD can encoded with MAT encoder in Passthrough mode.
+             */
+            else if (strstr(cap, "AUDIO_FORMAT_MAT_1_0") != NULL) {
+                sink_capability = AUDIO_FORMAT_DOLBY_TRUEHD;
             } else if (strstr(cap, "AUDIO_FORMAT_E_AC3") != NULL) {
                 sink_capability = AUDIO_FORMAT_E_AC3;
             } else if (strstr(cap, "AUDIO_FORMAT_AC3") != NULL) {
@@ -85,12 +93,23 @@ static audio_format_t get_sink_capability (struct aml_audio_device *adev)
             aml_audio_free(cap);
             cap = NULL;
         }
+        dd_is_support = hdmi_desc->dd_fmt.is_support;
+        ddp_is_support = hdmi_desc->ddp_fmt.is_support;
+        mat_is_support = hdmi_desc->mat_fmt.is_support;
     } else {
         if (mat_is_support) {
             sink_capability = AUDIO_FORMAT_MAT;
+            mat_is_support = true;
+            hdmi_desc->mat_fmt.is_support = true;
         } else if (ddp_is_support) {
             sink_capability = AUDIO_FORMAT_E_AC3;
         } else if (dd_is_support) {
+            sink_capability = AUDIO_FORMAT_AC3;
+        }
+        /* eARC TXs support formats at least support dd, for Test ID HFR5-1-27 */
+        if (sink_capability == AUDIO_FORMAT_PCM_16_BIT &&
+            aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE) == ATTEND_TYPE_EARC &&
+            adev->bHDMIARCon) {
             sink_capability = AUDIO_FORMAT_AC3;
         }
         ALOGI ("%s dd support %d ddp support %#x\n", __FUNCTION__, dd_is_support, ddp_is_support);
@@ -178,6 +197,39 @@ static void get_sink_pcm_capability(struct aml_audio_device *adev)
     }
 
     ALOGI("pcm_fmt support sample_rate_mask:0x%x", hdmi_desc->pcm_fmt.sample_rate_mask);
+}
+
+static unsigned int get_sink_format_max_channels(struct aml_audio_device *adev, audio_format_t sink_format) {
+    unsigned int max_channels = 2;
+    struct aml_arc_hdmi_desc *hdmi_desc = &adev->hdmi_descs;
+
+    switch (sink_format) {
+    case AUDIO_FORMAT_PCM_16_BIT:
+        max_channels = hdmi_desc->pcm_fmt.max_channels;
+        break;
+    case AUDIO_FORMAT_AC3:
+        max_channels = hdmi_desc->dd_fmt.max_channels;
+        break;
+    case AUDIO_FORMAT_E_AC3:
+        max_channels = hdmi_desc->ddp_fmt.max_channels;
+        break;
+    case AUDIO_FORMAT_DTS:
+        max_channels = hdmi_desc->dts_fmt.max_channels;
+        break;
+    case AUDIO_FORMAT_DTS_HD:
+        max_channels = hdmi_desc->dtshd_fmt.max_channels;
+        break;
+    case AUDIO_FORMAT_MAT:
+        max_channels = hdmi_desc->mat_fmt.max_channels;
+        break;
+    default:
+        max_channels = 2;
+        break;
+    }
+    if (max_channels == 0) {
+        max_channels = 2;
+    }
+    return max_channels;
 }
 
 bool is_sink_support_dolby_passthrough(audio_format_t sink_capability)
@@ -372,6 +424,7 @@ void get_sink_format(struct audio_stream_out *stream)
     }
     adev->sink_format = sink_audio_format;
     adev->optical_format = optical_audio_format;
+    adev->sink_max_channels = get_sink_format_max_channels(adev, adev->sink_format);
 
     /* set the dual output format flag */
     if (adev->sink_format != adev->optical_format) {
@@ -380,8 +433,8 @@ void get_sink_format(struct audio_stream_out *stream)
         aml_out->dual_output_flag = false;
     }
 
-    ALOGI("%s sink_format %#x optical_format %#x, dual_output %d\n",
-           __FUNCTION__, adev->sink_format, adev->optical_format, aml_out->dual_output_flag);
+    ALOGI("%s sink_format %#x max channel =%d optical_format %#x, dual_output %d\n",
+           __FUNCTION__, adev->sink_format, adev->sink_max_channels, adev->optical_format, aml_out->dual_output_flag);
     return ;
 }
 
@@ -482,7 +535,10 @@ bool is_spdif_in_stable_hw (struct audio_stream_in *stream)
     struct aml_audio_device *aml_dev = in->dev;
     int type = 0;
 
-    type = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIFIN_AUDIO_TYPE);
+    if (is_earc_descrpt())
+        type = eArcIn_audio_format_detection(&aml_dev->alsa_mixer);
+    else
+        type = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIFIN_AUDIO_TYPE);
     if (type != in->spdif_fmt_hw) {
         ALOGV ("%s(), in type changed from %d to %d", __func__, in->spdif_fmt_hw, type);
         in->spdif_fmt_hw = type;
@@ -1335,3 +1391,20 @@ enum hdmiin_audio_mode get_hdmiin_audio_mode(struct aml_mixer_handle *mixer_hand
     return (enum hdmiin_audio_mode)aml_mixer_ctrl_get_int(mixer_handle,
             AML_MIXER_ID_HDMIIN_AUDIO_MODE);
 }
+
+int aml_audio_earctx_get_type(struct aml_audio_device *adev)
+{
+    int attend_type = 0;
+
+    attend_type = aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE);
+    return attend_type;
+}
+
+int aml_audio_earc_get_latency(struct aml_audio_device *adev)
+{
+    int latency = 0;
+
+    latency = aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_LATENCY);
+    return latency;
+}
+

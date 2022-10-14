@@ -759,7 +759,8 @@ static int out_get_presentation_position_port(
         latency_ms = aml_audio_get_latency_offset(adev->active_outport,
                                                          out->hal_internal_format,
                                                          adev->sink_format,
-                                                         adev->ms12.dolby_ms12_enable);
+                                                         adev->ms12.dolby_ms12_enable,
+                                                         is_earc);
         frame_latency = latency_ms * (out->hal_rate / MSEC_PER_SEC);
         *frames += frame_latency ;
     }

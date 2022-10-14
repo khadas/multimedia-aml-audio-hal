@@ -26,6 +26,20 @@
 typedef enum  {
     MS12_CONFIG_MAIN_VOLUME,
     MS12_CONFIG_MAT_STREAM_PROFILE,
+    MS12_CONFIG_GAME_MODE,
+    MS12_CONFIG_ATMOS_DROP,    /*drop the first 2 frames for atmos case*/
+    MS12_CONFIG_MIXER_MAX_SIZE_ENABLED, /*enable the mixer max size to 1536, this can save cpu bandwidth*/
+    MS12_CONFIG_STEREO_OUT_LATENCY,
+    MS12_CONFIG_MULTICHANNEL_OUT_LATENCY,
+    MS12_CONFIG_DAP_SPEAKER_OUT_LATENCY,
+    MS12_CONFIG_DAP_HEADPHONE_OUT_LATENCY,
+    MS12_CONFIG_DDP_OUT_LATENCY,
+    MS12_CONFIG_DD_OUT_LATENCY,
+    MS12_CONFIG_MAT_OUT_LATENCY,
+    MS12_CONFIG_COMPRESSION_FORMAT,
+    MS12_CONFIG_SCHEDULER_STATE,
+    MS12_CONFIG_AC4DEC_GET_ACTIVE_PRESENTATION,
+    MS12_CONFIG_AC4DEC_CHECK_THE_PGI_IS_PRESENT,
 }ms12_config_type_t;
 
 typedef union ms12_config {
@@ -142,6 +156,8 @@ public:
     virtual int     DolbyMS12SetMainVolume(float volume);
     virtual int     DolbyMS12SetMATStreamProfile(int stream_profile);
     virtual int     DolbyMS12GetInputISDolbyAtmos();
+
+    virtual int     DolbyMS12SetSchedulerState(int sch_state);
 
     virtual unsigned long long DolbyMS12GetDecoderNFramesPcmOutput(void *ms12_pointer, int format, int is_main);
 

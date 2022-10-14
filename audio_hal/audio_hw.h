@@ -380,6 +380,11 @@ struct aml_audio_device {
     struct aml_arc_hdmi_desc hdmi_descs;
     /* Save the HDMI ARC actual capability info. */
     struct aml_arc_hdmi_desc hdmi_arc_capability_desc;
+    /* HDMIRX default EDID */
+    char default_EDID_array[EDID_ARRAY_MAX_LEN];
+    /*it is used to save the string of last set_arc_hdmi and to check whether ARC or EARC status has changed*/
+    char last_arc_hdmi_array[EDID_ARRAY_MAX_LEN];
+    bool need_to_update_arc_status;
     int arc_hdmi_updated;
     int a2dp_updated;
     bool need_reset_a2dp;
@@ -410,8 +415,10 @@ struct aml_audio_device {
     bool is_paused[ALSA_DEVICE_CNT];
     struct aml_hw_mixer hw_mixer;
     audio_format_t sink_format;
+    unsigned int sink_max_channels;
     audio_format_t optical_format;
     audio_format_t sink_capability;
+    audio_format_t last_sink_capability;
     volatile int32_t next_unique_ID;
     /* list head for audio_patch */
     struct listnode patch_list;
@@ -488,7 +495,7 @@ struct aml_audio_device {
     bool is_has_video;
     struct aml_stream_out *ms12_out;
     struct timespec mute_start_ts;
-	int spdif_fmt_hw;
+    int spdif_fmt_hw;
     bool ms12_ott_enable;
     bool ms12_main1_dolby_dummy;
     /*amlogic soft ware noise gate fot analog TV source*/
@@ -577,6 +584,7 @@ struct aml_audio_device {
     bool gap_ignore_pts;
     int gap_passthrough_state;
     uint32_t gap_passthrough_ms12_no_output_counter;
+    bool arc_connected_reconfig;  /*when arc connected, set it as to true*/
     float master_volume;
     bool master_mute;
     int syss_mixgain;

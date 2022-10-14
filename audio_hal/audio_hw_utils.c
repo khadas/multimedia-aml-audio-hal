@@ -709,6 +709,25 @@ int aml_audio_dump_audio_bitstreams(const char *path, const void *buf, size_t by
 
     return 0;
 }
+
+//Tune the eARC with non-tunnel for earc-ddp
+int aml_audio_get_earc_latency_offset(int aformat)
+{
+    char buf[PROPERTY_VALUE_MAX];
+    int ret = -1;
+    int latency_ms = 0;
+    char *prop_name = NULL;
+    (void)aformat;
+
+    prop_name = AVSYNC_NONMS12_AUDIO_HAL_EARC_LATENCY_DDP_PROPERTY;
+    latency_ms = AVSYNC_NONMS12_AUDIO_HAL_EARC_LATENCY_DDP;
+    ret = property_get(prop_name, buf, NULL);
+    if (ret > 0) {
+        latency_ms = atoi(buf);
+    }
+    return latency_ms;
+}
+
 int aml_audio_get_arc_latency_offset(int aformat)
 {
     char buf[PROPERTY_VALUE_MAX];
@@ -1124,13 +1143,17 @@ int aml_audio_get_speaker_latency_offset(int aformat ,int ms12_enable)
 
     return latency_ms;
 }
-int aml_audio_get_latency_offset( enum OUT_PORT port,audio_format_t source_format,
-                                      audio_format_t sink_format,int ms12_enable)
+int aml_audio_get_latency_offset( enum OUT_PORT port, audio_format_t source_format,
+                                      audio_format_t sink_format, int ms12_enable, int is_eARC)
 {
     int latency_ms = 0;
     switch (port)  {
         case OUTPORT_HDMI_ARC:
-            latency_ms = aml_audio_get_arc_latency_offset(source_format);
+        if (is_eARC) {
+                latency_ms = aml_audio_get_earc_latency_offset(source_format);
+            } else {
+                latency_ms = aml_audio_get_arc_latency_offset(source_format);
+            }
             break;
         case OUTPORT_HDMI:
             latency_ms = aml_audio_get_hdmi_latency_offset(source_format,sink_format,ms12_enable);
@@ -1462,11 +1485,42 @@ int halformat_convert_to_spdif(audio_format_t format, int ch_mask) {
         case AUDIO_FORMAT_DTS_HD:
             aml_spdif_format = AML_DTS_HD;
             break;
+        case AUDIO_FORMAT_DOLBY_TRUEHD:
         case AUDIO_FORMAT_MAT:
             aml_spdif_format = AML_TRUE_HD;
             break;
         default:
             aml_spdif_format = AML_STEREO_PCM;
+            break;
+    }
+    return aml_spdif_format;
+}
+int halformat_convert_to_arcformat(audio_format_t format, int ch_mask) {
+    int aml_spdif_format = AML_AUDIO_CODING_TYPE_STEREO_LPCM;
+    switch (format) {
+        case AUDIO_FORMAT_PCM_16_BIT:
+            aml_spdif_format = AML_AUDIO_CODING_TYPE_STEREO_LPCM;
+            if (audio_channel_count_from_out_mask(ch_mask) > 2) {
+                aml_spdif_format = AML_AUDIO_CODING_TYPE_MULTICH_8CH_LPCM;
+            }
+            break;
+        case AUDIO_FORMAT_AC3:
+            aml_spdif_format = AML_AUDIO_CODING_TYPE_AC3;
+            break;
+        case AUDIO_FORMAT_E_AC3:
+            aml_spdif_format = AML_AUDIO_CODING_TYPE_EAC3;
+            break;
+        case AUDIO_FORMAT_DTS:
+            aml_spdif_format = AML_AUDIO_CODING_TYPE_DTS;
+            break;
+        case AUDIO_FORMAT_DTS_HD:
+            aml_spdif_format = AML_AUDIO_CODING_TYPE_DTS_HD;
+            break;
+        case AUDIO_FORMAT_MAT:
+            aml_spdif_format = AML_AUDIO_CODING_TYPE_MLP;
+            break;
+        default:
+            aml_spdif_format = AML_AUDIO_CODING_TYPE_STEREO_LPCM;
             break;
     }
     return aml_spdif_format;
@@ -1486,6 +1540,8 @@ int alsa_device_get_port_index(alsa_device_t alsa_device)
         alsa_port = PORT_SPDIFB;
     } else if (alsa_device == TDM_DEVICE) {
         alsa_port = PORT_I2S2HDMI;
+    } else if (alsa_device == EARC_DEVICE) {
+        alsa_port = PORT_EARC;
     }
     return alsa_port;
 }
@@ -1957,6 +2013,35 @@ int aml_audio_trace_int(char *name, int value)
     }
     #endif
     return 0;
+}
+
+void check_audio_level(const char *name, const void *buffer, size_t bytes) {
+    int num_frame = bytes/4;
+    int i = 0;
+    short *p = (short *)buffer;
+    int silence = 0;
+    int silence_cnt = 0;
+    int max = 0;
+    int min = 0;
+    int max_pos = 0;
+
+    min = max = *p;
+    for (int i=0; i<num_frame;i++) {
+        if (max < *(p+2*i)) {
+            max = *(p+2*i);
+            max_pos = i;
+        }
+        if (min > *(p+2*i)) {
+            min = *(p+2*i);
+        }
+        if (*(p+2*i) == 0) {
+             silence_cnt ++;
+        }
+    }
+    if (max < 10) {
+        silence = 1;
+    }
+    ALOGI("%-24s data detect min=%8d max=%8d silence=%d silence_cnt=%5d frames=%5d", name, min, max, silence, silence_cnt, num_frame);
 }
 
 float aml_audio_get_focus_volume_ratio()

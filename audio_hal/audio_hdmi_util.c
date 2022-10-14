@@ -53,6 +53,7 @@
 #include "audio_hdmi_util.h"
 #include "aml_alsa_mixer.h"
 #include "aml_audio_stream.h"
+#include "dolby_lib_api.h"
 
 struct audio_format_code_list {
     AML_HDMI_FORMAT_E  id;
@@ -247,8 +248,37 @@ int set_arc_hdmi(struct audio_hw_device *dev, char *value, size_t len)
         return -EINVAL;
     }
 
+    if (adev->dolby_lib_type == eDolbyNull) {
+        return 0;
+    }
+    /*if the latest set_arc_hdmi string is same as the last, do not update the EDID*/
+    /*if not, we need to update the EDID and copy the string to last_arc_hdmi_array*/
+    if (strcmp(value,adev->last_arc_hdmi_array) == 0) {
+        adev->need_to_update_arc_status = false;
+        return 0;
+    } else {
+        adev->need_to_update_arc_status = true;
+        memcpy(adev->last_arc_hdmi_array, value, EDID_ARRAY_MAX_LEN);
+    }
     memset(hdmi_desc->SAD, 0, EDID_ARRAY_MAX_LEN);
 
+    /* if dts decoder doesn't support, don't update dts edid */
+    if (!adev->dts_decode_enable) {
+        int edid_length = hdmi_desc->EDID_length;
+        for (i = 0; i < edid_length/3; ) {
+            char AudioFormatCodes = (hdmi_desc->SAD[TLV_HEADER_SIZE + 3*i] >> 3) & 0xF;
+            /* mask EDID of dts and dtshd */
+            if (AudioFormatCodes == AML_HDMI_FORMAT_DTS || AudioFormatCodes == AML_HDMI_FORMAT_DTSHD) {
+                char *pr = &hdmi_desc->SAD[TLV_HEADER_SIZE + 3*i];
+                memmove(pr, (pr + 3), (edid_length - 3*i - 3));
+                edid_length -= 3;
+            } else {
+                i++;
+            }
+        }
+        hdmi_desc->EDID_length = edid_length;
+        ptr[1] = (unsigned int)hdmi_desc->EDID_length;
+    }
     pt = strtok_r (value, "[], ", &tmp);
     while (pt != NULL) {
 
@@ -267,10 +297,12 @@ int set_arc_hdmi(struct audio_hw_device *dev, char *value, size_t len)
     ptr[1] = (unsigned int)hdmi_desc->EDID_length;
 
     if (hdmi_desc->EDID_length == 0) {
-        ALOGI("ARC is disconnect!");
+        ALOGI("ARC is disconnect! Reset to default EDID.");
         adev->arc_hdmi_updated = 0;
         update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
     } else {
+        /* get default edid of hdmirx */
+        get_current_edid(adev, adev->default_EDID_array, EDID_ARRAY_MAX_LEN);
         ALOGI("ARC is connected, EDID_length = [%d], ARC HDMI AVR port = [%d]",
             hdmi_desc->EDID_length, hdmi_desc->avr_port);
         /*for (i = 0; i < hdmi_desc->EDID_length/3; i++) {
@@ -316,9 +348,16 @@ int update_edid_after_edited_audio_sad(struct aml_audio_device *adev, struct for
             fmt_desc->is_support, fmt_desc->max_channels, fmt_desc->sample_rate_mask, fmt_desc->max_bit_rate, fmt_desc->atmos_supported);
     }
 
+    /*
+     * if there is no ddp/ms12 lib, don't update edid.
+     */
+    if (adev->dolby_lib_type == eDolbyNull) {
+        return 0;
+    }
     if (BYPASS == adev->hdmi_format) {
         /* update the AVR's EDID */
         update_edid(adev, false, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
+        ALOGI("Bypass mode!, update AVR EDID.");
     }
     else if (AUTO == adev->hdmi_format) {
         if (!fmt_desc->is_support) {
@@ -340,7 +379,8 @@ int update_edid_after_edited_audio_sad(struct aml_audio_device *adev, struct for
             bool is_mat_pcm_supported = fmt_desc->atmos_supported;
             bool is_truehd_supported = fmt_desc->atmos_supported;
             int available_edid_len = 0;
-            get_current_edid(adev, EDID_cur_array, EDID_ARRAY_MAX_LEN);
+            memcpy(EDID_cur_array, adev->default_EDID_array, EDID_ARRAY_MAX_LEN);
+            //get_current_edid(adev, EDID_cur_array, EDID_ARRAY_MAX_LEN);
             /* edit the current EDID audio array to add DDP_ATMOS and MAT_pcm*/
             for (int n = 0; n < EDID_ARRAY_MAX_LEN / SAD_SIZE; n++) {
                 update_dolby_atmos_decoding_and_rendering_cap_for_ddp_sad(
@@ -422,6 +462,10 @@ int set_arc_format(struct audio_hw_device *dev, char *value, size_t len)
                 fmt_desc = &hdmi_desc->ddp_fmt;
             } else if (val == AML_HDMI_FORMAT_MAT) {
                 fmt_desc = &hdmi_desc->mat_fmt;
+                if (adev->need_to_update_arc_status) {
+                    adev->need_to_update_arc_status = false;
+                    adev->arc_hdmi_updated = 1;
+                }
             } else if (val == AML_HDMI_FORMAT_LPCM) {
                 fmt_desc = &hdmi_desc->pcm_fmt;
             } else if (val == AML_HDMI_FORMAT_DTS) {
@@ -456,6 +500,21 @@ int set_arc_format(struct audio_hw_device *dev, char *value, size_t len)
                 update_edid_after_edited_audio_sad(adev, fmt_desc);
                 /*
                  * if the ARC capbility format is changed, it should not support HBR(MAT/DTS-HD)
+                 * for the sequence is LPCM -> DD -> DTS -> DDP -> DTSHD,
+                 * which is defined in "private void setAudioFormat()" at file:DroidLogicEarcService.java
+                 * so, here we choose the DDP part to update the sink format.
+                 */
+                update_sink_format_after_hotplug(adev);
+            } else if (format == AML_HDMI_FORMAT_MAT && fmt_desc->is_support == true) {
+                /* byte 3, bit 0 is profile bit, if profile 1 MAT, don't output MAT PCM*/
+                fmt_desc->atmos_supported = (val & 0x1) > 0 ? true : false;
+                if (fmt_desc->atmos_supported == false)
+                    fmt_desc->is_support = false;
+
+                /* when arc is connected update AVR SAD to hdmi edid */
+                update_edid_after_edited_audio_sad(adev, fmt_desc);
+                /*
+                 * if the ARC capability format is changed, it should not support HBR(MAT/DTS-HD)
                  * for the sequence is LPCM -> DD -> DTS -> DDP -> DTSHD,
                  * which is defined in "private void setAudioFormat()" at file:DroidLogicEarcService.java
                  * so, here we choose the DDP part to update the sink format.

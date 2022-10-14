@@ -146,6 +146,7 @@ add_library(audio_hal SHARED
 	audio_hal/aml_config_parser.c
 	audio_hal/aml_config_data.c
 	audio_hal/audio_effect_if.c
+	audio_hal/earc_utils.c
 	utils/cJSON/cJSON.c
 	utils/aml_hw_mixer.c
 	utils/alsa_device_parser.c

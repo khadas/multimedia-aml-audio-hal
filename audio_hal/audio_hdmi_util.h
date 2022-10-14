@@ -64,6 +64,7 @@ struct format_desc {
     unsigned int max_bit_rate;
     /* only used by dd+ format */
     bool   atmos_supported;
+    bool   MAT_PCM_48kHz_only;
 };
 
 /*

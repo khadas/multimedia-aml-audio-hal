@@ -28,9 +28,28 @@
 
 #define DOLBY_SAMPLE_SIZE 4//2ch x 2bytes(16bits) = 4 bytes
 
+typedef enum MS12_SCHEDULER_STATE {
+    MS12_SCHEDULER_NONE = -1,
+    MS12_SCHEDULER_RUNNING =  0,
+    MS12_SCHEDULER_STANDBY =  1,
+
+    MS12_SCHEDULER_MAX,
+} ms12_scheduler_state_t;
+
+typedef enum MS12_RESUME_STATE {
+    MS12_RESUME_NONE = -1,
+    MS12_RESUME_FROM_RESUME =  0,
+    MS12_RESUME_FROM_FLUSH =  1,
+    MS12_RESUME_FROM_CLOSE =  2,
+    MS12_RESUME_FROM_DTV_PAUSE = 3,
+
+    MS12_RESUME_MAX,
+} ms12_resume_state_t;
+
 enum {
     BITSTREAM_OUTPUT_A,
     BITSTREAM_OUTPUT_B,
+    BITSTREAM_OUTPUT_C,/*multi channel pcm*/
     BITSTREAM_OUTPUT_CNT
 };
 
@@ -154,6 +173,29 @@ struct dolby_ms12_desc {
     bool     b_legacy_ddpout;
     void *   iec61937_ddp_buf;
     float    main_volume;
+    uint64_t first_in_frame_pts;
+    uint64_t last_synced_frame_pts;
+    uint64_t out_synced_frame_count;
+    bool debug_synced_frame_pts_flag;
+    bool     is_muted;
+    bool     do_easing;
+    /* MAT Encoder inside ms12, begin */
+    unsigned int matenc_maxoutbufsize;
+    int b_iec_header;
+    int mat_enc_debug_enable;
+    void *mat_enc_handle;
+    char *mat_enc_out_buffer;
+    int mat_enc_out_bytes;
+    uint64_t dtv_decoder_offset_base;  /*save the dtv input offset, which is realted with PTS*/
+    /* MAT Encoder inside ms12, end */
+    /* For DAP multi output except the stereo output */
+    bool tv_tuning_flag;
+    int ms12_scheduler_state;
+    int last_scheduler_state;
+    int ms12_resume_state;
+    bool need_ms12_resume;
+    uint32_t ms12_timer_id;
+    bool sys_data_write2alsa_status;
 };
 
 /*

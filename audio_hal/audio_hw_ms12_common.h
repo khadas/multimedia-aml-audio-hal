@@ -54,14 +54,20 @@ struct ms12_mesg_desc {
 int set_dolby_ms12_runtime_pause(struct dolby_ms12_desc *ms12, int is_pause);
 int dolby_ms12_main_pause(struct audio_stream_out *stream);
 int dolby_ms12_main_resume(struct audio_stream_out *stream);
+
 /*
- *@brief check whether the mesg list is empty
+ *@brief send scheduler state to ms12
  */
-bool ms12_msg_list_is_empty(struct dolby_ms12_desc *ms12);
+int aml_audiohal_sch_state_2_ms12(struct dolby_ms12_desc *ms12, int sch_state);
 
 /*
  *@brief check whether the mesg list is empty
  */
+/*
+ *@brief set dolby ms12 scheduler state
+ */
+int aml_set_ms12_scheduler_state(struct dolby_ms12_desc *ms12);
+
 
 bool ms12_msg_list_is_empty(struct dolby_ms12_desc *ms12);
 
@@ -74,5 +80,8 @@ int audiohal_send_msg_2_ms12(struct dolby_ms12_desc *ms12, ms12_mesg_type_t mesg
  */
 int ms12_mesg_thread_create(struct dolby_ms12_desc *ms12);
 int ms12_mesg_thread_destroy(struct dolby_ms12_desc *ms12);
+
+/* @brief set ms12 full dap disable as full_dap_disable [0/1] */
+void set_ms12_full_dap_disable(struct dolby_ms12_desc *ms12, int full_dap_disable);
 
 #endif //end of _AUDIO_HW_MS12_COMMON_H_
