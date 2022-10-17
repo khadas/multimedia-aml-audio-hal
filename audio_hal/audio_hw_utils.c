@@ -1508,8 +1508,8 @@ bool is_disable_ms12_continuous(struct audio_stream_out *stream) {
         || (aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD)) {
         /*dts case, we need disable ms12 continuous mode*/
         return true;
-    } else if (is_high_rate_pcm(stream) || (is_multi_channel_pcm(stream) && !aml_out->is_normal_pcm)) {
-        /*high bit rate pcm case, we need disable ms12 continuous mode*/
+    } else if (is_high_rate_pcm(stream) || (is_multi_channel_pcm(stream) && !aml_out->is_normal_pcm && !adev->is_netflix)) {
+        /*high bit rate pcm case, we need disable ms12 continuous mode (except for netflix)*/
         return true;
     } else if (aml_out->hal_internal_format == AUDIO_FORMAT_AC3 \
                || aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3) {
