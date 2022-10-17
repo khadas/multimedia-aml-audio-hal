@@ -459,7 +459,6 @@ uint64_t pcm_get_timestamp(struct pcm* pcm, uint32_t sample_rate, unsigned int i
         return 0;
     }
     if (pcm_get_htimestamp(pcm, &available, &timestamp) < 0) {
-        ALOGE("Error getting PCM timestamp!");
         return 0;
     }
     ssize_t frames;
