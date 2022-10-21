@@ -308,7 +308,7 @@ static int Get_Parameters(void *buf, int *sample_rate, int *frame_size, int *ChN
     if ((ptr8[0] == 0x0b) && (ptr8[1] == 0x77)) {
         int i;
         uint8_t tmp;
-        for (i = 0; i < PTR_HEAD_SIZE; i += 2) {
+        for (i = 0; i < PTR_HEAD_SIZE - 1; i += 2) {
             tmp = ptr8[i];
             ptr8[i] = ptr8[i + 1];
             ptr8[i + 1] = tmp;
@@ -529,7 +529,7 @@ int dcv_decoder_init_patch(aml_dec_t ** ppaml_dec, aml_dec_config_t * dec_config
         goto error;
     }
 
-    raw_in_data->buf_size = MAX_DECODER_FRAME_LENGTH;
+    raw_in_data->buf_size = MAX_DECODER_FRAME_LENGTH * 2;
     raw_in_data->buf = (unsigned char*) aml_audio_calloc(1, raw_in_data->buf_size);
     if (!raw_in_data->buf) {
         ALOGE("malloc buffer failed\n");
@@ -806,7 +806,8 @@ int dcv_decoder_process_patch(aml_dec_t * aml_dec, unsigned char *buffer, int by
             }
             read_offset = 8;
             if (in_sync) {
-                Get_Parameters(read_pointer + read_offset, &mSample_rate, &mFrame_size, &mChNum, &is_eac3, &ad_substream_supported);
+                int frame_size = 0;
+                Get_Parameters(read_pointer + read_offset, &mSample_rate, &frame_size, &mChNum, &is_eac3, &ad_substream_supported);
             }
         }
     }
