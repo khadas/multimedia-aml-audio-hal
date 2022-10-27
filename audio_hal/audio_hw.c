@@ -6648,6 +6648,8 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
 
             if (adev->patch_src == SRC_DTV && adev->audio_patch != NULL) {
                 aml_audio_switch_output_mode((int16_t *)buffer, bytes, adev->audio_patch->mode);
+            } else if (adev->audio_patch == NULL) {
+                aml_audio_switch_output_mode((int16_t *)buffer, bytes, adev->sound_track_mode);
             }
 
 #ifndef NO_AUDIO_CAP
