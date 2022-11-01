@@ -1819,7 +1819,8 @@ static int out_flush_new (struct audio_stream_out *stream)
                 continous_mode(adev) &&
                 (adev->ms12.dolby_ms12_enable == true) &&
                 (adev->ms12.is_continuous_paused == false) &&
-                (out->write_func == MIXER_MAIN_BUFFER_WRITE)) {
+                (out->write_func == MIXER_MAIN_BUFFER_WRITE) &&
+                (!out->hwsync->eos)) {
 
                 ALOGI("flush easing pause");
 

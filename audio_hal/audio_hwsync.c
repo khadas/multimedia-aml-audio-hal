@@ -422,6 +422,7 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
                 pts_raw = pts = hwsync_header_get_pts(&p_hwsync->hw_sync_header[0]);
                 if (pts == HWSYNC_PTS_EOS) {
                     p_hwsync->eos = true;
+                    ALOGI("%s: eos detected!", __FUNCTION__);
                     continue;
                 }
                 header_sub_version = p_hwsync->hw_sync_header[2];
