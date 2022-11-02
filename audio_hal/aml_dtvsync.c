@@ -634,7 +634,10 @@ dtvsync_process_res  aml_dtvsync_nonms12_process(struct audio_stream_out *stream
             if (m_audiopolicy.param1 == -1) {
                 usleep(15000);
             } else {
-              usleep(m_audiopolicy.param1);
+                if (m_audiopolicy.param1 > 15000 || m_audiopolicy.param1 < 1) {
+                    m_audiopolicy.param1 = 15000;
+                }
+                usleep(m_audiopolicy.param1);
             }
         }
 
@@ -692,7 +695,10 @@ void aml_dtvsync_ms12_get_policy(struct audio_stream_out *stream)
             if (m_audiopolicy.param1 == -1) {
                 usleep(15000);
             } else {
-              usleep(m_audiopolicy.param1);
+                if (m_audiopolicy.param1 > 15000 || m_audiopolicy.param1 < 1) {
+                    m_audiopolicy.param1 = 15000;
+                }
+                usleep(m_audiopolicy.param1);
             }
         }
 
