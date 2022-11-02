@@ -3628,7 +3628,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out->ac4_parser_handle = NULL;
     }
     /*main stream is closed, close the ms12 main decoder*/
-    if (out->is_ms12_main_decoder) {
+    if (out->write_func == MIXER_MAIN_BUFFER_WRITE) {
         pthread_mutex_lock(&adev->ms12.lock);
         /*after ms12 lock, dolby_ms12_enable may be cleared with clean up function*/
         if (adev->ms12.dolby_ms12_enable) {
@@ -3678,7 +3678,8 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
             }
             dolby_ms12_hwsync_release();
         }
-        dolby_ms12_main_close(stream);
+        if (out->is_ms12_main_decoder)
+            dolby_ms12_main_close(stream);
     }
     if (continous_mode(adev) && (eDolbyMS12Lib == adev->dolby_lib_type)) {
         if (out->volume_l != 1.0) {
