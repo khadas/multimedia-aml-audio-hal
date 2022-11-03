@@ -3782,6 +3782,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     ALOGI("%s: exit", __func__);
 }
 
+
 static int aml_audio_output_routing(struct audio_hw_device *dev,
                                     enum OUT_PORT outport,
                                     bool user_setting)
@@ -4005,6 +4006,11 @@ static void set_device_connect_state(struct aml_audio_device *adev, struct str_p
                     aml_audio_set_speaker_mute(adev, "true");
                     aml_audio_update_arc_status(adev, true);
                 }
+#ifdef BUILD_LINUX
+                if ((device & AUDIO_DEVICE_OUT_HDMI) && adev->is_STB) {
+                    aml_audio_set_speaker_mute(adev, "true");
+                }
+#endif
                 update_sink_format_after_hotplug(adev);
             } else if (device & AUDIO_DEVICE_OUT_ALL_A2DP) {
                 adev->a2dp_updated = 1;
@@ -4035,6 +4041,12 @@ static void set_device_connect_state(struct aml_audio_device *adev, struct str_p
                     aml_audio_set_speaker_mute(adev, "false");
                     aml_audio_update_arc_status(adev, false);
                 }
+#ifdef BUILD_LINUX
+                if ((device & AUDIO_DEVICE_OUT_HDMI) && adev->is_STB) {
+                    aml_audio_set_speaker_mute(adev, "false");
+                }
+#endif
+                update_sink_format_after_hotplug(adev);
             } else if (device & AUDIO_DEVICE_OUT_ALL_A2DP) {
                 adev->a2dp_updated = 1;
                 adev->out_device &= (~device);
@@ -6649,9 +6661,6 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                 volume *= gain_speaker * adev->sink_gain[OUTPORT_SPEAKER];
             }
 
-            if ((eDolbyMS12Lib == adev->dolby_lib_type) && aml_out->ms12_vol_ctrl) {
-                volume = 1.0;
-            }
             apply_volume_16to32(volume, effect_tmp_buf, spk_tmp_buf, bytes);
             apply_volume_16to32(source_gain, tmp_buffer, ps32SpdifTempBuffer, bytes);
 #ifdef ADD_AUDIO_DELAY_INTERFACE
@@ -10264,80 +10273,17 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
         return -EINVAL;
     }
     ALOGI("++[%s:%d] audio_port id:%d, role:%d, type:%d", __func__, __LINE__, config->id, config->role, config->type);
-    struct audio_patch_set *patch_set = NULL;
-    struct audio_patch *patch = NULL;
-    struct listnode *node = NULL;
-
-    /* find the corrisponding sink for this src */
-    list_for_each(node, &aml_dev->patch_list) {
-        patch_set = node_to_item(node, struct audio_patch_set, list);
-        patch = &patch_set->audio_patch;
-        if (patch->sources[0].ext.device.type == config->ext.device.type) {
-            ALOGI("[%s:%d] patch set found id:%d, dev:%#x, patchset:%p", __func__, __LINE__,
-                patch->id, config->ext.device.type, patch_set);
-            break;
-        } else {
-            int i=0;
-            for (i=0; i<patch->num_sinks; i++) {
-                if ((patch->sources[0].type == AUDIO_PORT_TYPE_MIX &&
-                       patch->sinks[i].type == AUDIO_PORT_TYPE_DEVICE &&
-                       patch->sinks[i].id == config->id)) {
-                    ALOGI("patch found mix->dev patch id:%d, sink id:%d, patchset:%p", patch->id, config->id, patch_set);
-                    break;
-                }
-                if ((patch->sources[0].type == AUDIO_PORT_TYPE_DEVICE &&
-                       patch->sinks[i].type == AUDIO_PORT_TYPE_DEVICE &&
-                       patch->sinks[i].id == config->id)) {
-                    ALOGI("patch found dev->dev patch id:%d, sink id:%d, patchset:%p", patch->id, config->id, patch_set);
-                    break;
-                }
-            }
-            if (i >= patch->num_sinks) {
-                patch_set = NULL;
-                patch = NULL;
-            } else {
-                break;
-            }
-        }
-    }
-
-    if (!patch_set || !patch) {
-        ALOGW("[%s:%d] no right patch available. patch_set:%p or patch:%p is null", __func__, __LINE__, patch_set, patch);
-        return -EINVAL;
-    }
-
-    /* Only 3 sink devices are allowed to coexist */
-    enum OUT_PORT sink_devs[3] = {OUTPORT_SPEAKER, OUTPORT_SPEAKER, OUTPORT_SPEAKER};
-    for (int i=0; i<patch->num_sinks; i++) {
-        if (i >= 3) {
-            ALOGW("[%s:%d] invalid num_sinks:%d", __func__, __LINE__, patch->num_sinks);
-            break;
-        } else {
-            android_dev_convert_to_hal_dev(patch->sinks[i].ext.device.type, (int *)&sink_devs[i]);
-            if (aml_dev->debug_flag) {
-                ALOGD("[%s:%d] sink[%d]:%s", __func__, __LINE__, i, outputPort2Str(sink_devs[i]));
-            }
-        }
-    }
 
     if (config->type == AUDIO_PORT_TYPE_DEVICE) {
         if (config->role == AUDIO_PORT_ROLE_SINK) {
-            if (patch->num_sinks == 1) {
-                android_dev_convert_to_hal_dev(config->ext.device.type, (int *)&outport);
+            android_dev_convert_to_hal_dev(config->ext.device.type, (int *)&outport);
+            aml_dev->sink_gain[outport] = DbToAmpl(config->gain.values[0] / 100.0);
+            if (outport == OUTPORT_HDMI_ARC) {
+                aml_dev->sink_gain[outport] = 1.0;
             }
-#ifdef DEBUG_VOLUME_CONTROL
-            int vol = property_get_int32("vendor.media.audio_hal.volume", -1);
-            if (vol != -1) {
-                aml_dev->sink_gain[outport] = (float)vol;
-                aml_dev->sink_gain[OUTPORT_SPEAKER] = (float)vol;
-            } else
-#endif
-            {
-                aml_dev->sink_gain[outport] = DbToAmpl(config->gain.values[0] / 100.0);
-                ALOGI(" - set sink device[%#x](outport:%s): volume_Mb[%d], gain[%f]",
+            ALOGI(" - set sink device[%#x](outport:%s): volume_dB[%d], gain[%f]",
                         config->ext.device.type, outputPort2Str(outport),
                         config->gain.values[0], aml_dev->sink_gain[outport]);
-            }
             ALOGI(" - now the sink gains are:");
             ALOGI("\t- OUTPORT_SPEAKER->gain[%f]", aml_dev->sink_gain[OUTPORT_SPEAKER]);
             ALOGI("\t- OUTPORT_HDMI_ARC->gain[%f]", aml_dev->sink_gain[OUTPORT_HDMI_ARC]);
@@ -10346,58 +10292,30 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
             ALOGI("\t- active outport is: %s", outputPort2Str(aml_dev->active_outport));
         } else if (config->role == AUDIO_PORT_ROLE_SOURCE) {
             android_dev_convert_to_hal_dev(config->ext.device.type, (int *)&inport);
-            aml_dev->src_gain[inport] = 1.0;
-            if (patch->sinks[0].type == AUDIO_PORT_TYPE_DEVICE) {
-                if (patch->num_sinks == 2 || patch->num_sinks == 3) {
-                    outport = get_output_dev_for_strategy(aml_dev, sink_devs, patch->num_sinks);
-                    switch (outport) {
-                        case OUTPORT_HDMI_ARC:
-                            aml_dev->sink_gain[outport] = 1.0;
-                            break;
-                        case OUTPORT_SPEAKER:
-                        case OUTPORT_A2DP:
-                            aml_dev->sink_gain[outport] = DbToAmpl(config->gain.values[0] / 100.0);
-                            break;
-                        default:
-                            ALOGW("[%s:%d] invalid out device type:%s", __func__, __LINE__, outputPort2Str(outport));
-                    }
-                } else if (patch->num_sinks == 1) {
-                    outport = sink_devs[0];
-                    if (OUTPORT_HDMI_ARC == outport || OUTPORT_SPDIF == outport) {
-                        aml_dev->sink_gain[outport] =  1.0;
+            if (inport == INPORT_TUNER) {
+                if (aml_dev->is_TV) {
+                    if (aml_dev->patch_src == SRC_DTV) {
+                        inport = INPORT_DTV;
                     } else {
-                        aml_dev->sink_gain[outport] = DbToAmpl(config->gain.values[0] / 100.0);
+                        inport = INPORT_ATV;
                     }
+                } else {
+                   inport = INPORT_DTV;
                 }
-                if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
-                    /* dev->dev and DTV src gain using MS12 primary gain */
-                    if (aml_dev->audio_patching || aml_dev->patch_src == SRC_DTV) {
-                        pthread_mutex_lock(&aml_dev->lock);
-                        // In recent (20180609) modify, HDMI ARC adjust volume will this function.
-                        // Once this fucntion was called, HDMI ARC have no sound
-                        // Maybe the db_gain parameter is difference form project to project
-                        // After remove this function here, HDMI ARC volume still can work
-                        // So. Temporary remove here.
-                        // TODO: find out when call this function will cause HDMI ARC mute
-                        //ret = set_dolby_ms12_primary_input_db_gain(&aml_dev->ms12, config->gain.values[1] / 100);
-                        pthread_mutex_unlock(&aml_dev->lock);
-                        if (ret < 0) {
-                            ALOGE("set dolby primary gain failed");
-                        }
-                    }
-                }
-                ALOGI(" - set src device[%#x](inport:%s): gain[%f]",
-                            config->ext.device.type, inputPort2Str(inport), aml_dev->src_gain[inport]);
-                ALOGI(" - set sink device[%#x](outport:%s): volume_Mb[%d], gain[%f]",
-                            patch->sinks->ext.device.type, outputPort2Str(outport),
-                            config->gain.values[0], aml_dev->sink_gain[outport]);
-            } else if (patch->sinks[0].type == AUDIO_PORT_TYPE_MIX) {
-                aml_dev->src_gain[inport] = DbToAmpl(config->gain.values[0] / 100.0);
-                ALOGI(" - set src device[%#x](inport:%s): gain[%f], active inport:%s",
-                            config->ext.device.type, inputPort2Str(inport), aml_dev->src_gain[inport], inputPort2Str(aml_dev->active_inport));
             }
+            aml_dev->src_gain[inport] = DbToAmpl(config->gain.values[0] / 100.0);
+            ALOGI(" - set src device[%#x](inport:%s): volume db[%d], gain[%f]",
+                  config->ext.device.type, inputPort2Str(inport),
+                  config->gain.values[0], aml_dev->src_gain[inport]);
+            ALOGI(" - now the source gains are:");
+            ALOGI(" - INPORT_DTV->gain[%f]", aml_dev->src_gain[INPORT_DTV]);
+            ALOGI(" - INPORT_ATV->gain[%f]", aml_dev->src_gain[INPORT_ATV]);
+            ALOGI(" - INPORT_HDMI->gain[%f]", aml_dev->src_gain[INPORT_HDMIIN]);
+            ALOGI(" - INPORT_AV->gain[%f]", aml_dev->src_gain[INPORT_LINEIN]);
+            ALOGI(" - INPORT_MEDIA->gain[%f]", aml_dev->src_gain[INPORT_MEDIA]);
+            ALOGI(" - set gain for in_port:%s, active inport is:%s", inputPort2Str(inport), inputPort2Str(aml_dev->active_inport));
         } else {
-            ALOGW("[%s:%d] unsupported role:%d type.", __func__, __LINE__, config->role);
+            ALOGI("[%s:%d] unsupported role:%d type.", __func__, __LINE__, config->role);
         }
     }
     return 0;

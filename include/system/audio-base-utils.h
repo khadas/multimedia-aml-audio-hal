@@ -159,6 +159,7 @@ enum {
                                 AUDIO_DEVICE_IN_LOOPBACK |
                                 AUDIO_DEVICE_IN_IP |
                                 AUDIO_DEVICE_IN_BUS |
+                                AUDIO_DEVICE_IN_MEDIA |
                                 AUDIO_DEVICE_IN_PROXY |
                                 AUDIO_DEVICE_IN_USB_HEADSET |
                                 AUDIO_DEVICE_IN_BLUETOOTH_BLE |
@@ -292,6 +293,7 @@ static CONST_ARRAY uint32_t AUDIO_DEVICE_IN_ALL_ARRAY[] = {
     AUDIO_DEVICE_IN_LOOPBACK,                   // 0x80040000u
     AUDIO_DEVICE_IN_IP,                         // 0x80080000u
     AUDIO_DEVICE_IN_BUS,                        // 0x80100000u
+    AUDIO_DEVICE_IN_MEDIA,                      // 0x80200000u
     AUDIO_DEVICE_IN_PROXY,                      // 0x81000000u
     AUDIO_DEVICE_IN_USB_HEADSET,                // 0x82000000u
     AUDIO_DEVICE_IN_BLUETOOTH_BLE,              // 0x84000000u

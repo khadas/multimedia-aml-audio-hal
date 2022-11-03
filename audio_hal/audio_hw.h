@@ -231,7 +231,10 @@ enum IN_PORT {
     INPORT_BUILTIN_MIC          = 6,
     INPORT_ECHO_REFERENCE       = 7,
     INPORT_ARCIN                = 8,
-    INPORT_MAX                  = 9,
+    INPORT_DTV                  = 9,
+    INPORT_ATV                  = 10,
+    INPORT_MEDIA                = 11,
+    INPORT_MAX                  = 12,
 };
 
 struct audio_patch_set {

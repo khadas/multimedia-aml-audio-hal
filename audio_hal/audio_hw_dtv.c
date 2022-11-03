@@ -1936,6 +1936,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
     int write_bytes = DEFAULT_PLAYBACK_PERIOD_SIZE * PLAYBACK_PERIOD_COUNT;
     int ret;
     int apts_diff = 0;
+    enum IN_PORT inport = aml_dev->active_inport;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
     ALOGI("[audiohal_kpi]++%s created.", __FUNCTION__);
     // FIXME: get actual configs
@@ -1989,6 +1990,10 @@ void *audio_dtv_patch_output_threadloop(void *data)
     }
     aml_out = (struct aml_stream_out *)stream_out;
     aml_out->dtvsync_enable = property_get_bool(DTV_SYNCENABLE, true);
+    if (inport == INPORT_TUNER) {
+        inport = INPORT_DTV;
+    }
+    stream_out->set_volume(stream_out, aml_dev->src_gain[inport], aml_dev->src_gain[inport]);
     ALOGI("++%s live create a output stream success now!!!\n ", __FUNCTION__);
 
     patch->out_buf_size = write_bytes * EAC3_MULTIPLIER;

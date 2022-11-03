@@ -388,6 +388,7 @@ enum {
     AUDIO_DEVICE_IN_LOOPBACK                   = 0x80040000u, // BIT_IN | 0x40000
     AUDIO_DEVICE_IN_IP                         = 0x80080000u, // BIT_IN | 0x80000
     AUDIO_DEVICE_IN_BUS                        = 0x80100000u, // BIT_IN | 0x100000
+    AUDIO_DEVICE_IN_MEDIA                      = 0x80200000u, // BIT_IN | 0x200000
     AUDIO_DEVICE_IN_PROXY                      = 0x81000000u, // BIT_IN | 0x1000000
     AUDIO_DEVICE_IN_USB_HEADSET                = 0x82000000u, // BIT_IN | 0x2000000
     AUDIO_DEVICE_IN_BLUETOOTH_BLE              = 0x84000000u, // BIT_IN | 0x4000000
