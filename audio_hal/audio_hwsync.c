@@ -307,6 +307,7 @@ void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out
     p_hwsync->eos = false;
 
     p_hwsync->last_lookup_apts = 0xffffffff;
+    p_hwsync->last_ms12_latency_frames = 0;
 
     if (!p_hwsync->use_mediasync && (p_hwsync->es_mediasync.mediasync == NULL)) {
         p_hwsync->hwsync_id = -1;
@@ -778,7 +779,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
 
                         ALOGV("Use apts w/o delay deduction %u to replace %u due to underrun.", apts_save, pts_adj);
                         apts = pts_adj;
-                    } else if (p_hwsync->last_lookup_apts == apts_save) {
+                    } else if (p_hwsync->last_lookup_apts == apts_save && p_hwsync->last_ms12_latency_frames == ms12_pipeline_delay_frames) {
                         /* only report audio pts when lookup_apts changes.
                          * the output from MS12 may come in smaller resolution (such as every 256 samples than
                          * input like 1536 samples for Dolby, then the rendered APTS become an almost fixed number
@@ -797,6 +798,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                         /* still report last rendered APTS */
                         apts = out->msync_rendered_pts;
                     }
+                    p_hwsync->last_ms12_latency_frames = ms12_pipeline_delay_frames;
                 }
 
                 if (pts_log) {
@@ -804,10 +806,10 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                     unsigned long hw_ptr = 0;
                     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
                     pcm_get_hw_ptr(adev->pcm_handle[I2S_DEVICE], &hw_ptr, &hw_ptr_ts);
-                    ALOGI("PTSLOG [%lld.%.9ld] injected %" PRIu64 ", offset:%d" PRIu64 ", lookup_pts:%u, latency_pts:%u, apts:%u, action:%d, hw_ptr[%lld.%.9ld:%lu]",
+                    ALOGI("PTSLOG [%lld.%.9ld] injected %" PRIu64 ", offset:%d" PRIu64 ", lookup_pts:%u, latency_pts:%u, ms12 frames:%d, apts:%u, action:%d, hw_ptr[%lld.%.9ld:%lu]",
                           (long long)ts.tv_sec, ts.tv_nsec,
                           out->total_write_size, offset,
-                          apts_save, latency_pts, apts, out->msync_action,
+                          apts_save, latency_pts, ms12_pipeline_delay_frames, apts, out->msync_action,
                           (long long)hw_ptr_ts.tv_sec, hw_ptr_ts.tv_nsec, hw_ptr);
                 }
 

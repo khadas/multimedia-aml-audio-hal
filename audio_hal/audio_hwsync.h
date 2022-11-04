@@ -102,6 +102,7 @@ typedef struct  audio_hwsync {
     uint64_t last_apts_from_header;
     uint64_t last_apts_from_header_raw;
     uint64_t last_lookup_apts;
+    int last_ms12_latency_frames;
     int video_valid_time;
 
     apts_tab_t pts_tab[HWSYNC_APTS_NUM];

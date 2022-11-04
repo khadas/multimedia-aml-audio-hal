@@ -104,7 +104,6 @@ int dolby_ms12_main_pause(struct audio_stream_out *stream)
     dolby_ms12_set_pause_flag(true);
     //ms12_runtime_update_ret = aml_ms12_update_runtime_params(ms12);
     ms12_runtime_update_ret = set_dolby_ms12_runtime_pause(ms12, true);
-    ms12->is_continuous_paused = true;
     ALOGI("%s  ms12_runtime_update_ret:%d", __func__, ms12_runtime_update_ret);
 
     //1.audio easing duration is 32ms,
@@ -122,7 +121,7 @@ int dolby_ms12_main_pause(struct audio_stream_out *stream)
         aml_hwsync_set_tsync_pause(aml_out->hwsync);
         aml_out->tsync_status = TSYNC_STATUS_PAUSED;
     }
-
+    ms12->is_continuous_paused = true;
     ALOGI("%s  sleep 120ms finished and exit", __func__);
     return 0;
 }
