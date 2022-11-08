@@ -115,6 +115,22 @@ static unsigned int DEFAULT_OUT_SAMPLING_RATE = 48000;
 #define FLOAT_ZERO              (0.00002)   /* the APM mute volume is 0.00001, less than 0.00002 we think is mute. */
 #define TV_SPEAKER_OUTPUT_CH_NUM    10
 
+struct renderpts_item {
+    struct listnode list;
+    uint64_t cur_outapts;
+    uint64_t out_start_apts;
+};
+
+struct aml_pts_handle {
+    struct listnode frame_list;
+    pthread_mutex_t list_lock;
+    int64_t prepts;
+    int64_t gapts;
+    int64_t ms12_pcmoutstep_count;
+    int32_t ms12_pcmoutstep_val;
+    int32_t ptsnum;
+};
+
 
 /*the same as "AUDIO HAL FORMAT" in kernel*/
 enum audio_hal_format {

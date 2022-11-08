@@ -312,6 +312,11 @@ Error:
 int ms12_mesg_thread_create(struct dolby_ms12_desc *ms12)
 {
     int ret = 0;
+    //init pts list
+    static struct aml_pts_handle pts_handle;
+    ms12->p_pts_list = &pts_handle;
+    list_init(&(ms12->p_pts_list->frame_list));
+    pthread_mutex_init(&(ms12->p_pts_list->list_lock), NULL);
 
     list_init(&ms12->mesg_list);
     ms12->CommThread_ExitFlag = false;
@@ -357,8 +362,8 @@ int ms12_mesg_thread_destroy(struct dolby_ms12_desc *ms12)
         ret = audiohal_send_msg_2_ms12(ms12, MS12_MESG_TYPE_EXIT_THREAD);
 
         pthread_join(ms12->ms12_mesg_threadID, NULL);
+        pthread_mutex_destroy(&(ms12->p_pts_list->list_lock));
         ms12->ms12_mesg_threadID = 0;
-
         /* destroy cond & mutex*/
         pthread_cond_destroy(&ms12->cond);
         pthread_mutex_destroy(&ms12->mutex);

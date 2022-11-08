@@ -2452,6 +2452,55 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
         adev->arc_connected_reconfig = false;
     }
 
+    {//sync karma dash
+        struct aml_stream_out *aml_out_write =NULL;
+        aml_out_write = direct_active(adev);
+        if (aml_out_write)
+        {
+            if (aml_out_write->hwsync && (aml_out_write->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out_write->hwsync->use_mediasync)
+            {
+                if (output_format == AUDIO_FORMAT_PCM_16_BIT) {
+                    if (is_dolby_ms12_support_compression_format(aml_out_write->hal_internal_format)|| is_multi_channel_pcm(aml_out_write)) {
+                        pthread_mutex_lock(&adev->ms12.p_pts_list->list_lock);
+                        //#define DEFAULT_AUDIO_INSERT_THRESHOLD (200 * TIME_PTS_UNIT_MS)
+                        int tmpms = adev->ms12.p_pts_list->gapts/90;
+                        if (tmpms > 1 && tmpms < 200 && adev->ms12.p_pts_list->ms12_pcmoutstep_val == 0) {
+                            int outms = size/2/ms12_info->output_ch/48;
+                            adev->ms12.p_pts_list->ms12_pcmoutstep_val =  adev->ms12.p_pts_list->gapts/90/outms;
+                            ALOGI("calc ms12_pcmoutstep_val:%d, size:%d, output_ch:%d, gapts:%d", adev->ms12.p_pts_list->ms12_pcmoutstep_val, size, ms12_info->output_ch, adev->ms12.p_pts_list->gapts);
+                            if (size/2/ms12_info->output_ch == 256) //ms12 decoder out sample
+                            {
+                                int tmpcount = adev->ms12.p_pts_list->gapts/90/outms/6;
+                                if (tmpcount > 1)
+                                {
+                                    adev->ms12.p_pts_list->ms12_pcmoutstep_val = tmpcount*6;
+                                }
+                            }
+                        }
+                        adev->ms12.p_pts_list->ms12_pcmoutstep_count ++;
+                        pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
+                        if ((adev->ms12.p_pts_list->ms12_pcmoutstep_val > 0) && (adev->ms12.p_pts_list->ms12_pcmoutstep_count % adev->ms12.p_pts_list->ms12_pcmoutstep_val == 0)) {
+                            if (adev->debug_flag > 1) {
+                                ALOGI("%d,%d,%d,%x,gappts %d,step %lld ,%d \n",aml_out_write->hal_ch,size,ms12_info->output_ch,aml_out_write->hal_internal_format,adev->ms12.p_pts_list->gapts,adev->ms12.p_pts_list->ms12_pcmoutstep_count,adev->ms12.p_pts_list->ms12_pcmoutstep_val);
+                            }
+                            process_result = aml_hwsynces_ms12_process_policy(priv_data, ms12_info,aml_out_write);
+                            if (process_result == ESSYNC_AUDIO_DROP) {
+                                return ret;
+                            }
+                        }
+                    }
+                    else {
+                        process_result = aml_hwsynces_ms12_process_policy(priv_data, ms12_info,aml_out_write);
+                        if (process_result == ESSYNC_AUDIO_DROP) {
+                            return ret;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
     /*update the master pcm frame, which is used for av sync*/
     if (audio_is_linear_pcm(output_format)) {
         if (ms12_info->output_ch == 8 || ms12_info->output_ch == 6) {
@@ -2473,12 +2522,10 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
         if (process_result == DTVSYNC_AUDIO_DROP)
             return ret;
     }
-    if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
-    {
-        process_result = aml_hwsynces_ms12_process_policy(priv_data, ms12_info);
-        if (process_result == ESSYNC_AUDIO_DROP)
-            return ret;
-    }
+
+
+
+
     if (audio_is_linear_pcm(output_format)) {
        if (ms12_info->pcm_type == MC_LPCM) {
             mc_pcm_output(buffer, priv_data, size, ms12_info);

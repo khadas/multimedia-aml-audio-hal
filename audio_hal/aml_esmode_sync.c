@@ -426,30 +426,42 @@ int aml_hwsynces_ms12_process_insert(void *priv_data, int insert_time_ms,
     return 0;
 }
 
-sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_info_t *ms12_info)
+sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_info_t *ms12_info,struct aml_stream_out *aml_out_write)
 {
-    struct aml_stream_out *aml_out = (struct aml_stream_out *)priv_data;
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)priv_data;//ms12out
     struct audio_stream_out *stream_out = (struct audio_stream_out *)aml_out;
     struct aml_audio_device *adev = aml_out->dev;
-    struct dolby_ms12_desc *ms12 = &(adev->ms12);
     struct mediasync_audio_policy *async_policy = NULL;
+    struct renderpts_item *frame_item = NULL;
+    struct listnode *item = NULL;
 
+    pthread_mutex_lock(&adev->ms12.p_pts_list->list_lock);
+    if (!list_empty(&adev->ms12.p_pts_list->frame_list)) {
+        item = list_head(&adev->ms12.p_pts_list->frame_list);
+        frame_item = node_to_item(item, struct renderpts_item, list);
+        list_remove(item);
+    }
+    pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
+
+    if (NULL != frame_item)
     {
-        async_policy = &(aml_out->hwsync->es_mediasync.apolicy);
-        ALOGI("process_policy1:%d, prm1:%d, prm2:%d\n", async_policy->audiopolicy,
-            async_policy->param1, async_policy->param2);
-
-        while (aml_out->hwsync && (aml_out->pause_status == false) && async_policy->audiopolicy == MEDIASYNC_AUDIO_HOLD) {
-            if (async_policy->param1 == -1) {
-                usleep(15000);
-            } else {
+        async_policy = &(aml_out_write->hwsync->es_mediasync.apolicy);
+        do {
+            mediasync_wrap_AudioProcess(aml_out_write->hwsync->es_mediasync.mediasync, frame_item->out_start_apts, frame_item->cur_outapts, MEDIASYNC_UNIT_PTS, async_policy);
+            if (adev->debug_flag > 0)
+                ALOGI("ms12_process_policy_14=%d=%s, param1=%u, param2=%u, ori=0x%llx,curout=0x%llx \n",
+                    async_policy->audiopolicy, mediasyncAudiopolicyType2Str(async_policy->audiopolicy),
+                    async_policy->param1, async_policy->param2,
+                    frame_item->out_start_apts, frame_item->cur_outapts);
+            if (async_policy->audiopolicy == MEDIASYNC_AUDIO_HOLD) {
+                if (async_policy->param1 > 15000 || async_policy->param1 < 1) {
+                    async_policy->param1 = 15000;
+                }
                 usleep(async_policy->param1);
             }
-            if (aml_out->hwsync == NULL)
-            {
-                return ESSYNC_AUDIO_OUTPUT;
-            }
-        };
+        } while (aml_out_write->hwsync && (aml_out_write->pause_status == false) && async_policy->audiopolicy == MEDIASYNC_AUDIO_HOLD);
+
+        aml_audio_free(frame_item);
         if (async_policy->audiopolicy == MEDIASYNC_AUDIO_DROP_PCM) {
 
             return ESSYNC_AUDIO_DROP;
@@ -471,9 +483,8 @@ sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_
         } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_NORMAL_OUTPUT) {
             adev->underrun_mute_flag = false;
         }
+        async_policy->audiopolicy = MEDIASYNC_AUDIO_UNKNOWN;
     }
-
-    async_policy->audiopolicy = MEDIASYNC_AUDIO_UNKNOWN;
     return ESSYNC_AUDIO_OUTPUT;
 }
 

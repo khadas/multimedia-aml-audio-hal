@@ -216,6 +216,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
         if ( 0 == aml_audio_hwsync_lookup_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, &hw_esmode_apts)) {
             aml_out->hwsync->es_mediasync.out_start_apts = hw_esmode_apts;
         } else {
+            hw_esmode_apts = HWSYNC_PTS_NA;
             ALOGE("[%s:%d] es_mediasync av sync loopup apts fail", __func__, __LINE__);
         }
     }
@@ -239,9 +240,25 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
         }
         if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
         {
+            //ms12_delayms = aml_audio_get_cur_ms12_latencyes(stream);
             ms12_delayms = aml_audio_get_ms12_tunnel_latency(stream)/48;
             aml_out->hwsync->es_mediasync.cur_outapts = aml_out->hwsync->es_mediasync.out_start_apts - ms12_delayms * 90;
-            aml_hwsynces_ms12_get_policy(stream);
+            //aml_hwsynces_ms12_get_policy(stream);
+            if (hw_esmode_apts != HWSYNC_PTS_NA) {
+                pthread_mutex_lock(&adev->ms12.p_pts_list->list_lock);
+                struct renderpts_item *prenderpts = aml_audio_malloc(sizeof(struct renderpts_item));
+                prenderpts->cur_outapts = aml_out->hwsync->es_mediasync.cur_outapts;
+                prenderpts->out_start_apts = aml_out->hwsync->es_mediasync.out_start_apts;
+                list_add_tail(&adev->ms12.p_pts_list->frame_list, &prenderpts->list);
+                if (adev->ms12.p_pts_list->prepts != HWSYNC_PTS_NA) {
+                    adev->ms12.p_pts_list->gapts = prenderpts->out_start_apts - adev->ms12.p_pts_list->prepts;
+                }
+                adev->ms12.p_pts_list->prepts = prenderpts->out_start_apts;
+                pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
+            }
+            if (adev->debug_flag > 1) {
+                ALOGI("bypass_aml_dec %d,%llx,%llx,gappts %d\n",ms12_delayms,aml_out->hwsync->es_mediasync.cur_outapts,aml_out->hwsync->es_mediasync.out_start_apts,adev->ms12.p_pts_list->gapts);
+            }
         }
     } else {
         if (aml_out->aml_dec == NULL) {
@@ -311,20 +328,30 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                         ms12_delayms = aml_audio_get_cur_ms12_latency(stream);
                         if(patch->skip_amadec_flag) {
                             patch->dtvsync->cur_outapts = aml_dec->out_frame_pts - ms12_delayms * 90;//need consider the alsa delay
-                            if (adev->debug_flag)
+                            if (adev->debug_flag) {
                                 ALOGI("patch->dtvsync->cur_outapts %lld", patch->dtvsync->cur_outapts);
+                            }
                             if (aml_out->dtvsync_enable)
                                 aml_dtvsync_ms12_get_policy(stream);
                         }
                     }
                     if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
                     {
+                         //ms12_delayms = aml_audio_get_cur_ms12_latencyes(stream);
                          ms12_delayms = (aml_audio_get_ms12_tunnel_latency(stream)+out_frames)/48;
                          aml_out->hwsync->es_mediasync.cur_outapts = aml_dec->out_frame_pts - ms12_delayms * 90;//need consider the alsa delay
-                         if (adev->debug_flag)
+                         if (adev->debug_flag) {
                              ALOGI("esmodesync->cur_outapts %llx,ms12_delayms %d,out_frames %d,decin %llx,decout %llx,data_sr %d\n", aml_out->hwsync->es_mediasync.cur_outapts,ms12_delayms,out_frames,aml_dec->in_frame_pts,aml_dec->out_frame_pts,dec_pcm_data->data_sr);
-                         aml_hwsynces_ms12_get_policy(stream);
-
+                         }
+                         //aml_hwsynces_ms12_get_policy(stream);
+                         if (hw_esmode_apts != HWSYNC_PTS_NA) {
+                             pthread_mutex_lock(&adev->ms12.p_pts_list->list_lock);
+                             struct renderpts_item *prenderpts = aml_audio_malloc(sizeof(struct renderpts_item));
+                             prenderpts->cur_outapts = aml_out->hwsync->es_mediasync.cur_outapts;
+                             prenderpts->out_start_apts = aml_out->hwsync->es_mediasync.out_start_apts;
+                             list_add_tail(&adev->ms12.p_pts_list->frame_list, &prenderpts->list);
+                             pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
+                         }
                     }
                 }
 

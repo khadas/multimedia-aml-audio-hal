@@ -3487,6 +3487,25 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         memset(out->audioeffect_tmp_buffer, 0, out->config.period_size * 6);
     }
 
+    if (eDolbyMS12Lib == adev->dolby_lib_type)
+    {//clean pts
+        struct renderpts_item *frame_item = NULL;
+        struct listnode *item = NULL;
+        pthread_mutex_lock(&adev->ms12.p_pts_list->list_lock);
+        while (!list_empty(&adev->ms12.p_pts_list->frame_list)) {
+            item = list_head(&adev->ms12.p_pts_list->frame_list);
+            frame_item = node_to_item(item, struct renderpts_item, list);
+            list_remove(item);
+            aml_audio_free(frame_item);
+        }
+        adev->ms12.p_pts_list->prepts = HWSYNC_PTS_NA;
+        adev->ms12.p_pts_list->gapts = 0;
+        adev->ms12.p_pts_list->ptsnum = 0;
+        adev->ms12.p_pts_list->ms12_pcmoutstep_val = 0;
+        adev->ms12.p_pts_list->ms12_pcmoutstep_count = 0;
+        pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
+    }
+
     if (out->hw_sync_mode) {
         out->hwsync = aml_audio_calloc(1, sizeof(audio_hwsync_t));
         if (!out->hwsync) {
