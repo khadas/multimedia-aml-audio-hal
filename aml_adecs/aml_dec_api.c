@@ -157,21 +157,23 @@ int aml_decoder_release(aml_dec_t *aml_dec)
         sprintf(info_buf, "bitrate %d", val);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
-        sprintf(info_buf, "channels %d", val);
+        sprintf(info_buf, "ch_num %d", val);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
         sprintf(info_buf, "samplerate %d", val);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
-        sprintf(info_buf, "frames %d", val);
+        sprintf(info_buf, "decoded_frames %d", val);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
-        sprintf(info_buf, "errors %d", val);
+        sprintf(info_buf, "decoded_err %d", val);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
-        sprintf(info_buf, "drops %d", val);
+        sprintf(info_buf, "decoded_drop %d", val);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
+        sprintf (info_buf, "ch_configuration %d", val);
+        sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
     }
 
     return ret;
@@ -218,6 +220,36 @@ int aml_decoder_get_info(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_
     return ret;
 }
 
+
+static void UpdateDecodeInfo_ChannelConfiguration(char *sysfs_buf, int ch_num) {
+    switch (ch_num) {
+        case 1:
+            sprintf (sysfs_buf, "ch_configuration %d", TIF_HAL_PLAYBACK_AUDIO_SOURCE_CHANNEL_CONFIGURATION_MONO);
+            break;
+        case 2:
+            sprintf (sysfs_buf, "ch_configuration %d", TIF_HAL_PLAYBACK_AUDIO_SOURCE_CHANNEL_CONFIGURATION_STEREO);
+            break;
+        case 3:
+            sprintf (sysfs_buf, "ch_configuration %d", TIF_HAL_PLAYBACK_AUDIO_SOURCE_CHANNEL_CONFIGURATION_L_C_R);
+            break;
+        case 4:
+            sprintf (sysfs_buf, "ch_configuration %d", TIF_HAL_PLAYBACK_AUDIO_SOURCE_CHANNEL_CONFIGURATION_L_R_SL_RS);
+            break;
+        case 5:
+            sprintf (sysfs_buf, "ch_configuration %d", TIF_HAL_PLAYBACK_AUDIO_SOURCE_CHANNEL_CONFIGURATION_L_C_R_SL_SR);
+            break;
+        case 6:
+            sprintf (sysfs_buf, "ch_configuration %d", TIF_HAL_PLAYBACK_AUDIO_SOURCE_CHANNEL_CONFIGURATION_5_1);
+            break;
+        case 8:
+            sprintf (sysfs_buf, "ch_configuration %d", TIF_HAL_PLAYBACK_AUDIO_SOURCE_CHANNEL_CONFIGURATION_7_1);
+            break;
+        default:
+            ALOGE("unsupport yet");
+            break;
+    }
+    sysfs_set_sysfs_str(REPORT_DECODED_INFO, sysfs_buf);
+}
 
 int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int *used_bytes)
 {
@@ -290,23 +322,23 @@ int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int
         sprintf(info_buf, "bitrate %d", dec_info.dec_info.stream_bitrate);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
-        sprintf(info_buf, "channels %d", dec_info.dec_info.stream_ch);
+        sprintf(info_buf, "ch_num %d", dec_info.dec_info.stream_ch);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
         sprintf(info_buf, "samplerate %d", dec_info.dec_info.stream_sr);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
-        sprintf(info_buf, "frames %d", dec_info.dec_info.stream_decode_num);
+        sprintf(info_buf, "decoded_frames %d", dec_info.dec_info.stream_decode_num);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
-        sprintf(info_buf, "errors %d", dec_info.dec_info.stream_error_num);
+        sprintf(info_buf, "decoded_err %d", dec_info.dec_info.stream_error_num);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
-        sprintf(info_buf, "drops %d", dec_info.dec_info.stream_drop_num);
+        sprintf(info_buf, "decoded_drop %d", dec_info.dec_info.stream_drop_num);
         sysfs_set_sysfs_str(REPORT_DECODED_INFO, info_buf);
         memset(info_buf, 0x00, MAX_BUFF_LEN);
+        UpdateDecodeInfo_ChannelConfiguration(info_buf, dec_info.dec_info.stream_ch);
     }
-
 
     frame_size = audio_bytes_per_sample(dec_pcm_data->data_format) * dec_pcm_data->data_ch;
     /*one decoded frame length is too big, we need seprate it*/

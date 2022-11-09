@@ -580,6 +580,10 @@ int run_sync(struct mad_decoder *decoder)
                     break;
                 case MAD_FLOW_CONTINUE:
                 default:
+                    if (decoder->sync->stream.error >= MAD_ERROR_LOSTSYNC) {
+                        decoder->droppped_nb_frames++;
+                        decoder->error_nb_frames++;
+                    }
                     continue;
                 }
             } else {

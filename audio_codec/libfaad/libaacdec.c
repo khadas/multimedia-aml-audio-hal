@@ -392,6 +392,7 @@ retry:
     }
 
     gFaadCxt->hDecoder = NeAACDecOpen();
+    gFaadCxt->error_num = 0;
     config = NeAACDecGetCurrentConfiguration(gFaadCxt->hDecoder);
     config->defObjectType = LC;
     config->outputFormat = FAAD_FMT_16BIT;
@@ -467,7 +468,6 @@ int audio_dec_decode(
     }
     if (!gFaadCxt->init_flag) {
         gFaadCxt->error_count = 0;
-        gFaadCxt->error_num = 0;
         gFaadCxt->decoded_nb_frames = 0;
         audio_codec_print("begin audio_decoder_init,buf size %d  \n", dec_bufsize);
         ret = audio_decoder_init(adec_ops, outbuf, outlen, dec_buf, dec_bufsize, (long *)&inbuf_consumed);

@@ -687,7 +687,7 @@ void aml_dtvsync_ms12_get_policy(struct audio_stream_out *stream)
                                 patch->dtvsync->cur_outapts,
                                 MEDIASYNC_UNIT_PTS, &m_audiopolicy);
 
-        if (m_audiopolicy.audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT)
+        if (adev->debug_flag)
             ALOGI("do get m_audiopolicy=%d=%s, param1=%u, param2=%u, out_pts=0x%llx,cur=0x%llx\n",
                 m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
                 m_audiopolicy.param1, m_audiopolicy.param2,
@@ -726,8 +726,9 @@ dtvsync_process_res aml_dtvsync_ms12_process_policy(void *priv_data, aml_ms12_de
 
     if (aml_dtvsync != NULL) {
         async_policy = &(aml_dtvsync->apolicy);
-        ALOGI("cur policy:%d, prm1:%d, prm2:%d\n", async_policy->audiopolicy,
-            async_policy->param1, async_policy->param2);
+        if (adev->debug_flag)
+            ALOGI("cur policy:%d, prm1:%d, prm2:%d\n", async_policy->audiopolicy,
+                async_policy->param1, async_policy->param2);
 
         if (async_policy->audiopolicy == MEDIASYNC_AUDIO_DROP_PCM) {
 
