@@ -805,7 +805,8 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                     struct timespec ts, hw_ptr_ts = {0};
                     unsigned long hw_ptr = 0;
                     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-                    pcm_get_hw_ptr(adev->pcm_handle[I2S_DEVICE], &hw_ptr, &hw_ptr_ts);
+                    if (adev->pcm_handle[I2S_DEVICE])
+                        pcm_get_hw_ptr(adev->pcm_handle[I2S_DEVICE], &hw_ptr, &hw_ptr_ts);
                     ALOGI("PTSLOG [%lld.%.9ld] injected %" PRIu64 ", offset:%d" PRIu64 ", lookup_pts:%u, latency_pts:%u, ms12 frames:%d, apts:%u, action:%d, hw_ptr[%lld.%.9ld:%lu]",
                           (long long)ts.tv_sec, ts.tv_nsec,
                           out->total_write_size, offset,
