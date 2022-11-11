@@ -307,6 +307,7 @@ int get_sysfs_int(const char *path)
         close(fd);
     } else {
         ALOGD("[%s]open %s node failed! return 0\n", path, __FUNCTION__);
+        return -1;
     }
     return val;
 }
@@ -1207,6 +1208,9 @@ int aml_audio_get_dolby_dap_drc_mode(int *drc_mode, int *drc_cut, int *drc_boost
     int ret = 0;
     unsigned dap_drc_control = (DDPI_UDC_COMP_LINE<<DRC_MODE_BIT)|(100<<DRC_HIGH_CUT_BIT)|(100<<DRC_LOW_BST_BIT);
     dap_drc_control = get_sysfs_int("/sys/class/audiodsp/dap_drc_control");
+
+    if (dap_drc_control == -1)
+        return -1;
 
     if (!drc_mode || !drc_cut || !drc_boost)
         return -1;
