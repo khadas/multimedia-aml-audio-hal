@@ -40,6 +40,7 @@ static void earc_cds_conf_to_str(char *earc_cds, char *cds_str, int hex, struct 
     cds_str[0] = '\0';
     /* bypass version */
     cds_blocks = &earc_cds[1];
+    char cds_str_last[AUDIO_HAL_CHAR_MAX_LEN] = {0};
     for (i = 0; i < CDS_MAX - 1;) {
         /* block id */
         cds_blockid = cds_blocks[i];
@@ -62,7 +63,8 @@ static void earc_cds_conf_to_str(char *earc_cds, char *cds_str, int hex, struct 
                         if (hex) {
                             cds_str[index++] = audio_blocks[1 + j + m];
                         } else {
-                            sprintf(cds_str, "%s%d, ", cds_str, audio_blocks[1 + j + m]);
+                            memcpy(cds_str_last, cds_str, AUDIO_HAL_CHAR_MAX_LEN);
+                            sprintf(cds_str, "%s%d, ", cds_str_last, audio_blocks[1 + j + m]);
                         }
                     }
                     /* Dolby Audio and Dolby Atmos
