@@ -1098,6 +1098,4 @@ struct aec_info {
 #define PLAYBACK_PERIOD_SIZE (CODEC_BASE_FRAME_COUNT * PLAYBACK_PERIOD_MULTIPLIER)
 #define CHANNEL_STEREO 2
 #define PLAYBACK_CODEC_SAMPLING_RATE 48000
-/* Maximum string length in audio hal. */
-#define AUDIO_HAL_CHAR_MAX_LEN                          (256)
 #endif

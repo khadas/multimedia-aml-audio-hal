@@ -203,7 +203,8 @@
 #define TUNNEL_SYNC_HEADER_SIZE    (20)
 
 #define DISABLE_CONTINUOUS_OUTPUT "persist.vendor.audio.continuous.disable"
-
+/* Maximum string length in audio hal. */
+#define AUDIO_HAL_CHAR_MAX_LEN                          (256)
 
 static const struct pcm_config pcm_config_out = {
     .channels = 2,
