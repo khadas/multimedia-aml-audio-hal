@@ -25,14 +25,8 @@ echo commit count $COMMIT_COUNT
 COMMIT_ID=$(git show -s --pretty=format:%h)
 echo commit id $COMMIT_ID
 
-#find the module name line
-MODULE_NAME_LINE=`sed -n '/\"MM-module-name/=' audio_hal/audio_hal_version.h`
-#echo $VERSION_LINE
-
 #version rule string
 VERSION_STRING=${MAJORVERSION}.${MINORVERSION}.${REVISION}-r${COMMIT_COUNT}-g${COMMIT_ID}
 
-#update the original version
-if [ ${MODULE_NAME_LINE} -gt 0 ]; then
-sed -i -e ${MODULE_NAME_LINE}s"/.*/\"${MODULE_NAME},version:${VERSION_STRING}\"\;/" audio_hal/audio_hal_version.h
-fi
+#create version header file
+sed "s/@version@/\"${MODULE_NAME},version:${VERSION_STRING}\"/" audio_hal/audio_hal_version.h.in > audio_hal/audio_hal_version.h
