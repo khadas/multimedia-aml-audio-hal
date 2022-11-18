@@ -135,7 +135,7 @@ static int seek_61937_sync_word(char *buffer, int size)
         if (buffer[i + 0] == 0x72 && buffer[i + 1] == 0xf8 && buffer[i + 2] == 0x1f && buffer[i + 3] == 0x4e) {
             return i;
         }
-        if (buffer[i + 0] == 0x4e && buffer[i + 1] == 0x1f && buffer[i + 2] == 0xf8 && buffer[i + 3] == 0x72) {
+        if (buffer[i + 0] == 0xf8 && buffer[i + 1] == 0x72 && buffer[i + 2] == 0x4e && buffer[i + 3] == 0x1f) {
             return i;
         }
     }

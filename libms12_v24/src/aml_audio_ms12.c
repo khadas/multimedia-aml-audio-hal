@@ -47,6 +47,8 @@ int get_dolby_ms12_init(struct dolby_ms12_desc *ms12_desc, char *dolby_ms12_path
         ALOGE("%s, fail to get ms12 handle\n", __FUNCTION__);
         return ret;
     }
+    /*increase ms12 mixer size from 256 to 1536, except the mat output case*/
+     dolby_ms12_enable_mixer_max_size(0);
 
     if (ms12_desc->dolby_ms12_init_argv) {
         ms12_desc->dolby_ms12_ptr = dolby_ms12_init(ms12_desc->dolby_ms12_init_argc, ms12_desc->dolby_ms12_init_argv);

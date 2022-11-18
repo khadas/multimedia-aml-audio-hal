@@ -534,3 +534,13 @@ extern "C" int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duratio
     }
 }
 
+extern "C" int dolby_ms12_enable_mixer_max_size(int enable)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12EnableMixerMaxSize(enable);
+    }
+    return -1;
+}
+

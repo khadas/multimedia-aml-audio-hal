@@ -158,6 +158,7 @@ public:
     virtual int     DolbyMS12GetInputISDolbyAtmos();
 
     virtual int     DolbyMS12SetSchedulerState(int sch_state);
+    virtual int     DolbyMS12EnableMixerMaxSize(int enable);
 
     virtual unsigned long long DolbyMS12GetDecoderNFramesPcmOutput(void *ms12_pointer, int format, int is_main);
 

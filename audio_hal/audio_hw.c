@@ -9067,7 +9067,14 @@ void *audio_patch_input_threadloop(void *data)
             int period_mul = 1;//convert_audio_format_2_period_mul(patch->aformat);
             int read_threshold = 0;
             read_bytes = in->config.period_size * audio_stream_in_frame_size(&in->stream) * period_mul;
-
+            bool hdmi_raw_in_flag = patch && (patch->input_src == AUDIO_DEVICE_IN_HDMI) && (!audio_is_linear_pcm(patch->aformat));
+            if (hdmi_raw_in_flag) {
+                read_bytes = read_bytes / 2;
+                if (patch->aformat == AUDIO_FORMAT_MAT) {
+                    read_bytes = read_bytes * 4;
+                    read_threshold = 2 * read_bytes;
+                }
+            }
             if (patch->input_src == AUDIO_DEVICE_IN_LINE) {
                 read_threshold = 4 * read_bytes;
             }
@@ -9230,7 +9237,15 @@ void *audio_patch_output_threadloop(void *data)
     aml_audio_set_cpu23_affinity();
 
     while (!patch->output_thread_exit) {
-        int period_mul = (patch->aformat == AUDIO_FORMAT_E_AC3) ? EAC3_MULTIPLIER : 1;
+        int period_mul;
+        if (patch->aformat == AUDIO_FORMAT_E_AC3)
+            period_mul = EAC3_MULTIPLIER;
+        else if ((patch->aformat == AUDIO_FORMAT_MAT) || (patch->aformat == AUDIO_FORMAT_DTS_HD))
+            period_mul = HBR_MULTIPLIER;
+        else {
+            period_mul = 1;
+        }
+        //ALOGI("%s  period_mul = %d ", __func__, period_mul);
 
         if (aml_dev->game_mode)
             write_bytes = LOW_LATENCY_PLAYBACK_PERIOD_SIZE * audio_stream_out_frame_size(&out->stream);

@@ -33,6 +33,14 @@
 
 #include "alsa_device_parser.h"
 
+#define AML_DCA_SW_CORE_16M             0x7ffe8001  ///< dts-cd 16bit 1024 framesize
+#define AML_DCA_SW_CORE_14M             0x1fffe800  ///< dts-cd 14bit 1024 or 512 framesize
+#define AML_DCA_SW_CORE_16              0xfe7f0180  ///< dts-cd 16bit 1024 framesize
+#define AML_DCA_SW_CORE_14              0xff1f00e8  ///< dts-cd 14bit 1024 or 512 framesize
+#define DTSCD_FRAMESIZE1                2048    // Bytes
+#define DTSCD_FRAMESIZE2                4096    // Bytes
+#define WAIT_COUNT_MAX 30
+
 /*Find the position of 61937 sync word in the buffer*/
 static int seek_61937_sync_word(char *buffer, int size)
 {
@@ -48,7 +56,7 @@ static int seek_61937_sync_word(char *buffer, int size)
         if (buffer[i + 0] == 0x72 && buffer[i + 1] == 0xf8 && buffer[i + 2] == 0x1f && buffer[i + 3] == 0x4e) {
             return i;
         }
-        if (buffer[i + 0] == 0x4e && buffer[i + 1] == 0x1f && buffer[i + 2] == 0xf8 && buffer[i + 3] == 0x72) {
+        if (buffer[i + 0] == 0xf8 && buffer[i + 1] == 0x72 && buffer[i + 2] == 0x4e && buffer[i + 3] == 0x1f) {
             return i;
         }
     }
@@ -365,18 +373,12 @@ int audio_type_parse(void *buffer, size_t bytes, int *package_size, audio_channe
     uint32_t *tmp_pc;
     uint32_t pc = 0;
     uint32_t tmp = 0;
+    static unsigned int _dts_cd_sync_count = 0;
+    static unsigned int _dtscd_checked_bytes = 0;
+
+    //DoDumpData(temp_buffer, bytes, CC_DUMP_SRC_TYPE_INPUT_PARSE);
 
     pos_sync_word = seek_61937_sync_word((char*)temp_buffer, bytes);
-    pos_dtscd_sync_word = seek_dts_cd_sync_word((char*)temp_buffer, bytes);
-
-    DoDumpData(temp_buffer, bytes, CC_DUMP_SRC_TYPE_INPUT_PARSE);
-
-    if (pos_dtscd_sync_word >= 0) {
-        AudioType = DTSCD;
-        *package_size = DTSHD_PERIOD_SIZE * 2;
-        ALOGV("%s() %d data format: %d *package_size %d\n", __FUNCTION__, __LINE__, AudioType, *package_size);
-        return AudioType;
-    }
 
     if (pos_sync_word >= 0) {
         tmp_pc = (uint32_t*)(temp_buffer + pos_sync_word + 4);
@@ -435,8 +437,44 @@ int audio_type_parse(void *buffer, size_t bytes, int *package_size, audio_channe
             AudioType = LPCM;
             break;
         }
-        ALOGV("%s() data format: %d, *package_size %d, input size %zu\n",
+        _dts_cd_sync_count = 0;
+        _dtscd_checked_bytes = 0;
+        ALOGI("%s() data format: %d, *package_size %d, input size %zu\n",
               __FUNCTION__, AudioType, *package_size, bytes);
+    } else {
+        pos_dtscd_sync_word = seek_dts_cd_sync_word((unsigned char*)temp_buffer, bytes);
+        if (pos_dtscd_sync_word >= 0) {
+            do {
+                ///< Check it was found the first time
+                if (_dts_cd_sync_count < 1) {
+                    _dtscd_checked_bytes += (bytes - pos_dtscd_sync_word);
+                    _dts_cd_sync_count++;
+                    break;
+                }
+
+                ///< Check if the framesize of dtscd is aligned.
+                _dtscd_checked_bytes += pos_dtscd_sync_word;
+                if (_dtscd_checked_bytes == DTSCD_FRAMESIZE1 || _dtscd_checked_bytes == DTSCD_FRAMESIZE2) {
+                    AudioType = DTSCD;
+                    *package_size = DTSHD_PERIOD_SIZE * 2;
+                    ALOGV("%s() %d data format: %d *package_size %d\n", __FUNCTION__, __LINE__, AudioType, *package_size);
+                    return AudioType;
+                } else {
+                    _dtscd_checked_bytes = 0;   // Invalid dtscd framesize, clear
+                    _dts_cd_sync_count = 0;
+                }
+
+            } while (0);
+
+        } else {
+            if (_dts_cd_sync_count > 0) { // Incoming dtscd frames may be truncated, need to accumulate.
+                _dtscd_checked_bytes += bytes;
+                if (_dtscd_checked_bytes > DTSCD_FRAMESIZE2) {
+                    _dtscd_checked_bytes = 0;   // Invalid dtscd framesize, clear
+                    _dts_cd_sync_count = 0;
+                }
+            }
+        }
     }
     return AudioType;
 }
@@ -453,7 +491,7 @@ static int get_config_by_params(struct pcm_config *config_in, bool normal_pcm)
     config_in->rate = 48000;
     config_in->format = PCM_FORMAT_S16_LE;
     config_in->period_size = PARSER_DEFAULT_PERIOD_SIZE;
-    config_in->period_count = 4;
+    config_in->period_count = 16;
 
     return 0;
 }
@@ -493,7 +531,7 @@ static int audio_type_parse_init(audio_type_parse_t *status)
 
     if (audio_type_status->soft_parser) {
         in = pcm_open(audio_type_status->card, audio_type_status->device,
-                      PCM_IN, &audio_type_status->config_in);
+                      PCM_IN| PCM_NONEBLOCK, &audio_type_status->config_in);
         if (!pcm_is_ready(in)) {
             ALOGE("open device failed: %s\n", pcm_get_error(in));
             pcm_close(in);
@@ -571,10 +609,10 @@ static int update_audio_type(audio_type_parse_t *status, int update_bytes, int s
     }
     if (audio_type_status->audio_type != LPCM && audio_type_status->cur_audio_type == LPCM) {
         /* check 2 period size of IEC61937 burst data to find syncword*/
-        if (audio_type_status->read_bytes > (audio_type_status->package_size * 2)) {
+        if (audio_type_status->read_bytes > (audio_type_status->package_size * 3)) {
+            ALOGI("no IEC61937 header found, PCM data! read_bytes = %d, package_size = %d\n", audio_type_status->read_bytes, audio_type_status->package_size);
             audio_type_status->audio_type = audio_type_status->cur_audio_type;
             audio_type_status->read_bytes = 0;
-            ALOGI("no IEC61937 header found, PCM data!\n");
             enable_HW_resample(mixer_handle, sr);
         }
         audio_type_status->read_bytes += update_bytes;
@@ -639,7 +677,7 @@ static void* audio_type_parse_threadloop(void *data)
     int bytes, ret = -1;
     int cur_samplerate = HW_RESAMPLE_48K;
     int last_cur_samplerate = HW_RESAMPLE_48K;
-    int read_bytes = 0;
+    int read_bytes = 0, read_back, nodata_count;
     int txlx_chip = check_chip_name("txlx", 4);
     int txl_chip = check_chip_name("txl", 3);
     int auge_chip = alsa_device_is_auge();
@@ -663,7 +701,7 @@ static void* audio_type_parse_threadloop(void *data)
         if (get_hdmiin_audio_mode(audio_type_status->mixer_handle) == HDMIIN_MODE_I2S) {
             resample_src = RESAMPLE_FROM_TDMIN_B;
         }
-        cur_samplerate = set_resample_source(audio_type_status->mixer_handle, RESAMPLE_FROM_FRHDMIRX);
+        cur_samplerate = set_resample_source(audio_type_status->mixer_handle, resample_src);
     }else if (audio_type_status->input_dev == AUDIO_DEVICE_IN_HDMI_ARC) {
         cur_samplerate = set_resample_source(audio_type_status->mixer_handle, RESAMPLE_FROM_EARCRX_DMAC);
     }else if (audio_type_status->input_dev == AUDIO_DEVICE_IN_SPDIF) {
@@ -704,7 +742,7 @@ static void* audio_type_parse_threadloop(void *data)
 
             //sw audio format detection.
             if (cur_samplerate == HW_RESAMPLE_192K) {
-                read_bytes = bytes * 4;
+                read_bytes = bytes * 4 * 2;
                 if (read_bytes > audio_type_status->period_bytes) {
                     audio_type_status->parse_buffer = aml_audio_realloc(audio_type_status->parse_buffer, read_bytes + 16);
                     audio_type_status->period_bytes = read_bytes;
@@ -712,16 +750,40 @@ static void* audio_type_parse_threadloop(void *data)
             } else {
                 read_bytes = bytes;
             }
+             /* non-blocking read prevent 10s stuck when switching TV sources */
+            nodata_count = 0;
+            read_back = 0;
+            while (read_back < read_bytes && audio_type_status->running_flag) {
             ret = pcm_read(audio_type_status->in, audio_type_status->parse_buffer + 3, read_bytes);
+            //ALOGI("read_back %d, read_bytes: %d, ret:%d", read_back, read_bytes, ret);
+            if (ret >= 0) {
+                    nodata_count = 0;
+                    read_back += ret;
+                } else if (ret != -EAGAIN) {
+                    ALOGD("%s:%d, pcm_read fail, ret:%#x, error info:%s",
+                        __func__, __LINE__, ret, strerror(errno));
+                    memset(audio_type_status->parse_buffer + 3, 0, read_bytes);
+                    break;
+                } else {
+                    if (nodata_count >= WAIT_COUNT_MAX) {
+                        nodata_count = 0;
+                        ALOGW("aml_alsa_input_read immediate return: read_bytes = %d, read_back = %d", read_bytes, read_back);
+                        memset(audio_type_status->parse_buffer + 3, 0,bytes);
+                        break;
+                    }
+                    nodata_count++;
+                    usleep((read_bytes - read_back) * 1000 / 4 / 48 / 2);
+                }
+            }
             if (ret >= 0) {
                 audio_type_status->cur_audio_type = audio_type_parse(audio_type_status->parse_buffer,
-                                                    read_bytes, &(audio_type_status->package_size),
+                                                    read_back, &(audio_type_status->package_size),
                                                     &(audio_type_status->audio_ch_mask));
                 //ALOGD("cur_audio_type=%d\n", audio_type_status->cur_audio_type);
-                memcpy(audio_type_status->parse_buffer, audio_type_status->parse_buffer + read_bytes, 3);
-                update_audio_type(audio_type_status, read_bytes, cur_samplerate);
+                memcpy(audio_type_status->parse_buffer, audio_type_status->parse_buffer + read_back, 3);
+                update_audio_type(audio_type_status, read_back, cur_samplerate);
             } else {
-                usleep(10 * 1000);
+                usleep(3 * 1000);
             }
         } else {
             if (auge_chip) {
@@ -748,7 +810,7 @@ static void* audio_type_parse_threadloop(void *data)
                     enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_DISABLE);
                 }
             }
-            usleep(10 * 1000);
+            usleep(3 * 1000);
             //ALOGE("fail to read bytes = %d\n", bytes);
         }
     }

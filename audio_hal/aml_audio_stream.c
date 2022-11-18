@@ -677,9 +677,8 @@ bool signal_status_check(audio_devices_t in_device, int *mute_time,
                         struct audio_stream_in *stream) {
     if (in_device & AUDIO_DEVICE_IN_HDMI) {
         bool hw_stable = is_hdmi_in_stable_hw(stream);
-        bool sw_stable = is_hdmi_in_stable_sw(stream);
-        if (!hw_stable || !sw_stable) {
-            ALOGV("%s() hw_stable %d sw_stable %d\n", __func__, hw_stable, sw_stable);
+        if (!hw_stable) {
+            ALOGV("%s() hw_stable %d \n", __func__, hw_stable);
             *mute_time = 100;
             return false;
         }
@@ -1252,6 +1251,14 @@ int reconfig_read_param_through_hdmiin(struct aml_audio_device *aml_dev,
         ALOGD("%s(), game pic mode %d, period size %d",
                 __func__, aml_dev->game_mode, period_size);
         stream_in->config.period_size = period_size;
+        if (!stream_in->standby) {
+            do_input_standby(stream_in);
+        }
+        s32Ret = start_input_stream(stream_in);
+        stream_in->standby = 0;
+        if (s32Ret < 0) {
+            ALOGE("[%s:%d] start input stream failed! ret:%#x", __func__, __LINE__, s32Ret);
+        }
         if (ringbuffer) {
             ring_buffer_reset_size(ringbuffer, buf_size);
         }

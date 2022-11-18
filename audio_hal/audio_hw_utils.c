@@ -702,9 +702,11 @@ int aml_audio_dump_audio_bitstreams(const char *path, const void *buf, size_t by
         return 0;
     }
 
-    FILE *fp = fopen(path, "a+");
+    FILE *fp = fopen(path, "ab+");
     if (fp) {
         int flen = fwrite((char *)buf, 1, bytes, fp);
+        if (flen != bytes)
+            ALOGI("write error!!");
         fclose(fp);
     }
 
