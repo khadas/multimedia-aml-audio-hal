@@ -551,6 +551,7 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     }
 
     if (p_hwsync->aout->msync_session) {
+        ALOGI("%s apts:%d", __func__, pts32);
         int r = av_sync_audio_start(p_hwsync->aout->msync_session, pts32, 0,
                                    aml_audio_hwsync_msync_callback, p_hwsync->aout);
 

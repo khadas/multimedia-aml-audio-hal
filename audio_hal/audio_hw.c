@@ -1578,6 +1578,16 @@ static int out_pause (struct audio_stream_out *stream)
 exit1:
     out->pause_status = true;
     if (out->msync_session) {
+        if (out->hwsync) {
+            uint32_t apts32 = out->hwsync->last_apts_from_header;
+            int latency = out_get_latency(stream);
+            struct audio_policy policy;
+            if (aml_getprop_bool("media.audiohal.ptslog"))
+                ALOGI("apts:%d, latency:%d ms", apts32, latency);
+            av_sync_audio_render(out->msync_session, apts32, &policy);
+            if (latency > 0 && latency < 100)
+                aml_audio_sleep(latency * 1000);
+        }
         av_sync_pause(out->msync_session, true);
     }
 exit:
@@ -7743,9 +7753,18 @@ hwsync_rewrite:
                                     ret = insert_output_bytes (aml_out, insert_size);
                                 }
                             }
+                            aml_audio_hwsync_set_first_pts(aml_out->hwsync, cur_pts);
                         }
-
-                        aml_audio_hwsync_set_first_pts(aml_out->hwsync, cur_pts);
+                        else if (aml_out->avsync_type == AVSYNC_TYPE_MSYNC) {
+                            struct audio_policy policy;
+                            int latency = out_get_latency(stream) * 90;
+                            uint32_t apts32 = (cur_pts - latency) & 0xffffffff;
+                            if (aml_getprop_bool("media.audiohal.ptslog"))
+                                ALOGI("apts:%d pts:%lld latency:%d", apts32, cur_pts, latency);
+                            aml_audio_hwsync_set_first_pts(aml_out->hwsync, apts32);
+                            if (aml_out->msync_session)
+                                av_sync_audio_render(aml_out->msync_session, apts32, &policy);
+                        }
                     } else {
                         if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type && has_video) {
                             uint64_t apts;
@@ -7807,6 +7826,9 @@ hwsync_rewrite:
                             struct audio_policy policy;
                             uint64_t latency = out_get_latency(stream) * 90;
                             uint32_t apts32 = (cur_pts - latency) & 0xffffffff;
+                            if (aml_getprop_bool("media.audiohal.ptslog"))
+                                ALOGI("apts:%d pts:%lld latency:%lld", apts32, cur_pts, latency);
+
                             av_sync_audio_render(aml_out->msync_session, apts32, &policy);
                             /* TODO: for non-amaster mode, handle sync policy on audio side */
                         }
