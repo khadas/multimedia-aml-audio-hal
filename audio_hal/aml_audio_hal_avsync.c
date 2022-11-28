@@ -286,7 +286,7 @@ void dtv_adjust_spdif_output_clock(struct aml_audio_patch* patch, int direct, in
     struct aml_mixer_handle * handle = &(aml_dev->alsa_mixer);
     int output_clock, i;
     unsigned int spidif_current_clock = 0;
-    eMixerCtrlID mixerID = spdifb ? AML_MIXER_ID_CHANGE_SPIDIFB_PLL : AML_MIXER_ID_CHANGE_SPIDIF_PLL;
+    eMixerCtrlID mixerID = spdifb ? AML_MIXER_ID_CHANGE_SPDIFB_PLL : AML_MIXER_ID_CHANGE_SPDIF_PLL;
 
     spidif_current_clock = aml_mixer_ctrl_get_int(handle, mixerID);
     if (spidif_current_clock > DEFAULT_SPDIF_PLL_DDP_CLOCK * 4 ||
@@ -300,7 +300,7 @@ void dtv_adjust_spdif_output_clock(struct aml_audio_patch* patch, int direct, in
                 aml_mixer_ctrl_set_int(handle, mixerID, output_clock);
             }
             if (aml_audio_get_debug_flag())
-                ALOGI("spidif_clock 1 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPIDIF_PLL));
+                ALOGI("spidif_clock 1 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPDIF_PLL));
         } else if (spidif_current_clock < patch->dtv_default_spdif_clock) {
             int value = patch->dtv_default_spdif_clock - spidif_current_clock;
             if (value > DEFAULT_DTV_OUTPUT_CLOCK) {
@@ -315,7 +315,7 @@ void dtv_adjust_spdif_output_clock(struct aml_audio_patch* patch, int direct, in
                 aml_mixer_ctrl_set_int(handle, mixerID, output_clock);
             }
             if (aml_audio_get_debug_flag())
-                ALOGI("spidif_clock 2 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPIDIF_PLL));
+                ALOGI("spidif_clock 2 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPDIF_PLL));
 
         } else {
             if (aml_audio_get_debug_flag())
@@ -329,7 +329,7 @@ void dtv_adjust_spdif_output_clock(struct aml_audio_patch* patch, int direct, in
                 aml_mixer_ctrl_set_int(handle, mixerID, output_clock);
             }
             if (aml_audio_get_debug_flag())
-                ALOGI("spidif_clock 3 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPIDIF_PLL));
+                ALOGI("spidif_clock 3 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPDIF_PLL));
         } else if (spidif_current_clock > patch->dtv_default_spdif_clock) {
             int value = spidif_current_clock - patch->dtv_default_spdif_clock;
             if (value > DEFAULT_DTV_OUTPUT_CLOCK) {
@@ -344,7 +344,7 @@ void dtv_adjust_spdif_output_clock(struct aml_audio_patch* patch, int direct, in
                 aml_mixer_ctrl_set_int(handle, mixerID, output_clock);
             }
             if (aml_audio_get_debug_flag())
-                ALOGI("spidif_clock 4 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPIDIF_PLL));
+                ALOGI("spidif_clock 4 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPDIF_PLL));
         } else {
             if (aml_audio_get_debug_flag())
                 ALOGI("spdif_SLOW clk %d,default %d",spidif_current_clock,patch->dtv_default_spdif_clock);
@@ -364,7 +364,7 @@ void dtv_adjust_spdif_output_clock(struct aml_audio_patch* patch, int direct, in
                 aml_mixer_ctrl_set_int(handle, mixerID, output_clock);
             }
             if (aml_audio_get_debug_flag())
-                ALOGI("spidif_clock 5 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPIDIF_PLL));
+                ALOGI("spidif_clock 5 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPDIF_PLL));
         } else if (spidif_current_clock < patch->dtv_default_spdif_clock) {
             int value = patch->dtv_default_spdif_clock - spidif_current_clock;
             if (value < 60 || value > DEFAULT_DTV_OUTPUT_CLOCK) {
@@ -375,7 +375,7 @@ void dtv_adjust_spdif_output_clock(struct aml_audio_patch* patch, int direct, in
                 aml_mixer_ctrl_set_int(handle, mixerID, output_clock);
             }
             if (aml_audio_get_debug_flag())
-                ALOGI("spidif_clock 6 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPIDIF_PLL));
+                ALOGI("spidif_clock 6 set %d to %d",spidif_current_clock,aml_mixer_ctrl_get_int(handle, AML_MIXER_ID_CHANGE_SPDIF_PLL));
         } else {
             return ;
         }

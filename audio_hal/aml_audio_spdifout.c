@@ -49,6 +49,7 @@ typedef struct spdifout_handle {
     bool need_extend_channel;
     size_t buf_size;
     void * temp_buf;
+    bool restore_hdmitx_selection;
 } spdifout_handle_t;
 
 
@@ -232,7 +233,7 @@ void aml_audio_set_spdif_format(int spdif_port, eMixerSpdif_Format aml_spdif_for
     }
 
     /* i2s2hdmi multi-ch use spdifa fmt too */
-    if (spdif_port == PORT_SPDIF || spdif_port == PORT_I2S2HDMI) {
+    if (spdif_port == PORT_SPDIF) {
         spdif_format_ctr_id = AML_MIXER_ID_SPDIF_FORMAT;
         if (aml_spdif_format == AML_DOLBY_DIGITAL_PLUS) {
             audio_route_set_spdif_mute(&aml_dev->alsa_mixer, 1);
@@ -246,27 +247,32 @@ void aml_audio_set_spdif_format(int spdif_port, eMixerSpdif_Format aml_spdif_for
         if (aml_dev->spdif_enable) {
             audio_route_set_spdif_mute(&aml_dev->alsa_mixer, 0);
         }
+    } else if (spdif_port == PORT_I2S2HDMI) {
+        spdif_format_ctr_id = AML_MIXER_ID_I2S2HDMI_FORMAT;
     }
 
     aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, spdif_format_ctr_id, aml_spdif_format);
 
     /*use same source for normal pcm case*/
-    if (aml_spdif_format == AML_STEREO_PCM || aml_spdif_format == AML_MULTI_CH_LPCM) {
-        //aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_TO_HDMI,  AML_SPDIF_A_TO_HDMITX);
+    if (aml_spdif_format == AML_STEREO_PCM) {
+        //aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_AUDIO_SRC_TO_HDMI,  AML_SPDIF_A_TO_HDMITX);
         aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_FORMAT, aml_spdif_format);
         //aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_B_FORMAT, aml_spdif_format);
+    } else if (aml_spdif_format == AML_MULTI_CH_LPCM) {
+        aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_I2S2HDMI_FORMAT, aml_spdif_format);
     }
     ALOGI("%s tinymix spdif_port:%d, SPDIF_FORMAT:%d", __func__, spdif_port, aml_spdif_format);
     return;
 }
 
-void aml_audio_select_spdif_to_hdmi(int spdif_select)
+void aml_audio_select_spdif_to_hdmi(int src_select)
 {
     struct aml_audio_device *aml_dev = (struct aml_audio_device *)adev_get_handle();
-    if ((spdif_select != AML_SPDIF_A_TO_HDMITX) && (spdif_select != AML_SPDIF_B_TO_HDMITX)) {
+    if (src_select >= AML_INVALID_TO_HDMITX) {
+        ALOGE("%s invalid hdmi src =%d", __func__, src_select);
         return;
     }
-    aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_TO_HDMI,  spdif_select);
+    aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_AUDIO_SRC_TO_HDMI,  src_select);
 
     return;
 }
@@ -279,6 +285,7 @@ static int spdifout_support_format(audio_format_t audio_format)
     case AUDIO_FORMAT_DTS:
     case AUDIO_FORMAT_DTS_HD:
     case AUDIO_FORMAT_MAT:
+    case AUDIO_FORMAT_DOLBY_TRUEHD:
     case AUDIO_FORMAT_IEC61937:
     case AUDIO_FORMAT_PCM_16_BIT:
         return true;
@@ -377,12 +384,16 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
         }
         ALOGI("%s channel =0x%x spdif format =0x%x spdif_port=0x%x", __func__, spdif_config->channel_mask, aml_spdif_format, phandle->spdif_port);
         /*set spdif format*/
-        if (phandle->spdif_port == PORT_SPDIF || phandle->spdif_port == PORT_I2S2HDMI) {
+        if (phandle->spdif_port == PORT_SPDIF) {
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_FORMAT, aml_spdif_format);
             ALOGI("%s set spdif format 0x%x", __func__, aml_spdif_format);
+        } else if (phandle->spdif_port == PORT_I2S2HDMI) {
+            aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_I2S2HDMI_FORMAT, aml_spdif_format);
+            ALOGI("%s set i2s to hdmi format 0x%x", __func__, aml_spdif_format);
         } else if (phandle->spdif_port == PORT_SPDIFB) {
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_B_FORMAT, aml_spdif_format);
             aml_audio_select_spdif_to_hdmi(AML_SPDIF_B_TO_HDMITX);
+            phandle->restore_hdmitx_selection = 1;
             ALOGI("%s set spdif_b format 0x%x", __func__, aml_spdif_format);
         } else if (phandle->spdif_port == PORT_EARC) {
 
@@ -403,6 +414,17 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
 
         /*open output alsa*/
         ret = aml_alsa_output_open_new(&alsa_handle, &stream_config, &device_config);
+        if (phandle->spdif_port == PORT_SPDIF) {
+            /*we have different output for hdmi and spdif, we choose tdm b to hdmi*/
+            ALOGI("optical =0x%x sink =0x%x", aml_dev->optical_format, aml_dev->sink_format);
+            if (aml_dev->optical_format != aml_dev->sink_format && aml_dev->sink_format == AUDIO_FORMAT_PCM_16_BIT) {
+                if (aml_dev->spdif_independent) {
+                    aml_audio_select_spdif_to_hdmi(aml_dev->hdmitx_src);
+                    phandle->restore_hdmitx_selection = 1;
+                }
+                aml_dev->raw_to_pcm_flag = true;
+            }
+        }
 
         if (ret != 0) {
             goto error;
@@ -550,12 +572,13 @@ int aml_audio_spdifout_close(void *phandle)
     }
 
     /*it is spdif a output*/
-    if (spdifout_phandle->spdif_port == PORT_SPDIF ||
-        spdifout_phandle->spdif_port == PORT_I2S2HDMI) {
+    if (spdifout_phandle->spdif_port == PORT_SPDIF) {
         aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_FORMAT, AML_STEREO_PCM);
-    } else if (spdifout_phandle->spdif_port == PORT_SPDIFB) {
-        /*it is spdif b output*/
-        aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_B_FORMAT, AML_STEREO_PCM);
+    } else if (spdifout_phandle->spdif_port == PORT_I2S2HDMI) {
+        /*i2s to  hdmitx case */
+        aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_I2S2HDMI_FORMAT, AML_STEREO_PCM);
+    }
+    if (spdifout_phandle->restore_hdmitx_selection) {
         aml_audio_select_spdif_to_hdmi(AML_SPDIF_A_TO_HDMITX);
     }
 

@@ -5362,13 +5362,13 @@ static void adev_get_cec_control_object(struct aml_audio_device *adev, char *tem
     int cec_control_tv = 0;
     if (!adev->is_TV && adev->dolby_lib_type != eDolbyMS12Lib) {
         enum AML_SPDIF_FORMAT format = AML_STEREO_PCM;
-        enum AML_SPDIF_TO_HDMITX spdif_index = aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_TO_HDMI);
+        enum AML_SRC_TO_HDMITX spdif_index = aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_AUDIO_SRC_TO_HDMI);
         if (spdif_index == AML_SPDIF_A_TO_HDMITX) {
             format = aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_FORMAT);
         } else if (spdif_index == AML_SPDIF_B_TO_HDMITX) {
             format = aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_B_FORMAT);
         } else {
-            ALOGW("[%s:%d] unsupported spdif index:%d, use the 2ch PCM.", __func__, __LINE__, spdif_index);
+            format = aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_I2S2HDMI_FORMAT);
         }
         cec_control_tv = (format == AML_STEREO_PCM) ? 0 : 1;
     }
@@ -10875,6 +10875,11 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     }
     //set msync log level
     log_set_level(AVS_LOG_INFO);
+
+    adev->hdmitx_src = aml_get_jason_int_value("HDMITX_Src_Select", -1);
+    if (adev->hdmitx_src != -1) {
+        adev->spdif_independent = true;
+    }
 
     ALOGD("%s: exit  dual_spdif_support(%d)", __func__, adev->dual_spdif_support);
     return 0;

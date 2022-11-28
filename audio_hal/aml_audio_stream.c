@@ -76,14 +76,6 @@ static audio_format_t get_sink_capability (struct aml_audio_device *adev)
         if (cap) {
             if ((strstr(cap, "AUDIO_FORMAT_MAT_2_0") != NULL) || (strstr(cap, "AUDIO_FORMAT_MAT_2_1") != NULL)) {
                 sink_capability = AUDIO_FORMAT_MAT;
-            }
-            /*
-             * Dolby MAT 1.0(TRUEHD inside) vs DDP+DD
-             * Dolby MS12 prefers to output DDP.
-             * But set sink as TrueHD, then TrueHD can encoded with MAT encoder in Passthrough mode.
-             */
-            else if (strstr(cap, "AUDIO_FORMAT_MAT_1_0") != NULL) {
-                sink_capability = AUDIO_FORMAT_DOLBY_TRUEHD;
             } else if (strstr(cap, "AUDIO_FORMAT_E_AC3") != NULL) {
                 sink_capability = AUDIO_FORMAT_E_AC3;
             } else if (strstr(cap, "AUDIO_FORMAT_AC3") != NULL) {
@@ -359,6 +351,20 @@ void get_sink_format(struct audio_stream_out *stream)
                 sink_audio_format = min(ms12_max_support_output_format(), sink_capability);
             }
             optical_audio_format = sink_audio_format;
+            /*if the sink device only support pcm, we check whether we can output dd or dts to spdif*/
+            if (adev->spdif_independent) {
+                if (sink_audio_format == AUDIO_FORMAT_PCM_16_BIT) {
+                    if (is_dts_format(source_format)) {
+                        optical_audio_format = min(source_format, AUDIO_FORMAT_DTS);
+                    } else {
+                        if (eDolbyMS12Lib == adev->dolby_lib_type) {
+                            optical_audio_format = AUDIO_FORMAT_AC3;
+                        } else {
+                            optical_audio_format = min(source_format, AUDIO_FORMAT_AC3);
+                        }
+                    }
+                }
+            }
             break;
         case BYPASS:
             if (is_dts_format(source_format)) {
@@ -367,6 +373,16 @@ void get_sink_format(struct audio_stream_out *stream)
                 sink_audio_format = get_suitable_output_format(aml_out, source_format, sink_capability);
             }
             optical_audio_format = sink_audio_format;
+            /*if the sink device only support pcm, we check whether we can output dd or dts to spdif*/
+            if (adev->spdif_independent) {
+                if (sink_audio_format == AUDIO_FORMAT_PCM_16_BIT) {
+                    if (is_dts_format(source_format)) {
+                        optical_audio_format = min(source_format, AUDIO_FORMAT_DTS);
+                    } else {
+                        optical_audio_format = min(source_format, AUDIO_FORMAT_AC3);
+                    }
+                }
+            }
             break;
         default:
             sink_audio_format = AUDIO_FORMAT_PCM_16_BIT;

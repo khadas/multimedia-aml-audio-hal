@@ -61,7 +61,7 @@ static struct aml_mixer_list gAmlMixerList[] = {
     {AML_MIXER_ID_ATV_IN_AUDIO_STABLE,  "ATV audio stable"},
     {AML_MIXER_ID_SPDIF_FORMAT,         "Audio spdif format"},
     {AML_MIXER_ID_SPDIF_B_FORMAT,       "Audio spdif_b format"},
-    {AML_MIXER_ID_SPDIF_TO_HDMI,        "Spdif to HDMITX Select"},
+    {AML_MIXER_ID_AUDIO_SRC_TO_HDMI,    "HDMITX Audio Source Select"},
 
     /* for AV status */
     {AML_MIXER_ID_AV_IN_AUDIO_STABLE,   "AV audio stable"},
@@ -75,9 +75,14 @@ static struct aml_mixer_list gAmlMixerList[] = {
     /* SPDIF IN audio SRC select */
     {AML_MIXER_ID_SPDIFIN_SRC,          "Audio spdifin source"},
     {AML_MIXER_ID_HDMIIN_AUDIO_PACKET,  "HDMIIN Audio Packet"},
-    {AML_MIXER_ID_CHANGE_SPIDIF_PLL,    "SPDIF CLK Fine Setting"},
-    {AML_MIXER_ID_CHANGE_SPIDIFB_PLL,   "SPDIF_B CLK Fine Setting"},
+    {AML_MIXER_ID_CHANGE_SPDIF_PLL,     "SPDIF CLK Fine Setting"},
+    {AML_MIXER_ID_CHANGE_SPDIF_PLL_PPM,     "SPDIF CLK Fine PPM Tuning"},
+    {AML_MIXER_ID_CHANGE_SPDIFB_PLL,    "SPDIF_B CLK Fine Setting"},
+    {AML_MIXER_ID_CHANGE_SPDIFB_PLL_PPM,    "SPDIF_B CLK Fine PPM Tuning"},
     {AML_MIXER_ID_CHANGE_I2S_PLL,       "TDM MCLK Fine Setting"},
+    {AML_MIXER_ID_CHANGE_I2S_PLL_PPM,       "TDM MCLK Fine PPM Tuning"},
+    {AML_MIXER_ID_CHANGE_EARC_PLL,      "eARC_TX CLK Fine Setting"},
+    {AML_MIXER_ID_CHANGE_EARC_PLL_PPM,      "eARC_TX CLK Fine PPM Tuning"},
     {AML_MIXER_ID_SPDIF_IN_SAMPLERATE,  "SPDIFIN audio samplerate"},
     {AML_MIXER_ID_HW_RESAMPLE_SOURCE,   "Hw resample module"},
     {AML_MIXER_ID_EARCRX_AUDIO_CODING_TYPE,   "eARC_RX Audio Coding Type"},
@@ -100,6 +105,9 @@ static struct aml_mixer_list gAmlMixerList[] = {
     {AML_MIXER_ID_VAD_ENABLE,           "VAD enable"},
     {AML_MIXER_ID_VAD_SOURCE_SEL,       "VAD Source sel"},
     {AML_MIXER_ID_VAD_SWITCH,           "VAD Switch"},
+    {AML_MIXER_ID_DTV_CLK_TUNING,       "DTV clk force MPLL"},
+    {AML_MIXER_ID_I2S2HDMI_FORMAT,    "Audio I2S to HDMITX Format"},
+    {AML_MIXER_ID_SPDIF_OUT_CHANNEL_STATUS, "spdif out channel status"},
 };
 
 static char *get_mixer_name_by_id(int mixer_id)

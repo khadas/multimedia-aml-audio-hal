@@ -814,7 +814,7 @@ int get_the_dolby_ms12_prepared(
         out = aml_out;
     }
     adev->ms12_out = out;
-    ALOGI("%s adev->ms12_out =  %p", __func__, adev->ms12_out);
+    ALOGI("%s adev->ms12_out =  %p, adev->sink_capability:0x%x", __func__, adev->ms12_out, adev->sink_capability);
     /************end**************/
     /*set the system app sound mixing enable*/
     if (adev->continuous_audio_mode) {

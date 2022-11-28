@@ -628,6 +628,10 @@ struct aml_audio_device {
     int minfo_atmos_flag;
 #endif
     bool audio_focus_enable;
+
+    /* board specific json configs */
+    int hdmitx_src; /* HDMITX src select for TDM */
+    bool spdif_independent;  /*spdif output can be independent with HDMI output*/
     /* -End- */
 };
 
