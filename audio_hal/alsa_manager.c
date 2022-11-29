@@ -207,6 +207,12 @@ int aml_alsa_output_open(struct audio_stream_out *stream) {
             config_raw.format = PCM_FORMAT_S16_LE;
             config = &config_raw;
             device = DIGITAL_DEVICE;
+        } else if (config->channels != 2) {
+            /* FIX ME                                               */
+            /* driver cannot support 6ch pcm, but netflix sends 6ch */
+            /* currently netflix always use Dolby MS12              */
+            /* so fix as 2ch, don't care sound                      */
+            config->channels = 2;
         }
     }
     int card = aml_out->card;
