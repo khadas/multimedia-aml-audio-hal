@@ -7622,7 +7622,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, const void *buf
         in order to get a low cpu loading, we enabled less ms12 modules in each
         hdmi in user case, we need reset the pipeline to get proper one.
         */
-        need_reset_decoder = digital_input_src ? true: false;
+        need_reset_decoder = true;//digital_input_src ? true: false;
         adev->arc_hdmi_updated = 0;
     }
     /* here to check if the hdmi audio output format dynamic changed. */
