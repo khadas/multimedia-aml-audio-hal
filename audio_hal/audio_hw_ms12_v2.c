@@ -2840,7 +2840,7 @@ bool is_bypass_dolbyms12(struct audio_stream_out *stream)
 bool is_audio_postprocessing_add_dolbyms12_dap(struct aml_audio_device *adev)
 {
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    bool is_dap_enable = (adev->active_outport == OUTPORT_SPEAKER) && (!adev->ms12.dap_bypass_enable);
+    bool is_dap_enable = (adev->active_outport == OUTPORT_SPEAKER) && (!adev->ms12.dap_bypass_enable) && adev->is_TV;
 
     /* Dolby MS12 V2 uses DAP Tuning file */
     if (adev->is_ms12_tuning_dat) {
