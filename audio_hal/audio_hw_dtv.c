@@ -3615,10 +3615,16 @@ static void *audio_dtv_patch_process_threadloop_v2(void *data)
                     patch->aformat = AUDIO_FORMAT_DTS;
                     patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_AAC ) {
-                    patch->aformat = AUDIO_FORMAT_AAC;
+                    if (eDolbyMS12Lib == aml_dev->dolby_lib_type_last)
+                        patch->aformat = AUDIO_FORMAT_HE_AAC_V2;
+                    else
+                        patch->aformat = AUDIO_FORMAT_AAC;
                     patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_AAC_LATM) {
-                    patch->aformat = AUDIO_FORMAT_AAC_LATM;
+                    if (eDolbyMS12Lib == aml_dev->dolby_lib_type_last)
+                        patch->aformat = AUDIO_FORMAT_HE_AAC_V1;
+                    else
+                        patch->aformat = AUDIO_FORMAT_AAC_LATM;
                     patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_MPEG ) {
                     patch->aformat = AUDIO_FORMAT_MP3;

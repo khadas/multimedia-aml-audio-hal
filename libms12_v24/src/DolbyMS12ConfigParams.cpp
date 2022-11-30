@@ -290,7 +290,7 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
                 setInputCMDMask("-imac4");
-            } else if ((mAudioStreamOutFormat == AUDIO_FORMAT_AAC) || (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1)) {
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1) {
                 //fixme, which he-aac format is allowed to this flow.
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V1_FILE_NAME);
                 (*row_index)++;
@@ -366,7 +366,7 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
-            } else if ((mAudioStreamOutFormat == AUDIO_FORMAT_AAC) || (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1)) {
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1) {
                 sprintf(ConfigParams[*row_index], "%s", "-im");
                 setInputCMDMask("-imheaac");
                 (*row_index)++;
@@ -404,62 +404,127 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
 
     // have active OTT signal,then configure input Main program input filename? zz
     if (mActivateOTTSignal == true) {
-        if ((mAudioStreamOutFormat == AUDIO_FORMAT_AC3) || (mAudioStreamOutFormat == AUDIO_FORMAT_E_AC3) || mMain1IsDummy) {
-            sprintf(ConfigParams[*row_index], "%s", "-im");
-            setInputCMDMask("-imddp");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%s", mDolbyMain1FileName);
-            (*row_index)++;
+        if (mHasAssociateInput == false) {
+            if ((mAudioStreamOutFormat == AUDIO_FORMAT_AC3) || (mAudioStreamOutFormat == AUDIO_FORMAT_E_AC3) || mMain1IsDummy) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imddp");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", mDolbyMain1FileName);
+                (*row_index)++;
 
-            sprintf(ConfigParams[*row_index], "%s", "-im2");
-            setInputCMDMask("-im2");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%s", mDolbyMain2FileName);
-            (*row_index)++;
-            ALOGD("%s() main1 %s main2 %s", __FUNCTION__, mDolbyMain1FileName, mDolbyMain2FileName);
-        } else if (mAudioStreamOutFormat == AUDIO_FORMAT_MAT) {
-            sprintf(ConfigParams[*row_index], "%s", "-im");
-            setInputCMDMask("-immat");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MAT_FILE_NAME);
-            (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", "-im2");
+                setInputCMDMask("-im2");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", mDolbyMain2FileName);
+                (*row_index)++;
+                ALOGD("%s() main1 %s main2 %s", __FUNCTION__, mDolbyMain1FileName, mDolbyMain2FileName);
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_MAT) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-immat");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MAT_FILE_NAME);
+                (*row_index)++;
 
-            sprintf(ConfigParams[*row_index], "%s", "-im2");
-            setInputCMDMask("-im2");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%s", mDolbyMain2FileName);
-            (*row_index)++;
-            ALOGD("%s() main1 %s main2 %s", __FUNCTION__, mDolbyMain1FileName, mDolbyMain2FileName);
-        } else if (mAudioStreamOutFormat == AUDIO_FORMAT_DOLBY_TRUEHD) {
-            sprintf(ConfigParams[*row_index], "%s", "-im");
-            setInputCMDMask("-immlp");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MLP_FILE_NAME);
-            (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", "-im2");
+                setInputCMDMask("-im2");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", mDolbyMain2FileName);
+                (*row_index)++;
+                ALOGD("%s() main1 %s main2 %s", __FUNCTION__, mDolbyMain1FileName, mDolbyMain2FileName);
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_DOLBY_TRUEHD) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-immlp");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_MLP_FILE_NAME);
+                (*row_index)++;
 
-            sprintf(ConfigParams[*row_index], "%s", "-im2");
-            setInputCMDMask("-im2");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%s", mDolbyMain2FileName);
-            (*row_index)++;
-            ALOGD("%s() main1 %s main2 %s", __FUNCTION__, mDolbyMain1FileName, mDolbyMain2FileName);
-        } else if (mAudioStreamOutFormat == AUDIO_FORMAT_AC4) {
-            sprintf(ConfigParams[*row_index], "%s", "-im");
-            setInputCMDMask("-imac4");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_AC4_FILE_NAME);
-            (*row_index)++;
-            ALOGD("%s() main1 %s", __FUNCTION__, mDolbyMain1FileName);
-        }
-        if (mOTTSoundInputEnable == true &&
-            mAudioStreamOutFormat != AUDIO_FORMAT_AC4 &&
-            mAudioStreamOutFormat != AUDIO_FORMAT_DOLBY_TRUEHD &&
-            mAudioStreamOutFormat != AUDIO_FORMAT_MAT) {
-            sprintf(ConfigParams[*row_index], "%s", "-iui");
-            setInputCMDMask("-iui");
-            (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%s", DEFAULT_OTT_PCM_FILE_NAME);
-            (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", "-im2");
+                setInputCMDMask("-im2");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", mDolbyMain2FileName);
+                (*row_index)++;
+                ALOGD("%s() main1 %s main2 %s", __FUNCTION__, mDolbyMain1FileName, mDolbyMain2FileName);
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_AC4) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imac4");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_AC4_FILE_NAME);
+                (*row_index)++;
+                ALOGD("%s() main1 %s", __FUNCTION__, mDolbyMain1FileName);
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1){
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imheaac");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V1_FILE_NAME);
+                (*row_index)++;
+                ALOGD("%s() main1 %s", __FUNCTION__, DEFAULT_MAIN_HEAAC_V1_FILE_NAME);
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V2) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imheaac");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V2_FILE_NAME);
+                (*row_index)++;
+                ALOGD("%s() main1 %s", __FUNCTION__, DEFAULT_MAIN_HEAAC_V2_FILE_NAME);
+            }
+            if (mOTTSoundInputEnable == true &&
+                mAudioStreamOutFormat != AUDIO_FORMAT_AC4 &&
+                mAudioStreamOutFormat != AUDIO_FORMAT_DOLBY_TRUEHD &&
+                mAudioStreamOutFormat != AUDIO_FORMAT_MAT &&
+                mAudioStreamOutFormat != AUDIO_FORMAT_HE_AAC_V1 &&
+                mAudioStreamOutFormat != AUDIO_FORMAT_HE_AAC_V2) {
+                sprintf(ConfigParams[*row_index], "%s", "-iui");
+                setInputCMDMask("-iui");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_OTT_PCM_FILE_NAME);
+                (*row_index)++;
+            }
+        } else {
+            /* ott mode with associate audio */
+            if ((mAudioStreamOutFormat == AUDIO_FORMAT_AC3) ||
+                (mAudioStreamOutFormat == AUDIO_FORMAT_E_AC3)) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imddp");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_DDP_FILE_NAME);
+                (*row_index)++;
+
+                sprintf(ConfigParams[*row_index], "%s", "-ia");
+                setInputCMDMask("-ia");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_DDP_FILE_NAME);
+                (*row_index)++;
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_AC4) {
+                /* do we have second stream for ac4? */
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imac4");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_AC4_FILE_NAME);
+                (*row_index)++;
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1){
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imheaac");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V1_FILE_NAME);
+                (*row_index)++;
+
+                sprintf(ConfigParams[*row_index], "%s", "-ia");
+                setInputCMDMask("-ia");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_HEAAC_V1_FILE_NAME);
+                (*row_index)++;
+            } else if (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V2){
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-imheaac");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V2_FILE_NAME);
+                (*row_index)++;
+
+                sprintf(ConfigParams[*row_index], "%s", "-ia");
+                setInputCMDMask("-ia");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_HEAAC_V2_FILE_NAME);
+                (*row_index)++;
+            }
         }
     }
 
@@ -1180,8 +1245,8 @@ int DolbyMS12ConfigParams::SetAc4Switches(char **ConfigParams, int *row_index)
 int DolbyMS12ConfigParams::SetHEAACSwitches(char **ConfigParams, int *row_index)
 {
     ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
-    if ((mHasAssociateInput == true) && ((mAudioStreamOutFormat == AUDIO_FORMAT_AAC) || \
-                                         (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1) || (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V2))) {
+    if ((mHasAssociateInput == true) && \
+        ((mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V1) || (mAudioStreamOutFormat == AUDIO_FORMAT_HE_AAC_V2))) {
         {
             sprintf(ConfigParams[*row_index], "%s", "-as");
             (*row_index)++;

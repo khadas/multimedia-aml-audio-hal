@@ -3412,6 +3412,7 @@ bool is_rebuild_the_ms12_pipeline(    audio_format_t main_input_fmt, audio_forma
     bool is_ott_format_alive = (main_input_fmt == AUDIO_FORMAT_AC3) || \
                                 ((main_input_fmt & AUDIO_FORMAT_E_AC3) == AUDIO_FORMAT_E_AC3) || \
                                 (main_input_fmt == AUDIO_FORMAT_PCM_16_BIT);
+    bool is_aac_alive = (main_input_fmt == AUDIO_FORMAT_HE_AAC_V1) || (main_input_fmt == AUDIO_FORMAT_HE_AAC_V2);
     ALOGD("%s line %d is_ac4_alive %d is_mat_alive %d is_ott_format_alive %d\n",__func__, __LINE__, is_ac4_alive, is_mat_alive, is_ott_format_alive);
 
     bool request_ac4_alive = (hal_internal_format == AUDIO_FORMAT_AC4);
@@ -3419,6 +3420,7 @@ bool is_rebuild_the_ms12_pipeline(    audio_format_t main_input_fmt, audio_forma
     bool request_ott_format_alive = (hal_internal_format == AUDIO_FORMAT_AC3) || \
                                 ((hal_internal_format & AUDIO_FORMAT_E_AC3) == AUDIO_FORMAT_E_AC3) || \
                                 (hal_internal_format == AUDIO_FORMAT_PCM_16_BIT);
+    bool request_aac_alive = (hal_internal_format == AUDIO_FORMAT_HE_AAC_V1) || (hal_internal_format == AUDIO_FORMAT_HE_AAC_V2);
     ALOGD("%s line %d request_ac4_alive %d request_mat_alive %d request_ott_format_alive %d\n",__func__, __LINE__, request_ac4_alive, request_mat_alive, request_ott_format_alive);
 
     if (request_ac4_alive && (is_ac4_alive^request_ac4_alive)) {
@@ -3438,8 +3440,10 @@ bool is_rebuild_the_ms12_pipeline(    audio_format_t main_input_fmt, audio_forma
         ALOGD("%s line %d main_input_fmt %#x hal_internal_format %#x (request_ott_format_alive^is_ac4_alive) %d (request_ott_format_alive^is_mat_alive) %d\n",
             __func__, __LINE__, main_input_fmt, hal_internal_format, (request_ott_format_alive^is_ac4_alive), (request_ott_format_alive^is_mat_alive));
         return (request_ott_format_alive^is_ac4_alive) || (request_ott_format_alive^is_mat_alive);
-    }
-    else {
+    } else if (request_aac_alive && (is_aac_alive^request_aac_alive)) {
+        ALOGD("%s line %d \n", __func__, __LINE__);
+        return true;
+    } else {
         ALOGE("%s line %d main_input_fmt %#x hal_internal_format %#x return false\n",
             __func__, __LINE__, main_input_fmt, hal_internal_format);
         return false;

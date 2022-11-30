@@ -7721,7 +7721,9 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
                                                       aformat != AUDIO_FORMAT_DOLBY_TRUEHD);
                 dolby_ms12_set_dolby_main1_as_dummy_file((aformat != AUDIO_FORMAT_AC4) &&
                                                          (aformat != AUDIO_FORMAT_MAT) &&
-                                                         (aformat != AUDIO_FORMAT_DOLBY_TRUEHD));
+                                                         (aformat != AUDIO_FORMAT_DOLBY_TRUEHD)&&
+                                                        (aformat != AUDIO_FORMAT_HE_AAC_V1) &&
+                                                        (aformat != AUDIO_FORMAT_HE_AAC_V2));
             }
             ring_buffer_reset(&adev->spk_tuning_rbuf);
             adev->ms12.is_continuous_paused = false;

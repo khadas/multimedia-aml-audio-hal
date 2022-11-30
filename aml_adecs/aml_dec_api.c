@@ -73,8 +73,7 @@ static aml_dec_func_t * get_decoder_function(audio_format_t format)
         return  &aml_mad_func;
     }
     case AUDIO_FORMAT_AAC:
-    case AUDIO_FORMAT_AAC_LATM:
-    case AUDIO_FORMAT_HE_AAC_V2: {
+    case AUDIO_FORMAT_AAC_LATM:{
         return  &aml_faad_func;
     }
     case AUDIO_FORMAT_FLAC: {

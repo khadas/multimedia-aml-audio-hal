@@ -561,6 +561,11 @@ int get_codec_type(int format)
     case AUDIO_FORMAT_PCM_16_BIT:
     case AUDIO_FORMAT_PCM_32_BIT:
         return TYPE_PCM;
+    case AUDIO_FORMAT_AAC:
+        return TYPE_AAC;
+    case AUDIO_FORMAT_HE_AAC_V1:
+    case AUDIO_FORMAT_HE_AAC_V2:
+        return TYPE_HEAAC;
     default:
         return TYPE_PCM;
     }
@@ -1643,7 +1648,9 @@ bool is_disable_ms12_continuous(struct audio_stream_out *stream) {
         (aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD) ||
         (aml_out->hal_internal_format == AUDIO_FORMAT_DOLBY_TRUEHD) ||
         (aml_out->hal_internal_format == AUDIO_FORMAT_MAT) ||
-        (aml_out->hal_internal_format == AUDIO_FORMAT_IEC61937)) {
+        (aml_out->hal_internal_format == AUDIO_FORMAT_IEC61937)||
+        (aml_out->hal_internal_format == AUDIO_FORMAT_HE_AAC_V1) ||
+        (aml_out->hal_internal_format == AUDIO_FORMAT_HE_AAC_V2)) {
         return true;
     } else if (aml_out->hal_internal_format == AUDIO_FORMAT_AC3 \
                || aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3) {
