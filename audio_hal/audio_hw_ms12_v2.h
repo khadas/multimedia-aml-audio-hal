@@ -280,7 +280,7 @@ bool is_ms12_output_compatible(struct audio_stream_out *stream, audio_format_t n
 /*
  *@brief dynamicly set dolby ms12 drc parameters
  */
-void dynamic_set_dolby_ms12_drc_parameters(struct dolby_ms12_desc *ms12);
+void dynamic_set_dolby_ms12_drc_parameters(struct dolby_ms12_desc *ms12, unsigned int mode_control);
 
 /*
  *@brief get ms12 pipeline latency

@@ -122,8 +122,7 @@ int aml_audio_get_latency_offset(enum OUT_PORT port,audio_format_t source_format
                                  audio_format_t sink_format,int ms12_enable,int is_eARC);
 uint32_t tspec_diff_to_us(struct timespec tval_old,
         struct timespec tval_new);
-int aml_audio_get_dolby_drc_mode(int *drc_mode, int *drc_cut, int *drc_boost);
-int aml_audio_get_dolby_dap_drc_mode(int *drc_mode, int *drc_cut, int *drc_boost);
+int aml_audio_get_drc_mode(int *drc_mode, int *drc_cut, int *drc_boost, uint32_t mode_control);
 void aml_audio_set_cpu23_affinity();
 void * aml_audio_get_muteframe(audio_format_t output_format, int * frame_size, int bAtmos);
 void aml_audio_switch_output_mode(int16_t *buf, size_t bytes, AM_AOUT_OutputMode_t mode);
@@ -159,13 +158,13 @@ bool aml_audio_check_sbr_product();
 
 int aml_audio_trace_int(char *name, int value);
 int aml_audio_trace_debug_level(void);
-
+int aml_audio_set_drc_control(char *pointer, uint32_t *drc_mode_ctl);
 /** convert the audio input format to in buffer's period multi coefficient.
  * @return period multi coefficient(1/4/16)
  */
 int convert_audio_format_2_period_mul(audio_format_t format);
-
 float aml_audio_get_focus_volume_ratio();
+int aml_audio_get_drc_control(struct aml_mixer_handle *mixer_handle);
 
 static inline void endian16_convert(void *buf, int size)
 {

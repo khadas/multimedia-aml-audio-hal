@@ -540,6 +540,9 @@ int dcv_decoder_init_patch(aml_dec_t ** ppaml_dec, aml_dec_config_t * dec_config
     dcv_decoder_config(aml_dec, AML_DEC_CONFIG_MIXING_ENABLE, dec_config);
     dcv_decoder_config(aml_dec, AML_DEC_CONFIG_AD_VOL, dec_config);
 
+    dcv_decoder_config(aml_dec, AML_DEC_CONFIG_DRC_CONTROL, dec_config);
+    dcv_decoder_config(aml_dec, AML_DEC_CONFIG_DOWNMIX_TYPE, dec_config);
+
     * ppaml_dec = (aml_dec_t *)ddp_dec;
     ALOGI("%s success", __func__);
     return 0;
@@ -951,6 +954,16 @@ int dcv_decoder_config(aml_dec_t * aml_dec, aml_dec_config_type_t config_type, a
             mixer_level = -32;
         ALOGI("dec_config->mixer_level %d",mixer_level);
         ret = (*ddp_decoder_config)(handle, DDP_CONFIG_MIXER_LEVEL, (ddp_config_t *)&mixer_level);
+        break;
+    }
+    case AML_DEC_CONFIG_DRC_CONTROL: {
+        ALOGI("drc_control 0x%x", dec_config->drc_control);
+        ret = (*ddp_decoder_config)(handle, DDP_CONFIG_DRC_CONTROL, (ddp_config_t *)&dec_config->drc_control);
+        break;
+    }
+    case AML_DEC_CONFIG_DOWNMIX_TYPE: {
+        ALOGI("downmix type %d",dec_config->downmix_type);
+        ret = (*ddp_decoder_config)(handle, DDP_CONFIG_DOWNMIX_TYPE, (ddp_config_t *)&dec_config->downmix_type);
         break;
     }
     default:

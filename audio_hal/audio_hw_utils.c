@@ -62,6 +62,7 @@
 
 //DRC Mode
 #define DDPI_UDC_COMP_LINE 2
+#define DRC_CONTROL_MODE_RF 3
 #define DRC_MODE_BIT  0
 #define DRC_HIGH_CUT_BIT 3
 #define DRC_LOW_BST_BIT 16
@@ -1256,52 +1257,17 @@ uint32_t tspec_diff_to_us(struct timespec tval_old,
             + (tval_new.tv_nsec - tval_old.tv_nsec) / 1000;
 }
 
-
-int aml_audio_get_dolby_drc_mode(int *drc_mode, int *drc_cut, int *drc_boost)
+int aml_audio_get_drc_mode(int *drc_mode, int *drc_cut, int *drc_boost, uint32_t mode_control)
 {
     char cEndpoint[PROPERTY_VALUE_MAX];
     int ret = 0;
-    unsigned ac3_drc_control = (DDPI_UDC_COMP_LINE<<DRC_MODE_BIT)|(100<<DRC_HIGH_CUT_BIT)|(100<<DRC_LOW_BST_BIT);
-    ac3_drc_control = get_sysfs_int("/sys/class/audiodsp/ac3_drc_control");
 
     if (!drc_mode || !drc_cut || !drc_boost)
         return -1;
-    *drc_mode = ac3_drc_control&3;
-    ALOGI("drc mode from sysfs %s\n",str_compmode[*drc_mode]);
-    ret = property_get("ro.vendor.dolby.drcmode",cEndpoint,"");
-    if (ret > 0) {
-        *drc_mode = atoi(cEndpoint)&3;
-        ALOGI("drc mode from prop %s\n",str_compmode[*drc_mode]);
-    }
-    *drc_cut  = (ac3_drc_control>>DRC_HIGH_CUT_BIT)&0xff;
-    *drc_boost  = (ac3_drc_control>>DRC_LOW_BST_BIT)&0xff;
-    ALOGI("dd+ drc mode %s,high cut %d pct,low boost %d pct\n",
-        str_compmode[*drc_mode],*drc_cut, *drc_boost);
-    return 0;
-}
-
-int aml_audio_get_dolby_dap_drc_mode(int *drc_mode, int *drc_cut, int *drc_boost)
-{
-    char cEndpoint[PROPERTY_VALUE_MAX];
-    int ret = 0;
-    unsigned dap_drc_control = (DDPI_UDC_COMP_LINE<<DRC_MODE_BIT)|(100<<DRC_HIGH_CUT_BIT)|(100<<DRC_LOW_BST_BIT);
-    dap_drc_control = get_sysfs_int("/sys/class/audiodsp/dap_drc_control");
-
-    if (dap_drc_control == -1)
-        return -1;
-
-    if (!drc_mode || !drc_cut || !drc_boost)
-        return -1;
-    *drc_mode = dap_drc_control&3;
-    ALOGI("drc mode from sysfs %s\n",str_compmode[*drc_mode]);
-    ret = property_get("ro.dolby.dapdrcmode",cEndpoint,"");
-    if (ret > 0) {
-        *drc_mode = atoi(cEndpoint)&3;
-        ALOGI("drc mode from prop %s\n",str_compmode[*drc_mode]);
-    }
-    *drc_cut  = (dap_drc_control>>DRC_HIGH_CUT_BIT)&0xff;
-    *drc_boost  = (dap_drc_control>>DRC_LOW_BST_BIT)&0xff;
-    ALOGI("dap drc mode %s,high cut %d pct,low boost %d pct\n",
+    *drc_mode = mode_control&3;
+    *drc_cut  = (mode_control>>DRC_HIGH_CUT_BIT)&0xff;
+    *drc_boost  = (mode_control>>DRC_LOW_BST_BIT)&0xff;
+    ALOGI("drc mode %s,high cut %d pct,low boost %d pct",
         str_compmode[*drc_mode],*drc_cut, *drc_boost);
     return 0;
 }
@@ -2154,4 +2120,32 @@ float aml_audio_get_focus_volume_ratio()
     }
 
     return ratio/100.0L;
+}
+
+int aml_audio_set_drc_control(char *pointer, uint32_t *drc_mode_ctl)
+{
+    char tmp[10];
+    int drc_mode, drc_cut, drc_boost;
+    ALOGI("[%s:%d] %s", __FUNCTION__, __LINE__, pointer);
+    if (sscanf(pointer, "%s %d %s %d %s %d",tmp, &drc_mode,
+        tmp, &drc_boost, tmp, &drc_cut) == 6) {
+        ALOGI("[%s:%d] mode: %d, cut:%d, boost:%d", __FUNCTION__, __LINE__, drc_mode, drc_cut, drc_boost);
+        drc_mode = (drc_mode == 0)? DDPI_UDC_COMP_LINE: DRC_CONTROL_MODE_RF;
+        *drc_mode_ctl = (drc_mode<<DRC_MODE_BIT)|(drc_cut<<DRC_HIGH_CUT_BIT)|(drc_boost<<DRC_LOW_BST_BIT);
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
+int aml_audio_get_drc_control(struct aml_mixer_handle *mixer_handle)
+{
+    int ret = -1;
+
+    if (NULL == mixer_handle) {
+        return ret;
+    }
+
+    ret = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_DRC_CONTROL);
+    return ret;
 }
