@@ -3521,8 +3521,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         }
         out->hwsync->tsync_fd = -1;
         aml_audio_hwsync_init(out->hwsync, out);
-        if ((adev->active_inport == INPORT_HDMIIN || adev->active_inport == INPORT_LINEIN ||
-            (adev->active_inport == INPORT_TUNER && adev->patch_src == SRC_ATV)) && (adev->is_TV)) {
+        if (adev->active_inport == INPORT_HDMIIN || adev->active_inport == INPORT_LINEIN ||
+            (adev->active_inport == INPORT_TUNER && adev->patch_src == SRC_ATV)) {
             /* TV HDMI/AV/ATV IN does not require avsync */
             out->hw_sync_mode = false;
             flags = flags & (~AUDIO_OUTPUT_FLAG_HW_AV_SYNC);
