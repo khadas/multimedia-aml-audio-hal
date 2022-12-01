@@ -970,6 +970,21 @@ struct pcm *pcm_open(unsigned int card, unsigned int device,
     pcm->subdevice = info.subdevice;
 
     param_init(&params);
+
+    if (flags == PCM_OUT) {
+        int channel_max = 0;
+        if (ioctl(pcm->fd, SNDRV_PCM_IOCTL_HW_REFINE, &params)) {
+            oops(pcm, errno, "failed to get hw params\n");
+            goto fail_close;
+        }
+        channel_max = param_get_int(&params, SNDRV_PCM_HW_PARAM_CHANNELS);
+        if (config->channels > channel_max) {
+            ALOGW("channel num %d exceeds max channel %d, so change as max channel",
+                config->channels, channel_max);
+            config->channels = channel_max;
+        }
+    }
+
     param_set_mask(&params, SNDRV_PCM_HW_PARAM_FORMAT,
                    pcm_format_to_alsa(config->format));
     param_set_mask(&params, SNDRV_PCM_HW_PARAM_SUBFORMAT,
