@@ -2743,7 +2743,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
     ALOGI("[audiohal_kpi]++%s start input now patch->input_thread_exit %d!!!\n ",
           __FUNCTION__, patch->input_thread_exit);
 
-    prctl(PR_SET_NAME, (unsigned long)"audio_input_patch");
+    prctl(PR_SET_NAME, (unsigned long)"dtv_input_data");
     dtv_package_list_init(patch->dtv_package_list);
 
     while (!patch->input_thread_exit) {
@@ -3237,7 +3237,7 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
     ALOGI("[audiohal_kpi]++%s live start output pcm now patch->output_thread_exit %d!!!\n ",
           __FUNCTION__, patch->output_thread_exit);
 
-    prctl(PR_SET_NAME, (unsigned long)"audio_output_patch");
+    prctl(PR_SET_NAME, (unsigned long)"dtv_output_data");
     aml_out->output_speed = 1.0f;
     aml_out->dtvsync_enable = property_get_bool(DTV_SYNCENABLE, true);
     ALOGI("output_speed=%f,dtvsync_enable=%d\n", aml_out->output_speed, aml_out->dtvsync_enable);
@@ -3394,6 +3394,7 @@ static void *audio_dtv_patch_process_threadloop_v2(void *data)
     patch->dtv_decoder_state = AUDIO_DTV_PATCH_DECODER_STATE_INIT;
     aml_demux_audiopara_t *demux_info = NULL;
     aml_dtv_audio_instances_t *dtv_audio_instances =  (aml_dtv_audio_instances_t *)aml_dev->aml_dtv_audio_instances;
+    prctl(PR_SET_NAME, (unsigned long)"dtv_input_cmd");
     while (!patch->cmd_process_thread_exit ) {
 
         pthread_mutex_lock(&patch->dtv_cmd_process_mutex);
