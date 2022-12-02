@@ -1844,6 +1844,7 @@ int dolby_ms12_bypass_process(struct audio_stream_out *stream, void *buffer, siz
                     spdif_config.rate = 32000;
                 }
                 spdif_config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+                spdif_config.data_ch = 2;
                 ret = aml_audio_spdifout_open(&bitstream_out->spdifout_handle, &spdif_config);
                 if (ret != 0) {
                     ALOGE("%s open spdif out failed\n", __func__);
