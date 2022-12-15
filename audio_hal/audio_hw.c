@@ -6961,7 +6961,8 @@ ssize_t hw_write (struct audio_stream_out *stream
                         if (!audio_is_linear_pcm(aml_out->hal_internal_format)) {
                             /*if udc decode doens't generate any data, we should not use the consume offset to get pts*/
                             ALOGV("udc generate pcm =%lld", dolby_ms12_get_main_pcm_generated(stream));
-                            if (dolby_ms12_get_main_pcm_generated(stream)) {
+                            if (dolby_ms12_get_main_pcm_generated(stream) ||
+                                (aml_out->hwsync->aout && aml_out->hwsync->aout->msync_action == AV_SYNC_AA_INSERT)) {
                                 aml_audio_hwsync_audio_process(aml_out->hwsync, dolby_ms12_get_main_bytes_consumed(stream), out_frames, &adjust_ms);
                             }
                         } else {
