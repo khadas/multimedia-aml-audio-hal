@@ -557,8 +557,8 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
 
         if (r == AV_SYNC_ASTART_SYNC) {
             ALOGI("MSYNC AV_SYNC_ASTART_SYNC");
-            p_hwsync->first_apts_flag = true;
             p_hwsync->aout->msync_action = AV_SYNC_AA_RENDER;
+            p_hwsync->first_apts_flag = true;
         } else if (r == AV_SYNC_ASTART_ASYNC) {
             struct timespec ts;
             ts_wait_time_us(&ts, MSYNC_CALLBACK_WAIT_TIMEOUT_US);
@@ -570,8 +570,8 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
             }
             pthread_mutex_unlock(&p_hwsync->aout->msync_mutex);
             ALOGI("MSYNC AV_SYNC_ASTART_ASYNC");
-            p_hwsync->first_apts_flag = true;
             p_hwsync->aout->msync_action = AV_SYNC_AA_RENDER;
+            p_hwsync->first_apts_flag = true;
         } else if (r == AV_SYNC_ASTART_AGAIN) {
             ALOGI("MSYNC AV_SYNC_ASTART_AGAIN");
             p_hwsync->aout->msync_action = AV_SYNC_AA_DROP;
