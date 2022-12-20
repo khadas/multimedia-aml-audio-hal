@@ -667,7 +667,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         if (adev && (eDolbyMS12Lib == adev->dolby_lib_type)) {
             /*the offset is the end of frame, so we need consider the frame len*/
             if (AVSYNC_TYPE_MSYNC == p_hwsync->aout->avsync_type) {
-                latency_frames = aml_audio_get_msync_ms12_tunnel_latency(stream) + frame_len;
+                latency_frames = aml_audio_get_msync_ms12_tunnel_latency(stream, p_hwsync->first_apts_flag) + frame_len;
             } else {
                 latency_frames = aml_audio_get_ms12_tunnel_latency(stream) + frame_len;
             }

@@ -617,7 +617,7 @@ int aml_audio_get_ms12_tunnel_latency(struct audio_stream_out *stream)
     return latency_frames;
 }
 
-int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream)
+int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream, bool first_apts_flag)
 {
     struct aml_stream_out *out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = out->dev;
@@ -634,7 +634,7 @@ int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream)
     /*we need get the correct ms12 out pcm */
     alsa_delay = (int32_t)out_get_ms12_latency_frames(stream);
 
-    if (adev->first_apts_flag) {
+    if (first_apts_flag) {
         if (adev->is_netflix) {
             input_latency_ms = get_ms12_netflix_tunnel_input_latency(out->hal_internal_format);
         } else {
