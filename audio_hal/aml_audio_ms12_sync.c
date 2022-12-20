@@ -634,13 +634,12 @@ int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream, boo
     /*we need get the correct ms12 out pcm */
     alsa_delay = (int32_t)out_get_ms12_latency_frames(stream);
 
-    if (first_apts_flag) {
-        if (adev->is_netflix) {
-            input_latency_ms = get_ms12_netflix_tunnel_input_latency(out->hal_internal_format);
-        } else {
-            input_latency_ms = get_ms12_tunnel_input_latency(out->hal_internal_format);
-        }
+    if (adev->is_netflix) {
+        input_latency_ms = get_ms12_netflix_tunnel_input_latency(out->hal_internal_format);
+    } else {
+        input_latency_ms = get_ms12_tunnel_input_latency(out->hal_internal_format);
     }
+
     if (adev->is_netflix) {
         output_latency_ms = get_ms12_netflix_output_latency(adev->ms12.optical_format);
     } else {

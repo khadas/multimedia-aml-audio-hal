@@ -298,6 +298,7 @@ void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out
         return;
     }
     p_hwsync->first_apts_flag = false;
+    p_hwsync->msync_first_insert_flag = false;
     p_hwsync->video_valid_time = 0;
     p_hwsync->hw_sync_state = HW_SYNC_STATE_HEADER;
     p_hwsync->hw_sync_header_cnt = 0;
@@ -667,7 +668,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         if (adev && (eDolbyMS12Lib == adev->dolby_lib_type)) {
             /*the offset is the end of frame, so we need consider the frame len*/
             if (AVSYNC_TYPE_MSYNC == p_hwsync->aout->avsync_type) {
-                latency_frames = aml_audio_get_msync_ms12_tunnel_latency(stream, p_hwsync->first_apts_flag) + frame_len;
+                latency_frames = aml_audio_get_msync_ms12_tunnel_latency(stream) + frame_len;
             } else {
                 latency_frames = aml_audio_get_ms12_tunnel_latency(stream) + frame_len;
             }
@@ -685,7 +686,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         if (latency_frames < 0) {
             latency_frames = 0;
         }
-        latency_pts = latency_frames / 48 * 90;
+        latency_pts = latency_frames * 90/ 48;
     }
 
     if (ret) {
@@ -706,6 +707,17 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);
             p_hwsync->last_lookup_apts = apts;
             adev->ms12.ms12_main_input_size = 0;
+            if (out->msync_action == AV_SYNC_AA_RENDER) {
+                clock_gettime(CLOCK_MONOTONIC_RAW, &out->msync_rendered_ts);
+                out->msync_rendered_pts = apts - latency_pts;
+                // force ME12 to insert mode at start
+                set_dolby_ms12_runtime_sync(&(adev->ms12), 1);
+                        //set_dolby_ms12_runtime_pause(&(adev->ms12), 1);
+                ALOGI("START MSYNC action switched to AA_INSERT First");
+                out->msync_action = AV_SYNC_AA_INSERT;
+                p_hwsync->msync_first_insert_flag = true;
+                return 0; // go out, at least have insert to next round.
+            }
         }
 
         if (p_hwsync->first_apts_flag) {
@@ -761,7 +773,8 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             if (out->msync_session &&  AVSYNC_TYPE_MSYNC == p_hwsync->aout->avsync_type) {
                 struct audio_policy policy;
                 if (adev->continuous_audio_mode &&
-                    eDolbyMS12Lib == adev->dolby_lib_type) {
+                    eDolbyMS12Lib == adev->dolby_lib_type &&
+                    !p_hwsync->msync_first_insert_flag) {
                    if (dolby_ms12_get_main_underrun()) {
                         /* when MS12 main pipeline gets underrun, the output latency does not reflect the real
                          * latency since muting frame can be inserted by MS12 when continuous output mode is
@@ -800,7 +813,6 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                             /* skip reporting rendering time */
                             return 0;
                         }
-
                         /* still report last rendered APTS */
                         apts = out->msync_rendered_pts;
                     }
@@ -859,6 +871,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                         ALOGI("MSYNC action switched to AA_RENDER.");
                     }
                     out->msync_action = policy.action;
+                    p_hwsync->msync_first_insert_flag = false;
                 }
 
                 if (debug_enable) {
