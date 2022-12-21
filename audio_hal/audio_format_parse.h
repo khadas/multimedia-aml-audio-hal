@@ -43,6 +43,7 @@ enum audio_type {
     TRUEHD,
     DTSCD,
     MUTE,
+    MPEGH,
 };
 
 
@@ -91,6 +92,7 @@ typedef struct audio_type_parse {
     unsigned int flags;
     int soft_parser;
     hdmiin_audio_packet_t hdmi_packet;
+    hdmiin_audio_packet_t last_reconfig_hdmi_packet;
 
     int period_bytes;
     char *parse_buffer;
@@ -130,9 +132,9 @@ char* audio_type_convert_to_string(int s32AudioType);
 /*
  *@brief convert android audio format to the audio type
  */
-int android_audio_format_t_convert_to_andio_type(audio_format_t format);
+int android_audio_format_t_convert_to_audio_type(audio_format_t format);
 /*
- *@brief get current android audio fromat from audio parser thread
+ *@brief get current android audio format from audio parser thread
  */
 audio_format_t audio_parse_get_audio_type(audio_type_parse_t *status);
 /*
@@ -140,7 +142,7 @@ audio_format_t audio_parse_get_audio_type(audio_type_parse_t *status);
  */
 audio_channel_mask_t audio_parse_get_audio_channel_mask(audio_type_parse_t *status);
 /*
- *@brief gget current audio fromat from audio parser thread
+ *@brief get current audio format from audio parser thread
  */
 int audio_parse_get_audio_type_direct(audio_type_parse_t *status);
 /*
@@ -148,13 +150,12 @@ int audio_parse_get_audio_type_direct(audio_type_parse_t *status);
  */
 int get_dts_stream_channels(const char *buffer, size_t bytes);
 /*
- *@brief gget current audio type from buffer data
+ *@brief get current audio type from buffer data
  */
 int audio_type_parse(void *buffer, size_t bytes, int *package_size, audio_channel_mask_t *cur_ch_mask);
 
 int audio_parse_get_audio_samplerate(audio_type_parse_t *status);
 
 int eArcIn_audio_format_detection(struct aml_mixer_handle *mixer_handle);
-
 
 #endif
