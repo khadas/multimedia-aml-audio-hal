@@ -243,7 +243,7 @@ int start_ease_in(struct aml_audio_device *adev) {
     adev->audio_ease->data_format.ch = 8;
     adev->audio_ease->data_format.sr = 48000;
     adev->audio_ease->ease_type = EaseInCubic;
-    ease_setting.duration = 200;
+    ease_setting.duration = 30;
     ease_setting.start_volume = 0.0;
     ease_setting.target_volume = 1.0;
     aml_audio_ease_config(adev->audio_ease, &ease_setting);
@@ -976,6 +976,10 @@ static int out_flush (struct audio_stream_out *stream)
      * hardware/libhardware/include/hardware/audio.h: Stream must already
      * be paused before calling flush(), we check and complain this case
      */
+    if (adev->audio_ease) {
+        start_ease_in(adev);
+    }
+
     if (!out->pause_status) {
         ALOGW("%s(%p), stream should be in pause status", __func__, out);
     }
@@ -1616,6 +1620,11 @@ static int out_resume (struct audio_stream_out *stream)
                         audio_is_linear_pcm(out->hal_internal_format) && channel_count <= 2);
 
     aml_audio_trace_int("out_resume", 1);
+
+    if (adev->audio_ease) {
+        start_ease_in(adev);
+    }
+
     pthread_mutex_lock (&adev->lock);
     pthread_mutex_lock (&out->lock);
     /* a stream should fail to resume if not previously paused */
@@ -5320,6 +5329,15 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+    ret = str_parms_get_int(parms, "gst_pause", &val);
+    if (ret >= 0) {
+        if (adev->audio_ease) {
+            start_ease_out(adev);
+        }
+        ALOGE ("gst_pause: fade out\n");
+        goto exit;
+    }
+
 #ifdef BUILD_LINUX
     ret = str_parms_get_str(parms, "setenv", value, sizeof(value));
     if (ret >= 0) {
@@ -6859,7 +6877,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
         dtv_in_write(stream, buffer, bytes);
 #endif
     }
-    if (adev->audio_patching) {
+    if (adev->audio_patching || adev->dolby_lib_type_last != eDolbyMS12Lib) {
         output_mute(stream,output_buffer,output_buffer_bytes);
     }
     return 0;
@@ -8907,6 +8925,10 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
         ALOGE("%s  aml_audio_ease_init faild\n", __func__);
         ret = -EINVAL;
         goto AUDIO_EASE_INIT_FAIL;
+    }
+
+    if (adev->audio_ease && adev->dolby_lib_type_last != eDolbyMS12Lib) {
+        start_ease_in(adev);
     }
 
     if (aml_getprop_bool("vendor.media.audio.hal.debug")) {
