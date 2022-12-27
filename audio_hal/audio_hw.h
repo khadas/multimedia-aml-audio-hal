@@ -478,6 +478,7 @@ struct aml_audio_device {
      * buffer size equal to efect_buf_size
      */
     void *spk_output_buf;
+    void *hp_output_buf;
     void *spdif_output_buf;
     void *effect_buf;
     size_t effect_buf_size;

@@ -6616,6 +6616,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
 
             int16_t *effect_tmp_buf;
             int32_t *spk_tmp_buf;
+            int16_t *hp_tmp_buf = NULL;
             int32_t *ps32SpdifTempBuffer = NULL;
             float source_gain;
             float gain_speaker = adev->eq_data.p_gain.speaker;
@@ -6642,10 +6643,18 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     ALOGE ("realloc spdif buf failed size %zu format = %#x", bytes, output_format);
                     return -ENOMEM;
                 }
+
+                adev->hp_output_buf = aml_audio_realloc(adev->hp_output_buf, bytes);
+                if (!adev->hp_output_buf) {
+                    ALOGE ("realloc hp buf failed size %zu format = %#x", bytes, output_format);
+                    return -ENOMEM;
+                }
             }
 
             effect_tmp_buf = (int16_t *)adev->effect_buf;
             spk_tmp_buf = (int32_t *)adev->spk_output_buf;
+            hp_tmp_buf = (int16_t *)adev->hp_output_buf;
+            memcpy(hp_tmp_buf, tmp_buffer, bytes);
             ps32SpdifTempBuffer = (int32_t *)adev->spdif_output_buf;
 #ifdef ENABLE_AVSYNC_TUNING
             tuning_spker_latency(adev, effect_tmp_buf, tmp_buffer, bytes);
@@ -6694,6 +6703,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
 
             apply_volume_16to32(volume, effect_tmp_buf, spk_tmp_buf, bytes);
             apply_volume_16to32(source_gain, tmp_buffer, ps32SpdifTempBuffer, bytes);
+            apply_volume(adev->sink_gain[OUTPORT_HEADPHONE], hp_tmp_buf, sizeof(uint16_t), bytes);
 #ifdef ADD_AUDIO_DELAY_INTERFACE
             aml_audio_delay_process(AML_DELAY_OUTPORT_SPEAKER, spk_tmp_buf,
                             out_frames * 2 * 4, AUDIO_FORMAT_PCM_32_BIT);
@@ -6722,8 +6732,8 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     aml_out->tmp_buffer_8ch[8 * i + 1] = spk_tmp_buf[2 * i + 1];
                     aml_out->tmp_buffer_8ch[8 * i + 2] = ps32SpdifTempBuffer[2 * i];
                     aml_out->tmp_buffer_8ch[8 * i + 3] = ps32SpdifTempBuffer[2 * i + 1];
-                    aml_out->tmp_buffer_8ch[8 * i + 4] = tmp_buffer[2 * i] << 16;
-                    aml_out->tmp_buffer_8ch[8 * i + 5] = tmp_buffer[2 * i + 1] << 16;
+                    aml_out->tmp_buffer_8ch[8 * i + 4] = hp_tmp_buf[2 * i] << 16;
+                    aml_out->tmp_buffer_8ch[8 * i + 5] = hp_tmp_buf[2 * i + 1] << 16;
                     aml_out->tmp_buffer_8ch[8 * i + 6] = tmp_buffer[2 * i] << 16;
                     aml_out->tmp_buffer_8ch[8 * i + 7] = tmp_buffer[2 * i + 1] << 16;
                 }
@@ -10271,6 +10281,9 @@ static int adev_close(hw_device_t *device)
     if (adev->spdif_output_buf) {
         aml_audio_free(adev->spdif_output_buf);
     }
+    if (adev->hp_output_buf) {
+        aml_audio_free(adev->hp_output_buf);
+    }
     #ifdef USE_EQ_DRC
     if (adev->aml_ng_handle) {
         release_noise_gate(adev->aml_ng_handle);
@@ -10619,7 +10632,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 
     adev->spk_output_buf = aml_audio_malloc(buffer_size * 2);
     if (adev->spk_output_buf == NULL) {
-        ALOGE("no memory for headphone output buffer");
+        ALOGE("no memory for speaker output buffer");
         ret = -ENOMEM;
         goto err_effect_buf;
     }
@@ -10629,9 +10642,17 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     if (adev->spdif_output_buf == NULL) {
         ALOGE("no memory for spdif output buffer");
         ret = -ENOMEM;
-        goto err_adev;
+        goto err_spk_buf;
     }
     memset(adev->spdif_output_buf, 0, buffer_size);
+
+    adev->hp_output_buf = aml_audio_malloc(buffer_size);
+    if (adev->hp_output_buf == NULL) {
+        ALOGE("no memory for hp output buffer");
+        ret = -ENOMEM;
+        goto err_spdif_buf;
+    }
+    memset(adev->hp_output_buf, 0, buffer_size);
 
     if (0 != aml_audio_config_parser()) {
         ALOGE("%s() Audio Config file parsing error\n",__FUNCTION__);
@@ -10641,7 +10662,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     ret = ring_buffer_init(&(adev->spk_tuning_rbuf), spk_tuning_buf_size);
     if (ret < 0) {
         ALOGE("Fail to init audio spk_tuning_rbuf!");
-        goto err_spk_tuning_buf;
+        goto err_hp_buf;
     }
     adev->spk_tuning_buf_size = spk_tuning_buf_size;
 
@@ -10890,7 +10911,11 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 Err_MS12_MesgThreadCreate:
 err_ringbuf:
     ring_buffer_release(&adev->spk_tuning_rbuf);
-err_spk_tuning_buf:
+err_hp_buf:
+    aml_audio_free(adev->hp_output_buf);
+err_spdif_buf:
+    aml_audio_free(adev->spdif_output_buf);
+err_spk_buf:
     aml_audio_free(adev->spk_output_buf);
 err_effect_buf:
     aml_audio_free(adev->effect_buf);
