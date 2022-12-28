@@ -31,7 +31,7 @@
 #include <media/AudioBufferProvider.h>
 #include <media/AudioResampler.h>
 #include <aml_resample_wrap.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 #undef LOG_TAG
 #define LOG_TAG "audio_resample_wrap"
 

@@ -26,7 +26,7 @@
 #endif
 #include <inttypes.h>
 
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <utils/Errors.h>
 #include <utils/StopWatch.h>
 

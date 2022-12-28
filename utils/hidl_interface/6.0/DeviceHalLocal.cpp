@@ -17,7 +17,7 @@
 #define LOG_TAG "DeviceHalLocal"
 //#define LOG_NDEBUG 0
 
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "DeviceHalLocal.h"
 #include "StreamHalLocal.h"

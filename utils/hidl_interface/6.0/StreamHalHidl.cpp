@@ -21,7 +21,7 @@
 #include <hwbinder/IPCThreadState.h>
 #include <media/AudioParameter.h>
 #include <mediautils/SchedulingPolicyService.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "DeviceHalHidl.h"
 #include "EffectHalHidl.h"

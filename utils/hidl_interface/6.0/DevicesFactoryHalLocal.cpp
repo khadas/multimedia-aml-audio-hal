@@ -20,7 +20,7 @@
 #include <string.h>
 
 #include <hardware/audio.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "DeviceHalLocal.h"
 #include "DevicesFactoryHalLocal.h"

@@ -38,7 +38,7 @@
 #include <utils/Timers.h>
 
 #define LOG_TAG "SystemClock"
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 namespace android {
 

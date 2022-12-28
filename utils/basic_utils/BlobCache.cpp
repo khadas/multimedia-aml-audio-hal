@@ -23,7 +23,7 @@
 
 #include <utils/BlobCache.h>
 #include <utils/Errors.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include <cutils/properties.h>
 

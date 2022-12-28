@@ -16,7 +16,7 @@
 
 #include <utils/String16.h>
 
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <utils/Unicode.h>
 #include <utils/String8.h>
 #include <utils/threads.h>

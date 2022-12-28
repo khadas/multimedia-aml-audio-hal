@@ -23,7 +23,7 @@
 #include <cutils/native_handle.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/AudioContainers.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include <common/all-versions/VersionUtils.h>
 

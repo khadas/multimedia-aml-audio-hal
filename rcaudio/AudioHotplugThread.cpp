@@ -21,7 +21,7 @@
 */
 
 #define LOG_TAG "AudioHAL:AudioHotplugThread"
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include <assert.h>
 #include <dirent.h>

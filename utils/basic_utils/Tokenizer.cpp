@@ -22,7 +22,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <utils/Tokenizer.h>
 
 // Enables debug output for the tokenizer.

@@ -146,6 +146,7 @@
 #include "audio_bt_sco.h"
 #include "aml_malloc_debug.h"
 
+
 #ifdef ENABLE_AEC_APP
 #include "audio_aec.h"
 #endif

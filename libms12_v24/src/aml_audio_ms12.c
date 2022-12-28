@@ -12,10 +12,7 @@
 #define LOG_TAG "libms12"
 // #define LOG_NDEBUG 0
 
-// for android O build, use cutils/log.h
-//#include <cutils/log.h>
-// for android P build, use log/log.h
-#include <log/log.h>
+#include <cutils/log.h>
 #include <dolby_ms12.h>
 #include <dolby_ms12_config_params.h>
 #include <dolby_ms12_status.h>

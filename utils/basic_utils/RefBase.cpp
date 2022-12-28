@@ -29,7 +29,7 @@
 
 #include <utils/Atomic.h>
 #include <utils/CallStack.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <utils/threads.h>
 
 #ifndef __unused

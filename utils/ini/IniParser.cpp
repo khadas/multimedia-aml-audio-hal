@@ -29,7 +29,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "ini.h"
 #include "IniParser.h"

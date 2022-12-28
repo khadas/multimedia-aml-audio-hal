@@ -19,7 +19,7 @@
 #include <utils/CallStack.h>
 #include <utils/Printer.h>
 #include <utils/Errors.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <utils/UniquePtr.h>
 
 namespace android {

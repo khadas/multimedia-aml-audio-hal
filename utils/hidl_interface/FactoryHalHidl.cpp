@@ -23,7 +23,7 @@
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 #include <hidl/Status.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 namespace android::detail {
 

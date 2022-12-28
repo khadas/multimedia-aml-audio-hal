@@ -5,7 +5,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AmLinuxDvb"
 
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <cutils/properties.h>
 
 #include <stdio.h>

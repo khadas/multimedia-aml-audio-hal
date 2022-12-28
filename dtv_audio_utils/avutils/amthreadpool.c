@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #define LOG_TAG "amthreadpool"
 #ifdef ANDROID
-#include <utils/Log.h>
+#include <cutils/log.h>
 #else
 #define     ALOGE printf
 #define 	ALOGI printf

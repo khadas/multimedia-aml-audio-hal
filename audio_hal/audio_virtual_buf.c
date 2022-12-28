@@ -20,7 +20,7 @@
 
 #include <sys/time.h>
 #include <stdlib.h>
-#include <log/log.h>
+#include <cutils/log.h>
 #include <string.h>
 #include <inttypes.h>
 

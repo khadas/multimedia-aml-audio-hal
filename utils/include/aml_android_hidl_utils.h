@@ -17,7 +17,7 @@
 #ifndef __AML_ANDROID_HIDL_UTILS_H__
 #define __AML_ANDROID_HIDL_UTILS_H__
 
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <system/audio.h>
 #include <utils/RefBase.h>
 #include <utils/Errors.h>

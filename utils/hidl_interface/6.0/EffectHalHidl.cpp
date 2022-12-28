@@ -21,7 +21,7 @@
 #include <cutils/native_handle.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/EffectsFactoryApi.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"

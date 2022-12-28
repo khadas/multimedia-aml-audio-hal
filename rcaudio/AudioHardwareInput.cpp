@@ -21,7 +21,8 @@
 */
 
 #define LOG_TAG "AudioHAL:AudioHardwareInput"
-#include <utils/Log.h>
+#include <cutils/log.h>
+
 
 #include <fcntl.h>
 #include <sys/eventfd.h>

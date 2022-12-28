@@ -24,7 +24,7 @@
 #include <android/hidl/manager/1.0/IServiceNotification.h>
 #include PATH(android/hardware/audio/FILE_VERSION/IDevice.h)
 #include <media/audiohal/hidl/HalDeathHandler.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "ConversionHelperHidl.h"
 #include "DeviceHalHidl.h"

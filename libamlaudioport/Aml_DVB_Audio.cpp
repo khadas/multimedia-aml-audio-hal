@@ -1,5 +1,5 @@
 #define LOG_TAG "Aml_DVB_Audio"
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <unistd.h>
 #include <cutils/str_parms.h>
 #include <AmlAudioOutPort.h>

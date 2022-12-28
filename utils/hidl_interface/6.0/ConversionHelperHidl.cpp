@@ -19,7 +19,7 @@
 #define LOG_TAG "HalHidl"
 #include <media/AudioContainers.h>
 #include <media/AudioParameter.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "ConversionHelperHidl.h"
 

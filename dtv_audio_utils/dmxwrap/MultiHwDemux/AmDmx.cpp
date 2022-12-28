@@ -1,6 +1,6 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AM_DMX_Device"
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <cutils/properties.h>
 
 #include <string.h>

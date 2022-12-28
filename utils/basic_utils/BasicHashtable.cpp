@@ -18,7 +18,7 @@
 
 #include <math.h>
 
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <utils/BasicHashtable.h>
 #include <utils/misc.h>
 

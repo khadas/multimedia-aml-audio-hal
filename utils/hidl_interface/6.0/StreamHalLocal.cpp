@@ -19,7 +19,7 @@
 
 #include <hardware/audio.h>
 #include <media/AudioParameter.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "DeviceHalLocal.h"
 #include "StreamHalLocal.h"

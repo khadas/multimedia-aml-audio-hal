@@ -21,7 +21,7 @@
 */
 
 #define LOG_TAG "AudioHAL:AudioStreamIn"
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include <assert.h>
 #include <stdio.h>

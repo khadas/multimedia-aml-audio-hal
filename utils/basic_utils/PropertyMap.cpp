@@ -20,7 +20,7 @@
 #include <string.h>
 
 #include <utils/PropertyMap.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 // Enables debug output for the parser.
 #define DEBUG_PARSER 0

@@ -17,7 +17,7 @@
 #define LOG_TAG "HalDeathHandler"
 //#define LOG_NDEBUG 0
 
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include <media/audiohal/hidl/HalDeathHandler.h>
 

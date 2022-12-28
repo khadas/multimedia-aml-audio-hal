@@ -18,7 +18,7 @@
 //#define LOG_NDEBUG 0
 #include <media/AudioParameter.h>
 #include <media/mediarecorder.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <utils/String16.h>
 #include <utils/String8.h>
 #include <utils/StrongPointer.h>

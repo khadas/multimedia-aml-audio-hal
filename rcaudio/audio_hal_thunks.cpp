@@ -20,7 +20,7 @@
  */
 
 #define LOG_TAG "AudioHAL:audio_hal_thunks"
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include <errno.h>
 #include <stdlib.h>

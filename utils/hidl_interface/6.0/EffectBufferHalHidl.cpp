@@ -21,7 +21,7 @@
 
 #include <android/hidl/allocator/1.0/IAllocator.h>
 #include <hidlmemory/mapping.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "ConversionHelperHidl.h"
 #include "EffectBufferHalHidl.h"

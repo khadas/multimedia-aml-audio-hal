@@ -18,7 +18,7 @@
 // #define LOG_NDEBUG 0
 // #define LOG_NALOGV 0
 
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <stdio.h>
 #include <string.h>
 #include <sstream>

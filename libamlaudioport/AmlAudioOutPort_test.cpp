@@ -16,7 +16,7 @@
 
 #define LOG_TAG "AmlAudioOutPort_Test"
 #include <AmlAudioOutPort.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <unistd.h>
 #include <Aml_DVB_Audio.h>
 

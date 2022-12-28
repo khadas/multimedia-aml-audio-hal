@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <dirent.h>
 
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <utils/Errors.h>
 #include <utils/ProcessCallStack.h>
 #include <utils/Printer.h>

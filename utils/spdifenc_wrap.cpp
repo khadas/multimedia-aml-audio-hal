@@ -23,7 +23,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sound/asound.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 #include <system/audio.h>
 #include <audio_utils/spdif/SPDIFEncoder.h>
 

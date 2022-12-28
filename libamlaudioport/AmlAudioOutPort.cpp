@@ -16,7 +16,7 @@
 
 #define LOG_TAG "AmlAudioOutPort"
 #include <AmlAudioOutPort.h>
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>

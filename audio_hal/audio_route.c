@@ -24,7 +24,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <log/log.h>
+#include <cutils/log.h>
+
 
 #include <tinyalsa/asoundlib.h>
 #include "aml_malloc_debug.h"
