@@ -1290,6 +1290,7 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         out->hw_sync_mode = sync_enable;
         out->hwsync->first_apts_flag = false;
         out->hwsync->video_valid_time = 0;
+        out->hwsync->msync_first_insert_flag = false;
         ALOGI("(%p)set hw_sync_id=%d, %s hw sync mode", out, hw_sync_id, sync_enable ? "enable" : "disable");
 
         if (adev->ms12_out != NULL && adev->ms12_out->hwsync) {

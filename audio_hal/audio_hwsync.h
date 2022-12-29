@@ -98,6 +98,7 @@ typedef struct  audio_hwsync {
     uint8_t body_align[64];
     uint8_t body_align_cnt;
     bool first_apts_flag;//flag to indicate set first apts
+    bool msync_first_insert_flag;
     uint64_t first_apts;
     uint64_t last_apts_from_header;
     uint64_t last_apts_from_header_raw;
