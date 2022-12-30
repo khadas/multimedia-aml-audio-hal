@@ -1777,7 +1777,8 @@ static int out_resume_new (struct audio_stream_out *stream)
 
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
         if (aml_dev->continuous_audio_mode == 1) {
-            if ((aml_dev->ms12.dolby_ms12_enable == true) && (aml_dev->ms12.is_continuous_paused == true)) {
+            if ((aml_dev->ms12.dolby_ms12_enable == true)
+                && (aml_dev->ms12.is_continuous_paused == true || aml_out->pause_status == true)) {
                 /*pcm case we resume here*/
                 if (audio_is_linear_pcm(aml_out->hal_internal_format)) {
                     pthread_mutex_lock(&ms12->lock);
