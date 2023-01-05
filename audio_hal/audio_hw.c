@@ -7939,7 +7939,7 @@ hwsync_rewrite:
     if (adev->audio_patch &&
             (IS_HDMI_IN_HW(patch->input_src) || patch->input_src == AUDIO_DEVICE_IN_SPDIF)) {
         cur_aformat = audio_parse_get_audio_type (patch->audio_parse_para);
-        if (cur_aformat != patch->aformat) {
+        if (cur_aformat != patch->aformat && cur_aformat != AUDIO_FORMAT_INVALID) {
             ALOGI ("HDMI/SPDIF input format changed from %#x to %#x\n", patch->aformat, cur_aformat);
             patch->aformat = cur_aformat;
             //FIXME: if patch audio format change, the hal_format need to redefine.
@@ -9498,14 +9498,12 @@ int release_patch_l(struct aml_audio_device *aml_dev)
         goto exit;
     }
     patch->output_thread_exit = 1;
-    patch->input_thread_exit = 1;
+    pthread_join(patch->audio_output_threadID, NULL);
     if (IS_HDMI_IN_HW(patch->input_src) ||
             patch->input_src == AUDIO_DEVICE_IN_SPDIF)
         exit_pthread_for_audio_type_parse(patch->audio_parse_threadID,&patch->audio_parse_para);
     patch->input_thread_exit = 1;
     pthread_join(patch->audio_input_threadID, NULL);
-    patch->output_thread_exit = 1;
-    pthread_join(patch->audio_output_threadID, NULL);
     ring_buffer_release(&patch->aml_ringbuffer);
     aml_audio_free(patch);
     aml_dev->audio_patch = NULL;
