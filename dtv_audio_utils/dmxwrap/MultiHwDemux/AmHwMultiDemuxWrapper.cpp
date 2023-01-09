@@ -15,6 +15,9 @@
 #include <dmx.h>
 #include "List.h"
 #include "RefBase.h"
+extern "C" {
+#include "aml_malloc_debug.h"
+}
 
 static void getVideoEsData(AmHwMultiDemuxWrapper* mDemuxWrapper,int fid,const uint8_t *data, int len, void *user_data) {
 //(void)mDemuxWrapper;
@@ -22,6 +25,7 @@ static void getVideoEsData(AmHwMultiDemuxWrapper* mDemuxWrapper,int fid,const ui
 //(void)data;
 //(void)len;
 (void)user_data;
+    /*
     mEsDataInfo* mEsData = new mEsDataInfo;
     mEsData->data = (uint8_t*)malloc(len);
     memcpy(mEsData->data,data,len);
@@ -33,6 +37,7 @@ static void getVideoEsData(AmHwMultiDemuxWrapper* mDemuxWrapper,int fid,const ui
     sp<TSPMessage> msg = mDemuxWrapper->dupNotify();
     msg->setInt32("what", kWhatReadVideo);
     msg->post();
+    */
     return;
 }
 #define  DEMUX_AUDIO_DUMP_PATH "/data/demux_audio.es"
@@ -56,7 +61,8 @@ static void getAudioEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, const 
 //(void)len;
 (void)user_data;
 
-    mEsDataInfo* mEsData = new mEsDataInfo;
+    mEsDataInfo* mEsData = (mEsDataInfo*)aml_audio_malloc(sizeof(mEsDataInfo));
+    //ALOGI("getAudioEsData memorydebug %p\n",mEsData);
     dmx_non_sec_es_header *es_header = (struct dmx_non_sec_es_header *)(data);
     if (len == (es_header->len + sizeof(struct dmx_non_sec_es_header))) {
         const unsigned char *data_es  = data + sizeof(struct dmx_non_sec_es_header);
@@ -92,7 +98,7 @@ static void getAudioADEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, cons
 (void)user_data;
     if (0 == mDemuxWrapper->adpesmode)
     {
-        mEsDataInfo* mEsData = new mEsDataInfo;
+        mEsDataInfo* mEsData = (mEsDataInfo*)aml_audio_malloc(sizeof(mEsDataInfo));
         dmx_non_sec_es_header *es_header = (struct dmx_non_sec_es_header *)(data);
         if ( len == (es_header->len + sizeof(struct dmx_non_sec_es_header))) {
             const unsigned char *data_es  = data + sizeof(struct dmx_non_sec_es_header);
@@ -120,7 +126,7 @@ static void getAudioADEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, cons
         //AM_AD_Data_t *ad = (AM_AD_Data_t *)user_data;
         //AM_ErrorCode_t ret=AM_PES_Decode((mDemuxWrapper->peshandle), (uint8_t *)data, len);
         ST_Aduserdata *paddata=(ST_Aduserdata *)user_data;
-        mEsDataInfo* mEsData = new mEsDataInfo;
+        mEsDataInfo* mEsData = (mEsDataInfo*)aml_audio_malloc(sizeof(mEsDataInfo));
         mEsData->data = (uint8_t*)malloc(len);
         memcpy(mEsData->data, data, len);
         mEsData->size = len;
@@ -570,7 +576,7 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::clearPendingEsData(List<mEsDataInfo*>& 
     while (it != mEsDataQueue.end()) {
         mEsDataInfo *mEsData = *it;
         free(mEsData->data);
-        delete mEsData;
+        aml_audio_free(mEsData);
         ++it;
     }
     mEsDataQueue.clear();
