@@ -173,8 +173,6 @@ int update_dolby_MAT_decoding_cap_for_dolby_MAT_and_dolby_TRUEHD_sad(
     , bool is_truehd_supported)
 {
     char *mat_sad = NULL;
-    int bit_for_mat_pcm = 1; // bytes3 bit1
-    int bit_for_truehd = 0; //bytes3 bit0
     int ret = -1;
     if (!array || (count < SAD_SIZE)) {
         ALOGE("%s line %d array %p count %d\n", __func__, __LINE__, array, count);
@@ -182,18 +180,19 @@ int update_dolby_MAT_decoding_cap_for_dolby_MAT_and_dolby_TRUEHD_sad(
     }
 
     mat_sad = (char *)array;
-    //ALOGV("%s line %d mat sad [%#x %#x %#x]\n", __func__, __LINE__, mat_sad[0], mat_sad[1], mat_sad[2]);
+
+    /* mask Atmos bit from AVR to hdmirx edid*/
+    /* bytes3 bit1: bit_for_mat_pcm; bytes3 bit0: bit_for_truehd */
     if (DOLBY_TRUEHD_AND_DOLBY_MAT == ((mat_sad[0] >> AUDIO_FORMAT_CODE_BYTE1_BIT3)&0xF)) {
-        if (is_mat_pcm_supported) {
-            mat_sad[2] |= (0x1 << bit_for_mat_pcm);
-        }
-        if (is_truehd_supported) {
-            mat_sad[2] |= (0x1 << bit_for_truehd);
-        }
+        int value = (is_mat_pcm_supported << 1) | is_truehd_supported;
+
+        mat_sad[2] &= 0xFC;
+        mat_sad[2] |= value;
+
         ret = 0;
-    }
-    else
+    } else {
         ret = -1;
+    }
 
     //ALOGV("%s line %d mat sad [%#x %#x %#x]\n", __func__, __LINE__, mat_sad[0], mat_sad[1], mat_sad[2]);
     return ret;
@@ -279,6 +278,8 @@ int set_arc_hdmi(struct audio_hw_device *dev, char *value, size_t len)
         hdmi_desc->EDID_length = edid_length;
         ptr[1] = (unsigned int)hdmi_desc->EDID_length;
     }
+
+    i = 0;
     pt = strtok_r (value, "[], ", &tmp);
     while (pt != NULL) {
 
@@ -361,26 +362,15 @@ int update_edid_after_edited_audio_sad(struct aml_audio_device *adev, struct for
     }
     else if (AUTO == adev->hdmi_format) {
         if (!fmt_desc->is_support) {
-            /* first step, reset the audio default EDID */
+            //if AVR doesn't support DDP, update EDID to default EDID
             update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
-        }
-        else {
-            /* reset the EDID as default */
-            //update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
-            /*Fixme:
-             *this is an patch, when switch from Passthrough-Mode to AUTO-Mode,
-             *MAT SAD in EDID is lost, but after update the default EDID one more,
-             *MAT SAD can be restored back.
-             */
-            //update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
-
-            /* get the current EDID audio array */
+        } else {
+            /* get the default EDID audio array */
             char EDID_cur_array[EDID_ARRAY_MAX_LEN] = {0};
             bool is_mat_pcm_supported = fmt_desc->atmos_supported;
             bool is_truehd_supported = fmt_desc->atmos_supported;
             int available_edid_len = 0;
             memcpy(EDID_cur_array, adev->default_EDID_array, EDID_ARRAY_MAX_LEN);
-            //get_current_edid(adev, EDID_cur_array, EDID_ARRAY_MAX_LEN);
             /* edit the current EDID audio array to add DDP_ATMOS and MAT_pcm*/
             for (int n = 0; n < EDID_ARRAY_MAX_LEN / SAD_SIZE; n++) {
                 update_dolby_atmos_decoding_and_rendering_cap_for_ddp_sad(
@@ -404,7 +394,7 @@ int update_edid_after_edited_audio_sad(struct aml_audio_device *adev, struct for
             }
 
             /* That array, sent to HDMIRX with amixer AML_MIXER_ID_HDMIIN_AUDIO_EDID, has an special format. */
-
+            /* Skip PCM SAD */
             memmove(EDID_cur_array + TLV_HEADER_SIZE - SAD_SIZE, EDID_cur_array, available_edid_len);
 
             available_edid_len -= SAD_SIZE;
@@ -413,13 +403,15 @@ int update_edid_after_edited_audio_sad(struct aml_audio_device *adev, struct for
 
             protocol_ptr[0] = 0;
             protocol_ptr[1] = (unsigned int)available_edid_len;
+            for (int cnt = 0; cnt < EDID_ARRAY_MAX_LEN; cnt++) {
+                ALOGV("%s line %d EDID_cur_array(%d) [%#x]\n",  __func__, __LINE__, cnt, EDID_cur_array[cnt]);
+            }
 
             /* update the EDID after editing*/
             update_edid(adev, false, (void *)EDID_cur_array, available_edid_len);
         }
-    }
-    else {
-        /* first step, reset the audio default EDID */
+    } else if (hdmi_desc->default_edid == false) {
+        /* Reset the audio default EDID */
         update_edid(adev, true, (void *)&hdmi_desc->SAD[0], hdmi_desc->EDID_length);
     }
     return 0;
@@ -462,6 +454,7 @@ int set_arc_format(struct audio_hw_device *dev, char *value, size_t len)
                 fmt_desc = &hdmi_desc->ddp_fmt;
             } else if (val == AML_HDMI_FORMAT_MAT) {
                 fmt_desc = &hdmi_desc->mat_fmt;
+                /*if arc format is changed or ARC switch to EARC, we need update it, then new output can be configured*/
                 if (adev->need_to_update_arc_status) {
                     adev->need_to_update_arc_status = false;
                     adev->arc_hdmi_updated = 1;

@@ -129,9 +129,23 @@ AUDIO_CHANNEL_OUT_QUAD|\
 AUDIO_CHANNEL_OUT_SURROUND|\
 AUDIO_CHANNEL_OUT_PENTA|\
 AUDIO_CHANNEL_OUT_5POINT1|\
+AUDIO_CHANNEL_OUT_6POINT1|\
 AUDIO_CHANNEL_OUT_7POINT1"
 
 #define EAC3_JOC_SUPPORT_CHANNEL \
+"AUDIO_CHANNEL_OUT_MONO|\
+AUDIO_CHANNEL_OUT_STEREO|\
+AUDIO_CHANNEL_OUT_TRI|\
+AUDIO_CHANNEL_OUT_TRI_BACK|\
+AUDIO_CHANNEL_OUT_3POINT1|\
+AUDIO_CHANNEL_OUT_QUAD|\
+AUDIO_CHANNEL_OUT_SURROUND|\
+AUDIO_CHANNEL_OUT_PENTA|\
+AUDIO_CHANNEL_OUT_5POINT1|\
+AUDIO_CHANNEL_OUT_6POINT1|\
+AUDIO_CHANNEL_OUT_7POINT1"
+
+#define DOLBY_TRUEHD_SUPPORT_CHANNEL \
 "AUDIO_CHANNEL_OUT_MONO|\
 AUDIO_CHANNEL_OUT_STEREO|\
 AUDIO_CHANNEL_OUT_TRI|\
@@ -659,13 +673,14 @@ exit:
     return 0;
 }
 
-char*  get_hdmi_sink_cap_new(const char *keys,audio_format_t format,struct aml_arc_hdmi_desc *p_hdmi_descs)
+char*  get_hdmi_sink_cap_new(const char *keys, audio_format_t format, struct aml_arc_hdmi_desc *p_hdmi_descs, bool report_aml_truehd)
 {
     int i = 0;
     int fd = -1;
     int size = 0;
     char *aud_cap = NULL;
     audio_profile_cap_t * audio_cap_item = NULL;
+    struct aml_audio_device *adev = adev_get_handle();
 
     ALOGD("%s is running...\n", __func__);
     aud_cap = (char*)aml_audio_malloc(1024);
@@ -749,23 +764,41 @@ char*  get_hdmi_sink_cap_new(const char *keys,audio_format_t format,struct aml_a
         /*check dolby truehd*/
         audio_cap_item = get_edid_support_audio_format(AUDIO_FORMAT_MAT);
         if (audio_cap_item) {
+            /*
+             * when cat /sys/class/amhdmitx/amhdmitx0/aud_cap,
+             * eg: "AML_MAT, 8 ch, 44.1/48/88.2/96/176.4/192 kHz, DepValue 0x1"
+             * would output MAT_1_0/MAT_2_0/MAT_2_1
+             * here, call the AVR-TrueHD if AVR only supports MAT_1_0(DOLBY TRUEHD) not MAT_2_0/MAT_2_1,
+             * If the AVR-TrueHD is broken or sick, we replace the AVR(Dolby ATMOS) with the property:
+             * "vendor.media.audiohal.mat_1_0" with value 1.
+             */
+            if (audio_cap_item->dep_value == 0x1) {
+                int force_truehd = aml_getprop_bool("vendor.media.audiohal.avr.mat_1_0");
+                if (force_truehd) {
+                    audio_cap_item->dep_value = 0x0;
+                    ALOGD("JUST For DEBUG!!! Convert the MAT's dep_value from 1 to 0 for TrueHD!\n");
+                }
+            }
             //DLB MAT and DLB TrueHD SAD
             if (audio_cap_item->dep_value == 0x1) {
                 //Byte3 bit0:1 bit1:0
                 //eg: "MAT, 8 ch, 32/44.1/48/88.2/96/176.4/192 kHz, DepValue 0x1"
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DOLBY_TRUEHD|AUDIO_FORMAT_MAT_1_0|AUDIO_FORMAT_MAT_2_0");
+                if (report_aml_truehd)
+                    size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DOLBY_TRUEHD|AUDIO_FORMAT_MAT_1_0|AUDIO_FORMAT_MAT_2_0");
                 p_hdmi_descs->mat_fmt.is_support = 1;
 
             } else if (audio_cap_item->dep_value == 0x0) {
                 //Byte3 bit0:0 bit1:0
                 //eg: "MAT, 8 ch, 48/96/192 kHz, DepValue 0x0"
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DOLBY_TRUEHD|AUDIO_FORMAT_MAT_1_0");
+                if (report_aml_truehd)
+                    size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DOLBY_TRUEHD|AUDIO_FORMAT_MAT_1_0");
                 p_hdmi_descs->mat_fmt.is_support = 0;//fixme about the mat_fmt.is_support
 
             } else if (audio_cap_item->dep_value == 0x3) {
                 //Byte3 bit0:0 bit1:1
                 //eg: "MAT, 8 ch, 48 kHz, DepValue 0x3"
-                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DOLBY_TRUEHD|AUDIO_FORMAT_MAT_1_0|AUDIO_FORMAT_MAT_2_0|AUDIO_FORMAT_MAT_2_1");
+                if (report_aml_truehd)
+                    size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DOLBY_TRUEHD|AUDIO_FORMAT_MAT_1_0|AUDIO_FORMAT_MAT_2_0|AUDIO_FORMAT_MAT_2_1");
                 p_hdmi_descs->mat_fmt.is_support = 1;
 
             } else {
@@ -827,6 +860,10 @@ char*  get_hdmi_sink_cap_new(const char *keys,audio_format_t format,struct aml_a
                 size += sprintf(aud_cap, "sup_channels=%s", "AUDIO_CHANNEL_OUT_STEREO");
 
             }
+            break;
+        case AUDIO_FORMAT_IEC61937:
+            // support all the channel mapping
+            size += sprintf(aud_cap, "sup_channels=%s", DOLBY_TRUEHD_SUPPORT_CHANNEL);
             break;
         default:
             /* take the 2ch supported as default */
@@ -1296,6 +1333,7 @@ char*  get_hdmi_sink_cap_dolbylib(const char *keys,audio_format_t format,struct 
                 case AUDIO_FORMAT_IEC61937:
                     size += sprintf(aud_cap, "sup_sampling_rates=%s",
                     "8000|11025|16000|22050|24000|32000|44100|48000|128000|176400|192000");
+                    break;
                 default:
                     size += sprintf(aud_cap, "sup_sampling_rates=%s", "32000|44100|48000");
             }
@@ -1942,7 +1980,7 @@ char *out_get_parameters_wrapper_about_sup_sampling_rates__channels__formats(con
                 if (out->flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
                         cap = (char *) get_offload_cap(keys,format);
                 } else {
-                    cap = (char *)get_hdmi_sink_cap_new(keys,format,&(adev->hdmi_descs));
+                    cap = (char *)get_hdmi_sink_cap_new(keys,format,&(adev->hdmi_descs), true);
 
                     /* below patch is for dd only sink device.
                      * When connect dd only device, if we support ms12 or ddp convert,

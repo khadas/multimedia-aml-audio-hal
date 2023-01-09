@@ -72,11 +72,29 @@ static audio_format_t get_sink_capability (struct aml_audio_device *adev)
     if (!adev->is_TV)
     {
         char *cap = NULL;
-        cap = (char *) get_hdmi_sink_cap_new (AUDIO_PARAMETER_STREAM_SUP_FORMATS,0,&(adev->hdmi_descs));
+        /*we should get the real audio cap, so we need it report the correct truehd info*/
+        cap = (char *) get_hdmi_sink_cap_new (AUDIO_PARAMETER_STREAM_SUP_FORMATS,0,&(adev->hdmi_descs), true);
         if (cap) {
+            /*
+             * Dolby MAT 2.0/2.1 has low latency vs Dolby MAT 1.0(TRUEHD inside)
+             * Dolby MS12 prefers to output MAT2.0/2.1.
+             */
             if ((strstr(cap, "AUDIO_FORMAT_MAT_2_0") != NULL) || (strstr(cap, "AUDIO_FORMAT_MAT_2_1") != NULL)) {
                 sink_capability = AUDIO_FORMAT_MAT;
-            } else if (strstr(cap, "AUDIO_FORMAT_E_AC3") != NULL) {
+            }
+            /*
+             * Dolby MAT 1.0(TRUEHD inside) vs DDP+DD
+             * Dolby MS12 prefers to output DDP.
+             * But set sink as TrueHD, then TrueHD can encoded with MAT encoder in Passthrough mode.
+             */
+            else if (strstr(cap, "AUDIO_FORMAT_MAT_1_0") != NULL) {
+                sink_capability = AUDIO_FORMAT_DOLBY_TRUEHD;
+            }
+            /*
+             * DDP vs DDP
+             * Dolby MS12 prefers to output DDP.
+             */
+            else if (strstr(cap, "AUDIO_FORMAT_E_AC3") != NULL) {
                 sink_capability = AUDIO_FORMAT_E_AC3;
             } else if (strstr(cap, "AUDIO_FORMAT_AC3") != NULL) {
                 sink_capability = AUDIO_FORMAT_AC3;
@@ -89,19 +107,13 @@ static audio_format_t get_sink_capability (struct aml_audio_device *adev)
         ddp_is_support = hdmi_desc->ddp_fmt.is_support;
         mat_is_support = hdmi_desc->mat_fmt.is_support;
     } else {
-        if (mat_is_support) {
+        if (mat_is_support || adev->hdmi_descs.mat_fmt.MAT_PCM_48kHz_only) {
             sink_capability = AUDIO_FORMAT_MAT;
             mat_is_support = true;
             hdmi_desc->mat_fmt.is_support = true;
         } else if (ddp_is_support) {
             sink_capability = AUDIO_FORMAT_E_AC3;
         } else if (dd_is_support) {
-            sink_capability = AUDIO_FORMAT_AC3;
-        }
-        /* eARC TXs support formats at least support dd, for Test ID HFR5-1-27 */
-        if (sink_capability == AUDIO_FORMAT_PCM_16_BIT &&
-            aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_ATTENDED_TYPE) == ATTEND_TYPE_EARC &&
-            adev->bHDMIARCon) {
             sink_capability = AUDIO_FORMAT_AC3;
         }
         ALOGI ("%s dd support %d ddp support %#x\n", __FUNCTION__, dd_is_support, ddp_is_support);
@@ -135,7 +147,7 @@ static audio_format_t get_sink_dts_capability (struct aml_audio_device *adev)
     if (!adev->is_TV)
     {
         char *cap = NULL;
-        cap = (char *) get_hdmi_sink_cap_new (AUDIO_PARAMETER_STREAM_SUP_FORMATS,0,&(adev->hdmi_descs));
+        cap = (char *) get_hdmi_sink_cap_new (AUDIO_PARAMETER_STREAM_SUP_FORMATS,0,&(adev->hdmi_descs), true);
         if (cap) {
             if (strstr(cap, "AUDIO_FORMAT_DTS") != NULL) {
                 sink_capability = AUDIO_FORMAT_DTS;
@@ -163,7 +175,7 @@ static void get_sink_pcm_capability(struct aml_audio_device *adev)
     char *cap = NULL;
     hdmi_desc->pcm_fmt.sample_rate_mask = 0;
 
-    cap = (char *) get_hdmi_sink_cap_new (AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES, AUDIO_FORMAT_PCM_16_BIT,&(adev->hdmi_descs));
+    cap = (char *) get_hdmi_sink_cap_new (AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES, AUDIO_FORMAT_PCM_16_BIT,&(adev->hdmi_descs), true);
     if (cap) {
         /*
          * bit:    6     5     4    3    2    1    0
