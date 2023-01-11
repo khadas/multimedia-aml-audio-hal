@@ -22,6 +22,8 @@
 #include "aml_audio_types_def.h"
 #include "aml_dec_api.h"
 
+#define DCA_BITS(x) (1 << x)
+
 struct dts_syncword_info {
     unsigned int syncword;
     int syncword_pos;
@@ -39,7 +41,7 @@ struct dts_frame_info {
 
 ///< Keep the members of dca_config_type_e the same as structure in dca_decoder.h
 ///< static param: need to reset decoder
-///< dynamic param: do not neet to reset decoder
+///< dynamic param: do not need to reset decoder
 typedef enum  {
     DCA_CONFIG_OUT_BITDEPTH, //runtime/static param
     DCA_CONFIG_OUT_CH, //runtime/static param
@@ -78,6 +80,11 @@ typedef union dca_info_s {
     } stream_info;  ///< DCA_GET_STREAM_INFO
 } dca_info_t;
 
+typedef enum {
+    DCA_INITED = DCA_BITS(0),   // dca decoder init or not.
+    DCA_PROCESS_HALF_FRAME = DCA_BITS(1),
+} DCA_DECODER_STATUS;
+
 struct dca_dts_dec {
     ///< Control
     aml_dec_t  aml_dec;
@@ -87,6 +94,8 @@ struct dca_dts_dec {
     ///< Information
     int status;
     int remain_size;
+    int half_frame_remain_size;
+    int half_frame_used_size;
     int outlen_pcm;
     int outlen_raw;
     int stream_type;    ///< enum audio_hal_format
