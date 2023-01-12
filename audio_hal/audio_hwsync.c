@@ -887,6 +887,39 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     }
     return ret;
 }
+
+/**************************************************************************************
+ * Function:    aml_audio_hwsync_reset_apts
+ *
+ * Description: Reset the pts table and the payload offset
+ *
+ * Inputs:      valid audio hwsync struct pointer (audio_hwsync_t)
+ *
+ * Outputs:     NONE
+ *
+ * Return:      NONE
+ *
+ * Notes:       For dolby ms12 cleanup, the consumed payload offset by dolby ms12 SDK will reset too,
+                so, the pts table and the payload need reset correspond.
+ **************************************************************************************/
+void aml_audio_hwsync_reset_apts(audio_hwsync_t *p_hwsync)
+{
+    if (NULL == p_hwsync) {
+        ALOGE("%s p_hwsync null point", __func__);
+        return;
+    }
+
+    pthread_mutex_lock(&p_hwsync->lock);
+    ALOGI("%s Reset, payload_offset %zu, first_apts 0x%llx, first_apts_flag %d", __func__,
+           p_hwsync->payload_offset, p_hwsync->first_apts, p_hwsync->first_apts_flag);
+
+    /* reset payload offset and pts table */
+    p_hwsync->payload_offset = 0;
+    memset(p_hwsync->pts_tab, 0, sizeof(apts_tab_t)*HWSYNC_APTS_NUM);
+    pthread_mutex_unlock(&p_hwsync->lock);
+    return;
+}
+
 int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, uint64_t apts)
 {
     int i = 0;

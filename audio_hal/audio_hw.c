@@ -7374,6 +7374,9 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
             pthread_mutex_lock(&adev->lock);
             get_dolby_ms12_cleanup(&adev->ms12, false);
             adev->ms12_out = NULL;
+
+            /* Reset pts table and the payload offset ##SWPL-107272 */
+            aml_audio_hwsync_reset_apts(aml_out->hwsync);
             pthread_mutex_lock(&adev->alsa_pcm_lock);
             struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
             if (aml_out->dual_output_flag && pcm) {
