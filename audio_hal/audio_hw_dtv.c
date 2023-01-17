@@ -330,9 +330,9 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                     dtv_assoc_audio_cache(-1);
                 }
             }
-            if (getprop_bool(DTV_ADSWITCH_PROPERTY)) {
-                adev->ad_switch_enable = 1;
-            }
+
+            adev->ad_switch_enable = 1;
+
             if (adev->ad_switch_enable)
                 adev->associate_audio_mixing_enable = val;
             else
