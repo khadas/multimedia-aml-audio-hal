@@ -1699,10 +1699,6 @@ static int out_pause_new (struct audio_stream_out *stream)
         goto exit;
     }
 
-    if (aml_out->msync_session) {
-        av_sync_pause(aml_out->msync_session, true);
-    }
-
     if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type || AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
         aml_hwsync_set_tsync_pause(aml_out->hwsync);
     }
@@ -1737,24 +1733,27 @@ static int out_pause_new (struct audio_stream_out *stream)
     }
 exit:
     aml_out->pause_status = true;
+    aml_out->position_update = 0;
 
+    //1.audio easing duration is 32ms,
+    //2.one loop for schedule_run cost about 32ms(contains the hardware costing),
+    //3.if [pause, vol_ease(in adev_set_parameters by Netflix)] too short, means it need more time to do audio easing
+    //so, the delay time for 32ms(pause is completed after audio easing is done) is enough.
+    aml_audio_sleep(32000);
+
+    /* do avsync pause after 32ms sleep for to avoid the system clock stop early than dolby fading out finish in dolby continue mode. ##SWPL-108005 */
+    if (aml_out->msync_session) {
+        av_sync_pause(aml_out->msync_session, true);
+    }
     pthread_mutex_unlock(&aml_out->lock);
     pthread_mutex_unlock(&aml_dev->lock);
-    aml_audio_trace_int("out_pause_new", 0);
 
     if (is_standby) {
         ALOGD("%s(), stream(%p) already in standy, return INVALID_STATE", __func__, stream);
         ret = INVALID_STATE;
     }
-    aml_out->position_update = 0;
 
-    if (aml_dev->is_netflix) {
-        //1.audio easing duration is 32ms,
-        //2.one loop for schedule_run cost about 32ms(contains the hardware costing),
-        //3.if [pause, vol_ease(in adev_set_parameters by Netflix)] too short, means it need more time to do audio easing
-        //so, the delay time for 32ms(pause is completed after audio easing is done) is enough.
-        aml_audio_sleep(64000);
-    }
+    aml_audio_trace_int("out_pause_new", 0);
     ALOGI("%s(), stream(%p) exit", __func__, stream);
     return ret;
 }
