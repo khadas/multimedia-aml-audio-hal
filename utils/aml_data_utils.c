@@ -599,7 +599,7 @@ int data_replace_lfe_data(
 	size_t  out_channels,
 	size_t  out_framesz,
 	void    *input_lfe_buffer,
-	size_t  in_channles,
+	size_t  in_channels,
 	size_t  in_framesz,
 	size_t  frames,
 	int     channel_insert_bit_mask)
@@ -619,7 +619,7 @@ int data_replace_lfe_data(
 	}
 
 	//TODO:
-	if (in_channles != 2) {
+	if (in_channels != 2) {
 		AMLOGE("%s: only support replace 2 channels\n", __func__);
 		return -1;
 	}
@@ -642,14 +642,14 @@ int data_replace_lfe_data(
 		case e16BitPerSample:
 			for (i=0; i<(int)frames; i++) {
 				for (j=0; j<lfe_cnt; j++) {
-					buf_out16[out_channels*i + lfe_base + j] = buf_in16[in_channles*i + j];
+					buf_out16[out_channels*i + lfe_base + j] = buf_in16[in_channels*i + j];
 				}
 			}
 			break;
 		case e32BitPerSample:
 			for (i=0; i<(int)frames; i++) {
 				for (j=0; j<lfe_cnt; j++) {
-					buf_out16[out_channels*i + lfe_base + j] = (int16_t)(buf_in16[in_channles*i + j] >> 16);
+					buf_out16[out_channels*i + lfe_base + j] = (int16_t)(buf_in16[in_channels*i + j] >> 16);
 				}
 			}
 			break;
@@ -662,14 +662,14 @@ int data_replace_lfe_data(
 		case e16BitPerSample:
 			for (i=0; i<(int)frames; i++) {
 				for (j=0; j<lfe_cnt; j++) {
-					buf_out32[out_channels*i + lfe_base + j] = ((int32_t)buf_in16[in_channles*i + j]) << 16;
+					buf_out32[out_channels*i + lfe_base + j] = ((int32_t)buf_in16[in_channels*i + j]) << 16;
 				}
 			}
 			break;
 		case e32BitPerSample:
 			for (i=0; i<(int)frames; i++) {
 				for (j=0; j<lfe_cnt; j++) {
-					buf_out32[out_channels*i + lfe_base + j] = buf_in32[in_channles*i + j];
+					buf_out32[out_channels*i + lfe_base + j] = buf_in32[in_channels*i + j];
 				}
 			}
 			break;

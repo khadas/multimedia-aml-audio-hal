@@ -350,7 +350,7 @@ static int parse_lpcm_1394_header (aml_pcm_config_t *pcm_config, unsigned int he
     }
     switch (header & 0x7) {
       case 0x0:                /* 2 channels dual-mono */
-      case 0x1:                /* 2 channles stereo */
+      case 0x1:                /* 2 channels stereo */
         pcm_config->lpcm_channel = 2;
         break;
       default:

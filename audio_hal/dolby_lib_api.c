@@ -44,10 +44,12 @@
 #define DTS_DCA_LIB_PATH_A "/odm/lib/libHwAudio_dtshd.so"
 #endif
 
-#ifndef MS12_V24_ENABLE
-    #define MS12_VERSION    "1.3"
-#else
+#if defined(MS12_V24_ENABLE)
     #define MS12_VERSION    "2.4"
+#elif defined(MS12_V26_ENABLE)
+    #define MS12_VERSION    "2.6"
+#else
+    #define MS12_VERSION    "1.3"
 #endif
 
 
@@ -179,7 +181,7 @@ int dolby_lib_decode_enable(eDolbyLibType_t lib_type) {
 }
 
 
-#ifndef MS12_V24_ENABLE
+#if !defined(MS12_V24_ENABLE) && !defined(MS12_V26_ENABLE)
 typedef enum ms_dap_mode_t
 {
     DAP_NO_PROC = 0,

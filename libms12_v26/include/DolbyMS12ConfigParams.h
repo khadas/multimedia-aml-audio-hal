@@ -162,8 +162,7 @@ public:
         return mHasAppInput;
     }
 
-    virtual int ChannelMask2ChannelConfig(audio_channel_mask_t channel_mask);
-    virtual int ChannelMask2LFEConfig(audio_channel_mask_t channel_mask);
+    virtual const char* ChannelMask2ChannelConfig(audio_channel_mask_t channel_mask);
 
     //*Begin||Add the APT to set the params*//
     //Functional Switches
@@ -204,9 +203,13 @@ public:
     {
         mDAPVirtualBassEnable = flag;    // 0 or 1
     }
-    virtual void setDRCMode(int val)
+    virtual void setStereoDRCMode(int val)
     {
         mDRCModesOfDownmixedOutput = val;    // 0 or 1
+    }
+    virtual void setMultichannelDRCMode(int val)
+    {
+        mDRCModesOfMultichannelOutput = val;   // 0 or 1
     }
     virtual void setDAPDRCMode(int val)
     {
@@ -621,6 +624,7 @@ private:
     int mDAPVirtualBassEnable;
     int mDBGOut;//(default: none)
     int mDRCModesOfDownmixedOutput;
+    int mDRCModesOfMultichannelOutput;
     int mDAPDRCMode;//for multi-ch and dap output[default is 0]
     int mDownmixMode;//Lt/Rt[val=0, default] or Lo/Ro
     int mEvaluationMode;//default is 0
@@ -680,7 +684,7 @@ private:
     //AC4 SWITCHES
     char mAC4Lang[4];
     char mAC4Lang2[4];
-    int mAC4Ac;//[ac4] Preferred associated type of service, 1:Visually Impaired (VI, default), 2: Hearing Impaired (HI), 3: Commentary
+    int mAC4Ac;//[ac4] Preferred associated type of service, 1:Visually Impaired (VI, default), 2: Hearing Impaired (HI), 3: Commentary, 4: Spoken subtitles, 5: Audio Description with spoken subtitles
     int mAC4Pat;//[ac4] Prefer Presentation Selection by associated type over language, 0: Prefer selection by language, 1: Prefer selection by associated type (default)
     int mAC4PresGroupIdx;//[ac4] Presentation group index to be decoded. 0>>>510: Presentation group index, -1: switch back to automatic selection by language and associated type (default)
     int mAC4De;//[ac4] Dialogue Enhancement gain [0-12], default 0
@@ -723,6 +727,10 @@ private:
     //DAP SWITCHES (content specific)
     DAPMISteering ContentDAPMISteering = {
         .mi_enable = 0,
+        .mi_dv_enable = 0,
+        .mi_de_enable = 0,
+        .mi_surround_enable = 0,
+        .mi_virtualizer_enable = 0,
     };
     DAPLeveler ContentDAPLeveler = {
         .leveler_enable = 0,
@@ -736,7 +744,6 @@ private:
         .ieq_band_target = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     };
     DAPDialogueEnhancer ContenDAPDialogueEnhancer = {
-        .de_enable = 0,
         .de_amount = 0,
     };
 

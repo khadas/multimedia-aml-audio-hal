@@ -129,7 +129,7 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     , mCompressorProfile(0)
 
     //HE-AAC SWITCHES
-    , mAssocInstanse(2)
+    , mAssocInstance(2)
     , mDefDialnormVal(108)
     , mTransportFormat(0)
 
@@ -1077,7 +1077,7 @@ int DolbyMS12ConfigParams::SetHEAACSwitches(char **ConfigParams, int *row_index)
         {
             sprintf(ConfigParams[*row_index], "%s", "-as");
             (*row_index)++;
-            sprintf(ConfigParams[*row_index], "%d", mAssocInstanse);
+            sprintf(ConfigParams[*row_index], "%d", mAssocInstance);
             (*row_index)++;
         }
 

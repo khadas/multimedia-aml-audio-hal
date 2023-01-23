@@ -395,7 +395,7 @@ int get_the_dolby_ms12_prepared(
     if (ms12->dual_decoder_support) {
         set_audio_associate_format(input_format);
         ALOGI("%s set_audio_associate_format %#x", __FUNCTION__, input_format);
-        dolby_ms12_set_asscociated_audio_mixing(adev->associate_audio_mixing_enable);
+        dolby_ms12_set_associated_audio_mixing(adev->associate_audio_mixing_enable);
         dolby_ms12_set_user_control_value_for_mixing_main_and_associated_audio(adev->mixing_level);
         ALOGI("%s associate_audio_mixing_enable %d mixing_level set to %d\n",
               __FUNCTION__, adev->associate_audio_mixing_enable, adev->mixing_level);

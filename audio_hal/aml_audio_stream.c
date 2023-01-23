@@ -31,14 +31,15 @@
 #include "aml_android_utils.h"
 #include "audio_format_parse.h"
 #include "alsa_config_parameters.h"
-#include "audio_hw_ms12.h"
 
 #ifdef USE_MEDIAINFO
 #include "aml_media_info.h"
 #endif
 
-#ifdef MS12_V24_ENABLE
+#if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
 #include "audio_hw_ms12_v2.h"
+#else
+#include "audio_hw_ms12.h"
 #endif
 #define min(a,b)            (((a) < (b)) ? (a) : (b))
 #define FMT_UPDATE_THRESHOLD_MAX    (10)
@@ -47,10 +48,10 @@
 
 
 static audio_format_t ms12_max_support_output_format() {
-#ifndef MS12_V24_ENABLE
-    return AUDIO_FORMAT_E_AC3;
-#else
+#if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
     return AUDIO_FORMAT_MAT;
+#else
+    return AUDIO_FORMAT_E_AC3;
 #endif
 }
 
@@ -1184,7 +1185,7 @@ void update_audio_format(struct aml_audio_device *adev, audio_format_t format)
             atmos_flag = adev->ms12.is_dolby_atmos;
         }
 
-        #ifdef MS12_V24_ENABLE
+        #if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
         /* when DAP is not in audio postprocessing, there is no ATMOS Experience. */
         if (is_audio_postprocessing_add_dolbyms12_dap(adev) == 0) {
             atmos_flag = 0;

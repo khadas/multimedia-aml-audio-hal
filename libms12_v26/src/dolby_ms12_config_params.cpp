@@ -465,7 +465,16 @@ extern "C" void dolby_ms12_set_drc_mode(int val)
     ALOGV("%s()\n", __FUNCTION__);
     android::DolbyMS12ConfigParams *config_param = getInstance();
     if (config_param) {
-        config_param->setDRCMode(val);
+        config_param->setStereoDRCMode(val);
+    }
+}
+
+extern "C" void dolby_ms12_set_multichannel_drc_mode(int val)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12ConfigParams *config_param = getInstance();
+    if (config_param) {
+        config_param->setMultichannelDRCMode(val);
     }
 }
 
@@ -779,7 +788,6 @@ extern "C" void dolby_ms12_set_dap_surround_decoder_enable(bool val)
         config_param->setDAPSurroundDecoderEnable(val);
     }
 }
-
 
 extern "C" void dolby_ms12_set_dap_surround_virtualizer(DAPSurroundVirtualizer *dapVirtualizerParameters)
 {

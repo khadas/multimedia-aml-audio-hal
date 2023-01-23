@@ -55,7 +55,11 @@
 #include "audio_hw_utils.h"
 #include "dtv_patch_out.h"
 #include "aml_audio_resampler.h"
+#if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
+#include "audio_hw_ms12_v2.h"
+#else
 #include "audio_hw_ms12.h"
+#endif
 #include "dolby_lib_api.h"
 #include "audio_dtv_ad.h"
 #include "alsa_config_parameters.h"
@@ -1035,7 +1039,7 @@ static int dtv_patch_pcm_write(unsigned char *pcm_data, int size,
     unsigned char *write_buf;
     int16_t tmpbuf[OUTPUT_BUFFER_SIZE];
     char info_buf[MAX_BUFF_LEN] = {0};
-    int valid_paramters = 1;
+    int valid_parameters = 1;
     int ratio = 100;
     int enable_audio_resample = property_get_int32(PROPERTY_ENABLE_AUDIO_RESAMPLE, 0);
 
@@ -1050,12 +1054,12 @@ static int dtv_patch_pcm_write(unsigned char *pcm_data, int size,
     }
     patch->sample_rate = symbolrate;
     // In the case of fast switching channels such as mpeg/dra/..., there may be an
-    // error "symbolrate" and "channel" paramters, so add the check to avoid it.
+    // error "symbolrate" and "channel" parameters, so add the check to avoid it.
     if (symbolrate > 96000 || symbolrate < 8000) {
-        valid_paramters = 0;
+        valid_parameters = 0;
     }
     if (channel > 8 || channel < 1) {
-        valid_paramters = 0;
+        valid_parameters = 0;
     }
     patch->chanmask = channel;
     if (patch->sample_rate != 48000) {
@@ -1100,7 +1104,7 @@ static int dtv_patch_pcm_write(unsigned char *pcm_data, int size,
     return_size = write_size;
     if ((patch->aformat != AUDIO_FORMAT_E_AC3 &&
          patch->aformat != AUDIO_FORMAT_AC3 &&
-         patch->aformat != AUDIO_FORMAT_DTS) && valid_paramters) {
+         patch->aformat != AUDIO_FORMAT_DTS) && valid_parameters) {
         if (patch->chanmask == 1) {
             int16_t *buf = (int16_t *)write_buf;
             int i = 0, samples_num;

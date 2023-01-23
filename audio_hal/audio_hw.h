@@ -38,12 +38,7 @@
 #include "../amlogic_AQ_tools/audio_eq_drc_compensation.h"
 #include "aml_audio_types_def.h"
 #include "aml_alsa_mixer.h"
-#ifndef MS12_V24_ENABLE
-#include "../libms12/include/aml_audio_ms12.h"
-#else
-#include "../libms12_v24/include/aml_audio_ms12.h"
-#endif
-
+#include "aml_audio_ms12.h"
 #include "audio_port.h"
 #include "aml_audio_ease.h"
 #include "aml_malloc_debug.h"
