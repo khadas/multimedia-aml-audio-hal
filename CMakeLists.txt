@@ -171,6 +171,7 @@ add_library(audio_hal SHARED
 	utils/audio_data_process.c
 	utils/tinyalsa/pcm.c
 	utils/tinyalsa/mixer.c
+	utils/channels.c
 	${BASIC_UTILS_FILES}
 	${BASIC_CUTILS_FILES}
 	#rcaudio/audio_hal_thunks.cpp

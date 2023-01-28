@@ -31,6 +31,7 @@
 #include "aml_android_utils.h"
 #include "audio_format_parse.h"
 #include "alsa_config_parameters.h"
+#include "channels.h"
 
 #ifdef USE_MEDIAINFO
 #include "aml_media_info.h"
@@ -471,22 +472,26 @@ bool is_hdmi_in_stable_hw (struct audio_stream_in *stream)
 {
     struct aml_stream_in *in = (struct aml_stream_in *) stream;
     struct aml_audio_device *aml_dev = in->dev;
+    struct aml_audio_patch *audio_patch = aml_dev->audio_patch;
+    audio_type_parse_t *audio_type_status = (audio_type_parse_t *)audio_patch->audio_parse_para;
     int type = 0;
     int stable = 0;
+    int tl1_chip = check_chip_name("tl1", 3, &aml_dev->alsa_mixer);
 
     stable = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_HDMI_IN_AUDIO_STABLE);
     if (!stable) {
         ALOGV("%s() amixer %s get %d\n", __func__, "HDMIIN audio stable", stable);
         return false;
     }
-
-    type = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_HDMIIN_AUDIO_TYPE);
-    if (type != in->spdif_fmt_hw) {
-        ALOGD ("%s(), in type changed from %d to %d", __func__, in->spdif_fmt_hw, type);
-        in->spdif_fmt_hw = type;
-        return false;
+    /* TL1 do not use HDMIIN_AUDIO_TYPE */
+    if (audio_type_status != NULL && audio_type_status->soft_parser != 1 && !tl1_chip) {
+        type = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_HDMIIN_AUDIO_TYPE);
+        if (type != in->spdif_fmt_hw) {
+            ALOGD ("%s(), in type changed from %d to %d", __func__, in->spdif_fmt_hw, type);
+            in->spdif_fmt_hw = type;
+            return false;
+        }
     }
-
     return true;
 }
 
@@ -572,6 +577,36 @@ bool is_spdif_in_stable_hw (struct audio_stream_in *stream)
         ALOGV ("%s(), in type changed from %d to %d", __func__, in->spdif_fmt_hw, type);
         in->spdif_fmt_hw = type;
         return false;
+    }
+
+    return true;
+}
+
+bool check_digital_in_stream_signal(struct audio_stream_in *stream)
+{
+    struct aml_stream_in *in = (struct aml_stream_in *) stream;
+    struct aml_audio_device *aml_dev = in->dev;
+    struct aml_audio_patch *patch = aml_dev->audio_patch;
+    audio_type_parse_t *audio_type_status = (audio_type_parse_t *)patch->audio_parse_para;
+    enum audio_type cur_audio_type = LPCM;
+
+    /* parse thread may have exited ,add the code to avoid NULL point visit*/
+    if (audio_type_status == NULL)  {
+        return true;
+    }
+
+    if (audio_type_status->soft_parser != 1) {
+        if (in->spdif_fmt_hw == SPDIFIN_AUDIO_TYPE_PAUSE) {
+            ALOGV("%s(), hw detect iec61937 PAUSE packet, mute input", __func__);
+            return false;
+        }
+    } else {
+        cur_audio_type = audio_parse_get_audio_type_direct(patch->audio_parse_para);
+        if (cur_audio_type == PAUSE || cur_audio_type == MUTE) {
+            ALOGV("%s(), soft parser iec61937 %s packet, mute input", __func__,
+                cur_audio_type == PAUSE ? "PAUSE" : "MUTE");
+            return false;
+        }
     }
 
     return true;
@@ -704,29 +739,91 @@ bool Stop_watch(struct timespec start_ts, int64_t time) {
 
 bool signal_status_check(audio_devices_t in_device, int *mute_time,
                         struct audio_stream_in *stream) {
+
+    struct aml_stream_in *in = (struct aml_stream_in *) stream;
+    struct aml_audio_device *adev = in->dev;
+    hdmiin_audio_packet_t last_audio_packet = in->last_audio_packet_type;
+    bool is_audio_packet_changed = false;
+
+    hdmiin_audio_packet_t cur_audio_packet = get_hdmiin_audio_packet(&adev->alsa_mixer);
+
+    is_audio_packet_changed = (((cur_audio_packet == AUDIO_PACKET_AUDS) || (cur_audio_packet == AUDIO_PACKET_HBR)) &&
+                               (last_audio_packet != cur_audio_packet));
+
     if (in_device & AUDIO_DEVICE_IN_HDMI) {
         bool hw_stable = is_hdmi_in_stable_hw(stream);
-        if (!hw_stable) {
-            ALOGV("%s() hw_stable %d \n", __func__, hw_stable);
-            *mute_time = 100;
+        if ((!hw_stable) || is_audio_packet_changed) {
+            ALOGV("%s() hdmi in hw unstable\n", __func__);
+            *mute_time = 300;
+            in->last_audio_packet_type = cur_audio_packet;
             return false;
         }
     }
     if ((in_device & AUDIO_DEVICE_IN_TV_TUNER) &&
             !is_atv_in_stable_hw (stream)) {
-        *mute_time = 100;
+        *mute_time = 1000;
         return false;
     }
     if (((in_device & AUDIO_DEVICE_IN_SPDIF) ||
             (in_device & AUDIO_DEVICE_IN_HDMI_ARC)) &&
             !is_spdif_in_stable_hw(stream)) {
-        *mute_time = 100;
+        *mute_time = 1000;
         return false;
     }
     if ((in_device & AUDIO_DEVICE_IN_LINE) &&
             !is_av_in_stable_hw(stream)) {
-       *mute_time = 100;
+       *mute_time = 1500;
        return false;
+    }
+    return true;
+}
+
+bool check_tv_stream_signal(struct audio_stream_in *stream)
+{
+    struct aml_stream_in *in = (struct aml_stream_in *)stream;
+    struct aml_audio_device *adev = in->dev;
+    struct aml_audio_patch* patch = adev->audio_patch;
+    int in_mute = 0, parental_mute = 0;
+    bool stable = true;
+    stable = signal_status_check(adev->in_device, &in->mute_mdelay, stream);
+    if (!stable) {
+        if (in->mute_log_cntr == 0)
+            ALOGI("%s: audio is unstable, mute channel", __func__);
+        if (in->mute_log_cntr++ >= 100)
+            in->mute_log_cntr = 0;
+        clock_gettime(CLOCK_MONOTONIC, &in->mute_start_ts);
+        in->mute_flag = true;
+    }
+    if (in->mute_flag) {
+        in_mute = Stop_watch(in->mute_start_ts, in->mute_mdelay);
+        if (!in_mute) {
+            ALOGI("%s: unmute audio since audio signal is stable", __func__);
+            /* The data of ALSA has not been read for a long time in the muted state,
+             * resulting in the accumulation of data. So, cache of capture needs to be cleared.
+             */
+            pcm_stop(in->pcm);
+            in->mute_log_cntr = 0;
+            in->mute_flag = false;
+        }
+    }
+
+    if (adev->parental_control_av_mute && (adev->active_inport == INPORT_TUNER || adev->active_inport == INPORT_LINEIN))
+        parental_mute = 1;
+
+    /*if need mute input source, don't read data from hardware anymore*/
+    if (in_mute || parental_mute) {
+
+        /* when audio is unstable, start avsync*/
+        if (patch && in_mute) {
+            patch->need_do_avsync = true;
+            patch->input_signal_stable = false;
+            adev->mute_start = true;
+        }
+        return false;
+    } else {
+        if (patch) {
+            patch->input_signal_stable = true;
+        }
     }
     return true;
 }
@@ -1230,8 +1327,14 @@ void update_audio_format(struct aml_audio_device *adev, audio_format_t format)
 
 int audio_route_set_hdmi_arc_mute(struct aml_mixer_handle *mixer_handle, int enable)
 {
-    int t5_chip = check_chip_name("t5", 2);
-    if (t5_chip) {
+    int extern_arc = 0;
+
+    if (check_chip_name("t5", 2, mixer_handle))
+        extern_arc = 1;
+    /*t5w hdmi arc mute path is HDMI ARC Switch off */
+    if (extern_arc == 1 && check_chip_name("t5w", 3, mixer_handle))
+        extern_arc  = 0;
+    if (extern_arc) {
         return aml_mixer_ctrl_set_int(mixer_handle, AML_MIXER_ID_SPDIF_MUTE, enable);
     } else {
         return aml_mixer_ctrl_set_int(mixer_handle, AML_MIXER_ID_HDMI_ARC_AUDIO_ENABLE, !enable);
@@ -1240,8 +1343,13 @@ int audio_route_set_hdmi_arc_mute(struct aml_mixer_handle *mixer_handle, int ena
 
 int audio_route_set_spdif_mute(struct aml_mixer_handle *mixer_handle, int enable)
 {
-    int t5_chip = check_chip_name("t5", 2);
-    if (t5_chip) {
+    int extern_arc = 0;
+
+    if (check_chip_name("t5", 2, mixer_handle))
+        extern_arc = 1;
+    if (extern_arc == 1 && check_chip_name("t5w", 3, mixer_handle))
+        extern_arc  = 0;
+    if (extern_arc) {
         return aml_mixer_ctrl_set_int(mixer_handle, AML_MIXER_ID_SPDIF_B_MUTE, enable);
     } else {
         return aml_mixer_ctrl_set_int(mixer_handle, AML_MIXER_ID_SPDIF_MUTE, enable);
@@ -1288,6 +1396,7 @@ int reconfig_read_param_through_hdmiin(struct aml_audio_device *aml_dev,
         if (s32Ret < 0) {
             ALOGE("[%s:%d] start input stream failed! ret:%#x", __func__, __LINE__, s32Ret);
         }
+
         if (ringbuffer) {
             ring_buffer_reset_size(ringbuffer, buf_size);
         }
@@ -1302,7 +1411,8 @@ int reconfig_read_param_through_hdmiin(struct aml_audio_device *aml_dev,
     int current_channel = get_hdmiin_channel(&aml_dev->alsa_mixer);
 
     is_channel_changed = ((current_channel > 0) && last_channel_count != current_channel);
-    is_audio_packet_changed = ((cur_audio_packet != AUDIO_PACKET_NONE) && (last_audio_packet != cur_audio_packet));
+    is_audio_packet_changed = (((cur_audio_packet == AUDIO_PACKET_AUDS) || (cur_audio_packet == AUDIO_PACKET_HBR)) &&
+                               (last_audio_packet != cur_audio_packet));
     //reconfig input stream and buffer when HBR and AUDS audio switching or channel num changed
     if ((is_channel_changed) || is_audio_packet_changed) {
         int period_size = 0;
@@ -1346,6 +1456,7 @@ int reconfig_read_param_through_hdmiin(struct aml_audio_device *aml_dev,
         return -1;
     }
 }
+
 
 int stream_check_reconfig_param(struct audio_stream_out *stream)
 {
@@ -1411,6 +1522,41 @@ int update_sink_format_after_hotplug(struct aml_audio_device *adev)
     }
 
     return 0;
+}
+
+/* expand channels or contract channels*/
+int input_stream_channels_adjust(struct audio_stream_in *stream, void* buffer, size_t bytes)
+{
+    struct aml_stream_in *in = (struct aml_stream_in *)stream;
+    int ret = -1;
+
+    if (!in || !bytes)
+        return ret;
+
+    int channel_count = audio_channel_count_from_in_mask(in->hal_channel_mask);
+
+    if (!channel_count)
+        return ret;
+
+    size_t read_bytes = in->config.channels * bytes / channel_count;
+    if (!in->input_tmp_buffer || in->input_tmp_buffer_size < read_bytes) {
+        in->input_tmp_buffer = aml_audio_realloc(in->input_tmp_buffer, read_bytes);
+        if (!in->input_tmp_buffer) {
+            AM_LOGE("aml_audio_realloc is fail");
+            return ret;
+        }
+        in->input_tmp_buffer_size = read_bytes;
+    }
+
+    ret = aml_alsa_input_read(stream, in->input_tmp_buffer, read_bytes);
+    if (in->config.format == PCM_FORMAT_S16_LE)
+        adjust_channels(in->input_tmp_buffer, in->config.channels,
+            buffer, channel_count, 2, read_bytes);
+    else if (in->config.format == PCM_FORMAT_S32_LE)
+        adjust_channels(in->input_tmp_buffer, in->config.channels,
+            buffer, channel_count, 4, read_bytes);
+
+   return ret;
 }
 
 int set_hdmiin_audio_mode(struct aml_mixer_handle *mixer_handle, char *mode)

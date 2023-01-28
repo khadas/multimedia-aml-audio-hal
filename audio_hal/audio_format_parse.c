@@ -699,8 +699,8 @@ static void* audio_type_parse_threadloop(void *data)
     hdmiin_audio_packet_t cur_audio_packet = AUDIO_PACKET_NONE;
     audio_type_status->last_reconfig_hdmi_packet = AUDIO_PACKET_NONE;
     int read_bytes = 0, read_back, nodata_count;
-    int txlx_chip = check_chip_name("txlx", 4);
-    int txl_chip = check_chip_name("txl", 3);
+    int txlx_chip = check_chip_name("txlx", 4, audio_type_status->mixer_handle);
+    int txl_chip = check_chip_name("txl", 3, audio_type_status->mixer_handle);
     int auge_chip = alsa_device_is_auge();
 
     ret = audio_type_parse_init(audio_type_status);
@@ -846,6 +846,7 @@ static void* audio_type_parse_threadloop(void *data)
     ALOGI("Exit thread loop for audio type parse!\n");
     return ((void *) 0);
 }
+
 
 int audio_parse_get_audio_samplerate(audio_type_parse_t *status)
 {

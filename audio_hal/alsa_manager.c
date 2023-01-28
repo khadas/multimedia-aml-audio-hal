@@ -729,6 +729,7 @@ size_t aml_alsa_input_read(struct audio_stream_in *stream,
     int nodata_count = 0;
     struct pcm *pcm_handle = in->pcm;
     size_t frame_size = in->config.channels * pcm_format_to_bits(in->config.format) / 8;
+    bool hdmi_raw_in_flag = patch && (patch->input_src == AUDIO_DEVICE_IN_HDMI) && (!audio_is_linear_pcm(patch->aformat));
 
     while (read_bytes < bytes) {
         if (patch && patch->input_thread_exit) {
@@ -746,21 +747,28 @@ size_t aml_alsa_input_read(struct audio_stream_in *stream,
         if (ret >= 0) {
             nodata_count = 0;
             read_bytes += ret;
-            ALOGV("pcm_handle:%p, ret:%d read_bytes:%d, bytes:%d ",
-                pcm_handle,ret,read_bytes,bytes);
+            ALOGV("pcm_handle:%p, ret:%d read_bytes:%zu, bytes:%zu ",
+                pcm_handle, ret, read_bytes, bytes);
         } else if (ret != -EAGAIN) {
             ALOGD("%s:%d, pcm_read fail, ret:%#x, error info:%s",
                 __func__, __LINE__, ret, strerror(errno));
             memset((void*)buffer,0,bytes);
             return ret;
         } else {
-             usleep( (bytes - read_bytes) * 1000000 / audio_stream_in_frame_size(stream) /
-                in->requested_rate / 2);
+            if (hdmi_raw_in_flag) {
+                usleep((bytes - read_bytes) * 1000000 / audio_stream_in_frame_size(stream) /
+                    in->config.rate);
+            } else {
+                usleep((bytes - read_bytes) * 1000000 / audio_stream_in_frame_size(stream) /
+                    in->config.rate / 2);
+
+            }
+
+             ALOGV("bytes %zu bytes - read_bytes %zu nodata_count %d",bytes, bytes - read_bytes, nodata_count);
              nodata_count++;
              if (nodata_count >= WAIT_COUNT_MAX) {
-                 nodata_count = 0;
-                 ALOGV("aml_alsa_input_read immediate return");
-                 memset((void*)buffer,0,bytes);
+                 ALOGW("%s:%d,read timeout, in:%p read_bytes:%zu need:%zu", __func__, __LINE__, in, read_bytes, bytes);
+                 memset((void*)buffer, 0, bytes);
                  return 0;
              }
         }

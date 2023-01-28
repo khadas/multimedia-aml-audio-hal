@@ -735,7 +735,8 @@ static int mixer_inports_read(struct amlAudioMixer *audio_mixer)
                 audio_hwsync_t *hwsync = (out != NULL) ? (out->hwsync) : NULL;
                 fade_in = 1;
                 AM_LOGI("input port:%s tsync resume", mixerInputType2Str(type));
-                hwsync->hwsync_need_resume = true;
+                if (hwsync)
+                    hwsync->hwsync_need_resume = true;
                 set_inport_state(in_port, ACTIVE);
             } else if (state == STOPPED || state == PAUSED || state == FLUSHED) {
                 AM_LOGV("input port:%s stopped, paused or flushed", mixerInputType2Str(type));
@@ -779,6 +780,8 @@ static int mixer_inports_read(struct amlAudioMixer *audio_mixer)
                     aml_hwsync_wrap_set_tsync_pause(hwsync);
                     audio_fade_func(in_port->data, ret, 0);
                     set_inport_state(in_port, PAUSED);
+                    /* Mute the last data to prevent gap. */
+                    ring_buffer_clear(in_port->r_buf);
                 } else if (fade_in) {
                     AM_LOGI("input port:%s fade in", mixerInputType2Str(type));
                     audio_fade_func(in_port->data, ret, 1);

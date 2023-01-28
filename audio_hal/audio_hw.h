@@ -509,7 +509,6 @@ struct aml_audio_device {
     /*atsc has video in program*/
     bool is_has_video;
     struct aml_stream_out *ms12_out;
-    struct timespec mute_start_ts;
     int spdif_fmt_hw;
     bool ms12_ott_enable;
     bool ms12_main1_dolby_dummy;
@@ -890,6 +889,7 @@ struct aml_stream_in {
     uint64_t timestamp_nsec;
     bool bt_sco_active;
     hdmiin_audio_packet_t audio_packet_type;
+    hdmiin_audio_packet_t last_audio_packet_type;
 };
 typedef  int (*do_standby_func)(struct aml_stream_out *out);
 typedef  int (*do_startup_func)(struct aml_stream_out *out);

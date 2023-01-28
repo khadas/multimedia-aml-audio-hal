@@ -43,6 +43,9 @@
         (format == AUDIO_FORMAT_DTS) ||\
         (format == AUDIO_FORMAT_DTS_HD))
 
+#define IS_DIGITAL_IN_HW(device) ((device) == AUDIO_DEVICE_IN_HDMI ||\
+                             (device) == AUDIO_DEVICE_IN_HDMI_ARC ||\
+                             (device) == AUDIO_DEVICE_IN_SPDIF)
 
 typedef uint32_t usecase_mask_t;
 
@@ -432,7 +435,6 @@ int enable_HW_resample(struct aml_mixer_handle *mixer_handle, int enable_sr);
 bool Stop_watch(struct timespec start_ts, int64_t time);
 bool signal_status_check(audio_devices_t in_device, int *mute_time,
                          struct audio_stream_in *stream);
-
 int set_resample_source(struct aml_mixer_handle *mixer_handle, enum ResampleSource source);
 int set_spdifin_pao(struct aml_mixer_handle *mixer_handle,int enable);
 
@@ -468,7 +470,7 @@ int audio_route_set_spdif_mute(struct aml_mixer_handle *mixer_handle, int enable
 int reconfig_read_param_through_hdmiin(struct aml_audio_device *aml_dev,
                                        struct aml_stream_in *stream_in,
                                        ring_buffer_t *ringbuffer, int buffer_size);
-
+int input_stream_channels_adjust(struct audio_stream_in *stream, void* buffer, size_t bytes);
 /*
  *@brief update the sink format after HDMI/HDMI-ARC hot pluged
  * return zero if success.
@@ -476,6 +478,18 @@ int reconfig_read_param_through_hdmiin(struct aml_audio_device *aml_dev,
 int update_sink_format_after_hotplug(struct aml_audio_device *adev);
 
 int stream_check_reconfig_param(struct audio_stream_out *stream);
+
+/*
+*@brief check tv signal need to mute or not
+* return false if signal need to mute
+*/
+bool check_tv_stream_signal (struct audio_stream_in *stream);
+
+/*
+*@brief check digital-in signal need to mute(PAUSE/MUTE) or not
+* return false if signal need to mute
+*/
+bool check_digital_in_stream_signal(struct audio_stream_in *stream);
 
 /*
  * @breif set HDMIIN audio mode: "SPDIF", "I2S", "TDM"
