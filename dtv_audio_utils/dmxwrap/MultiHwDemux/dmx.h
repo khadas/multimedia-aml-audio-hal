@@ -209,8 +209,8 @@ struct dmx_pes_filter_params
 	__u32          flags;
     #ifdef CONFIG_AMLOGIC_DVB_COMPAT
 #define DMX_MEM_SEC_LEVEL1   (1 << 10)
-#define DMX_MEM_SEC_LEVEL2   (1 << 11)
-#define DMX_MEM_SEC_LEVEL3   (1 << 12)
+#define DMX_MEM_SEC_LEVEL2   (2 << 10)
+#define DMX_MEM_SEC_LEVEL3   (3 << 10)
 #define DMX_MEM_SEC_LEVEL4   (4 << 10)
 #define DMX_MEM_SEC_LEVEL5   (5 << 10)
 #define DMX_MEM_SEC_LEVEL6   (6 << 10)
