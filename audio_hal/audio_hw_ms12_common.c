@@ -26,8 +26,11 @@
 #include <sys/prctl.h>
 #include <cutils/properties.h>
 #include <inttypes.h>
-
+#if defined(DOLBY_MS12_V26_ENABLE) || defined (DOLBY_MS12_V24_ENABLE)
+#include "audio_hw_ms12_v2.h"
+#else
 #include "audio_hw_ms12.h"
+#endif
 #include "audio_hw_ms12_common.h"
 #include "alsa_config_parameters.h"
 #include "aml_ac3_parser.h"
@@ -83,7 +86,7 @@ const char *scheduler_state_2_string[MS12_SCHEDULER_MAX] = {
 
 /*****************************************************************************
 *   Function Name:  set_dolby_ms12_runtime_pause
-*   Description:    set pause or resume to dobly ms12.
+*   Description:    set pause or resume to dolby ms12.
 *   Parameters:     struct dolby_ms12_desc: ms12 variable pointer
 *                   int: state pause or resume
 *   Return value:   0: success, or else fail

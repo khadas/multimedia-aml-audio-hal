@@ -5,7 +5,6 @@ project(aml_audio_hal
 
 include(GNUInstallDirs)
 execute_process(COMMAND sh version_config.sh WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_subdirectory("libms12_v24")
 add_subdirectory("audio_codec/libfaad")
 add_subdirectory("audio_codec/libmad")
 add_subdirectory("audio_codec/libvorbis")
@@ -35,7 +34,15 @@ option(NO_USE_CAP_MUTE_HDMI "Don't support audio capture mute for HDMI INPUT" OF
 option(USE_APP_MIXING "Support appsound mixing" ON)
 option(USE_DIAG_LOG "Support diagnostic logging for RDK" OFF)
 option(USE_MEDIA_INFO "Support media info API reporting" OFF)
+option(USE_MS12_V26 "Use MS12 v2.6" OFF)
 
+if(USE_MS12_V26)
+add_subdirectory("libms12_v26")
+add_definitions(-DDOLBY_MS12_V26_ENABLE)
+else()
+add_subdirectory("libms12_v24")
+add_definitions(-DDOLBY_MS12_V24_ENABLE)
+endif()
 
 if(USE_DTV)
     list(APPEND DTV_FILES dtv_audio_utils/audio_data_read/audio_dtv_ad.c)
@@ -111,7 +118,7 @@ add_library(audio_hal SHARED
 	audio_hal/amlAudioMixer.c
 	audio_hal/aml_audio_ms12_bypass.c
 	audio_hal/aml_audio_stream.c
-    audio_hal/aml_audio_spdifout.c
+	audio_hal/aml_audio_spdifout.c
 	audio_hal/aml_audio_timer.c
 	audio_hal/aml_avsync_tuning.c
 	audio_hal/audio_format_parse.c
@@ -171,7 +178,7 @@ add_library(audio_hal SHARED
     ${EQ_DRC_FILES}
 )
 
-add_definitions(-DNDEBUG -DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK -DDOLBY_MS12_ENABLE -DMS12_V24_ENABLE -DBUILD_LINUX)
+add_definitions(-DNDEBUG -DREPLACE_OUTPUT_BUFFER_WITH_CALLBACK -DDOLBY_MS12_ENABLE -DBUILD_LINUX)
 if(NO_USE_CAP)
 add_definitions(-DNO_AUDIO_CAP)
 
@@ -214,7 +221,6 @@ target_include_directories(audio_hal PRIVATE
 	./utils/include
 	./utils/tinyalsa/include
 	./utils/cJSON
-	./libms12_v24/include
 	./amlogic_AQ_tools
 	./dtv_audio_utils/audio_read_api
 	./audio_hal
@@ -225,6 +231,12 @@ target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-de
 target_link_libraries(audio_hal
 	audioprocessing spdifenc ms12v2
 	-lcutils -lamaudioutils -llog -lexpat -lpthread -ldl -lstdc++ -lrt -Wl,-z,defs)
+
+if(USE_MS12_V26)
+	target_include_directories(audio_hal PRIVATE ./libms12_v26/include)
+else()
+	target_include_directories(audio_hal PRIVATE ./libms12_v24/include)
+endif()
 
 if(USE_EQ_DRC)
 	target_include_directories(audio_hal PRIVATE

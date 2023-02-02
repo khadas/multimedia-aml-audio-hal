@@ -27,7 +27,7 @@
 #include <cutils/properties.h>
 #include <inttypes.h>
 
-#include "audio_hw_ms12.h"
+#include "audio_hw_ms12_v2.h"
 #include "alsa_config_parameters.h"
 #include "aml_ac3_parser.h"
 #include <sound/asound.h>
@@ -639,6 +639,9 @@ void set_dolby_ms12_drc_parameters(audio_format_t input_format, int output_confi
     }
 
     dolby_ms12_set_drc_mode(dolby_ms12_drc_mode);
+#ifdef MS12_V26_ENABLE
+    dolby_ms12_set_multichannel_drc_mode(dolby_ms12_drc_mode);
+#endif
     ALOGI("%s dolby_ms12_set_drc_mode %s", __FUNCTION__, (dolby_ms12_drc_mode == DOLBY_DRC_RF_MODE) ? "RF MODE" : "LINE MODE");
 
     if (output_config_mask & MS12_OUTPUT_MASK_DAP) {
@@ -759,7 +762,7 @@ int get_the_dolby_ms12_prepared(
         set_audio_associate_format(input_format);
         ALOGI("%s set_audio_associate_format %#x", __FUNCTION__, input_format);
     }
-    dolby_ms12_set_asscociated_audio_mixing(associate_audio_mixing_enable);
+    dolby_ms12_set_associated_audio_mixing(associate_audio_mixing_enable);
     dolby_ms12_set_user_control_value_for_mixing_main_and_associated_audio(adev->mixing_level);
 
 

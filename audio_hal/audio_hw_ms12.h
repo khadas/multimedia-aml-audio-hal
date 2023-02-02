@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef MS12_V24_ENABLE
+#if !defined(MS12_V24_ENABLE) && !defined(MS12_V26_ENABLE)
 
 #ifndef _AUDIO_HW_MS12_H_
 #define _AUDIO_HW_MS12_H_

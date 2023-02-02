@@ -199,10 +199,10 @@ int data_exchange_i2s_channels(
  * Description:
  *     replace lfe data
  * Input:
- *     out_channles            - channel count of putput data
+ *     out_channels            - channel count of putput data
  *     out_framesz             - frame size of output
  *     input_lfe_buffer        - input lfe data
- *     in_channles             - channel count of input data
+ *     in_channels             - channel count of input data
  *     in_framesz              - frame size of input
  *     frames                  - frame count
  *     channel_insert_bit_mask - eChOnI2SBitMask, bit mask of lfe channel
@@ -212,10 +212,10 @@ int data_exchange_i2s_channels(
  *****************************************************************************/
 int data_replace_lfe_data(
 	void    *out_buf,
-	size_t  out_channles,
+	size_t  out_channels,
 	size_t  out_framesz,
 	void    *input_lfe_buffer,
-	size_t  in_channles,
+	size_t  in_channels,
 	size_t  in_framesz,
 	size_t  frames,
 	int     channel_insert_bit_mask);

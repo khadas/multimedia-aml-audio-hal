@@ -83,6 +83,10 @@ typedef struct
 typedef struct
 {
     int mi_enable;//(0,1, def: 0)
+    int mi_dv_enable;//(0,1, def: 0)
+    int mi_de_enable;//(0,1, def: 0)
+    int mi_surround_enable;//(0,1, def: 0)
+    int mi_virtualizer_enable;//(0,1, def: 0)
 }DAPMISteering;
 
 typedef struct
@@ -102,8 +106,7 @@ typedef struct
 
 typedef struct
 {
-    int de_enable;// (0,1, def: 0)
-    int de_amount;//(0...16, def: 0)
+    int de_amount;//(0...12, def: 0)
 }DAPDialogueEnhancer;
 
 typedef struct

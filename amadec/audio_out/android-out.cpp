@@ -245,7 +245,7 @@ void reset_system_samplerate(struct aml_audio_dec* audec)
          dts_raw_reset_sysFS=1;
          Samplerate=audec->samplerate;
     }else if (audec->format == ACODEC_FMT_TRUEHD && (digital_raw == 1 || digital_raw == 2)) {
-         //Dobly TrueHD RawOutput
+         //Dolby TrueHD RawOutput
          Samplerate = 192000;
     }
     if ((audec->format == ACODEC_FMT_AC3  && (audec->samplerate == 32000 || audec->samplerate == 44100))

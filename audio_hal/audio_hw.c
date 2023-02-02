@@ -7211,7 +7211,7 @@ ssize_t hw_write (struct audio_stream_out *stream
         }
 
     }
-    /*we should also to caculate the alsa latency*/
+    /*we should also to calculate the alsa latency*/
     {
         clock_gettime (CLOCK_MONOTONIC, &aml_out->timestamp);
         aml_out->lasttimestamp.tv_sec = aml_out->timestamp.tv_sec;
@@ -8439,7 +8439,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
         /*
            mixer_aux_buffer_write is called when the hw write is called another thread,for example
            main write thread or ms12 thread. aux audio is coming from the audioflinger mixed thread.
-           we need caculate the system buffer latency in ms12 also with the alsa out latency.It is
+           we need calculate the system buffer latency in ms12 also with the alsa out latency.It is
            48K 2 ch 16 bit audio.
            */
         alsa_latency_frame = adev->ms12.latency_frame;
@@ -10705,7 +10705,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         spdif_tuning_latency = 0;
     }
 
-    // try to detect which dobly lib is readable
+    // try to detect which dolby lib is readable
     adev->dolby_lib_type = detect_dolby_lib_type();
     adev->dolby_lib_type_last = adev->dolby_lib_type;
     adev->dolby_decode_enable = dolby_lib_decode_enable(adev->dolby_lib_type_last);
