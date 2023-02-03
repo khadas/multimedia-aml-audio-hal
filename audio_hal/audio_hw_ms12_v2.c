@@ -508,7 +508,11 @@ static inline alsa_device_t usecase_device_adapter_with_ms12(alsa_device_t useca
 void set_ms12_drc_boost_value_for_2ch_downmixed_output(struct dolby_ms12_desc *ms12, int boost)
 {
     char parm[64] = "";
+#ifdef MS12_V26_ENABLE
+    sprintf(parm, "%s %d", "-drc_boost_stereo", boost);
+#else
     sprintf(parm, "%s %d", "-bs", boost);
+#endif
     if ((strlen(parm)) > 0 && ms12)
         aml_ms12_update_runtime_params(ms12, parm);
 }
@@ -516,14 +520,22 @@ void set_ms12_drc_boost_value_for_2ch_downmixed_output(struct dolby_ms12_desc *m
 void set_ms12_drc_cut_value_for_2ch_downmixed_output(struct dolby_ms12_desc *ms12, int cut)
 {
     char parm[64] = "";
+#ifdef MS12_V26_ENABLE
+    sprintf(parm, "%s %d", "-drc_cut_stereo", cut);
+#else
     sprintf(parm, "%s %d", "-cs", cut);
+#endif
     if ((strlen(parm)) > 0 && ms12)
         aml_ms12_update_runtime_params(ms12, parm);
 }
 void set_ms12_drc_mode_for_2ch_downmixed_output(struct dolby_ms12_desc *ms12, bool drc_mode)
 {
     char parm[64] = "";
+#ifdef MS12_V26_ENABLE
+    sprintf(parm, "%s %d", "-drc_stereo", drc_mode);
+#else
     sprintf(parm, "%s %d", "-drc", drc_mode);
+#endif
     if ((strlen(parm)) > 0 && ms12)
         aml_ms12_update_runtime_params(ms12, parm);
 }
@@ -531,7 +543,11 @@ void set_ms12_drc_mode_for_2ch_downmixed_output(struct dolby_ms12_desc *ms12, bo
 void set_ms12_drc_boost_value(struct dolby_ms12_desc *ms12, int boost)
 {
     char parm[64] = "";
+#ifdef MS12_V26_ENABLE
+    sprintf(parm, "%s %d", "-drc_boost_multichannel", boost);
+#else
     sprintf(parm, "%s %d", "-b", boost);
+#endif
     if ((strlen(parm)) > 0 && ms12)
         aml_ms12_update_runtime_params(ms12, parm);
 }
@@ -539,16 +555,28 @@ void set_ms12_drc_boost_value(struct dolby_ms12_desc *ms12, int boost)
 void set_ms12_drc_cut_value(struct dolby_ms12_desc *ms12, int cut)
 {
     char parm[64] = "";
+#ifdef MS12_V26_ENABLE
+    sprintf(parm, "%s %d", "-drc_cut_multichannel", cut);
+#else
     sprintf(parm, "%s %d", "-c", cut);
+#endif
     if ((strlen(parm)) > 0 && ms12)
         aml_ms12_update_runtime_params(ms12, parm);
 }
 
 
+#ifdef MS12_V26_ENABLE
+void set_ms12_drc_mode_dap_output(struct dolby_ms12_desc *ms12, bool drc_mode)
+#else
 void set_ms12_drc_mode_for_multichannel_and_dap_output(struct dolby_ms12_desc *ms12, bool drc_mode)
+#endif
 {
     char parm[64] = "";
+#ifdef MS12_V26_ENABLE
+    sprintf(parm, "%s %d", "-drc_dap", drc_mode);
+#else
     sprintf(parm, "%s %d", "-dap_drc", drc_mode);
+#endif
     if ((strlen(parm)) > 0 && ms12)
         aml_ms12_update_runtime_params(ms12, parm);
 }
@@ -605,7 +633,11 @@ void dynamic_set_dolby_ms12_drc_parameters(struct dolby_ms12_desc *ms12)
         }
         set_ms12_drc_boost_value(ms12, drc_boost);
         set_ms12_drc_cut_value(ms12, drc_cut);
+#ifdef MS12_V26_ENABLE
+        set_ms12_drc_mode_dap_output(ms12, dolby_ms12_dap_drc_mode);
+#else
         set_ms12_drc_mode_for_multichannel_and_dap_output(ms12, dolby_ms12_dap_drc_mode);
+#endif
         ALOGI("%s dynamic set dap_drc %s",
             __FUNCTION__, (dolby_ms12_dap_drc_mode == DOLBY_DRC_RF_MODE) ? "RF MODE" : "LINE MODE");
     }

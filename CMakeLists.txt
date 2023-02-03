@@ -38,10 +38,10 @@ option(USE_MS12_V26 "Use MS12 v2.6" OFF)
 
 if(USE_MS12_V26)
 add_subdirectory("libms12_v26")
-add_definitions(-DDOLBY_MS12_V26_ENABLE)
+add_definitions(-DMS12_V26_ENABLE)
 else()
 add_subdirectory("libms12_v24")
-add_definitions(-DDOLBY_MS12_V24_ENABLE)
+add_definitions(-DMS12_V24_ENABLE)
 endif()
 
 if(USE_DTV)
