@@ -841,7 +841,6 @@ int dca_decoder_process_patch(aml_dec_t *aml_dec, unsigned char *buffer, int byt
         if ( ((dts_dec->outlen_pcm > 0) || (dts_dec->outlen_raw > 0)) && (used_size > 0) ) {
             ///< get dts stream type, display audio info banner.
             if (!dts_decoder_getinfo) {
-                dts_dec->stream_type = -1;
                 dts_dec->is_headphone_x = false;
             } else {
                 dca_info_t dca_info;
