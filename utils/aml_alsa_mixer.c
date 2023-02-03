@@ -66,7 +66,9 @@ static struct aml_mixer_list gAmlMixerList[] = {
     /* for AV status */
     {AML_MIXER_ID_AV_IN_AUDIO_STABLE,   "AV audio stable"},
     /* for Speaker master volume */
-    {AML_MIXER_ID_EQ_MASTER_VOLUME,     "EQ master volume"},
+    {AML_MIXER_ID_EQ_LCH_VOLUME,        "AED Lch volume"},
+    {AML_MIXER_ID_EQ_RCH_VOLUME,        "AED Rch volume"},
+    {AML_MIXER_ID_EQ_MASTER_VOLUME,     "AED master volume"},
     /* ARCIN and SPDIFIN switch*/
     {AML_MIXER_ID_SPDIFIN_ARCIN_SWITCH, "AudioIn Switch"},
     {AML_MIXER_ID_SPDIFIN_PAO,          "SPDIFIN PAO"},

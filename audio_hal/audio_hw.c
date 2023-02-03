@@ -4147,6 +4147,21 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+    ret = str_parms_get_int(parms, "AED master volume", &val);
+    if (ret >= 0) {
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_EQ_MASTER_VOLUME, val);
+        ALOGI("audio master volume : %d\n", val);
+        goto exit;
+    }
+
+    ret = str_parms_get_int(parms, "AED channel volume", &val);
+    if (ret >= 0) {
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_EQ_LCH_VOLUME, val);
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_EQ_RCH_VOLUME, val);
+        ALOGI("audio channel volume : %d\n", val);
+        goto exit;
+    }
+
     // HDMI cable plug off
     ret = str_parms_get_int(parms, "disconnect", &val);
     if (ret >= 0) {
@@ -4748,6 +4763,54 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     ret = str_parms_get_int(parms, "hal_param_all_delay_time_ms", &val);
     if (ret >= 0) {
         aml_audio_delay_set_time(AML_DELAY_OUTPORT_ALL, val);
+        goto exit;
+    }
+#endif
+#ifdef USE_EQ_DRC
+    ret = str_parms_get_str(parms, "EQ_PARAM", value, sizeof(value));
+    if (ret >= 0) {
+       sscanf(value, "%lf %lf %u %u %u",&adev->Eq_data.G,&adev->Eq_data.Q,&adev->Eq_data.fc,&adev->Eq_data.type,&adev->Eq_data.band_id);
+       setpar_eq(adev->Eq_data.G,adev->Eq_data.Q,adev->Eq_data.fc,adev->Eq_data.type,adev->Eq_data.band_id);
+       goto exit;
+    }
+    ret = str_parms_get_str(parms,"mb_drc",value,sizeof(value));
+    if (ret >= 0) {
+        sscanf(value, "%u %u %u %u %f %f",&adev->Drc_data.band_id,&adev->Drc_data.attrack_time,&adev->Drc_data.release_time,
+             &adev->Drc_data.estimate_time,&adev->Drc_data.K,&adev->Drc_data.threshold);
+        setmb_drc(adev->Drc_data.band_id,adev->Drc_data.attrack_time,adev->Drc_data.release_time,adev->Drc_data.estimate_time,
+                adev->Drc_data.K,adev->Drc_data.threshold);
+        goto exit;
+    }
+    ret = str_parms_get_str(parms,"fb_drc",value,sizeof(value));
+    if (ret >= 0) {
+        sscanf(value, "%u %u %u %u %f %f %u",&adev->Drc_data.band_id,&adev->Drc_data.attrack_time,&adev->Drc_data.release_time,
+             &adev->Drc_data.estimate_time,&adev->Drc_data.K,&adev->Drc_data.threshold,&adev->Drc_data.delays);
+        setfb_drc(adev->Drc_data.band_id,adev->Drc_data.attrack_time,adev->Drc_data.release_time,adev->Drc_data.estimate_time,
+               adev->Drc_data.K,adev->Drc_data.threshold,adev->Drc_data.delays);
+        goto exit;
+    }
+    ret = str_parms_get_str(parms,"csfilter_drc",value,sizeof(value));
+    if (ret >= 0) {
+        sscanf(value, "%u %u",&adev->Drc_data.band_id,&adev->Drc_data.fc);
+        setcsfilter_drc(adev->Drc_data.band_id,adev->Drc_data.fc);
+        goto exit;
+    }
+    ret = str_parms_get_int(parms, "eq_enable", &val);
+    if (ret >= 0) {
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_AED_EQ_ENABLE, val);
+        ALOGI("audio AED EQ enable: %s\n", val?"enable":"disable");
+        goto exit;
+    }
+    ret = str_parms_get_int(parms, "multi_drc_enable", &val);
+    if (ret >= 0) {
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_AED_MULTI_DRC_ENABLE, val);
+        ALOGI("audio AED Multi-band DRC enable: %s\n", val?"enable":"disable");
+        goto exit;
+    }
+    ret = str_parms_get_int(parms, "fullband_drc_enable", &val);
+    if (ret >= 0) {
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_AED_FULL_DRC_ENABLE, val);
+        ALOGI("audio AED Full-band DRC enable: %s\n", val?"enable":"disable");
         goto exit;
     }
 #endif

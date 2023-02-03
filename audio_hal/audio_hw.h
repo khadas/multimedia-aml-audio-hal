@@ -35,7 +35,9 @@
 #include "audio_hwsync.h"
 #include "audio_post_process.h"
 #include "aml_hw_mixer.h"
-#include "../amlogic_AQ_tools/audio_eq_drc_compensation.h"
+#include "audio_eq_drc_compensation.h"
+#include "aml_DRC_param_gen.h"
+#include "aml_EQ_param_gen.h"
 #include "aml_audio_types_def.h"
 #include "aml_alsa_mixer.h"
 #include "aml_audio_ms12.h"
@@ -185,6 +187,25 @@ struct aml_hal_mixer {
     /* flag to check if need cache some data before write to mix */
     unsigned char need_cache_flag;
     pthread_mutex_t lock;
+};
+
+struct drc_data {
+    uint32_t band_id;
+    uint32_t attrack_time;
+    uint32_t release_time;
+    float threshold;
+    unsigned int fc;
+    unsigned int estimate_time;
+    float K;
+    unsigned int delays;
+};
+
+struct eq_data {
+    double G;
+    double Q;
+    unsigned int fc;
+    unsigned int type;
+    unsigned int band_id;
 };
 
 enum patch_src_assortion {
@@ -483,6 +504,8 @@ struct aml_audio_device {
     ring_buffer_t spk_tuning_rbuf;
     bool mix_init_flag;
     struct eq_drc_data eq_data;
+    struct drc_data Drc_data;
+    struct eq_data Eq_data;
     /*used for high pricision A/V from amlogic amadec decoder*/
     unsigned first_apts;
     /*
