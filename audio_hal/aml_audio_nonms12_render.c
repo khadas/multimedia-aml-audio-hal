@@ -356,7 +356,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                         if (adev->mute_start)  {
                             /* fade in start */
                             ALOGI("start fade in");
-                            start_ease_in(adev->audio_ease);
+                            start_ease_in(adev);
                             adev->mute_start = false;
                         }
                     }
