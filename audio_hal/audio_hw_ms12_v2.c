@@ -2981,7 +2981,7 @@ bool is_bypass_dolbyms12(struct audio_stream_out *stream)
 
     return (is_dts
             || is_high_rate_pcm(stream)
-            || (is_multi_channel_pcm(stream) && (adev->hdmi_format == BYPASS)));
+            || (is_multi_channel_pcm(stream) && !(adev->is_netflix && aml_out->is_normal_pcm) && (adev->hdmi_format == BYPASS)));
 }
 
 bool is_audio_postprocessing_add_dolbyms12_dap(struct aml_audio_device *adev)
