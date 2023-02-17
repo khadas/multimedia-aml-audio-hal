@@ -10518,6 +10518,7 @@ static int aml_audio_focus(struct aml_audio_device *adev, bool on)
 #define AUDIO_DELAY_MAX "Audio_Delay_Max"
 #define USE_SUB_MIX "Sub_Mix_Enable"
 #define Audio_Focus_Enable "Audio_Focus_Enable"
+#define STB_MS12_DAP_MODE "Stb_dolby_ms12_dap_init_mode"
 
 static int adev_open(const hw_module_t* module, const char* name, hw_device_t** device)
 {
@@ -10737,6 +10738,8 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->ms12_force_ddp_out = property_get_bool("ro.vendor.platform.is.forceddp", false);
 #endif
     adev->spdif_enable = true;
+    adev->dolby_ms12_dap_init_mode = aml_get_jason_int_value(STB_MS12_DAP_MODE, 0);
+
 
     /*for ms12 case, we set default continuous mode*/
     if (eDolbyMS12Lib == adev->dolby_lib_type) {

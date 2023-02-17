@@ -130,6 +130,9 @@
 #define MILLISECOND_2_PTS (90) // 1ms = 90 (pts)
 #define DOLBY_MS12_AVSYNC_BEEP_DURATION (360)//ms, every 3s one beep
 
+//dap init mode
+#define DAP_CONTENT_PROC_MODE 1
+#define DAP_CONTENT_PROC_DEVICE_PROC_MODE 2
 
 
 static const unsigned int ms12_muted_dd_raw[] = {
@@ -689,7 +692,7 @@ void set_dolby_ms12_drc_parameters(audio_format_t input_format, int output_confi
     }
 }
 
-static void set_dolby_ms12_dap_init_mode(struct aml_audio_device *adev)
+static int set_dolby_ms12_dap_init_mode(struct aml_audio_device *adev)
 {
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     int dap_init_mode = 0;
@@ -699,9 +702,11 @@ static void set_dolby_ms12_dap_init_mode(struct aml_audio_device *adev)
         dap_init_mode = get_ms12_dap_init_mode(adev->is_TV);
     }
     else {
-        dap_init_mode = 0;
+        dap_init_mode = adev->dolby_ms12_dap_init_mode;
     }
+    ALOGD("dap_init_mode = %d", dap_init_mode);
     dolby_ms12_set_dap2_initialisation_mode(dap_init_mode);
+    return dap_init_mode;
 }
 
 static void set_dolby_ms12_downmix_mode(struct aml_audio_device *adev)
@@ -749,6 +754,7 @@ int get_the_dolby_ms12_prepared(
         demux_info = (aml_demux_audiopara_t *)patch->demux_info;
     }
     int ret = 0, associate_audio_mixing_enable = 0;
+    int dap_init_mode = 0;
 #ifdef BUILD_LINUX
     bool output_5_1_ddp = adev->is_netflix;//netflix need output 5.1 ddp
 #else
@@ -858,7 +864,7 @@ int get_the_dolby_ms12_prepared(
     dolby_ms12_set_system_app_audio_mixing(adev->system_app_mixing_status);
 
     /* set DAP init mode */
-    set_dolby_ms12_dap_init_mode(adev);
+    dap_init_mode = set_dolby_ms12_dap_init_mode(adev);
     /* set Downmix mode(Lt/Rt as default) */
     set_dolby_ms12_downmix_mode(adev);
 
@@ -866,7 +872,12 @@ int get_the_dolby_ms12_prepared(
     if (adev->sink_capability == AUDIO_FORMAT_MAT) {
         output_config = MS12_OUTPUT_MASK_STEREO | MS12_OUTPUT_MASK_MAT;
     } else {
-        output_config = MS12_OUTPUT_MASK_DD | MS12_OUTPUT_MASK_DDP | MS12_OUTPUT_MASK_STEREO | MS12_OUTPUT_MASK_SPEAKER | MS12_OUTPUT_MASK_DAP;
+        output_config = MS12_OUTPUT_MASK_DD | MS12_OUTPUT_MASK_DDP | MS12_OUTPUT_MASK_STEREO;
+        if (DAP_CONTENT_PROC_DEVICE_PROC_MODE == dap_init_mode) {
+            output_config = output_config | MS12_OUTPUT_MASK_SPEAKER | MS12_OUTPUT_MASK_DAP;
+        } else if (DAP_CONTENT_PROC_MODE == dap_init_mode) {
+            output_config |= MS12_OUTPUT_MASK_DAP;
+        }
     }
     /* for soundbar, we only need speaker output */
     if (adev->is_SBR)
