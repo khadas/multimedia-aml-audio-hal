@@ -214,8 +214,8 @@ static const struct pcm_config pcm_config_out = {
 static const struct pcm_config pcm_config_out_direct = {
     .channels = 2,
     .rate = MM_FULL_POWER_SAMPLING_RATE,
-    .period_size = DEFAULT_PLAYBACK_PERIOD_SIZE * 2,
-    .period_count = PLAYBACK_PERIOD_COUNT * 2,
+    .period_size = DEFAULT_PLAYBACK_PERIOD_SIZE,
+    .period_count = PLAYBACK_PERIOD_COUNT,
     .format = PCM_FORMAT_S16_LE,
 };
 
@@ -3293,7 +3293,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         }
 
         out->config = pcm_config_out_direct;
-        out->config.start_threshold = out->config.period_size * 2;
+        out->config.start_threshold = out->config.period_size * 4;
         out->config.channels = audio_channel_count_from_out_mask(config->channel_mask);
         out->config.rate = config->sample_rate;
         switch (config->format) {
@@ -3354,6 +3354,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
             out->raw_61937_frame_size = 16;
             break;
         case TYPE_PCM:
+            out->config.period_size *= 2;
+            out->config.period_count *= 2;
             if (out->config.channels >= 6 || out->config.rate > 48000)
                 adev->hi_pcm_mode = true;
             break;
