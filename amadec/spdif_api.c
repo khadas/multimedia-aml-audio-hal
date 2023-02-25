@@ -1,22 +1,19 @@
-/*************************************************************************************
- *       @file  spdif_api.c
- *      @brief
- * Simple SPDIF test tools
- * Detailed description starts here.
+/*
+ * Copyright (C) 2021 Amlogic Corporation.
  *
- *     @author  jian.xu jian.xu@amlogic.com
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *   @internal
- *     Created  2012-4-19
- *    Revision  v1.0
- *    Compiler  gcc/g++
- *     Company  Amlogic Inc.
- *   Copyright  Copyright (c) 2011,
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * This source code is released for free distribution under the terms of the
- * GNU General Public License as published by the Free Software Foundation.
- *************************************************************************************
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>

@@ -1,12 +1,26 @@
+/*
+ * Copyright (C) 2020 Amlogic Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef AMDMX_H
 #define AMDMX_H
 
 #include <stdio.h>
 #include <string.h>
-
 #include <am_types.h>
-
-//#include <AmLinuxDvb.h>
+#include <linux/types.h>
 #include <pthread.h>
 #include "RefBase.h"
 #include <AmHwMultiDemuxWrapper.h>
@@ -125,5 +139,144 @@ private:
 	//AM_DMX_Source_t     src;     /**< TS输入源*/
 };
 
+
+/*24~31 one byte for audio type, dmx_audio_format_t*/
+#define DMX_AUDIO_FORMAT_BIT 24
+#define CONFIG_AMLOGIC_DVB_COMPAT
+
+#define ACODEC_FMT_NULL -1
+#define ACODEC_FMT_MPEG 0
+#define ACODEC_FMT_PCM_S16LE 1
+#define ACODEC_FMT_AAC 2
+#define ACODEC_FMT_AC3 3
+#define ACODEC_FMT_ALAW 4
+#define ACODEC_FMT_MULAW 5
+#define ACODEC_FMT_DTS 6
+#define ACODEC_FMT_PCM_S16BE 7
+#define ACODEC_FMT_FLAC 8
+#define ACODEC_FMT_COOK 9
+#define ACODEC_FMT_PCM_U8 10
+#define ACODEC_FMT_ADPCM 11
+#define ACODEC_FMT_AMR 12
+#define ACODEC_FMT_RAAC 13
+#define ACODEC_FMT_WMA 14
+#define ACODEC_FMT_WMAPRO 15
+#define ACODEC_FMT_PCM_BLURAY 16
+#define ACODEC_FMT_ALAC 17
+#define ACODEC_FMT_VORBIS 18
+#define ACODEC_FMT_AAC_LATM 19
+#define ACODEC_FMT_APE 20
+#define ACODEC_FMT_EAC3 21
+#define ACODEC_FMT_WIFIDISPLAY 22
+#define ACODEC_FMT_DRA 23
+#define ACODEC_FMT_TRUEHD 25
+#define ACODEC_FMT_MPEG1  26 // AFORMAT_MPEG-->mp3,AFORMAT_MPEG1-->mp1,AFROMAT_MPEG2-->mp2
+#define ACODEC_FMT_MPEG2  27
+#define ACODEC_FMT_WMAVOI 28
+#define DMX_KERNEL_CLIENT   0x8000
+
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+#define DMX_USE_SWFILTER    0x100
+#endif
+
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+typedef enum dmx_input_source {
+    INPUT_DEMOD,
+    INPUT_LOCAL,
+    INPUT_LOCAL_SEC
+} dmx_input_source_t;
+
+/**
+ * struct dmx_non_sec_es_header - non-sec Elementary Stream (ES) Header
+ *
+ * @pts_dts_flag:[1:0], 01:pts valid, 10:dts valid
+ * @pts:	pts value
+ * @dts:	dts value
+ * @len:	data len
+ */
+struct dmx_non_sec_es_header {
+    __u8 pts_dts_flag;
+    __u64 pts;
+    __u64 dts;
+    __u32 len;
+};
+
+/**
+ * struct dmx_sec_es_data - sec Elementary Stream (ES)
+ *
+ * @pts_dts_flag:[1:0], 01:pts valid, 10:dts valid
+ * @pts:	pts value
+ * @dts:	dts value
+ * @buf_start:	buf start addr
+ * @buf_end:	buf end addr
+ * @data_start: data start addr
+ * @data_end: data end addr
+ */
+struct dmx_sec_es_data {
+    __u8 pts_dts_flag;
+    __u64 pts;
+    __u64 dts;
+    __u32 buf_start;
+    __u32 buf_end;
+    __u32 data_start;
+    __u32 data_end;
+};
+#endif
+
+enum dmx_audio_format {
+    AUDIO_UNKNOWN = 0,      /* unknown media */
+    AUDIO_MPX = 1,          /* mpeg audio MP2/MP3 */
+    AUDIO_AC3 = 2,          /* Dolby AC3/EAC3 */
+    AUDIO_AAC_ADTS = 3,     /* AAC-ADTS */
+    AUDIO_AAC_LOAS = 4,     /* AAC-LOAS */
+    AUDIO_DTS = 5,          /* DTS */
+    AUDIO_MAX
+};
+
+
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+#define DMX_MEM_SEC_LEVEL1   (1 << 10)
+#define DMX_MEM_SEC_LEVEL2   (2 << 10)
+#define DMX_MEM_SEC_LEVEL3   (3 << 10)
+#define DMX_MEM_SEC_LEVEL4   (4 << 10)
+#define DMX_MEM_SEC_LEVEL5   (5 << 10)
+#define DMX_MEM_SEC_LEVEL6   (6 << 10)
+#define DMX_MEM_SEC_LEVEL7   (7 << 10)
+
+#define DMX_ES_OUTPUT        (1 << 16)
+#define DMX_OUTPUT_RAW_MODE  (1 << 17)
+#endif
+
+
+typedef struct dmx_caps {
+    __u32 caps;
+    int num_decoders;
+} dmx_caps_t;
+
+typedef enum dmx_source {
+    DMX_SOURCE_FRONT0 = 0,
+    DMX_SOURCE_FRONT1,
+    DMX_SOURCE_FRONT2,
+    DMX_SOURCE_FRONT3,
+    DMX_SOURCE_DVR0   = 16,
+    DMX_SOURCE_DVR1,
+    DMX_SOURCE_DVR2,
+    DMX_SOURCE_DVR3,
+
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+    DMX_SOURCE_FRONT0_OFFSET = 100,
+    DMX_SOURCE_FRONT1_OFFSET,
+    DMX_SOURCE_FRONT2_OFFSET
+#endif
+} dmx_source_t;
+
+
+
+#define DMX_GET_CAPS             _IOR('o', 48, dmx_caps_t)
+#define DMX_SET_SOURCE           _IOW('o', 49, dmx_source_t)
+
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+#define DMX_SET_INPUT           _IO('o', 80)
+#endif
 
 #endif

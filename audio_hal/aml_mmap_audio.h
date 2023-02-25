@@ -17,7 +17,6 @@
 #ifndef _AML_MMAP_AUDIO_H_
 #define _AML_MMAP_AUDIO_H_
 
-#include <ion/ion.h>
 
 typedef struct AML_MMAP_THREAD_PARAM {
     pthread_t               threadId;

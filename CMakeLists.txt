@@ -5,8 +5,8 @@ project(aml_audio_hal
 
 include(GNUInstallDirs)
 execute_process(COMMAND sh version_config.sh WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_subdirectory("audio_codec/libfaad")
-add_subdirectory("audio_codec/libmad")
+#add_subdirectory("audio_codec/libfaad")
+#add_subdirectory("audio_codec/libmad")
 add_subdirectory("audio_codec/libvorbis")
 add_subdirectory("audio_codec/libdts")
 add_subdirectory("audio_codec/libdcv")
