@@ -288,6 +288,11 @@ int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duration);
 */
 int dolby_ms12_enable_mixer_max_size(int enable);
 
+/*@@
+    @brief get main audio info
+*/
+int dolby_ms12_get_main_audio_info(int *sample_rate, int *acmod, int *b_lfe);
+
 #ifdef __cplusplus
 }
 #endif

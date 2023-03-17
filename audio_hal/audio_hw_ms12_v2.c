@@ -1096,6 +1096,75 @@ bool is_ms12_passthrough(struct audio_stream_out *stream) {
     return bypass_ms12;
 }
 
+/*
+*@brief convert the dolby acmod to linux channel num
+*/
+static int acmod_convert_to_channel_num(AML_DOLBY_ACMOD acmod, int lfeon) {
+    int ch_mask = AUDIO_CHANNEL_OUT_STEREO;
+    int ch_num = 0;
+    switch (acmod) {
+        case AML_DOLBY_ACMOD_ONEPLUSONE: {
+            ch_mask = AUDIO_CHANNEL_OUT_STEREO;
+            break;
+        }
+        case AML_DOLBY_ACMOD_MONO: {
+            ch_mask = AUDIO_CHANNEL_OUT_MONO;
+            break;
+        }
+        case AML_DOLBY_ACMOD_STEREO: {
+            if (lfeon) {
+                ch_mask = AUDIO_CHANNEL_OUT_2POINT1;
+            } else {
+                ch_mask = AUDIO_CHANNEL_OUT_STEREO;
+            }
+            break;
+         }
+         /*this acmod can't be mapped*/
+        case AML_DOLBY_ACMOD_3_0:
+        case AML_DOLBY_ACMOD_2_1: {
+            if (lfeon) {
+                ch_mask = AUDIO_CHANNEL_OUT_3POINT1;
+            } else {
+                ch_mask = AUDIO_CHANNEL_OUT_TRI;
+            }
+            break;
+         }
+        /*this acmod can't be mapped*/
+        case AML_DOLBY_ACMOD_3_1:
+        case AML_DOLBY_ACMOD_2_2: {
+            ch_mask = AUDIO_CHANNEL_OUT_QUAD;
+            break;
+        }
+        case AML_DOLBY_ACMOD_3_2: {
+            if (lfeon) {
+                ch_mask = AUDIO_CHANNEL_OUT_5POINT1;
+            } else {
+                ch_mask = AUDIO_CHANNEL_OUT_PENTA;
+            }
+            break;
+        }
+        case AML_DOLBY_ACMOD_3_4: {
+            if (lfeon) {
+                ch_mask = AUDIO_CHANNEL_OUT_7POINT1;
+            } else {
+                ch_mask = AUDIO_CHANNEL_OUT_6POINT1;
+            }
+            break;
+        }
+        case AML_DOLBY_ACMOD_3_2_2: {
+            ch_mask = AUDIO_CHANNEL_OUT_5POINT1POINT2;
+            break;
+        }
+        default:
+            break;
+    }
+    while (ch_mask) {
+        if (ch_mask & 1 )
+            ch_num++;
+        ch_mask >>= 1;
+    }
+    return ch_num;
+}
 
 /*
  *@brief dolby ms12 main process
@@ -1492,6 +1561,22 @@ MAIN_INPUT:
             }
         }
         ms12->is_bypass_ms12 = is_ms12_passthrough(stream);
+        if (adev->audio_hal_info.first_decoding_frame == false) {
+            int sample_rate = 0;
+            int acmod = 0;
+            int b_lfe = 0;
+            dolby_ms12_get_main_audio_info(&sample_rate, &acmod, &b_lfe);
+            adev->audio_hal_info.first_decoding_frame = true;
+            /*Default: 2ch, 48khz*/
+            if (sample_rate)
+                adev->audio_hal_info.sample_rate = sample_rate;
+            else
+                adev->audio_hal_info.sample_rate = 48000;
+            if (acmod_convert_to_channel_num(acmod,b_lfe))
+                adev->audio_hal_info.channel_number = acmod_convert_to_channel_num(acmod,b_lfe);
+            else
+                adev->audio_hal_info.channel_number = 2;
+        }
 exit:
         if (get_ms12_dump_enable(DUMP_MS12_INPUT_MAIN)) {
             dump_ms12_output_data((void*)buffer, *use_size, MS12_INPUT_SYS_MAIN_FILE);

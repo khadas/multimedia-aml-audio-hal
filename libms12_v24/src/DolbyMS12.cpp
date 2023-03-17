@@ -982,5 +982,24 @@ int DolbyMS12::DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration)
     return ret;
 }
 
+int DolbyMS12::DolbyMS12GetMainAudioInfo(int *sample_rate, int *acmod, int *b_lfe)
+{
+    int ret = 0;
+    struct aml_audio_info p_aml_audio_info;
+    ALOGV("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12GetAudioInfo) {
+        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
+        return ret;
+    }
+
+    ret = (*FuncDolbyMS12GetAudioInfo)(&p_aml_audio_info);
+    *sample_rate = p_aml_audio_info.sample_rate;
+    *acmod       = p_aml_audio_info.acmod;
+    *b_lfe       = p_aml_audio_info.b_lfe;
+    ret = (*FuncDolbyMS12GetAudioInfo)(&p_aml_audio_info);
+    ALOGV("-%s() %d %d %d", __FUNCTION__, *sample_rate, *acmod, *b_lfe);
+    return ret;
+}
+
 /*--------------------------------------------------------------------------*/
 }   // namespace android

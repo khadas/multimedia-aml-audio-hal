@@ -544,3 +544,14 @@ extern "C" int dolby_ms12_enable_mixer_max_size(int enable)
     return -1;
 }
 
+extern "C" int dolby_ms12_get_main_audio_info(int *sample_rate, int *acmod, int *b_lfe)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetMainAudioInfo(sample_rate, acmod, b_lfe);
+    } else {
+        return -1;
+    }
+}
+

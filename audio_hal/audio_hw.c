@@ -3813,7 +3813,8 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     }
 
     pthread_mutex_unlock(&out->lock);
-
+    adev->audio_hal_info.is_decoding = false;
+    adev->audio_hal_info.first_decoding_frame = false;
     if (stream) {
         aml_audio_free(stream);
         stream = NULL;
@@ -5483,7 +5484,7 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         }
         return strdup ("hw_av_sync=12345678");
     }
-    //ALOGI ("adev_get_parameters keys: %s \n", keys);
+    // ALOGI ("adev_get_parameters keys: %s \n", keys);
     if (strstr (keys, "getenv=") ) {
         char *pret=getenv(&keys[7]);
         if (NULL != pret) {
@@ -5641,6 +5642,38 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
     } else if (strstr(keys, "dolby_lib_type")) {
         ALOGI("dolby_lib_type: %d", adev->dolby_lib_type);
         sprintf(temp_buf, "dolby_lib_type=%d", adev->dolby_lib_type);
+        return strdup(temp_buf);
+    } else if (!strncmp(keys, "audio_info=", 11)) {
+        int audio_info_type = 0;
+        keys += 11;
+        sscanf(keys ,"%d", &audio_info_type);
+
+        switch (audio_info_type) {
+        case AUDIO_PARAMTYPE_DEC_STATUS:
+            sprintf (temp_buf,"audio_information_d=%d", adev->audio_hal_info.is_decoding);
+            break;
+        case AUDIO_PARAMTYPE_PTS:
+            //AUDIO_PARAMTYPE_PTS
+            break;
+        case AUDIO_PARAMTYPE_SAMPLE_RATE:
+            if (adev->dec_stream_info.dec_info.stream_sr == 0) {
+                sprintf (temp_buf,"audio_information_s=%d", adev->audio_hal_info.sample_rate);
+            } else
+                sprintf (temp_buf,"audio_information_s=%d", adev->dec_stream_info.dec_info.stream_sr);
+            break;
+        case AUDIO_PARAMTYPE_CHANNEL_MODE:
+            if (adev->dec_stream_info.dec_info.stream_ch == 0) {
+                sprintf (temp_buf,"audio_information_c=%d", adev->audio_hal_info.channel_number);
+            } else
+                sprintf (temp_buf,"audio_information_c=%d", adev->dec_stream_info.dec_info.stream_ch);
+            break;
+        case AUDIO_PARAMTYPE_DIGITAL_AUDIO_INFO:
+            //AUDIO_PARAMTYPE_DIGITAL_AUDIO_INFO;
+            break;
+        default:
+            break;
+        }
+        ALOGI("temp_buf %s", temp_buf);
         return strdup(temp_buf);
     }
     return strdup("");

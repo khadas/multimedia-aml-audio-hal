@@ -276,7 +276,12 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                         dec_pcm_data->data_ch /= 3;
                     }
                 }
-
+                if (adev->audio_hal_info.first_decoding_frame == false) {
+                    aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &adev->dec_stream_info);
+                    adev->audio_hal_info.first_decoding_frame = true;
+                    adev->audio_hal_info.is_decoding = true;
+                    ALOGI("[%s:%d] aml_decoder_stream_info %d %d", __func__, __LINE__, adev->dec_stream_info.dec_info.stream_ch, adev->dec_stream_info.dec_info.stream_sr);
+                }
                 if (do_sync_flag) {
                     if (dec_pcm_data->data_ch != 0)
                         duration =  (pcm_len * 1000) / (2 * dec_pcm_data->data_ch * aml_out->config.rate);

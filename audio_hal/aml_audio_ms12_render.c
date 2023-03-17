@@ -299,6 +299,12 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                 ALOGV("%s() ret =%d pcm len =%d raw len=%d", __func__, ret, dec_pcm_data->data_len, dec_raw_data->data_len);
                 // write pcm data
                 if (dec_pcm_data->data_len > 0) {
+                    if (adev->audio_hal_info.first_decoding_frame == false) {
+                        aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &adev->dec_stream_info);
+                        adev->audio_hal_info.first_decoding_frame = true;
+                        adev->audio_hal_info.is_decoding = true;
+                        ALOGI("[%s:%d] aml_decoder_stream_info %d %d", __func__, __LINE__, adev->dec_stream_info.dec_info.stream_ch, adev->dec_stream_info.dec_info.stream_sr);
+                    }
                     void  *dec_data = (void *)dec_pcm_data->buf;
                     if (adev->patch_src  == SRC_DTV && adev->start_mute_flag == 1) {
                         memset(dec_pcm_data->buf, 0, dec_pcm_data->data_len);

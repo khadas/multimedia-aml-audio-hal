@@ -48,9 +48,9 @@ typedef union ms12_config {
 }ms12_config_t;
 struct aml_audio_info{
     int is_dolby_atmos;
-    int reserved_a;
-    int reserved_b;
-    int reserved_c;
+    int sample_rate;
+    int acmod;
+    int b_lfe;
 };
 
 namespace android
@@ -159,7 +159,7 @@ public:
 
     virtual int     DolbyMS12SetSchedulerState(int sch_state);
     virtual int     DolbyMS12EnableMixerMaxSize(int enable);
-
+    virtual int     DolbyMS12GetMainAudioInfo(int *sample_rate, int *acmod, int *b_lfe);
     virtual unsigned long long DolbyMS12GetDecoderNFramesPcmOutput(void *ms12_pointer, int format, int is_main);
 
     virtual void DolbyMS12SetDebugLevel(int);

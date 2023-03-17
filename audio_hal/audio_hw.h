@@ -338,8 +338,15 @@ struct aml_audio_mixer;
 typedef struct audio_hal_info{
     audio_format_t format;
     bool is_dolby_atmos;
+    bool is_decoding; /*store the decoder status*/
+    bool first_decoding_frame;
     int update_type;
     int update_cnt;
+    int channel_number;
+    int sample_rate;
+    int lfepresent;
+    int channel_mode;
+    int digital_audio_info;
 } audio_hal_info_t;
 
 struct aml_bt_output {
@@ -651,6 +658,7 @@ struct aml_audio_device {
     /* board specific json configs */
     int hdmitx_src; /* HDMITX src select for TDM */
     bool spdif_independent;  /*spdif output can be independent with HDMI output*/
+    aml_dec_info_t dec_stream_info;
     /* -End- */
 };
 
@@ -664,6 +672,14 @@ struct meta_data_list {
     struct listnode list;
     struct meta_data mdata;
 };
+
+typedef enum {
+    AUDIO_PARAMTYPE_DEC_STATUS = 0,
+    AUDIO_PARAMTYPE_PTS,
+    AUDIO_PARAMTYPE_SAMPLE_RATE,
+    AUDIO_PARAMTYPE_CHANNEL_MODE,
+    AUDIO_PARAMTYPE_DIGITAL_AUDIO_INFO,
+} audio_paramtype;
 
 typedef enum audio_data_handle_state {
     AUDIO_DATA_HANDLE_NONE = 0,
