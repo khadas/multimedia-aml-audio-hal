@@ -25,6 +25,7 @@
 #include <tinyalsa/asoundlib.h>
 #include <string.h>
 #include <alsa_device_parser.h>
+#include <aml_android_utils.h>
 
 #include "audio_port.h"
 #include "alsa_device_parser.h"
@@ -679,11 +680,156 @@ static ssize_t output_port_post_process(output_port *port, void *buffer, int byt
     int frames = bytes / FRAMESIZE_16BIT_STEREO;
     float vol = 1.0;
     int i = 0;
+    int16_t *tmp_buffer = (int16_t *) buffer;
+    struct aml_audio_device *adev = (struct aml_audio_device *)adev_get_handle();
 
     process_outport_msg(port);
     //if (get_debug_value(AML_DUMP_AUDIOHAL_TV)) {
     //    aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/port_postprocess.raw", buffer, bytes);
     //}
+
+
+    int16_t *effect_tmp_buf;
+    int32_t *spk_tmp_buf;
+    int16_t *hp_tmp_buf = NULL;
+    int32_t *ps32SpdifTempBuffer = NULL;
+    float source_gain;
+    float gain_speaker = adev->eq_data.p_gain.speaker;
+
+    /* handling audio effect process here */
+    if (adev->effect_buf_size < bytes) {
+        adev->effect_buf = aml_audio_realloc(adev->effect_buf, bytes);
+        if (!adev->effect_buf) {
+            ALOGE ("realloc effect buf failed size %zu", bytes);
+            return -ENOMEM;
+        } else {
+            ALOGI("realloc effect_buf size from %zu to %zu", adev->effect_buf_size, bytes);
+        }
+        adev->effect_buf_size = bytes;
+
+        adev->spk_output_buf = aml_audio_realloc(adev->spk_output_buf, bytes * 2);
+        if (!adev->spk_output_buf) {
+            ALOGE ("realloc headphone buf failed size %zu", bytes);
+            return -ENOMEM;
+        }
+        // 16bit -> 32bit, need realloc
+        adev->spdif_output_buf = aml_audio_realloc(adev->spdif_output_buf, bytes * 2);
+        if (!adev->spdif_output_buf) {
+            ALOGE ("realloc spdif buf failed size %zu", bytes);
+            return -ENOMEM;
+        }
+
+        adev->hp_output_buf = aml_audio_realloc(adev->hp_output_buf, bytes);
+        if (!adev->hp_output_buf) {
+            ALOGE ("realloc hp buf failed size %zu", bytes);
+            return -ENOMEM;
+        }
+    }
+
+    effect_tmp_buf = (int16_t *)adev->effect_buf;
+    spk_tmp_buf = (int32_t *)adev->spk_output_buf;
+    hp_tmp_buf = (int16_t *)adev->hp_output_buf;
+    memcpy(hp_tmp_buf, tmp_buffer, bytes);
+    ps32SpdifTempBuffer = (int32_t *)adev->spdif_output_buf;
+#ifdef ENABLE_AVSYNC_TUNING
+    tuning_spker_latency(adev, effect_tmp_buf, tmp_buffer, bytes);
+#else
+    memcpy(effect_tmp_buf, tmp_buffer, bytes);
+#endif
+
+    if (adev->patch_src == SRC_DTV)
+        source_gain = adev->eq_data.s_gain.dtv;
+    else if (adev->patch_src == SRC_HDMIIN)
+        source_gain = adev->eq_data.s_gain.hdmi;
+    else if (adev->patch_src == SRC_LINEIN)
+        source_gain = adev->eq_data.s_gain.av;
+    else if (adev->patch_src == SRC_ATV)
+        source_gain = adev->eq_data.s_gain.atv;
+    else
+        source_gain = adev->eq_data.s_gain.media;
+
+    if (adev->patch_src == SRC_DTV && adev->audio_patch != NULL) {
+        aml_audio_switch_output_mode((int16_t *)effect_tmp_buf, bytes, adev->audio_patch->mode);
+    } else if ( adev->audio_patch == NULL) {
+        aml_audio_switch_output_mode((int16_t *)effect_tmp_buf, bytes, adev->sound_track_mode);
+    }
+
+    /*aduio effect process for speaker*/
+    if (adev->active_outport != OUTPORT_A2DP) {
+        audio_post_process(&adev->native_postprocess, effect_tmp_buf, frames);
+    }
+
+    if (aml_getprop_bool("vendor.media.audiohal.outdump")) {
+        aml_audio_dump_audio_bitstreams("/data/audio/audio_spk.pcm",
+        effect_tmp_buf, bytes);
+    }
+
+    float volume = source_gain;
+    /* apply volume for spk/hp, SPDIF/HDMI keep the max volume */
+    if (adev->active_outport == OUTPORT_A2DP) {
+        if ((adev->patch_src == SRC_DTV || adev->patch_src == SRC_HDMIIN
+            || adev->patch_src == SRC_LINEIN || adev->patch_src == SRC_ATV)
+            && adev->audio_patching) {
+            volume *= adev->sink_gain[OUTPORT_A2DP];
+        }
+    } else {
+        volume *= gain_speaker * adev->sink_gain[OUTPORT_SPEAKER];
+    }
+
+    apply_volume_16to32(volume, effect_tmp_buf, spk_tmp_buf, bytes);
+    apply_volume_16to32(source_gain, tmp_buffer, ps32SpdifTempBuffer, bytes);
+    apply_volume(adev->sink_gain[OUTPORT_HEADPHONE], hp_tmp_buf, sizeof(uint16_t), bytes);
+
+    /* 2 ch 16 bit --> 8 ch 32 bit mapping, need 8X size of input buffer size */
+    if (port->processed_bytes < 8 * bytes) {
+        buf_proc = aml_audio_realloc(buf_proc, 8 * bytes);
+        if (!buf_proc) {
+            ALOGE("%s: realloc buf_proc buf failed size = %zu",
+                __func__, 8 * bytes);
+            return -ENOMEM;
+        } else {
+            ALOGI("%s: realloc buf_proc size from %zu to %zu",
+                __func__, port->processed_bytes, 8 * bytes);
+        }
+        port->processed_bytes = 8 * bytes;
+    }
+    if (alsa_device_is_auge()) {
+        for (i = 0; i < frames; i++) {
+            buf_proc[8 * i + 0] = spk_tmp_buf[2 * i];
+            buf_proc[8 * i + 1] = spk_tmp_buf[2 * i + 1];
+            buf_proc[8 * i + 2] = ps32SpdifTempBuffer[2 * i];
+            buf_proc[8 * i + 3] = ps32SpdifTempBuffer[2 * i + 1];
+            buf_proc[8 * i + 4] = hp_tmp_buf[2 * i] << 16;
+            buf_proc[8 * i + 5] = hp_tmp_buf[2 * i + 1] << 16;
+            buf_proc[8 * i + 6] = tmp_buffer[2 * i] << 16;
+            buf_proc[8 * i + 7] = tmp_buffer[2 * i + 1] << 16;
+        }
+    } else {
+        for (i = 0; i < frames; i++) {
+            buf_proc[8 * i + 0] = tmp_buffer[2 * i] << 16;
+            buf_proc[8 * i + 1] = tmp_buffer[2 * i + 1] << 16;
+            buf_proc[8 * i + 2] = spk_tmp_buf[2 * i];
+            buf_proc[8 * i + 3] = spk_tmp_buf[2 * i + 1];
+            buf_proc[8 * i + 4] = tmp_buffer[2 * i] << 16;
+            buf_proc[8 * i + 5] = tmp_buffer[2 * i + 1] << 16;
+            buf_proc[8 * i + 6] = 0;
+            buf_proc[8 * i + 7] = 0;
+        }
+    }
+#ifndef NO_AUDIO_CAP
+    /* 2ch downmix capture for TV platform*/
+    pthread_mutex_lock(&adev->cap_buffer_lock);
+    if (adev->cap_buffer ) {
+#ifndef NO_AUDIO_CAP_MUTE_HDMI
+        if ((adev->audio_patch) && (adev->patch_src != SRC_DTV)) {
+            memset(tmp_buffer, 0, frames * 4);
+        }
+#endif
+        IpcBuffer_write(adev->cap_buffer, (const unsigned char *)buffer, (int) bytes);
+    }
+    pthread_mutex_unlock(&adev->cap_buffer_lock);
+#endif
+
 #if 0
     for (int dev = AML_AUDIO_OUT_DEV_TYPE_SPEAKER; dev < AML_AUDIO_OUT_DEV_TYPE_BUTT; dev++) {
         vol = port->src_gain;
@@ -945,6 +1091,7 @@ output_port *new_output_port(
         }
         port->processed_buf = proc_buf;
         vol_buf = aml_audio_calloc(1, rbuf_size * STEREO_16BIT_TO_2CH_32BIT);
+        port->processed_bytes = rbuf_size * STEREO_16BIT_TO_2CH_32BIT;
         if (!vol_buf) {
             AM_LOGE("allocate output_port vol_buf, no memory");
             goto err_vol_buf;
