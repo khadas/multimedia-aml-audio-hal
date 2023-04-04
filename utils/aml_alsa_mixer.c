@@ -56,7 +56,7 @@ static struct aml_mixer_list gAmlMixerList[] = {
     {AML_MIXER_ID_HDMI_IN_SAMPLERATE,   "HDMIIN audio samplerate"},
     {AML_MIXER_ID_HDMI_IN_CHANNELS,     "HDMIIN audio channels"},
     {AML_MIXER_ID_HDMI_IN_FORMATS,      "HDMIIN audio format"},
-    {AML_MIXER_ID_HDMI_ATMOS_EDID,      "HDMI ATMOS EDID Switch"},
+    {AML_MIXER_ID_HDMI_IN_EDID,         "HDMIIN AUDIO EDID"},
     /* for ATV status */
     {AML_MIXER_ID_ATV_IN_AUDIO_STABLE,  "ATV audio stable"},
     {AML_MIXER_ID_SPDIF_FORMAT,         "Audio spdif format"},
