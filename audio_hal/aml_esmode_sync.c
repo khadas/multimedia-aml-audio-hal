@@ -165,7 +165,11 @@ bool aml_hwsynces_insertpcm(struct audio_stream_out *stream, audio_format_t form
             aml_hw_mixer_mixing(&adev->hw_mixer, out_buf, insert_size, format);
             if (audio_hal_data_processing(stream, out_buf, insert_size, &output_buffer,
                 &output_buffer_bytes, format) == 0) {
-                hw_write(stream, output_buffer, output_buffer_bytes, format);
+                if (adev->useSubMix) {
+                    out_write_direct_pcm(stream, output_buffer, output_buffer_bytes);
+                } else {
+                    hw_write(stream, output_buffer, output_buffer_bytes, format);
+                }
             }
         } else {
             ret = aml_audio_ms12_process_wrapper(stream, out_buf, insert_size);
