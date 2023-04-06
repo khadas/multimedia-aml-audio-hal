@@ -116,5 +116,6 @@ int get_audio_checkin_underrun(void);
 int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val);
 bool is_dtv_patch_alive(struct aml_audio_device *aml_dev);
 int dtv_patch_get_latency(struct aml_audio_device *aml_dev);
+bool dtv_is_secure(void *dtv_instances);
 
 #endif

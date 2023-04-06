@@ -6818,13 +6818,12 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
 #ifndef NO_AUDIO_CAP
                 /* 2ch downmix capture for TV platform*/
                 pthread_mutex_lock(&adev->cap_buffer_lock);
-                if (adev->cap_buffer ) {
-#ifndef NO_AUDIO_CAP_MUTE_HDMI
-                     if ((adev->audio_patch) && (adev->patch_src != SRC_DTV)) {
+                if (adev->cap_buffer) {
+                    if ((adev->audio_patch) &&
+                        ((adev->patch_src == SRC_DTV) && dtv_is_secure(adev->aml_dtv_audio_instances))) {
                         memset(tmp_buffer, 0, out_frames * 4);
-                     }
-#endif
-                   IpcBuffer_write(adev->cap_buffer, (const unsigned char *)buffer, (int) bytes);
+                    }
+                    IpcBuffer_write(adev->cap_buffer, (const unsigned char *)buffer, (int) bytes);
                 }
                 pthread_mutex_unlock(&adev->cap_buffer_lock);
 #endif
@@ -6860,13 +6859,12 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
 #ifndef NO_AUDIO_CAP
             /* 2ch downmix capture for nonetv platform*/
             pthread_mutex_lock(&adev->cap_buffer_lock);
-            if (adev->cap_buffer ) {
-#ifndef NO_AUDIO_CAP_MUTE_HDMI
-                     if ((adev->audio_patch) && (adev->patch_src != SRC_DTV)) {
+            if (adev->cap_buffer) {
+                if ((adev->audio_patch) &&
+                    ((adev->patch_src == SRC_DTV) && dtv_is_secure(adev->aml_dtv_audio_instances))) {
                         memset(tmp_buffer, 0, out_frames * 4);
-                     }
-#endif
-               IpcBuffer_write(adev->cap_buffer, (const unsigned char *)buffer, (int) bytes);
+                }
+                IpcBuffer_write(adev->cap_buffer, (const unsigned char *)buffer, (int) bytes);
             }
             pthread_mutex_unlock(&adev->cap_buffer_lock);
 #endif
