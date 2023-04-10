@@ -4108,4 +4108,13 @@ int dtv_in_read(struct audio_stream_in *stream, void* buffer, size_t bytes)
     return ret;
 }
 
+bool dtv_is_secure(void *dtv_instances)
+{
+    aml_dtv_audio_instances_t *dtv_audio_instances =  (aml_dtv_audio_instances_t *)dtv_instances;
+    if (dtv_audio_instances) {
+        return dtv_audio_instances->demux_info[dtv_audio_instances->demux_index_working].security_mem_level != 0;
+    } else {
+        return false;
+    }
+}
 
