@@ -25,7 +25,7 @@
 
 #define FLAC_LIB_PATH "/usr/lib/libflac-aml.so"
 #define FLAC_MAX_LENGTH (1024 * 64)
-#define FLAC_REMAIN_BUFFER_SIZE (4096 * 10)
+#define FLAC_REMAIN_BUFFER_SIZE (4096 * 20)
 
 typedef struct flac_decoder_operations {
     const char * name;
@@ -244,7 +244,11 @@ static int flac_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, i
         return -1;
     }
 
-    ALOGI("%s[%d]: old size:%d, new add size:%d, all size:%d", __FUNCTION__, __LINE__, flac_decoder->remain_size, bytes, flac_decoder->remain_size + bytes);
+    ALOGV("%s[%d]: old size:%d, new add size:%d, all size:%d", __FUNCTION__, __LINE__, flac_decoder->remain_size, bytes, flac_decoder->remain_size + bytes);
+    if ((flac_decoder->remain_size + bytes) > FLAC_REMAIN_BUFFER_SIZE) {
+        ALOGE("%s:%d: all size %d is bigger than %d", __func__, __LINE__, flac_decoder->remain_size + bytes, FLAC_REMAIN_BUFFER_SIZE);
+        return used_size_return;
+    }
     mark_remain_size = flac_decoder->remain_size;
     if (bytes > 0) {
         memcpy(flac_decoder->remain_data + flac_decoder->remain_size, buffer, bytes);
@@ -254,8 +258,11 @@ static int flac_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, i
     dec_pcm_data->data_len = 0;
     decode_len = flac_operation->decode(flac_operation, (char *)(dec_pcm_data->buf + dec_pcm_data->data_len), &pcm_len,
         (char *)flac_decoder->remain_data, flac_decoder->remain_size);
-    ALOGI("%s[%d]: decode_len %d, in %d, pcm_len %d", __FUNCTION__, __LINE__, decode_len, flac_decoder->remain_size, pcm_len);
-
+    ALOGV("%s[%d]: decode_len %d, in %d, pcm_len %d", __FUNCTION__, __LINE__, decode_len, flac_decoder->remain_size, pcm_len);
+    if (flac_decoder->remain_size < 0) {
+        ALOGE("%s:%d: remain_size < 0", __func__, __LINE__, flac_decoder->remain_size);
+        return used_size_return;
+    }
     if (decode_len > 0) {
         used_size = decode_len;
         dec_pcm_data->data_len += pcm_len;
@@ -273,7 +280,7 @@ static int flac_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, i
         }
     } else {
         used_size_return = bytes;
-        ALOGI("%s[%d]: in %d, decode_len %d, pcm_len %d, used_size %d, flac_dec->remain_size %d", __FUNCTION__, __LINE__, bytes, decode_len, pcm_len, used_size, flac_decoder->remain_size);
+        ALOGV("%s[%d]: in %d, decode_len %d, pcm_len %d, used_size %d, flac_dec->remain_size %d", __FUNCTION__, __LINE__, bytes, decode_len, pcm_len, used_size, flac_decoder->remain_size);
     }
     flac_decoder->total_pcm_size += dec_pcm_data->data_len;
     flac_decoder->total_raw_size += used_size_return;
@@ -299,7 +306,7 @@ static int flac_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, i
     flac_decoder->stream_info.stream_sr = dec_pcm_data->data_sr;
     dec_pcm_data->data_format = flac_config->flac_format;
     dump_flac_data(dec_pcm_data->buf, dec_pcm_data->data_len, "/data/flac_output.pcm");
-    ALOGI("%s[%d]: used_size_return %d, decoder pcm len %d, buffer len %d", __FUNCTION__, __LINE__, used_size_return, dec_pcm_data->data_len,
+    ALOGV("%s[%d]: used_size_return %d, decoder pcm len %d, buffer len %d", __FUNCTION__, __LINE__, used_size_return, dec_pcm_data->data_len,
         dec_pcm_data->buf_size);
 
     return used_size_return;
