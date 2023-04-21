@@ -580,6 +580,18 @@ static void pcm_decoder_config_prepare(struct audio_stream_out *stream, aml_pcm_
     return;
 }
 
+static void adpcm_decoder_config_prepare(struct audio_stream_out *stream, aml_adpcm_config_t * adpcm_config)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
+    struct aml_audio_device *adev = aml_out->dev;
+    adpcm_config->channel    = aml_out->hal_ch;
+    adpcm_config->samplerate = aml_out->hal_rate;
+    adpcm_config->pcm_format = aml_out->hal_format;
+    adpcm_config->block_size = aml_out->hal_decode_block_size;
+
+    return;
+}
+
 static void flac_decoder_config_prepare(struct audio_stream_out *stream, aml_flac_config_t * flac_config)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
@@ -639,6 +651,10 @@ int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t f
     case AUDIO_FORMAT_PCM_LPCM_1394:
     case AUDIO_FORMAT_PCM_LPCM_BLURAY: {
         pcm_decoder_config_prepare(stream, &dec_config->pcm_config);
+        break;
+    }
+    case AUDIO_FORMAT_PCM_ADPCM_IMA_WAV: {
+        adpcm_decoder_config_prepare(stream, &dec_config->adpcm_config);
         break;
     }
     case AUDIO_FORMAT_MP3:

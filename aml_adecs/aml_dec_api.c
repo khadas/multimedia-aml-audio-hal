@@ -35,6 +35,7 @@
 #include "aml_ddp_dec_api.h"
 #include "aml_dts_dec_api.h"
 #include "aml_pcm_dec_api.h"
+#include "aml_adpcm_dec_api.h"
 #include "aml_mpeg_dec_api.h"
 #include "aml_aac_dec_api.h"
 #include "aml_flac_dec_api.h"
@@ -81,6 +82,9 @@ static aml_dec_func_t * get_decoder_function(audio_format_t format)
     }
     case AUDIO_FORMAT_VORBIS: {
         return &aml_vorbis_func;
+    }
+    case AUDIO_FORMAT_PCM_ADPCM_IMA_WAV: {
+        return &aml_adpcm_func;
     }
     default:
         ALOGE("[%s:%d] doesn't support decoder format:%#x", __func__, __LINE__, format);

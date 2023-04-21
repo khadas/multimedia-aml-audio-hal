@@ -716,6 +716,7 @@ struct aml_stream_out {
     unsigned int hal_rate;
     unsigned int hal_ch;
     unsigned int hal_frame_size;
+    unsigned int hal_decode_block_size;
     unsigned int rate_convert;
     audio_output_flags_t flags;
     audio_devices_t out_device;

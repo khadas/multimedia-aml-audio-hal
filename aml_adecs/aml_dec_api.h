@@ -158,6 +158,16 @@ typedef struct aml_pcm_config {
     unsigned int lpcm_header;
 } aml_pcm_config_t;
 
+typedef struct aml_adpcm_config {
+    audio_format_t pcm_format;
+    int samplerate;
+    int channel;
+    int lpcm_channel;
+    int max_out_channels;
+    int width;
+    int codecID;
+    unsigned int block_size;
+} aml_adpcm_config_t;
 
 typedef struct aml_faad_config {
     audio_format_t aac_format;
@@ -190,6 +200,7 @@ typedef struct aml_dec_config {
     aml_mad_config_t mad_config;
     aml_faad_config_t faad_config;
     aml_pcm_config_t pcm_config;
+    aml_adpcm_config_t adpcm_config;
     aml_flac_config_t flac_config;
     aml_vorbis_config_t vorbis_config;
 

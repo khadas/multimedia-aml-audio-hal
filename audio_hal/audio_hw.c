@@ -1235,6 +1235,16 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         goto exit;
     }
 
+    ret = str_parms_get_str (parms, "adpcm_block_size", value, sizeof(value));
+    if (ret >=0 ) {
+        unsigned int block_size = atoi(value);
+        out->hal_decode_block_size = block_size;
+
+        ALOGI("[%s:%d]:set block_size=%d", __FUNCTION__, __LINE__, block_size);
+        ret = 0;
+        goto exit;
+    }
+
     ret = str_parms_get_str (parms, "hw_av_sync_type", value, sizeof(value));
     if (ret >=0 ) {
         int hw_sync_type = atoi(value);
