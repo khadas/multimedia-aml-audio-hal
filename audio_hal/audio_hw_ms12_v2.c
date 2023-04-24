@@ -2380,7 +2380,24 @@ int bitstream_output(void *buffer, void *priv_data, size_t size)
         return 0;
     }
 
-    if (ms12->optical_format != AUDIO_FORMAT_E_AC3) {
+    /*
+     * Old version:(ms12->optical_format != AUDIO_FORMAT_E_AC3)
+     *
+     * reason:
+     *      1. AVR(only MAT1.0 - TrueHD, not MAT2.0/MAT2.1)
+     *      2. TrueHD can passthrough the MS12 with MAT encoder.
+     *      3. MS12 pipeline add the DDP Encoder, so will output DDP.
+     *
+     * effect:
+     *      AVR(up to MAT1.0) + MS12
+     *      A. AUTO Mode:
+     *         all dolby input format should output DDP
+     *      B. NONE Mode:
+     *         all dolby input format should output PCM
+     *      C. Passthrough:
+     *         AC3/EAC3/MLP can passthrough, others should under ms12 processing.
+     */
+    if (ms12->optical_format < AUDIO_FORMAT_E_AC3) {
         return 0;
     }
 
