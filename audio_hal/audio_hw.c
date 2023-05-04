@@ -8765,12 +8765,13 @@ ssize_t out_write_new(struct audio_stream_out *stream,
      */
     if (!aml_out->is_sink_format_prepared) {
         get_sink_format(&aml_out->stream);
+        aml_out->card = alsa_device_get_card_index();
         if (!adev->is_TV) {
             if (is_use_spdifb(aml_out)) {
                 aml_audio_select_spdif_to_hdmi(AML_SPDIF_B_TO_HDMITX);
                 aml_out->restore_hdmitx_selection = true;
             }
-            aml_out->card = alsa_device_get_card_index();
+
             if (adev->sink_format == AUDIO_FORMAT_PCM_16_BIT) {
                 aml_out->device = PORT_I2S;
             } else {
