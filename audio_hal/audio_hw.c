@@ -3822,7 +3822,8 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
             }
             adev->ms12.need_resume = 0;
             adev->ms12.need_resync = 0;
-            adev->ms12_out->hw_sync_mode = false;
+            if (adev->ms12_out)
+                adev->ms12_out->hw_sync_mode = false;
 
             audiohal_send_msg_2_ms12(&adev->ms12, MS12_MESG_TYPE_FLUSH);
             audiohal_send_msg_2_ms12(&adev->ms12, MS12_MESG_TYPE_RESUME);
@@ -7950,18 +7951,6 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, const void *buf
                 dolby_ms12_hwsync_init();
         }
     }
-    // why clean up, ms12 thead will handle all?? zz
-    if (eDolbyMS12Lib == adev->dolby_lib_type) {
-        if (patch && continous_mode(adev)) {
-            if (adev->ms12.dolby_ms12_enable) {
-                pthread_mutex_lock(&adev->lock);
-                get_dolby_ms12_cleanup(&adev->ms12, false);
-                adev->ms12_out = NULL;
-                pthread_mutex_unlock(&adev->lock);
-            }
-            return return_bytes;
-        }
-    }
     case_cnt = popcount (adev->usecase_masks);
     if (adev->mix_init_flag == false) {
         ALOGI ("%s mix init, mask %#x",__func__,adev->usecase_masks);
@@ -8015,13 +8004,6 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, const void *buf
         */
         need_reset_decoder = true;//digital_input_src ? true: false;
         adev->arc_hdmi_updated = 0;
-    }
-    /* here to check if the hdmi audio output format dynamic changed. */
-    if (adev->pre_hdmi_format != adev->hdmi_format ) {
-        ALOGI("hdmi format is changed from %d to %d need reconfig output", adev->pre_hdmi_format, adev->hdmi_format);
-        adev->pre_hdmi_format = adev->hdmi_format;
-        need_reconfig_output = true;
-        need_reset_decoder = digital_input_src ? true: false;
     }
 
     if (adev->a2dp_updated) {
@@ -8349,6 +8331,15 @@ hwsync_rewrite:
                 aml_out->hal_format = cur_aformat ;
             }
             aml_out->hal_internal_format = cur_aformat;
+            if (cur_aformat == AUDIO_FORMAT_AC3 || cur_aformat == AUDIO_FORMAT_E_AC3) {
+                int audio_samplerate = audio_parse_get_audio_samplerate(patch->audio_parse_para);
+                if (audio_samplerate == 96000 || audio_samplerate == 192000) {
+                    audio_samplerate = 48000;
+                } else if (audio_samplerate == 88200 || audio_samplerate == 176400) {
+                    audio_samplerate = 44100;
+                }
+                aml_out->hal_rate = audio_samplerate;
+            }
             aml_out->hal_channel_mask = audio_parse_get_audio_channel_mask (patch->audio_parse_para);
             ALOGI ("%s hal_channel_mask %#x\n", __FUNCTION__, aml_out->hal_channel_mask);
 
@@ -8356,6 +8347,9 @@ hwsync_rewrite:
                 ALOGI("restore ms12 continuous mode");
                 adev->continuous_audio_mode = 1;
                 aml_out->restore_continuous = false;
+                adev->doing_reinit_ms12 = true;
+                get_dolby_ms12_cleanup(&adev->ms12, false);
+                adev->ms12_out = NULL;
             }
             if (aml_out->hal_internal_format == AUDIO_FORMAT_DTS ||
                 aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD) {
@@ -8365,6 +8359,7 @@ hwsync_rewrite:
                     adev->ms12_out = NULL;
                 }
                 adev->dolby_lib_type = eDolbyDcvLib;
+                aml_out->restore_dolby_lib_type = true;
                 if (aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD) {
                     /* For DTS HBR case, needs enlarge buffer and start threshold to anti-xrun */
                     aml_out->config.period_count = 6;
@@ -8379,6 +8374,29 @@ hwsync_rewrite:
                 }
 
             } else {
+                if (is_disable_ms12_continuous(stream)) {
+                    if (adev->continuous_audio_mode) {
+                        ALOGI("Need disable MS12 continuous");
+                        if (adev->dolby_lib_type == eDolbyMS12Lib) {
+                            adev->doing_reinit_ms12 = true;
+                        }
+                        bool set_ms12_non_continuous = true;
+                        get_dolby_ms12_cleanup(&adev->ms12, set_ms12_non_continuous);
+                        adev->ms12_out = NULL;
+                        adev->exiting_ms12 = 1;
+                        aml_out->restore_continuous = true;
+                    }
+                } else if (is_need_reset_ms12_continuous(stream)) {
+                    adev->doing_reinit_ms12 = true;
+                    get_dolby_ms12_cleanup(&adev->ms12, false);
+                    adev->ms12_out = NULL;
+                } else if (audio_is_linear_pcm(aml_out->hal_internal_format)) {
+                    dolby_ms12_set_main_dummy(0, true);
+                    adev->ms12_main1_dolby_dummy = true;
+                } else {
+                    dolby_ms12_set_main_dummy(1, true);
+                    adev->ms12_ott_enable = false;
+                }
                 adev->dolby_lib_type = adev->dolby_lib_type_last;
             }
             //we just do not support dts decoder,just mute as LPCM
@@ -8386,6 +8404,9 @@ hwsync_rewrite:
             need_reset_decoder = true;
             /* reset audio patch ringbuffer */
             ring_buffer_reset(&patch->aml_ringbuffer);
+            if ((adev->hdmi_format == BYPASS) && (ms12->ms12_bypass_handle)) {
+                aml_ms12_bypass_reset(ms12->ms12_bypass_handle);
+            }
 #ifdef ADD_AUDIO_DELAY_INTERFACE
             // fixed switch between RAW and PCM noise, drop delay residual data
             aml_audio_delay_clear(AML_DELAY_OUTPORT_SPDIF);
@@ -8405,6 +8426,25 @@ hwsync_rewrite:
                 aml_spdif_encoder_close(aml_out->spdifenc_handle);
                 aml_out->spdifenc_handle = NULL;
                 aml_out->spdifenc_init = false;
+            }
+            if (aml_out->spdifout_handle) {
+                aml_audio_spdifout_close(aml_out->spdifout_handle);
+                aml_out->spdifout_handle = NULL;
+            }
+            if (aml_out->spdifout2_handle) {
+                aml_audio_spdifout_close(aml_out->spdifout2_handle);
+                aml_out->spdifout2_handle = NULL;
+            }
+            if (aml_out->aml_dec) {
+                aml_decoder_release(aml_out->aml_dec);
+                aml_out->aml_dec = NULL;
+            }
+            for (int i = 0; i < BITSTREAM_OUTPUT_CNT; i++) {
+                struct bitstream_out_desc * bitstream_out = &ms12->bitstream_out[i];
+                if (bitstream_out->spdifout_handle) {
+                    aml_audio_spdifout_close(bitstream_out->spdifout_handle);
+                    bitstream_out->spdifout_handle = NULL;
+                }
             }
 
             adev->spdif_encoder_init_flag = false;
@@ -9273,7 +9313,7 @@ ssize_t out_write_new(struct audio_stream_out *stream,
         }
         aml_out->continuous_mode_check = false;
     }
-
+#if 0
     if ((adev->dolby_lib_type_last == eDolbyMS12Lib) &&
         (adev->audio_patching)) {
         /*in patching case, we can't use continuous mode*/
@@ -9285,6 +9325,7 @@ ssize_t out_write_new(struct audio_stream_out *stream,
             adev->doing_reinit_ms12 = true;
         }
     }
+#endif
 
     if (adev->continuous_audio_mode && aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) {
         bool set_ms12_non_continuous = true;
@@ -10024,6 +10065,7 @@ void *audio_patch_output_threadloop(void *data)
         pthread_mutex_lock(&aml_out->lock);
         do_output_standby_l((struct audio_stream *)aml_out);
         pthread_mutex_unlock(&aml_out->lock);
+#if 0
         if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
             get_dolby_ms12_cleanup(&aml_dev->ms12, false);
             aml_dev->ms12_out = NULL;
@@ -10033,6 +10075,7 @@ void *audio_patch_output_threadloop(void *data)
             aml_dev->need_remove_conti_mode = false;
             aml_dev->continuous_audio_mode = 0;
         }
+#endif
     }
     aml_dev->mix_init_flag = false;
     aml_dev->mute_start = true;
@@ -10780,6 +10823,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                     inport == INPORT_LINEIN ||
                     inport == INPORT_SPDIF  ||
                     inport == INPORT_TUNER) {
+#if 0
                     if (eDolbyMS12Lib == aml_dev->dolby_lib_type && aml_dev->continuous_audio_mode)
                     {
                         bool set_ms12_non_continuous = true;
@@ -10790,6 +10834,8 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                         usecase_change_validate_l(aml_dev->active_outputs[STREAM_PCM_NORMAL], true);
                         ALOGI("enter patching mode, exit MS12 continuous mode");
                     }
+#endif
+                    usecase_change_validate_l(aml_dev->active_outputs[STREAM_PCM_NORMAL], true);
                 }
             } else if ((inport == INPORT_TUNER) && (aml_dev->patch_src == SRC_DTV)) {
 #ifdef USE_DTV
@@ -10808,6 +10854,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                      }
 
                      aml_dev->patch_src = SRC_DTV;
+#if 0
                      if (eDolbyMS12Lib == aml_dev->dolby_lib_type && aml_dev->continuous_audio_mode) {
                         get_dolby_ms12_cleanup(&aml_dev->ms12, true);
                         aml_dev->ms12_out = NULL;
@@ -10817,12 +10864,14 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                         if (aml_dev->active_outputs[STREAM_PCM_NORMAL] != NULL)
                             usecase_change_validate_l(aml_dev->active_outputs[STREAM_PCM_NORMAL], true);
                      }
-                     ret = create_dtv_patch(dev, AUDIO_DEVICE_IN_TV_TUNER,
-                                            AUDIO_DEVICE_OUT_SPEAKER);
-                     if (ret == 0) {
+#endif
+                    usecase_change_validate_l(aml_dev->active_outputs[STREAM_PCM_NORMAL], true);
+                    ret = create_dtv_patch(dev, AUDIO_DEVICE_IN_TV_TUNER,
+                                        AUDIO_DEVICE_OUT_SPEAKER);
+                    if (ret == 0) {
                         aml_dev->audio_patching = 1;
-                     }
-                     ALOGI("%s, now end create dtv patch the audio_patching is %d ", __func__, aml_dev->audio_patching);
+                    }
+                    ALOGI("%s, now end create dtv patch the audio_patching is %d ", __func__, aml_dev->audio_patching);
 
                  }
 #endif
@@ -10964,6 +11013,7 @@ static int adev_release_audio_patch(struct audio_hw_device *dev,
 #endif
             }
         }
+#if 0
         /* for no patch case, we need to restore it, especially note the multi-instance audio-patch */
 #ifdef USE_DTV
         if (eDolbyMS12Lib == aml_dev->dolby_lib_type && (aml_dev->continuous_audio_mode_default == 1) && !is_dtv_patch_alive(aml_dev))
@@ -10979,6 +11029,7 @@ static int adev_release_audio_patch(struct audio_hw_device *dev,
             pthread_mutex_unlock(&aml_dev->ms12.lock);
             ALOGI("%s restore continuous_audio_mode=%d", __func__, aml_dev->continuous_audio_mode);
         }
+#endif
         aml_dev->audio_patching = 0;
         /* save ATV src to deal with ATV HP hotplug */
         if (aml_dev->patch_src != SRC_ATV && aml_dev->patch_src != SRC_DTV) {

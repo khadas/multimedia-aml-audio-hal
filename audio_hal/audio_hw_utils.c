@@ -1675,7 +1675,9 @@ bool is_disable_ms12_continuous(struct audio_stream_out *stream) {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
 
-    if (is_high_rate_pcm(stream) ||
+    if (adev->audio_patching && aml_out->tv_src_stream) {
+        return true;
+    } else if (is_high_rate_pcm(stream) ||
         /*high bit rate pcm case, we need disable ms12 continuous mode (except for netflix)*/
         (is_multi_channel_pcm(stream) && !aml_out->is_normal_pcm && !adev->is_netflix) ||
         (aml_out->hal_internal_format == AUDIO_FORMAT_DTS) ||
