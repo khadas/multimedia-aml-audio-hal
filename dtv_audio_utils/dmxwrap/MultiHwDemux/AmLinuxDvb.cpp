@@ -29,6 +29,9 @@
 
 #include <inttypes.h>
 
+namespace audio_dmx {
+
+
 #define UNUSED(x) (void)(x)
 AmLinuxDvd::AmLinuxDvd() {
     ALOGI("AmLinuxDvd\n");
@@ -51,7 +54,7 @@ AM_ErrorCode_t AmLinuxDvd::dvb_open(AM_DMX_Device *dev) {
         ALOGE("not enough memory");
         return AM_DMX_ERR_NO_MEM;
     }
-    ALOGI("dev->dev_no %d",dev->dev_no);
+    ALOGI("[%s():%d]dev->dev_no %d",__func__, __LINE__, dev->dev_no);
     snprintf(dmx->dev_name, sizeof(dmx->dev_name), "/dev/dvb0.demux%d", dev->dev_no);
     //snprintf(dmx->dev_name, sizeof(dmx->dev_name), DVB_DEMUX);
     for (i=0; i<DMX_FILTER_COUNT; i++)
@@ -373,3 +376,4 @@ AM_ErrorCode_t AmLinuxDvd::dvb_set_source(AM_DMX_Device *dev, AM_DMX_Source_t sr
     return AM_FileEcho(buf, cmd);
 }
 #endif
+}

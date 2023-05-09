@@ -13,6 +13,7 @@ extern "C" {
 #include <dmx_audio_es.h>
 int aml_audio_get_debug_flag();
 }
+using namespace audio_dmx;
 
 AM_Dmx_Audio_ErrorCode_t Open_Dmx_Audio (void **demux_handle ,int demux_id, int security_mem_level) {
     Am_DemuxWrapper_OpenPara_t avpara;

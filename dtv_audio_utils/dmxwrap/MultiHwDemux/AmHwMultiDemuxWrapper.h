@@ -7,6 +7,8 @@
 #include "AmDemuxWrapper.h"
 
 
+namespace audio_dmx {
+
 class AM_DMX_Device;
 typedef void (*AM_Audio_AD_DataCb) (const unsigned char * data, int len, void * handle);
 typedef struct aduserdata
@@ -69,5 +71,5 @@ public:
    sp<TSPMessage> mNotify;
 };
 
-
+}
 #endif

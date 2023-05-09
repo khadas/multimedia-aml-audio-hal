@@ -19,6 +19,8 @@ extern "C" {
 #include "aml_malloc_debug.h"
 }
 
+using namespace audio_dmx;
+namespace audio_dmx {
 static void getVideoEsData(AmHwMultiDemuxWrapper* mDemuxWrapper,int fid,const uint8_t *data, int len, void *user_data) {
 //(void)mDemuxWrapper;
 (void)fid;
@@ -191,6 +193,7 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperOpen(Am_DemuxWrapper_Open
        ALOGE("AmDmxDevice is NULL");
        return AM_Dmx_ERROR;
     }
+       ALOGI("AmDemuxWrapperOpen int");
     memcpy(&mDemuxPara,mPara,sizeof(Am_DemuxWrapper_OpenPara_t));
     AmDmxDevice->AM_DMX_Open(mDemuxPara.dev_no);
 
@@ -201,6 +204,8 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetTSSource(Am_DemuxWrapp
     (void) para;
     (void) src;
     mDemuxPara.dev_no = src;
+       ALOGI("AmDemuxWrapperSetTSSource int, src:%d", src);
+
     return AM_Dmx_SUCCESS;
 }
 
@@ -582,5 +587,5 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::clearPendingEsData(List<mEsDataInfo*>& 
     mEsDataQueue.clear();
     return AM_Dmx_SUCCESS;
 }
-
+}
 

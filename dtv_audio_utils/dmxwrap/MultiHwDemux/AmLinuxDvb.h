@@ -3,6 +3,7 @@
 
 #include <AmDmx.h>
 #include "RefBase.h"
+namespace audio_dmx {
 
 #define DVB_DVR     "/dev/dvb0.dvr0"
 #define DVB_DEMUX    "/dev/dvb0.demux0"
@@ -39,5 +40,6 @@ public:
 private:
     int mDvrFd;
 };
+}
 
 #endif

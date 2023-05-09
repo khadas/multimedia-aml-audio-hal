@@ -30,7 +30,7 @@
 #include <time.h>
 #endif
 
-
+namespace audio_dmx {
 #define DMX_FILTER_SIZE 16
 
 /**
@@ -326,5 +326,5 @@ typedef struct dmx_filter dmx_filter_t;
 #define DMX_EXPBUF               _IOWR('o', 62, struct dmx_exportbuffer)
 #define DMX_QBUF                 _IOWR('o', 63, struct dmx_buffer)
 #define DMX_DQBUF                _IOWR('o', 64, struct dmx_buffer)
-
+}
 #endif /* _DVBDMX_H_ */

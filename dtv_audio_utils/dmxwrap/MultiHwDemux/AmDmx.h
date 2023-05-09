@@ -25,6 +25,8 @@
 #include "RefBase.h"
 #include <AmHwMultiDemuxWrapper.h>
 
+namespace audio_dmx {
+
 #define DMX_FILTER_COUNT      (32)
 
 #define DMX_FL_RUN_CB         (1)
@@ -278,5 +280,6 @@ typedef enum dmx_source {
 #ifdef CONFIG_AMLOGIC_DVB_COMPAT
 #define DMX_SET_INPUT           _IO('o', 80)
 #endif
+}
 
 #endif

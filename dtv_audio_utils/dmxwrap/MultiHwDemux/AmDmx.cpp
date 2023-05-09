@@ -12,6 +12,8 @@
 #include <dmx.h>
 #include <AmHwMultiDemuxWrapper.h>
 #include "pes.h"
+
+namespace audio_dmx {
 #define PESBUFFERLEN 2048
 
 AM_DMX_Device::AM_DMX_Device(AmHwMultiDemuxWrapper* DemuxWrapper) :
@@ -488,9 +490,9 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_Open(int dev_no_t)
     //init_dmx_dev();
 
     //AM_TRY(dmx_get_dev(dev_no, &dev));
+    ALOGI("[%s():%d]AM_DMX_Device::AM_DMX_Open", __func__, __LINE__);
 
 //  pthread_mutex_lock(&am_gAdpLock);
-
     if (open_count > 0)
     {
         ALOGI("demux device %d has already been openned", dev_no);
@@ -511,7 +513,6 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_Open(int dev_no_t)
     //{
         ret = drv->dvb_open(this);
     //}
-
     if (ret == AM_SUCCESS)
     {
         pthread_mutex_init(&lock, NULL);
@@ -526,7 +527,6 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_Open(int dev_no_t)
             ret = AM_DMX_ERR_CANNOT_CREATE_THREAD;
         }
     }
-
     if (ret == AM_SUCCESS)
     {
         open_count = 1;
@@ -1067,5 +1067,6 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_WriteTs(uint8_t* data,int32_t size,uint64_t
         return AM_FAILURE;
     }
     return AM_SUCCESS;
+}
 }
 
