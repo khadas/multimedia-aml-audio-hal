@@ -197,6 +197,8 @@ static inline stream_usecase_t attr_to_usecase(uint32_t devices __unused,
             //multi-channel LPCM or hi-res LPCM
             return STREAM_PCM_DIRECT;
         }
+    } else if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
+        return STREAM_PCM_MMAP;
     } else {
         return STREAM_PCM_NORMAL;
     }
