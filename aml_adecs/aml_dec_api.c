@@ -120,6 +120,8 @@ int aml_decoder_init(aml_dec_t **ppaml_dec, audio_format_t format, aml_dec_confi
     dec_config->mixer_level = 0;
     dec_config->ad_fade = 0;
     dec_config->ad_pan = 0;
+    aml_dec_handel->ad_data = NULL;
+    aml_dec_handel->ad_size = 0;
     return ret;
 
 ERROR:
