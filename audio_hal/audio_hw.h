@@ -51,8 +51,12 @@
 #include "aml_audio_delay.h"
 #endif
 
+#ifdef USE_MSYNC
 #include <aml_avsync.h>
 #include <aml_avsync_log.h>
+#else
+#include "aml_avsync_stub.h"
+#endif
 
 #include "aml_audio_resample_manager.h"
 #include "aml_audio_resampler.h"

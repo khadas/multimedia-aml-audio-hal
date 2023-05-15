@@ -35,6 +35,7 @@ option(USE_APP_MIXING "Support appsound mixing" ON)
 option(USE_DIAG_LOG "Support diagnostic logging for RDK" OFF)
 option(USE_MEDIA_INFO "Support media info API reporting" OFF)
 option(USE_MS12_V26 "Use MS12 v2.6" OFF)
+option(USE_MSYNC "Compile with MSYNC option" ON)
 
 if(USE_MS12_V26)
 add_subdirectory("libms12_v26")
@@ -78,6 +79,10 @@ endif()
 
 if(USE_MEDIA_INFO)
     add_definitions(-DUSE_MEDIAINFO)
+endif()
+
+if(USE_MSYNC)
+    add_definitions(-DUSE_MSYNC)
 endif()
 
 #############################################
@@ -155,6 +160,7 @@ add_library(audio_hal SHARED
 	audio_hal/aml_config_data.c
 	audio_hal/audio_effect_if.c
 	audio_hal/earc_utils.c
+	audio_hal/aml_avsync_stub.c
 	utils/cJSON/cJSON.c
 	utils/aml_hw_mixer.c
 	utils/alsa_device_parser.c
@@ -262,8 +268,11 @@ if(USE_MEDIA_INFO)
 	target_link_libraries(audio_hal -lamlminfo)
 endif()
 
+if(USE_MSYNC)
 target_link_libraries(audio_hal -lamlavsync)
-
+else()
+target_link_libraries(audio_hal)
+endif()
 
 if(USE_SC2)
 	add_definitions(-DDVB_AUDIO_SC2)
