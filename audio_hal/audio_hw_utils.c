@@ -926,7 +926,7 @@ uint32_t out_get_latency_frames(const struct audio_stream_out *stream)
         return a2dp_out_get_latency(adev) * out->hal_rate / 1000;
     }
 #endif
-    whole_latency_frames = out->config.period_size * out->config.period_count;
+    whole_latency_frames = out->config.start_threshold;
     if (!out->pcm || !pcm_is_ready(out->pcm)) {
         return whole_latency_frames / mul;
     }
