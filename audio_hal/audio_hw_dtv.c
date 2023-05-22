@@ -216,6 +216,7 @@ void clean_dtv_patch_pts(struct aml_audio_patch *patch)
         patch->last_pcrpts = 0;
     }
 }
+
 int get_audio_checkin_underrun(void)
 {
     char tempbuf[128];
@@ -329,11 +330,13 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
             break;
         case AUDIO_DTV_PATCH_CMD_SET_AD_ENABLE:
             pthread_mutex_lock(&adev->lock);
+#ifdef USE_AMADEC
             if (patch->skip_amadec_flag != true) {
                 if (val == 0) {
                     dtv_assoc_audio_cache(-1);
                 }
             }
+#endif
 
             adev->ad_switch_enable = 1;
 
@@ -1231,6 +1234,8 @@ extern int adev_open_output_stream_new(struct audio_hw_device *dev,
                                        const char *address __unused);
 ssize_t out_write_new(struct audio_stream_out *stream, const void *buffer,
                       size_t bytes);
+
+#ifdef USE_AMADEC
 void audio_dtv_underrun_loop_mute_check(struct aml_audio_patch *patch,
                             struct audio_stream_out *stream_out)
 {
@@ -1313,6 +1318,7 @@ void audio_dtv_underrun_loop_mute_check(struct aml_audio_patch *patch,
         }
     }
 }
+#endif
 
 
 int audio_dtv_patch_output_default(struct aml_audio_patch *patch,
@@ -1416,8 +1422,10 @@ int audio_dtv_patch_output_dolby(struct aml_audio_patch *patch,
     unsigned long long all_zero_len = 0;
     struct dolby_ddp_dec *ddp_dec = (struct dolby_ddp_dec *)aml_out->aml_dec;
     int avail = get_buffer_read_space(ringbuffer);
+#ifdef USE_AMADEC
     if (aml_dev->is_multi_demux)
         audio_dtv_underrun_loop_mute_check(patch, stream_out);
+#endif
 
     if (avail > 0) {
         if (avail > (int)patch->out_buf_size) {
@@ -1646,6 +1654,7 @@ int audio_dtv_patch_output_dts(struct aml_audio_patch *patch, struct audio_strea
 }
 
 
+#ifdef USE_AMADEC
 int audio_dtv_patch_output_dolby_dual_decoder(struct aml_audio_patch *patch,
                                          struct audio_stream_out *stream_out, int *apts_diff)
 {
@@ -2122,6 +2131,7 @@ exit_open:
     ALOGI("--%s live ", __FUNCTION__);
     return ((void *)0);
 }
+#endif
 
 int patch_thread_get_cmd(struct aml_audio_patch *patch, int *cmd, int *path_id)
 {
@@ -3701,6 +3711,7 @@ static int create_dtv_output_stream_thread(struct aml_audio_patch *patch)
             }
 
         } else {
+#ifdef USE_AMADEC
             ret = pthread_create(&(patch->audio_output_threadID), NULL,
                                  audio_dtv_patch_output_threadloop, patch);
             if (ret != 0) {
@@ -3708,6 +3719,7 @@ static int create_dtv_output_stream_thread(struct aml_audio_patch *patch)
                 pthread_mutex_destroy(&patch->dtv_output_mutex);
                 return -1;
             }
+#endif
         }
 
         patch->ouput_thread_created = 1;
@@ -3880,6 +3892,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     if (getprop_bool(DTV_SKIPAMADEC)) {
         patch->skip_amadec_flag = true;
     }
+
     ALOGI("%s, skip_amadec_flag %d \n", __FUNCTION__, patch->skip_amadec_flag);
     if (patch->skip_amadec_flag) {
         ret = pthread_create(&(patch->audio_cmd_process_threadID), NULL,
@@ -3889,6 +3902,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
             goto err_in_thread;
         }
     } else {
+#ifdef USE_AMADEC
         aml_dev->dual_decoder_support = 0;
         ret = pthread_create(&(patch->audio_cmd_process_threadID), NULL,
                              audio_dtv_patch_process_threadloop, patch);
@@ -3896,6 +3910,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
             ALOGE("%s, Create process thread fail!\n", __FUNCTION__);
             goto err_in_thread;
         }
+#endif
     }
 
     if (aml_dev->tuner2mix_patch) {
@@ -3905,9 +3920,11 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
             patch->dtvin_buffer_inited = 1;
         }
     }
+#ifdef USE_AMADEC
     if (patch->skip_amadec_flag != true) {
         dtv_assoc_init();
     }
+#endif
     patch->dtv_aformat = aml_dev->dtv_aformat;
     patch->dtv_output_clock = 0;
     patch->dtv_default_i2s_clock = aml_dev->dtv_i2s_clock;
@@ -3966,9 +3983,11 @@ int release_dtv_patch_l(struct aml_audio_device *aml_dev)
     if (patch->dtv_package_list)
         aml_audio_free(patch->dtv_package_list);
     deinit_cmd_list(patch->dtv_cmd_list);
+#ifdef USE_AMADEC
     if (patch->skip_amadec_flag != true) {
         dtv_assoc_deinit();
     }
+#endif
     ring_buffer_release(&(patch->aml_ringbuffer));
 
     aml_audio_free(patch);
@@ -4040,6 +4059,7 @@ bool is_dtv_patch_alive(struct aml_audio_device *aml_dev)
 }
 
 
+#ifdef USE_AMADEC
 int audio_decoder_status(unsigned int *perror_count)
 {
     int ret = 0;
@@ -4052,6 +4072,7 @@ int audio_decoder_status(unsigned int *perror_count)
 
     return ret;
 }
+#endif
 
 
 #if 0

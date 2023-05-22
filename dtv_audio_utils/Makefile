@@ -24,12 +24,15 @@ TARGET_OBJS= utils/tsp_utils.o \
     dmxwrap/MultiHwDemux/AmDmx.o \
     audio_data_read/dmx_audio_es.o \
     audio_data_read/uio_audio_read.o \
-    audio_data_read/audio_dtv_ad.o \
     sync/audio_dtv_sync.o \
     avutils/amthreadpool.o \
     avutils/itemlist.o \
     avutils/amsysfsutils.o \
     avutils/amconfigutils.o
+
+ifeq ($(rm_amadec),n)
+TARGET_OBJS+= audio_data_read/audio_dtv_ad.o
+endif
 
 TARGET=libdvbaudioutils.so
 

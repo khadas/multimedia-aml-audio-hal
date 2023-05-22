@@ -15,8 +15,8 @@ TARGET_OBJS=adec-external-ctrl.o \
 	audiodsp_update_format.o \
 	adec-wfd.o \
 	dsp/audiodsp-ctl.o \
-	feeder.o \
-	audio_out/alsa-out.o
+    feeder.o
+    #audio_out/alsa-out.o
 
 TARGET=libaudamadec.so
 
@@ -25,7 +25,8 @@ INSTALL_DIR=${LIB_DIR}
 #$(warning  AML_AUDIO_HAL_STAGING_DIR is ${AML_AUDIO_HAL_STAGING_DIR})
 #CFLAGS += -shared -lpthread -lm -lrt -llog -lcutils -L$ENV{AML_AUDIO_HAL_STAGING_DIR}/usr/lib/
 #-lasound
-CFLAGS += -shared -lpthread -lm -lasound -lrt -DBUILD_LINUX
+#CFLAGS += -shared -lpthread -lm -lasound -lrt -DBUILD_LINUX
+CFLAGS += -shared -lpthread -lm -lrt -DBUILD_LINUX
 
 TOPDIR=$(shell pwd)
 SRC?=$(TOPDIR)
