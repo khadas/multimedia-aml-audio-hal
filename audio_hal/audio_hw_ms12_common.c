@@ -127,7 +127,7 @@ int dolby_ms12_main_pause(struct audio_stream_out *stream)
     //so, the delay need up to 96ms, from start to done, put 120ms here.
     aml_audio_sleep(120000);
 
-    if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_PAUSED) {
+    if ((aml_out->hw_sync_mode) && (aml_out->tsync_status != TSYNC_STATUS_PAUSED) && (1 == adev->continuous_audio_mode)) {
         //ALOGI(" %s  delay 150ms", __func__);
         //usleep(150 * 1000);
         aml_hwsync_set_tsync_pause(aml_out->hwsync);
@@ -148,6 +148,10 @@ int dolby_ms12_main_resume(struct audio_stream_out *stream)
     dolby_ms12_set_pause_flag(false);
     //ms12_runtime_update_ret = aml_ms12_update_runtime_params(ms12);
     ms12_runtime_update_ret = set_dolby_ms12_runtime_pause(ms12, false);
+    if ((aml_out->hw_sync_mode) && (aml_out->tsync_status == TSYNC_STATUS_PAUSED) && (1 == adev->continuous_audio_mode)) {
+        aml_hwsync_set_tsync_resume(aml_out->hwsync);
+        aml_out->tsync_status = TSYNC_STATUS_RUNNING;
+    }
     ms12->is_continuous_paused = false;
     ALOGI("%s  ms12_runtime_update_ret:%d", __func__, ms12_runtime_update_ret);
 

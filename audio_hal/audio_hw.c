@@ -1707,7 +1707,9 @@ static int out_pause_new (struct audio_stream_out *stream)
     }
 
     if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type || AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
-        aml_hwsync_set_tsync_pause(aml_out->hwsync);
+        if ((eDolbyMS12Lib != aml_dev->dolby_lib_type) || (1 != aml_dev->continuous_audio_mode)) {
+            aml_hwsync_set_tsync_pause(aml_out->hwsync);
+        }
     }
 
     if (eDolbyMS12Lib == aml_dev->dolby_lib_type) {
@@ -1815,7 +1817,9 @@ static int out_resume_new (struct audio_stream_out *stream)
     aml_out->pause_status = false;
     if (aml_out->hw_sync_mode && !aml_dev->ms12.need_resume) {
         if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type || AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
-            aml_hwsync_set_tsync_resume(aml_out->hwsync);
+            if ((eDolbyMS12Lib != aml_dev->dolby_lib_type) || (1 != aml_dev->continuous_audio_mode)) {
+                aml_hwsync_set_tsync_resume(aml_out->hwsync);
+            }
         }
         aml_out->tsync_status = TSYNC_STATUS_RUNNING;
     }

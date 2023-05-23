@@ -2719,6 +2719,22 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
         adev->arc_connected_reconfig = false;
     }
 
+    /*update the master pcm frame, which is used for av sync*/
+    if (audio_is_linear_pcm(output_format)) {
+        if (ms12_info->output_ch == 8 || ms12_info->output_ch == 6) {
+            ms12_info->pcm_type = MC_LPCM;
+        }
+        if (ms12_info->pcm_type == DAP_LPCM) {
+            if (is_dolbyms12_dap_enable(aml_out)) {
+                ms12->master_pcm_frames += size / (2 * ms12_info->output_ch);
+            }
+        } else if (ms12_info->pcm_type == NORMAL_LPCM) {
+            if (!is_dolbyms12_dap_enable(aml_out)) {
+                ms12->master_pcm_frames += size / (2 * ms12_info->output_ch);
+            }
+        }
+    }
+
     {//sync karma dash
         struct aml_stream_out *aml_out_write =NULL;
         aml_out_write = direct_active(adev);
@@ -2767,31 +2783,11 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
         }
     }
 
-
-    /*update the master pcm frame, which is used for av sync*/
-    if (audio_is_linear_pcm(output_format)) {
-        if (ms12_info->output_ch == 8 || ms12_info->output_ch == 6) {
-            ms12_info->pcm_type = MC_LPCM;
-        }
-        if (ms12_info->pcm_type == DAP_LPCM) {
-            if (is_dolbyms12_dap_enable(aml_out)) {
-                ms12->master_pcm_frames += size / (2 * ms12_info->output_ch);
-            }
-        } else if (ms12_info->pcm_type == NORMAL_LPCM) {
-            if (!is_dolbyms12_dap_enable(aml_out)) {
-                ms12->master_pcm_frames += size / (2 * ms12_info->output_ch);
-            }
-        }
-    }
-
     if (do_sync_flag && aml_out->dtvsync_enable) {
         process_result = aml_dtvsync_ms12_process_policy(priv_data, ms12_info);
         if (process_result == DTVSYNC_AUDIO_DROP)
             return ret;
     }
-
-
-
 
     if (audio_is_linear_pcm(output_format)) {
        if (ms12_info->pcm_type == MC_LPCM) {
@@ -2815,8 +2811,6 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
             ALOGE("%s  abnormal output_format:0x%x", __func__, output_format);
         }
     }
-
-
 
     return ret;
 }
