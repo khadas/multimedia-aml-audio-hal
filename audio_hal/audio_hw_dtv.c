@@ -373,6 +373,16 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
             }
             pthread_mutex_unlock(&adev->lock);
             break;
+        case AUDIO_DTV_PATCH_CMD_SET_MEDIA_PRESENTATION_ID:
+            demux_info->media_presentation_id = val;
+            ALOGI("media_presentation_id %d",demux_info->media_presentation_id);
+            if (eDolbyMS12Lib == adev->dolby_lib_type_last) {
+                pthread_mutex_lock(&ms12->lock);
+                set_ms12_ac4_presentation_group_index(ms12, demux_info->media_presentation_id);
+                pthread_mutex_unlock(&ms12->lock);
+            }
+            break;
+
         case AUDIO_DTV_PATCH_CMD_CONTROL:
             if (patch == NULL) {
                 ALOGI("%s()the audio patch is NULL \n", __func__);

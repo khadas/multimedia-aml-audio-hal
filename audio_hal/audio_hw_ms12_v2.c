@@ -567,6 +567,13 @@ void set_ms12_drc_cut_value(struct dolby_ms12_desc *ms12, int cut)
         aml_ms12_update_runtime_params(ms12, parm);
 }
 
+void set_ms12_ac4_presentation_group_index(struct dolby_ms12_desc *ms12, int index)
+{
+    char parm[64] = "";
+    sprintf(parm, "%s %d", "-ac4_pres_group_idx", index);
+    if ((strlen(parm)) > 0 && ms12)
+        aml_ms12_update_runtime_params(ms12, parm);
+}
 
 #ifdef MS12_V26_ENABLE
 void set_ms12_drc_mode_dap_output(struct dolby_ms12_desc *ms12, bool drc_mode)
