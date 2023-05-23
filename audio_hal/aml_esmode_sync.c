@@ -562,18 +562,23 @@ sync_process_res  aml_hwmediasync_nonms12_process(struct audio_stream_out *strea
     }
 
     do {
-        mediasync_wrap_AudioProcess(aml_out->hwsync->es_mediasync.mediasync, aml_dec->out_frame_pts, aml_out->hwsync->es_mediasync.cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
-        if (adev->debug_flag > 0)
-            ALOGI("get m_audiopolicy=%d=%s, param1=%u, param2=%u, out_pts=0x%llx,cur=0x%llx \n",
-                m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
-                m_audiopolicy.param1, m_audiopolicy.param2,
-                aml_dec->out_frame_pts, aml_out->hwsync->es_mediasync.cur_outapts);
+        if (aml_out->hwsync && aml_out->hwsync->es_mediasync.mediasync) {
+            if (aml_out->tsync_status == TSYNC_STATUS_STOP) {
+                break;
+            }
+            mediasync_wrap_AudioProcess(aml_out->hwsync->es_mediasync.mediasync, aml_dec->out_frame_pts, aml_out->hwsync->es_mediasync.cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
+            if (adev->debug_flag > 0 || MEDIASYNC_AUDIO_NORMAL_OUTPUT != m_audiopolicy.audiopolicy)
+                ALOGI("get m_audiopolicy=%d=%s, param1=%u, param2=%u, out_pts=0x%llx,cur=0x%llx \n",
+                    m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
+                    m_audiopolicy.param1, m_audiopolicy.param2,
+                    aml_dec->out_frame_pts, aml_out->hwsync->es_mediasync.cur_outapts);
 
-        if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
-            if (m_audiopolicy.param1 == -1) {
-                usleep(15000);
-            } else {
-                usleep(m_audiopolicy.param1);
+            if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
+                if (m_audiopolicy.param1 == -1) {
+                    usleep(15000);
+                } else {
+                    usleep(m_audiopolicy.param1);
+                }
             }
         }
 

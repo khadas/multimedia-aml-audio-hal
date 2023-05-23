@@ -9044,7 +9044,7 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
      */
     if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_STOP && !has_hwsync_stream_running(stream)) {
         ALOGI("%s set AUDIO_PAUSE when close stream\n",__func__);
-        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
+        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type || AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
             aml_hwsync_set_tsync_pause(aml_out->hwsync);
         }
         aml_out->tsync_status = TSYNC_STATUS_PAUSED;
