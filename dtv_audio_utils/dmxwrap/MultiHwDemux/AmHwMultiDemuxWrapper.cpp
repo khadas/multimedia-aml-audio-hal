@@ -1,19 +1,18 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AmHwMultiDemuxWrapper"
-#include "tsp_platform.h"
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #ifdef BUILD_LINUX
+#include <cutils/log.h>
 #include <cutils/properties.h>
 #endif
 #include <AmDemuxWrapper.h>
 #include <AmHwMultiDemuxWrapper.h>
 #include <AmDmx.h>
 #include <dmx.h>
-#include "List.h"
 #include "RefBase.h"
 extern "C" {
 #include "aml_malloc_debug.h"

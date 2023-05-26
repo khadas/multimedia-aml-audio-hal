@@ -4,6 +4,7 @@
 #ifndef BUILD_LINUX
 #include <cutils/trace.h>
 #endif
+#include <cutils/log.h>
 #include <cutils/properties.h>
 #include <AmDemuxWrapper.h>
 #include <AmHwDemuxWrapper.h>

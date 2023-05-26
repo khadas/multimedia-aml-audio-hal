@@ -9,7 +9,6 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AmHwDemuxWrapper"
-//#include "tsp_platform.h"
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -18,8 +17,8 @@
 #include <TSPMessage.h>
 #include <AmDemuxWrapper.h>
 #include <AmHwDemuxWrapper.h>
-//#include "FileSystemIo.h"
-//using namespace android;
+#include <cutils/log.h>
+#include <cutils/properties.h>
 #define STB_SOURCE_FILE            "/sys/class/stb/source"
 #define STREAM_TS_FILE             "/dev/amstream_mpts"
 #define STREAM_TS_SCHED_FILE      "/dev/amstream_mpts_sched"
