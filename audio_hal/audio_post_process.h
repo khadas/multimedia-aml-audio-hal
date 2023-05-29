@@ -39,7 +39,7 @@ int audio_VX_post_process(struct aml_native_postprocess *native_postprocess, int
 
 /* VirtualX: */
 /* path of virtualx effect license library */
-#define VIRTUALX_LICENSE_LIB_PATH "/vendor/lib/soundfx/libvx.so"
+#define VIRTUALX_LICENSE_LIB_PATH "/usr/lib/soundfx/libvx.so"
 
 void VirtualX_reset(struct aml_native_postprocess *native_postprocess);
 void VirtualX_Channel_reconfig(struct aml_native_postprocess *native_postprocess, int ch_num);

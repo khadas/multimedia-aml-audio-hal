@@ -56,7 +56,7 @@ int audio_post_process(struct aml_native_postprocess *native_postprocess, int16_
     audio_buffer_t out_buf;
     int frames = in_frames;
 
-    if (native_postprocess == NULL &&
+    if (native_postprocess == NULL ||
         native_postprocess->num_postprocessors != native_postprocess->total_postprocessors) {
         return ret;
     }
@@ -94,7 +94,8 @@ int audio_VX_post_process(struct aml_native_postprocess *native_postprocess, int
     audio_buffer_t out_buf;
 
     effect_handle_t effect = native_postprocess->postprocessors[0];
-    if (effect != NULL && native_postprocess->libvx_exist && native_postprocess->effect_in_ch == 6) {
+    if (effect && (*effect) && (*effect)->process && in_buffer &&
+        native_postprocess->libvx_exist && native_postprocess->effect_in_ch == 6) {
         /* do multi channel processing for dts streaming in VX */
         in_buf.frameCount = bytes/12;
         out_buf.frameCount = bytes/12;
@@ -124,7 +125,7 @@ static int VirtualX_setparameter(struct aml_native_postprocess *native_postproce
     *(int32_t *)p->data = param;
     *((int32_t *)p->data + 1) = ch_num;
 
-    if (effect != NULL) {
+    if (effect && (*effect) && (*effect)->command) {
         (*effect)->command(effect, cmdCode, cmdSize, (void *)p, &replySize, &replyData);
     }
 
@@ -158,20 +159,20 @@ void VirtualX_Channel_reconfig(struct aml_native_postprocess *native_postprocess
 
 bool Check_VX_lib(void)
 {
-    void *h_libvx_hanle = NULL;
+    void *h_libvx_handle = NULL;
 
     if (access(VIRTUALX_LICENSE_LIB_PATH, R_OK) != 0) {
         ALOGI("%s, %s does not exist", __func__, VIRTUALX_LICENSE_LIB_PATH);
         return false;
     }
-    h_libvx_hanle = dlopen(VIRTUALX_LICENSE_LIB_PATH, RTLD_NOW);
-    if (!h_libvx_hanle) {
+    h_libvx_handle = dlopen(VIRTUALX_LICENSE_LIB_PATH, RTLD_NOW);
+    if (!h_libvx_handle) {
         ALOGE("%s, fail to dlopen %s(%s)", __func__, VIRTUALX_LICENSE_LIB_PATH, dlerror());
         return false;
     } else {
         ALOGD("%s, success to dlopen %s", __func__, VIRTUALX_LICENSE_LIB_PATH);
-        dlclose(h_libvx_hanle);
-        h_libvx_hanle = NULL;
+        dlclose(h_libvx_handle);
+        h_libvx_handle = NULL;
         /* VX effect lib is in system, set dts output as stream content */
         dca_set_out_ch_internal(0);
         return true;
