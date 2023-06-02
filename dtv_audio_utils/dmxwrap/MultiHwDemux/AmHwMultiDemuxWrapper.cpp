@@ -460,8 +460,15 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetAudioParam(int aid, AM
     //aparam.flags |= DMX_OUTPUT_RAW_MODE;
     AmDmxDevice->AM_DMX_AllocateFilter(&fid_audio);
     AmDmxDevice->AM_DMX_SetCallback(fid_audio, getAudioEsData, NULL);
-    AmDmxDevice->AM_DMX_SetBufferSize(fid_audio, 1024 * 1024);
-    ALOGI("AM_DMX_SetPesFilter aparam.flags %0x",aparam.flags);
+    unsigned int dmx_buffer_size = AM_DMX_DEFAULT_BUFFER_SIZE;
+    const char *env = getenv(ENV_DMX_LOW_MEM);
+    if (NULL != env)
+    {
+        dmx_buffer_size = AM_DMX_LOW_MEM_BUFFER_SIZE;
+    }
+
+    AmDmxDevice->AM_DMX_SetBufferSize(fid_audio, dmx_buffer_size);
+    ALOGI("[%s():%d]AM_DMX_SetPesFilter aparam.flags %0x, dmx_buffer_size: 0x%x", __func__, __LINE__, aparam.flags, dmx_buffer_size);
     AmDmxDevice->AM_DMX_SetPesFilter(fid_audio, &aparam);
     mDemuxPara.aud_fd = fid_audio;
     ALOGI("fid_audio %d",fid_audio);

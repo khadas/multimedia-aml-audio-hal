@@ -1,13 +1,14 @@
 #ifndef AM_HWMULTI_DEMUX_WRAPPER_H
 #define AM_HWMULTI_DEMUX_WRAPPER_H
-//#include <AmDmx.h>
 
-#include "List.h"
 #include "RefBase.h"
 #include "AmDemuxWrapper.h"
 
 
 namespace audio_dmx {
+#define ENV_DMX_LOW_MEM "LOW_MEM_PLATFORM"
+#define AM_DMX_LOW_MEM_BUFFER_SIZE (384*1024)     //384K for zapper 128M mem
+#define AM_DMX_DEFAULT_BUFFER_SIZE (1024*1024)    //1M
 
 class AM_DMX_Device;
 typedef void (*AM_Audio_AD_DataCb) (const unsigned char * data, int len, void * handle);
