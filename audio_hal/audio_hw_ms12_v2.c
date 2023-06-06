@@ -1493,20 +1493,20 @@ MAIN_INPUT:
                     }
                     // LINUX change
                     // Remove rate control for main input
-#ifndef BUILD_LINUX
+//#ifndef BUILD_LINUX
                     // rate control when continuous_audio_mode for streaming
                     if (adev->continuous_audio_mode == 1) {
 
                         if (adev->debug_flag) {
-                            ALOGI("%s line %d ret dolby_ms12 input_bytes %d",
-                                    __func__, __LINE__, dolby_ms12_input_bytes);
+                            ALOGI("%s line %d ret dolby_ms12 input_bytes %d, ms12_hal_format 0x%x",
+                                    __func__, __LINE__, dolby_ms12_input_bytes, ms12_hal_format);
                         }
 
                         //FIXME, if ddp input, the size suppose as CONTINUOUS_OUTPUT_FRAME_SIZE
                         //if pcm input, suppose 2ch/16bits/48kHz
                         //FIXME, that MAT/TrueHD input is TODO!!!
                         uint64_t input_ns = 0;
-                        if ((ms12_hal_format == AUDIO_FORMAT_AC3) || \
+                        /*if ((ms12_hal_format == AUDIO_FORMAT_AC3) || \
                             (ms12_hal_format == AUDIO_FORMAT_E_AC3)) {
                             int sample_nums = aml_out->ddp_frame_nblks * SAMPLE_NUMS_IN_ONE_BLOCK;
                             int frame_duration = DDP_FRAME_DURATION(sample_nums*1000, DDP_OUTPUT_SAMPLE_RATE);
@@ -1519,7 +1519,7 @@ MAIN_INPUT:
                         } else if(ms12_hal_format == AUDIO_FORMAT_IEC61937) {
                             input_ns = (uint64_t)1536 * 1000000000LL / sample_rate;
                             ms12->main_input_rate = sample_rate;
-                        } else if (ms12_hal_format == AUDIO_FORMAT_AC4) {
+                        } else */if (ms12_hal_format == AUDIO_FORMAT_AC4) {
                             if (ac4_info.frame_rate) {
                                 input_ns = (uint64_t)NANO_SECOND_PER_SECOND * 1000 / ac4_info.frame_rate;
                             } else {
@@ -1527,21 +1527,21 @@ MAIN_INPUT:
                             }
                             ms12->main_input_rate = ac4_info.sample_rate;
                             ALOGV("input ns =%" PRId64 " frame rate=%d frame size=%d", input_ns, ac4_info.frame_rate, ac4_info.frame_size);
-                        } else {
-                            /*
-                            for LPCM audio,we support it is 2 ch 48K audio.
-                            */
+                        }/* else {
+                            //for LPCM audio,we support it is 2 ch 48K audio.
                             if (main_channel_num == 0) {
                                 main_channel_num = 2;
                             }
                             input_ns = (uint64_t)dolby_ms12_input_bytes * NANO_SECOND_PER_SECOND / (2 * main_channel_num) / ms12->config_sample_rate;
                             ms12->main_input_rate = ms12->config_sample_rate;
+                        }*/
+                        if (ms12_hal_format == AUDIO_FORMAT_AC4) {
+                            ms12->main_input_ns += input_ns;
+                            aml_out->main_input_ns += input_ns;
+                            audio_virtual_buf_process(aml_out->virtual_buf_handle, input_ns);
                         }
-                        ms12->main_input_ns += input_ns;
-                        aml_out->main_input_ns += input_ns;
-                        audio_virtual_buf_process(aml_out->virtual_buf_handle, input_ns);
                     }
-#endif
+//#endif
 
                     if (is_iec61937_format(stream)) {
                         *use_size = spdif_dec_used_size;
