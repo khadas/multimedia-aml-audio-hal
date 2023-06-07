@@ -631,6 +631,7 @@ int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream, boo
     int output_latency_ms = 0;
     int port_latency_ms = 0;
     int bypass_delay = 0;
+    int video_delay = 0;
 
     /*we need get the correct ms12 out pcm */
     alsa_delay = (int32_t)out_get_ms12_latency_frames(stream);
@@ -663,10 +664,14 @@ int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream, boo
     /*ms12 pipe line has some delay, we need consider it*/
     ms12_pipeline_delay = dolby_ms12_main_pipeline_latency_frames(stream);
 
-    latency_frames = alsa_delay + tunning_delay + atmos_tunning_delay + ms12_pipeline_delay + bypass_delay;
+    if (adev->is_TV) {
+        video_delay = get_ms12_tunnel_video_delay() * 48;
+    }
 
-    ALOGV("latency frames =%d alsa delay=%d ms tunning delay=%d ms ms12 pipe =%d ms atmos =%d ms",
-        latency_frames, alsa_delay / 48, tunning_delay / 48, ms12_pipeline_delay / 48, atmos_tunning_delay / 48);
+    latency_frames = alsa_delay + tunning_delay + atmos_tunning_delay + ms12_pipeline_delay + bypass_delay + video_delay;
+
+    ALOGV("latency frames =%d alsa delay=%d ms tunning delay=%d ms ms12 pipe =%d ms atmos =%d ms video_delay= %d ms",
+        latency_frames, alsa_delay / 48, tunning_delay / 48, ms12_pipeline_delay / 48, atmos_tunning_delay / 48, video_delay / 48);
     return latency_frames;
 }
 

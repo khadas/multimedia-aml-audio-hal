@@ -29,7 +29,7 @@
 #define DDP_FRAME_DEFAULT_DURATION                      (32)
 #define AVSYNC_MS12_TUNNEL_DIFF_DDP_JOC_VS_DDP_LATENCY  (DIFF_DDP_JOC_VS_DDP_LATENCY + (DDP_FRAME_DEFAULT_DURATION / 2))
 
-#define AVSYNC_MS12_TUNNEL_VIDEO_DELAY                  (-90)
+#define AVSYNC_MS12_TUNNEL_VIDEO_DELAY                  (-40)
 
 
 #define  AVSYNC_MS12_NONTUNNEL_PCM_LATENCY               (10)
@@ -55,7 +55,7 @@
 #define  AVSYNC_MS12_TUNNEL_AC4_LATENCY                  (50)
 
 #define  AVSYNC_MS12_NONTUNNEL_BYPASS_LATENCY            (-130)
-#define  AVSYNC_MS12_TUNNEL_BYPASS_LATENCY               (-130)
+#define  AVSYNC_MS12_TUNNEL_BYPASS_LATENCY               (-180)
 
 #define  AVSYNC_MS12_PCM_OUT_LATENCY                     (70)
 #define  AVSYNC_MS12_DD_OUT_LATENCY                      (50)
