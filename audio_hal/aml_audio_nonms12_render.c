@@ -366,6 +366,8 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                 }
 
                 if (eDolbyMS12Lib == adev->dolby_lib_type_last || !adev->useSubMix) {
+                    /*ease in or ease out*/
+                    aml_audio_ease_process(adev->audio_ease, dec_data, pcm_len);
                     aml_hw_mixer_mixing(&adev->hw_mixer, dec_data, pcm_len, output_format);
                     if (audio_hal_data_processing(stream, dec_data, pcm_len, &output_buffer, &output_buffer_bytes, output_format) == 0) {
                         hw_write(stream, output_buffer, output_buffer_bytes, output_format);

@@ -238,10 +238,10 @@ int start_ease_in(struct aml_audio_device *adev) {
     /*start ease in the audio*/
     ease_setting_t ease_setting;
     adev->audio_ease->data_format.format = AUDIO_FORMAT_PCM_16_BIT;
-    adev->audio_ease->data_format.ch = 8;
+    adev->audio_ease->data_format.ch = 2;
     adev->audio_ease->data_format.sr = 48000;
     adev->audio_ease->ease_type = EaseInCubic;
-    ease_setting.duration = 30;
+    ease_setting.duration = 110;
     ease_setting.start_volume = 0.0;
     ease_setting.target_volume = 1.0;
     aml_audio_ease_config(adev->audio_ease, &ease_setting);
@@ -258,7 +258,7 @@ int start_ease_out(struct aml_audio_device *adev) {
         ease_setting.target_volume = 0.0;
         adev->audio_ease->ease_type = EaseOutCubic;
         adev->audio_ease->data_format.format = AUDIO_FORMAT_PCM_16_BIT;
-        adev->audio_ease->data_format.ch = 8;
+        adev->audio_ease->data_format.ch = 2;
         adev->audio_ease->data_format.sr = 48000;
     } else {
         ease_setting.duration = 30;
@@ -3825,7 +3825,10 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         adev->dolby_lib_type = adev->dolby_lib_type_last;
         ALOGI("%s restore dolby lib =%d", __func__, adev->dolby_lib_type);
     }
-
+    //we muted in aml_audio_hwsync_find_frame when find eos, here recover mute
+    if (adev->dolby_lib_type != eDolbyMS12Lib && is_dolby_format(out->hal_internal_format)) {
+        set_aed_master_volume_mute(&adev->alsa_mixer, false);
+    }
     pthread_mutex_unlock(&out->lock);
     adev->audio_hal_info.is_decoding = false;
     adev->audio_hal_info.first_decoding_frame = false;

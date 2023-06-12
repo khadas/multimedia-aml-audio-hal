@@ -436,6 +436,12 @@ int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
                 if (pts == HWSYNC_PTS_EOS) {
                     p_hwsync->eos = true;
                     ALOGI("%s: eos detected!", __FUNCTION__);
+                    /* in nonms12 render case, there would pop noise when playback ending, as there's no fade out.
+                    *  and we use AED mute to avoid noise.
+                    */
+                    if (adev->dolby_lib_type != eDolbyMS12Lib && is_dolby_format(p_hwsync->aout->hal_internal_format)) {
+                        set_aed_master_volume_mute(&adev->alsa_mixer, true);
+                    }
                     continue;
                 }
                 header_sub_version = p_hwsync->hw_sync_header[2];
