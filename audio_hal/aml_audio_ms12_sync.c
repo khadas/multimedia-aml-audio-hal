@@ -530,10 +530,7 @@ static int aml_audio_output_ddp_atmos(struct audio_stream_out *stream)
     struct aml_stream_out *out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = out->dev;
 
-    bool is_atmos_supported = is_platform_supported_ddp_atmos(
-                            adev->hdmi_descs.ddp_fmt.atmos_supported
-                            , adev->active_outport
-                            , adev->is_TV);
+    bool is_atmos_supported = is_platform_supported_ddp_atmos(adev);
 
     bool is_ddp_atmos_format = (out->hal_format == AUDIO_FORMAT_E_AC3_JOC);
 

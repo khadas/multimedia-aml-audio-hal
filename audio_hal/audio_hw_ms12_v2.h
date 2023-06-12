@@ -235,7 +235,7 @@ void set_ms12_main_volume(struct dolby_ms12_desc *ms12, float volume);
 /*
  *@brief get the platform's capability of DDP-ATMOS.
  */
-bool is_platform_supported_ddp_atmos(bool atmos_supported, enum OUT_PORT current_out_port, bool is_tv);
+bool is_platform_supported_ddp_atmos(struct aml_audio_device *adev);
 
 bool is_dolby_ms12_main_stream(struct audio_stream_out *stream);
 bool is_support_ms12_reset(struct audio_stream_out *stream);
