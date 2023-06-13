@@ -521,22 +521,22 @@ write:
     }
 
     if (aml_out->pcm == NULL) {
-        ALOGE("%s: pcm is null", __func__);
+        ALOGE("[%s:%d] pcm is null", __func__, __LINE__);
         return bytes;
     }
     /*+[SE][BUG][SWPL-14811][zhizhong] add drop ac3 pcm function*/
     if (adev->patch_src ==  SRC_DTV && aml_out->need_drop_size > 0 && adev->audio_patch != NULL) {
         if (aml_out->need_drop_size >= (int)bytes) {
             aml_out->need_drop_size -= bytes;
-            ALOGI("av sync drop %d pcm, need drop:%d more,apts:0x%x,pcr:0x%x\n",
-                (int)bytes, aml_out->need_drop_size, adev->audio_patch->last_apts, adev->audio_patch->last_pcrpts);
+            ALOGI("[%s:%d] av sync drop %d pcm, need drop:%d more,apts:0x%x,pcr:0x%x\n",
+                __func__, __LINE__, (int)bytes, aml_out->need_drop_size, adev->audio_patch->last_apts, adev->audio_patch->last_pcrpts);
             if (adev->audio_patch->last_apts >= adev->audio_patch->last_pcrpts) {
-                ALOGI("pts already ok, drop finish\n");
+                ALOGI("[%s:%d] pts already ok, drop finish\n", __func__, __LINE__);
                 aml_out->need_drop_size = 0;
             } else
                 return bytes;
         } else {
-            ALOGI("bytes:%zu, need_drop_size=%d\n", bytes, aml_out->need_drop_size);
+            ALOGI("[%s:%d] bytes:%zu, need_drop_size=%d\n", __func__, __LINE__, bytes, aml_out->need_drop_size);
             if (adev->discontinue_mute_flag) {
                 ALOGI("drop mute discontinue_mute_flag=%d\n",
                 adev->discontinue_mute_flag);
@@ -546,20 +546,27 @@ write:
             ret = pcm_write(aml_out->pcm, audio_data + aml_out->need_drop_size,
                     bytes - aml_out->need_drop_size);
             aml_out->need_drop_size = 0;
-            ALOGI("drop finish\n");
+            ALOGI("[%s:%d] drop finish\n", __func__, __LINE__);
             return bytes;
         }
     }
 
     {
         struct snd_pcm_status status;
+        bool alsa_status;
         pcm_ioctl(aml_out->pcm, SNDRV_PCM_IOCTL_STATUS, &status);
+        alsa_status = (status.state == PCM_STATE_RUNNING);
+        if (alsa_status != aml_out->alsa_running_status) {
+            ALOGI("[%s:%d] alsa_running_status[%p] change from %d to %d", __func__, __LINE__, aml_out, aml_out->alsa_running_status, alsa_status);
+            aml_out->alsa_running_status = alsa_status;
+            aml_out->alsa_status_changed = true;
+        }
         if (status.state == PCM_STATE_XRUN) {
             ALOGW("[%s:%d] alsa underrun", __func__, __LINE__);
             if (adev->audio_discontinue) {
                 adev->discontinue_mute_flag = 1;
                 adev->no_underrun_count = 0;
-                ALOGD("output_write, audio discontinue, underrun, begin mute");
+                ALOGD("[%s:%d] output_write, audio discontinue, underrun, begin mute", __func__, __LINE__);
             }
         } else if (adev->discontinue_mute_flag == 1 && adev->patch_src ==  SRC_DTV ) {
             if (adev->audio_patch != NULL && adev->audio_discontinue == 0 &&
@@ -586,7 +593,7 @@ write:
             if (status.state == PCM_STATE_SETUP ||
                 status.state == PCM_STATE_PREPARED ||
                 status.state == PCM_STATE_XRUN) {
-                ALOGI("mute the first dd+ raw data");
+                ALOGI("[%s:%d] mute the first dd+ raw data", __func__, __LINE__);
                 memset(buffer, 0,bytes);
             }
         }
@@ -596,7 +603,7 @@ write:
     if (adev->raw_to_pcm_flag) {
         pcm_stop(aml_out->pcm);
         adev->raw_to_pcm_flag = false;
-        ALOGI("raw to lpcm switch %s\n",__func__);
+        ALOGI("[%s:%d] raw to lpcm switch\n", __func__, __LINE__);
     }
 
     /*for ms12 case, we control the output buffer level*/
@@ -610,14 +617,14 @@ write:
     if (debug_enable || (aml_out->alsa_write_cnt % 1000) == 0) {
         snd_pcm_sframes_t frames = 0;
         ret = pcm_ioctl(aml_out->pcm, SNDRV_PCM_IOCTL_DELAY, &frames);
-        ALOGI("alsa format =0x%x delay frames =%ld total frames=%lld", aml_out->alsa_output_format, frames, aml_out->alsa_write_frames);
+        ALOGI("[%s:%d] alsa format =0x%x delay frames =%ld total frames=%lld", __func__, __LINE__, aml_out->alsa_output_format, frames, aml_out->alsa_write_frames);
     }
 
 
     ret = pcm_write(aml_out->pcm, buffer, bytes);
     if (ret < 0) {
-        ALOGE("%s write failed,pcm handle %p %s, stream %p, %s",
-            __func__, aml_out->pcm, pcm_get_error(aml_out->pcm),
+        ALOGE("[%s:%d] write failed,pcm handle %p %s, stream %p, %s",
+            __func__, __LINE__, aml_out->pcm, pcm_get_error(aml_out->pcm),
             aml_out, usecase2Str(aml_out->usecase));
     }
 
@@ -654,6 +661,8 @@ int aml_alsa_output_resume(struct audio_stream_out *stream) {
     struct aml_audio_device *adev = out->dev;
     int ret = 0;
     unsigned int device = out->device;
+    struct snd_pcm_status status;
+    bool alsa_status;
 
     out->pcm = adev->pcm_handle[device];
     if (out->pcm && pcm_is_ready (out->pcm) ) {
@@ -666,6 +675,16 @@ int aml_alsa_output_resume(struct audio_stream_out *stream) {
             if (out->pcm == adev->pcm)
                 adev->pcm_paused = false;
         }
+        pcm_ioctl(out->pcm, SNDRV_PCM_IOCTL_STATUS, &status);
+        alsa_status = (status.state == PCM_STATE_RUNNING);
+    } else {
+        alsa_status = false;
+    }
+
+    if (alsa_status != out->alsa_running_status) {
+         ALOGI("[%s:%d] alsa_running_status[%p] change from %d to %d", __func__, __LINE__, out, out->alsa_running_status, alsa_status);
+         out->alsa_running_status = alsa_status;
+         out->alsa_status_changed = true;
     }
 
     return 0;

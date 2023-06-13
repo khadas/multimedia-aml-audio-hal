@@ -451,6 +451,8 @@ struct aml_audio_device {
     int usecase_cnt[STREAM_USECASE_MAX];
     struct aml_stream_out *active_outputs[STREAM_USECASE_MAX];
     pthread_mutex_t patch_lock;
+    pthread_mutex_t dtv_patch_lock;//this only use for locking adev->audio_patch in dtv source,
+                                    //since ms12_output will use adev->audio_patch to do media sync
     struct aml_audio_patch *audio_patch;
     /* indicates atv to mixer patch, no need HAL patching  */
     bool tuner2mix_patch;
@@ -650,6 +652,7 @@ struct aml_audio_device {
     void *cap_buffer;
     int cap_delay;
 #endif
+    int synctype; //tsplayer TS mode input set
     int injection_enable;
 
 #ifdef USE_MEDIAINFO
@@ -882,6 +885,12 @@ struct aml_stream_out {
     bool ms12_acmod2ch_lock_disable;
     bool frame_write_sum_updated;
     uint32_t timer_id;
+    uint64_t ms12_main_input_size;
+    uint64_t dolby_ms12_input_main_sum;
+    uint64_t parse_consumed_size;
+
+    //DTV sync
+    bool set_init_avsync_policy;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);

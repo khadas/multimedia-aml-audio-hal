@@ -77,6 +77,13 @@ typedef enum {
     ESSYNC_AUDIO_OUTPUT,
 } sync_process_res;
 
+struct mediasync_a_policy {
+    audio_policy last_audiopolicy;
+    audio_policy audiopolicy;
+    int32_t  param1;
+    int32_t  param2;
+};
+
 typedef struct audio_hwsync_mediasync {
     void* mediasync;
     int mediasync_id;
@@ -84,7 +91,9 @@ typedef struct audio_hwsync_mediasync {
     int64_t out_start_apts;
     int64_t out_end_apts;
     int duration;
-    struct mediasync_audio_policy apolicy;
+    struct mediasync_a_policy apolicy;
+    size_t total_data_size;
+    int64_t in_apts;
 }audio_hwsync_mediasync_t;//for AudioProcess mode
 
 typedef struct  audio_hwsync {

@@ -355,9 +355,11 @@ struct aml_audio_patch {
     unsigned int dtv_output_clock;
     unsigned int dtv_default_i2s_clock;
     unsigned int dtv_default_spdif_clock;
+    unsigned int dtv_default_arc_clock;
     unsigned int spdif_format_set;
     int spdif_step_clk;
     int i2s_step_clk;
+    int arc_step_clk;
     int dtv_audio_mode;
     int tsync_mode;
     int dtv_apts_lookup;
@@ -418,6 +420,7 @@ struct aml_audio_patch {
     struct timespec start_ts;
     int mdelay;
     bool start_mute;
+    size_t total_data_size;
 };
 
 stream_usecase_t convert_usecase_mask_to_stream_usecase(usecase_mask_t mask);

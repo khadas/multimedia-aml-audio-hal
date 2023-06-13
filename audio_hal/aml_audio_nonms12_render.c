@@ -131,7 +131,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
     struct aml_audio_patch *patch = adev->audio_patch;
     struct aml_native_postprocess *VX_postprocess = &adev->native_postprocess;
     bool do_sync_flag = adev->patch_src  == SRC_DTV && patch && patch->skip_amadec_flag;
-    if (!aml_out->dtvsync_enable)
+    if (!patch || !aml_out->dtvsync_enable)
     {
         do_sync_flag = 0;
     }
@@ -163,15 +163,9 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                 aml_dec->in_frame_pts = decoder_apts_lookup(patch->decoder_offset);
             }
         }
-
-        if ((aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
+        else if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
         {
-            int64_t apts = 0;
-            if ( 0 == aml_audio_hwsync_lookup_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, &apts)) {
-                aml_dec->in_frame_pts = apts;
-            } else {
-                ALOGE("[%s:%d] es av sync loopup apts fail", __func__, __LINE__);
-            }
+            aml_dec->in_frame_pts = aml_out->hwsync->es_mediasync.in_apts;
         }
 
         do {
@@ -282,7 +276,13 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
 
                     }
                     //sync process here
-                    if (adev->patch_src  == SRC_DTV && aml_out->dtvsync_enable) {
+                    if (adev->patch_src == SRC_DTV && patch && aml_out->dtvsync_enable) {
+
+                        if (aml_out->alsa_status_changed) {
+                            ALOGI("[%s:%d]aml_out->alsa_running_status %d", __FUNCTION__, __LINE__, aml_out->alsa_running_status);
+                            aml_dtvsync_setParameter(patch->dtvsync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
+                            aml_out->alsa_status_changed = false;
+                        }
 
                         process_result = aml_dtvsync_nonms12_process(stream, duration, &speed_enabled);
                         if (process_result == DTVSYNC_AUDIO_DROP)
@@ -303,12 +303,11 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                     }
                 }
 
-                if ((aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
+                if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
                 {
                     sync_process_res pro_result = ESSYNC_AUDIO_OUTPUT;
                     if (dec_pcm_data->data_ch != 0)
                         duration =  (pcm_len * 1000) / (2 * dec_pcm_data->data_ch * aml_out->config.rate);
-
 
                     alsa_latency = 90 *(out_get_alsa_latency_frames(stream)  * 1000) / aml_out->config.rate;
                     aml_out->hwsync->es_mediasync.cur_outapts = aml_dec->out_frame_pts - decoder_latency - alsa_latency;
@@ -332,7 +331,6 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                             pcm_len = aml_out->speed_handle->speed_size;
                         }
                     }
-
                }
 
                 /*if (adev->dev2mix_patch) {

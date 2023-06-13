@@ -151,7 +151,7 @@ static void get_pcm_hardware_config_parameters(
         hardware_config->channels = channels;
         hardware_config->format = PCM_FORMAT_S32_LE;
     }
-    hardware_config->rate = rate;//defualt sample rate = 48KHz
+    hardware_config->rate = rate;//default sample rate = 48KHz
     if (!game_mode)
         hardware_config->period_size = PERIOD_SIZE;
     else

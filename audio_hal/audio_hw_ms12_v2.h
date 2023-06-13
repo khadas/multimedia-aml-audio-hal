@@ -318,5 +318,4 @@ void set_ms12_ac4_presentation_group_index(struct dolby_ms12_desc *ms12, int ind
  */
 void set_ms12_main_audio_mute(struct dolby_ms12_desc *ms12, bool b_mute, unsigned int duration);
 
-
 #endif //end of _AUDIO_HW_MS12_H_

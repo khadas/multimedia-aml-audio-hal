@@ -35,6 +35,8 @@
 
 #include "aml_audio_ms12_sync.h"
 #include "aml_esmode_sync.h"
+#include "aml_audio_hal_avsync.h"
+#include "audio_media_sync_util.h"
 
 #define MS12_MAIN_WRITE_LOOP_THRESHOLD                  (2000)
 #define AUDIO_IEC61937_FRAME_SIZE 4
@@ -47,13 +49,18 @@ int aml_audio_get_cur_ms12_latency(struct audio_stream_out *stream) {
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     struct aml_audio_patch *patch = adev->audio_patch;
-    aml_demux_audiopara_t *demux_info = (aml_demux_audiopara_t *)patch->demux_info;
+    aml_demux_audiopara_t *demux_info = NULL;
+    if (NULL != patch)
+    {
+        aml_demux_audiopara_t *demux_info = (aml_demux_audiopara_t *)patch->demux_info;
+    }
+
     int ms12_latencyms = 0;
 
     uint64_t inputnode_consumed = dolby_ms12_get_main_bytes_consumed(stream);
     uint64_t frames_generated = dolby_ms12_get_main_pcm_generated(stream);
     if (is_dolby_ms12_support_compression_format(aml_out->hal_internal_format)) {
-        if (demux_info->dual_decoder_support)
+        if (demux_info && (demux_info->dual_decoder_support))
             ms12_latencyms = (frames_generated - ms12->master_pcm_frames) / 48;
         else
             ms12_latencyms = (ms12->ms12_main_input_size - inputnode_consumed) / aml_out->ddp_frame_size * 32 + (frames_generated - ms12->master_pcm_frames) / 48;
@@ -77,7 +84,7 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, const void *
     int total_write = 0;
     void *buffer = (void *)write_buf;
     struct aml_audio_patch *patch = adev->audio_patch;
-    int write_retry =0;
+    int write_retry = 0;
     size_t used_size = 0;
     void *output_buffer = NULL;
     size_t output_buffer_bytes = 0;
@@ -181,25 +188,22 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
     bool bypass_aml_dec = false;
     bool do_sync_flag = adev->patch_src  == SRC_DTV && patch && patch->skip_amadec_flag;
     int64_t hw_esmode_apts = 0;
-    if (!aml_out->dtvsync_enable)
+
+    bool esmode_flag = false;
+    if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
+    {
+        esmode_flag = true;
+    }
+
+    if (!patch || !aml_out->dtvsync_enable)
     {
         do_sync_flag = 0;
     }
-    struct dolby_ms12_desc *ms12 = &(adev->ms12);
 
+    struct dolby_ms12_desc *ms12 = &(adev->ms12);
     if (is_dolby_ms12_support_compression_format(aml_out->hal_internal_format)
         || is_multi_channel_pcm(stream)) {
         bypass_aml_dec = true;
-    }
-
-    if ((aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
-    {
-        if ( 0 == aml_audio_hwsync_lookup_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, &hw_esmode_apts)) {
-            aml_out->hwsync->es_mediasync.out_start_apts = hw_esmode_apts;
-        } else {
-            hw_esmode_apts = HWSYNC_PTS_NA;
-            ALOGE("[%s:%d] es_mediasync av sync loopup apts fail", __func__, __LINE__);
-        }
     }
 
     if (bypass_aml_dec) {
@@ -212,33 +216,11 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
         }
 
         ret = aml_audio_ms12_process_wrapper(stream, buffer, bytes);
-        if (do_sync_flag) {
-            ms12_delayms = aml_audio_get_cur_ms12_latency(stream);
-            if(patch->skip_amadec_flag && aml_out->dtvsync_enable) {
-                patch->dtvsync->cur_outapts = patch->cur_package->pts - ms12_delayms * 90;
-                aml_dtvsync_ms12_get_policy(stream);
-            }
-        }
-        if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
-        {
-            //ms12_delayms = aml_audio_get_cur_ms12_latencyes(stream);
-            ms12_delayms = aml_audio_get_ms12_tunnel_latency(stream)/48;
-            aml_out->hwsync->es_mediasync.cur_outapts = aml_out->hwsync->es_mediasync.out_start_apts - ms12_delayms * 90;
-            //aml_hwsynces_ms12_get_policy(stream);
-            if (hw_esmode_apts != HWSYNC_PTS_NA) {
-                pthread_mutex_lock(&adev->ms12.p_pts_list->list_lock);
-                struct renderpts_item *prenderpts = aml_audio_malloc(sizeof(struct renderpts_item));
-                prenderpts->cur_outapts = aml_out->hwsync->es_mediasync.cur_outapts;
-                prenderpts->out_start_apts = aml_out->hwsync->es_mediasync.out_start_apts;
-                list_add_tail(&adev->ms12.p_pts_list->frame_list, &prenderpts->list);
-                if (adev->ms12.p_pts_list->prepts != HWSYNC_PTS_NA) {
-                    adev->ms12.p_pts_list->gapts = prenderpts->out_start_apts - adev->ms12.p_pts_list->prepts;
-                }
-                adev->ms12.p_pts_list->prepts = prenderpts->out_start_apts;
-                pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
-            }
-            if (adev->debug_flag > 1) {
-                ALOGI("bypass_aml_dec %d,%llx,%llx,gappts %d\n",ms12_delayms,aml_out->hwsync->es_mediasync.cur_outapts,aml_out->hwsync->es_mediasync.out_start_apts,adev->ms12.p_pts_list->gapts);
+        if (true == do_sync_flag) {
+            if (aml_out->alsa_status_changed) {
+                ALOGI("[%s:%d] aml_out->alsa_running_status %d", __FUNCTION__, __LINE__, aml_out->alsa_running_status);
+                aml_dtvsync_setParameter(patch->dtvsync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
+                aml_out->alsa_status_changed = false;
             }
         }
     } else {
@@ -246,6 +228,8 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
             config_output(stream, true);
         }
         aml_dec_t *aml_dec = aml_out->aml_dec;
+        aml_dec_info_t dec_info;
+        audio_mediasync_util_t * mediasync_util = aml_audio_get_mediasync_util_handle();
         if (do_sync_flag) {
             if(patch->skip_amadec_flag) {
                 if (patch->cur_package)
@@ -255,10 +239,22 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                 }
             }
         }
-
-        if ((aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
+        else if (esmode_flag)
         {
-            aml_dec->in_frame_pts = aml_out->hwsync->es_mediasync.out_start_apts = hw_esmode_apts;
+            aml_dec->in_frame_pts = aml_out->hwsync->es_mediasync.in_apts;
+        }
+
+        if ((do_sync_flag) || (esmode_flag))
+        {
+            if (false == mediasync_util->record_flag)
+            {
+                mediasync_util->es_last_apts = aml_dec->in_frame_pts;
+                mediasync_util->record_flag  = true;
+            }
+            else
+            {
+                aml_dec->in_frame_pts = mediasync_util->es_last_apts;
+            }
         }
 
         if (aml_dec) {
@@ -266,13 +262,14 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
             dec_data_info_t * dec_raw_data = &aml_dec->dec_raw_data;
             dec_data_info_t * raw_in_data  = &aml_dec->raw_in_data;
             left_bytes = bytes;
+            int dec_count = 0;
             do {
                 if (adev->debug_flag)
                     ALOGI("left_bytes %d dec_used_size %d", left_bytes, dec_used_size);
                 ret = aml_decoder_process(aml_dec, (unsigned char *)buffer + dec_used_size, left_bytes, &used_size);
 
                 if (ret < 0) {
-                    ALOGV("aml_decoder_process error");
+                    ALOGI("aml_decoder_process error");
                     return return_bytes;
                 }
                 left_bytes -= used_size;
@@ -284,10 +281,18 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                         aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &adev->dec_stream_info);
                         adev->audio_hal_info.first_decoding_frame = true;
                         adev->audio_hal_info.is_decoding = true;
-                        ALOGI("[%s:%d] aml_decoder_stream_info %d %d", __func__, __LINE__, adev->dec_stream_info.dec_info.stream_ch, adev->dec_stream_info.dec_info.stream_sr);
+                        //ALOGI("[%s:%d] aml_decoder_stream_info %d %d", __func__, __LINE__, adev->dec_stream_info.dec_info.stream_ch, adev->dec_stream_info.dec_info.stream_sr);
+                        if (48000 != aml_out->hal_rate)
+                        {
+                            ms12->config_sample_rate  = aml_out->hal_rate = 48000;
+                            ms12->config_channel_mask = 0x3;
+                        }
                     }
+                    mediasync_util->record_flag = false;
                     void  *dec_data = (void *)dec_pcm_data->buf;
-                    if (adev->patch_src  == SRC_DTV && adev->start_mute_flag == 1) {
+                    if ((adev->audio_patch != NULL) &&
+                        (adev->patch_src == SRC_DTV || adev->patch_src == SRC_HDMIIN) &&
+                        (adev->start_mute_flag == 1)) {
                         memset(dec_pcm_data->buf, 0, dec_pcm_data->data_len);
                     }
                     if (dec_pcm_data->data_sr > 0) {
@@ -296,7 +301,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                     if (patch) {
                         patch->sample_rate = dec_pcm_data->data_sr;
                     }
-                    if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE ) {
+                    if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE) {
                          ret = aml_audio_resample_process_wrapper(&aml_out->resample_handle, dec_pcm_data->buf, dec_pcm_data->data_len, dec_pcm_data->data_sr, dec_pcm_data->data_ch);
                          if (ret != 0) {
                              ALOGI("aml_audio_resample_process_wrapper failed");
@@ -305,51 +310,30 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                              dec_pcm_data->data_len = aml_out->resample_handle->resample_size;
                          }
                     }
-                    out_frames += dec_pcm_data->data_len /( 2 * dec_pcm_data->data_ch);
-                    if (patch && (adev->patch_src  == SRC_DTV))
-                        patch->dtv_pcm_writed += dec_pcm_data->data_len;
-                    aml_dec->out_frame_pts = aml_dec->in_frame_pts + (90 * out_frames /(dec_pcm_data->data_sr / 1000));
-                    //aml_audio_dump_audio_bitstreams("/data/mixing_data.raw", dec_data, dec_pcm_data->data_len);
-                    ret = aml_audio_ms12_process_wrapper(stream, dec_data, dec_pcm_data->data_len);
-                    if (do_sync_flag) {
-                        ms12_delayms = aml_audio_get_cur_ms12_latency(stream);
-                        if(patch->skip_amadec_flag) {
-                            patch->dtvsync->cur_outapts = aml_dec->out_frame_pts - ms12_delayms * 90;//need consider the alsa delay
-                            if (adev->debug_flag) {
-                                ALOGI("patch->dtvsync->cur_outapts %lld", patch->dtvsync->cur_outapts);
-                            }
-                            if (aml_out->dtvsync_enable)
-                                aml_dtvsync_ms12_get_policy(stream);
-                        }
-                    }
-                    if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
-                    {
-                         //ms12_delayms = aml_audio_get_cur_ms12_latencyes(stream);
-                         ms12_delayms = (aml_audio_get_ms12_tunnel_latency(stream)+out_frames)/48;
-                         aml_out->hwsync->es_mediasync.cur_outapts = aml_dec->out_frame_pts - ms12_delayms * 90;//need consider the alsa delay
-                         if (adev->debug_flag) {
-                             ALOGI("esmodesync->cur_outapts %llx,ms12_delayms %d,out_frames %d,decin %llx,decout %llx,data_sr %d\n", aml_out->hwsync->es_mediasync.cur_outapts,ms12_delayms,out_frames,aml_dec->in_frame_pts,aml_dec->out_frame_pts,dec_pcm_data->data_sr);
-                         }
-                         //aml_hwsynces_ms12_get_policy(stream);
-                         if (hw_esmode_apts != HWSYNC_PTS_NA) {
-                             pthread_mutex_lock(&adev->ms12.p_pts_list->list_lock);
-                             struct renderpts_item *prenderpts = aml_audio_malloc(sizeof(struct renderpts_item));
-                             prenderpts->cur_outapts = aml_out->hwsync->es_mediasync.cur_outapts;
-                             prenderpts->out_start_apts = aml_out->hwsync->es_mediasync.out_start_apts;
-                             list_add_tail(&adev->ms12.p_pts_list->frame_list, &prenderpts->list);
-                             pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
-                         }
-                    }
-                }
+                    out_frames += dec_pcm_data->data_len / (2 * dec_pcm_data->data_ch);
 
+                    if ((do_sync_flag) || (esmode_flag))
+                    {
+                        int64_t out_apts;
+                        out_apts = (0 == dec_count) ? aml_dec->in_frame_pts : aml_dec->out_frame_pts;
+                        if (aml_audio_mediasync_util_checkin_apts(mediasync_util, mediasync_util->payload_offset, out_apts) < 0) {
+                            ALOGE("[%s:%d] checkin apts(%llx) data_size(%zu) fail",
+                                __FUNCTION__, __LINE__, out_apts, mediasync_util->payload_offset);
+                        }
+                        mediasync_util->payload_offset += dec_pcm_data->data_len;
+
+                        if (mediasync_util->media_sync_debug)
+                             ALOGI("out_frames %d, out_apts1 %llx, in_frame_pts %llx, out_frame_pts %llx, data_sr %d, frame_offset %zu",
+                                    out_frames, out_apts, aml_dec->in_frame_pts, aml_dec->out_frame_pts,
+                                    dec_pcm_data->data_sr, mediasync_util->payload_offset);
+                    }
+                    aml_dec->out_frame_pts = aml_dec->in_frame_pts + (90 * out_frames /(dec_pcm_data->data_sr / 1000));
+                    ret = aml_audio_ms12_process_wrapper(stream, dec_data, dec_pcm_data->data_len);
+                }
+                dec_count++;
             } while ((left_bytes > 0) || aml_dec->fragment_left_size);
         }
-
     }
-
     return return_bytes;
 }
-
-
-
 

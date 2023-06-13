@@ -153,6 +153,7 @@
 #include <audio_effects/effect_aec.h>
 #include <audio_utils/clock.h>
 #include "audio_hal_version.h"
+#include "audio_media_sync_util.h"
 
 #define CARD_AMLOGIC_BOARD 0
 /* ALSA ports for AML */
@@ -1784,7 +1785,7 @@ static int out_resume_new (struct audio_stream_out *stream)
     pthread_mutex_lock(&aml_dev->lock);
     pthread_mutex_lock(&aml_out->lock);
     /* a stream should fail to resume if not previously paused */
-    // aml_out->standby is always "1" in ms12 continous mode, which will cause fail to resume here
+    // aml_out->standby is always "1" in ms12 continuous mode, which will cause fail to resume here
     if (/*aml_out->standby || */aml_out->pause_status == false) {
         // If output stream is not standby or not paused,
         // we should return Result::INVALID_STATE (3),
@@ -3229,7 +3230,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
 
     ALOGD("%s: enter: devices(%#x) channel_mask(%#x) rate(%d) format(%#x) flags(%#x)", __func__,
         devices, config->channel_mask, config->sample_rate, config->format, flags);
-
+    ALOGI("%s: enter, ver:%s", __func__, libVersion_audio_hal);
     out = (struct aml_stream_out *)aml_audio_calloc(1, sizeof(struct aml_stream_out));
     if (!out) {
         ALOGE("%s malloc error", __func__);
@@ -3237,7 +3238,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     }
 
     if (address && !strncmp(address, "AML_", 4)) {
-        ALOGI("%s(): aml TV source stream", __func__);
+        ALOGI("%s(): aml TV source stream = %s", __func__, address);
         out->tv_src_stream = true;
     }
 
@@ -3557,6 +3558,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
             out->hw_sync_mode = false;
             flags = flags & (~AUDIO_OUTPUT_FLAG_HW_AV_SYNC);
         }
+        audio_mediasync_util_t* media_sync_util = aml_audio_mediasync_util_init();
+        ALOGI("[%s:%d], aml_audio_mediasync_util_init, media_sync_util=%p", __func__, __LINE__, media_sync_util);
     }
 
     /*if tunnel mode pcm is not 48Khz, resample to 48K*/
@@ -3596,6 +3599,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->flags = flags;
     out->ddp_frame_size = aml_audio_get_ddp_frame_size();
     out->resample_handle = NULL;
+    out->set_init_avsync_policy = false;
     *stream_out = &out->stream;
     ALOGD("%s: exit", __func__);
 
@@ -3763,6 +3767,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         if (out->hwsync->es_mediasync.mediasync) {
             //free(out->hwsync->mediasync);
             out->hwsync->es_mediasync.mediasync = NULL;
+            out->hwsync->es_mediasync.total_data_size = 0;
             if (adev->hw_mediasync) {
                 adev->hw_mediasync = NULL;
             }
@@ -3797,7 +3802,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out->resample_handle = NULL;
     }
 
-    /*TBD .to fix the AC-4 continous function in ms12 lib then remove this */
+    /*TBD .to fix the AC-4 continuous function in ms12 lib then remove this */
     /*
      * will close MS12 if the AVR DDP-ATMOS capbility is changed,
      * such as switch from DDP-AVR to ATMOS-AVR
@@ -4698,7 +4703,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 set_ms12_atmos_lock(&(adev->ms12), adev->atoms_lock_flag);
                 ALOGI("%s set adev->atoms_lock_flag = %d, \n", __func__,adev->atoms_lock_flag);
             } else {
-                ALOGI("%s not in continous mode, do nothing\n", __func__);
+                ALOGI("%s not in continuous mode, do nothing\n", __func__);
             }
             pthread_mutex_unlock(&adev->lock);
             }
@@ -4935,6 +4940,30 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         if (ret >= 0) {
             dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_CONTROL, val);
             goto exit;
+#if 0
+            int cmd_val= val & ((1 << DVB_DEMUX_ID_BASE) - 1);
+            ALOGI("[%s:%d] cmd_val=%d(%d)", __FUNCTION__, __LINE__, cmd_val, val);
+
+            if (cmd_val == AUDIO_DTV_PATCH_CMD_STOP || cmd_val == AUDIO_DTV_PATCH_CMD_PAUSE) {
+                ALOGI("[%s:%d] mute dtv to do fade out", __FUNCTION__, __LINE__);
+                //adev->start_mute_flag = true;
+                set_ms12_main_audio_mute(&adev->ms12, true, 32);
+                //set_aed_master_volume_mute(&adev->alsa_mixer, true); // dtv continuous mode, we do not need aed to do fade
+                //set_dac_digital_volume_mute(&adev->alsa_mixer, true);
+                usleep(64000);
+                dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_CONTROL, val);
+            } else if (cmd_val == AUDIO_DTV_PATCH_CMD_RESUME) {
+                ALOGI("[%s:%d] unmute dtv to do fade in", __FUNCTION__, __LINE__);
+                dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_CONTROL, val);
+                usleep(20000);//when resume, av sync policy is HOLD, we need wait 20ms that audio policy change to normal output
+                //adev->start_mute_flag = false;
+                set_ms12_main_audio_mute(&adev->ms12, false, 32);
+                //set_aed_master_volume_mute(&adev->alsa_mixer, false);
+                //set_dac_digital_volume_mute(&adev->alsa_mixer, false);
+            } else {
+                dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_CONTROL, val);
+            }
+#endif
         }
 
         ret = str_parms_get_int(parms, "hal_param_dual_dec_support", &val);
@@ -4981,9 +5010,9 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_SECURITY_MEM_LEVEL, val);
             goto exit;
         }
-        //t5d tsmode todo
         ret = str_parms_get_int(parms, "hal_param_dtv_synctype", &val);
         if (ret >= 0) {
+            adev->synctype = val;
             ALOGI("adev->synctype set to %d\n", val);
             goto exit;
         }
@@ -6286,7 +6315,7 @@ int do_output_standby_l(struct audio_stream *stream)
     }
 
     /*
-    if continous mode,we need always have output.
+    if continuous mode,we need always have output.
     so we should not disable the output.
     */
     pthread_mutex_lock(&adev->alsa_pcm_lock);
@@ -7443,9 +7472,6 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
             pthread_mutex_lock(&adev->lock);
             get_dolby_ms12_cleanup(&adev->ms12, false);
             adev->ms12_out = NULL;
-
-            /* Reset pts table and the payload offset ##SWPL-107272 */
-            aml_audio_hwsync_reset_apts(aml_out->hwsync);
             pthread_mutex_lock(&adev->alsa_pcm_lock);
             struct pcm *pcm = adev->pcm_handle[DIGITAL_DEVICE];
             if (aml_out->dual_output_flag && pcm) {
@@ -7769,6 +7795,25 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, const void *buf
             need_reset_decoder = false;
         }
         aml_out->out_device = adev->out_device;
+    }
+
+    if (need_reconfig_output && need_reset_decoder) {
+        /* Reset pts table and the payload offset ##SWPL-107272 */
+        ALOGI("continuous_mode(adev) %d ms12->dolby_ms12_enable %d", adev->continuous_audio_mode, ms12->dolby_ms12_enable);
+        int is_compatible = false;
+        if (adev->continuous_audio_mode && ms12->dolby_ms12_enable) {
+            is_compatible = is_ms12_output_compatible(stream, adev->sink_format, adev->optical_format);
+        }
+
+        if (is_compatible) {
+            need_reset_decoder = false;
+        }
+        get_sink_format (stream);
+        if (!is_bypass_dolbyms12(stream) && (need_reset_decoder == true)) {
+            ALOGI("%s aml_audio_hwsync_reset_apts ", __func__);
+            aml_audio_hwsync_reset_apts(aml_out->hwsync);
+            aml_audio_mediasync_util_init();
+        }
     }
 
 hwsync_rewrite:
@@ -8153,7 +8198,7 @@ hwsync_rewrite:
             return return_bytes;
         }
         /*
-        continous mode,available dolby format coming,need set main dolby dummy to false
+        continuous mode,available dolby format coming,need set main dolby dummy to false
         */
         if (continous_mode(adev) && adev->ms12_main1_dolby_dummy == true
             && (!audio_is_linear_pcm(aml_out->hal_internal_format) && is_dolby_ms12_support_compression_format(aml_out->hal_internal_format))) {
@@ -8785,11 +8830,37 @@ ssize_t out_write_new(struct audio_stream_out *stream,
     }
 
     /*when there is data writing in this stream, we can add it to active stream*/
-
     pthread_mutex_lock(&adev->lock);
     adev->active_outputs[aml_out->usecase] = aml_out;
     pthread_mutex_unlock(&adev->lock);
 
+    if ((true == aml_out->hw_sync_mode)
+        && (NULL != aml_out->hwsync->es_mediasync.mediasync)) {
+        if (true == hwsync_header_valid(buffer))
+        {
+            uint64_t apts = hwsync_header_get_pts(buffer);
+            size_t total_data_size = aml_out->hwsync->es_mediasync.total_data_size + hwsync_header_get_size(buffer);
+            //aml_out->hwsync->es_mediasync.total_data_size += hwsync_header_get_size(buffer);
+            audio_mediasync_util_t *media_sync_util = aml_audio_get_mediasync_util_handle();
+            if (adev->debug_flag > 1) {
+                ALOGI("[%s:%d], total_data_size:%zu, apts:%lld, bytes:%zu, media_sync_util=%p", __func__, __LINE__,
+                    total_data_size, apts, bytes, media_sync_util);
+            }
+
+            if (is_dolby_ms12_support_compression_format(aml_out->hal_internal_format))
+            {
+                if (0 > aml_audio_mediasync_util_checkin_apts(media_sync_util, total_data_size, apts))
+                {
+                    ALOGE("[%s:%d], checkin apts(%llx) data_size(%zu) total_data_size(%zu)fail", __func__, __LINE__, apts, bytes, total_data_size);
+                }
+            }
+
+            pthread_mutex_lock(&aml_out->hwsync->lock);
+            aml_out->hwsync->es_mediasync.total_data_size = total_data_size;
+            aml_out->hwsync->es_mediasync.in_apts = apts;
+            pthread_mutex_unlock(&aml_out->hwsync->lock);
+        }
+    }
 
     /*move it from open function, because when hdmi hot plug, audio service will
      * call many times open/close to query the hdmi capability, this will affect the
@@ -8862,6 +8933,13 @@ ssize_t out_write_new(struct audio_stream_out *stream,
         }
     }
 
+    if (adev->continuous_audio_mode && aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) {
+        bool set_ms12_non_continuous = true;
+        ALOGI("mediasync esmode we need disable continuous mode\n");
+        get_dolby_ms12_cleanup(&adev->ms12, set_ms12_non_continuous);
+        adev->ms12_out = NULL;
+        adev->doing_reinit_ms12 = true;
+    }
 
     aml_audio_trace_int("out_write_new", bytes);
     /**
@@ -9018,6 +9096,8 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
     if (aml_getprop_bool("vendor.media.audio.hal.debug")) {
         aml_out->debug_stream = 1;
     }
+
+    audio_mediasync_util_t* media_sync_util = aml_audio_mediasync_util_init();
     ALOGD("-%s: out %p: io handle:%d, usecase:%s card:%d alsa devices:%d", __func__,
         aml_out, handle, usecase2Str(aml_out->usecase), aml_out->card, aml_out->device);
 
@@ -10529,6 +10609,7 @@ static int adev_close(hw_device_t *device)
         deleteHalSubMixing(adev->sm);
     }
     aml_hwsync_close_tsync(adev->tsync_fd);
+    pthread_mutex_destroy(&adev->dtv_patch_lock);
     pthread_mutex_destroy(&adev->patch_lock);
     pthread_mutex_destroy(&adev->dtv_lock);
 #ifdef ADD_AUDIO_DELAY_INTERFACE
@@ -10936,6 +11017,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->continuous_audio_mode = adev->continuous_audio_mode_default;
     pthread_mutex_init(&adev->alsa_pcm_lock, NULL);
     pthread_mutex_init(&adev->patch_lock, NULL);
+    pthread_mutex_init(&adev->dtv_patch_lock, NULL);
     open_mixer_handle(&adev->alsa_mixer);
 
     /* Set the earctx mode by the property, only need set false */

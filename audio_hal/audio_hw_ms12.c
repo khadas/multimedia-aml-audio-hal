@@ -407,7 +407,7 @@ int get_the_dolby_ms12_prepared(
     ALOGI("%s dolby_ms12_set_drc_mode %s", __FUNCTION__, (dolby_ms12_drc_mode == DOLBY_DRC_RF_MODE) ? "RF MODE" : "LINE MODE");
     int ret = 0;
 
-    /*set the continous output flag*/
+    /*set the continuous output flag*/
     set_dolby_ms12_continuous_mode((bool)adev->continuous_audio_mode);
     dolby_ms12_set_atmos_lock_flag(adev->atoms_lock_flag);
     /* create  the ms12 output stream here */

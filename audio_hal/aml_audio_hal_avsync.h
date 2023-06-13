@@ -83,6 +83,93 @@
 #define DEFAULT_AUDIO_LEAST_CACHE_MS (50)
 #define AUDIO_PCR_LATENCY_MAX (3000)
 #define DEFULT_DEBUG_TIME_INTERVAL (5000)
+#define DTV_AUDIO_START_MUTE_MAX_HTRESHOLD    (3 * 1000) //ms
+#define DTV_AUDIO_RETUNE_DEFAULT_THRESHOLD    (60)  //ms
+#define DTV_AUDIO_DROP_TIMEOUT_THRESHOLD      (5000) //ms
+#define DTV_AUDIO_DROP_DEFAULT_THRESHOLD      (200)  //ms
+#define DTV_AUDIO_CACHE_LATENCY_THRESHOLD   (1500)  //ms
+#define DTV_AUDIO_JUMPED_DEFAULT_THRESHOLD   (400)  //ms
+#define DEFAULT_DTV_ADJUST_CLOCK_THRESHOLD   (5) //percent
+
+/* dtv NONMS12 tuning part */
+//input format
+#define  DTV_AVSYNC_NONMS12_PCM_LATENCY                    (0)
+#define  DTV_AVSYNC_NONMS12_DD_LATENCY                     (0)
+#define  DTV_AVSYNC_NONMS12_DDP_LATENCY                    (0)
+#define  DTV_AVSYNC_NONMS12_PCM_LATENCY_PROPERTY           "vendor.media.audio.hal.nonms12.dtv.pcm"
+#define  DTV_AVSYNC_NONMS12_DD_LATENCY_PROPERTY            "vendor.media.audio.hal.nonms12.dtv.dd"
+#define  DTV_AVSYNC_NONMS12_DDP_LATENCY_PROPERTY           "vendor.media.audio.hal.nonms12.dtv.ddp"
+//port speaker
+#define  DTV_AVSYNC_NONMS12_TV_SPEAKER_LATENCY                    (0)
+#define  DTV_AVSYNC_NONMS12_TV_SPEAKER_LATENCY_PROPERTY           "vendor.media.audio.hal.nonms12.tv.dtv.speaker"
+//port A2DP
+#define  DTV_AVSYNC_NONMS12_TV_MIX_A2DP_LATENCY                   (120)
+#define  DTV_AVSYNC_NONMS12_TV_MIX_A2DP_LATENCY_PROPERTY          "vendor.media.audio.hal.nonms12.tv.dtv.mix.a2dp"
+//port arc
+#define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_PCM_LATENCY              (0)
+#define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_DD_LATENCY               (60)
+#define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_DDP_LATENCY              (90)
+#define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_PCM_LATENCY_PROPERTY     "vendor.media.audio.hal.nonms12.dtv.arc.pcm"
+#define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_DD_LATENCY_PROPERTY      "vendor.media.audio.hal.nonms12.dtv.arc.dd"
+#define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_DDP_LATENCY_PROPERTY     "vendor.media.audio.hal.nonms12.dtv.arc.ddp"
+//passthrough arc
+#define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_PT_DD_LATENCY            (0)
+#define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_PT_DDP_LATENCY           (0)
+#define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_PT_DD_LATENCY_PROPERTY   "vendor.media.audio.hal.nonms12.dtv.pt.arc.dd"
+#define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_PT_DDP_LATENCY_PROPERTY  "vendor.media.audio.hal.nonms12.dtv.pt.arc.ddp"
+/* end dtv NONMS12 tuning part */
+
+/* dtv MS12 tuning part */
+//input format
+#define  DTV_AVSYNC_MS12_PCM_LATENCY                    (0)
+#define  DTV_AVSYNC_MS12_DD_LATENCY                     (120)
+#define  DTV_AVSYNC_MS12_DDP_LATENCY                    (150)
+#define  DTV_AVSYNC_MS12_AC4_LATENCY                    (120)
+#define  DTV_AVSYNC_MS12_AAC_LATENCY                    (10)
+#define  DTV_AVSYNC_MS12_PCM_LATENCY_PROPERTY         "vendor.media.audio.hal.ms12.dtv.pcm"
+#define  DTV_AVSYNC_MS12_DD_LATENCY_PROPERTY          "vendor.media.audio.hal.ms12.dtv.dd"
+#define  DTV_AVSYNC_MS12_DDP_LATENCY_PROPERTY         "vendor.media.audio.hal.ms12.dtv.ddp"
+#define  DTV_AVSYNC_MS12_AC4_LATENCY_PROPERTY         "vendor.media.audio.hal.ms12.dtv.ac4"
+#define  DTV_AVSYNC_MS12_AAC_LATENCY_PROPERTY         "vendor.media.audio.hal.ms12.dtv.aac"
+//port speaker
+#define  DTV_AVSYNC_MS12_TV_SPEAKER_LATENCY                  (0)
+#define  DTV_AVSYNC_MS12_TV_SPEAKER_LATENCY_PROPERTY                  "vendor.media.audio.hal.ms12.tv.dtv.speaker"
+//port A2DP
+#define  DTV_AVSYNC_MS12_TV_MIX_A2DP_LATENCY                  (200)
+#define  DTV_AVSYNC_MS12_TV_MIX_A2DP_LATENCY_PROPERTY                 "vendor.media.audio.hal.ms12.tv.dtv.mix.a2dp"
+//port arc
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_PCM_LATENCY             (0)
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_DD_LATENCY              (100)
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_DDP_LATENCY             (120)
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_MAT_LATENCY             (120)
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_PCM_LATENCY_PROPERTY            "vendor.media.audio.hal.ms12.dtv.arc.pcm"
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_DD_LATENCY_PROPERTY             "vendor.media.audio.hal.ms12.dtv.arc.dd"
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_DDP_LATENCY_PROPERTY             "vendor.media.audio.hal.ms12.dtv.arc.ddp"
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_MAT_LATENCY_PROPERTY            "vendor.media.audio.hal.ms12.dtv.arc.mat"
+//passthrough arc
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_PT_DD_LATENCY            (0)
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_PT_DDP_LATENCY           (0)
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_PT_DD_LATENCY_PROPERTY         "vendor.media.audio.hal.ms12.dtv.pt.arc.dd"
+#define  DTV_AVSYNC_MS12_HDMI_ARC_OUT_PT_DDP_LATENCY_PROPERTY         "vendor.media.audio.hal.ms12.dtv.pt.arc.ddp"
+
+
+//STB_box hdmi out
+#define  AVSYNC_MS12_DTV_HDMI_OUT_PCM_LATENCY                (-55) /* if 0,  result locates at [-10, 10] */
+#define  AVSYNC_MS12_DTV_HDMI_OUT_DD_LATENCY                 (0)
+#define  AVSYNC_MS12_DTV_HDMI_OUT_DDP_LATENCY                (0)
+#define  AVSYNC_MS12_DTV_HDMI_OUT_MAT_LATENCY                (-40)
+
+#define  AVSYNC_MS12_DTV_HDMI_OUT_PCM_LATENCY_PROPERTY                "vendor.media.audio.hal.ms12.dtv.hdmi.pcm"
+#define  AVSYNC_MS12_DTV_HDMI_OUT_DD_LATENCY_PROPERTY                 "vendor.media.audio.hal.ms12.dtv.hdmi.dd"
+#define  AVSYNC_MS12_DTV_HDMI_OUT_DDP_LATENCY_PROPERTY                "vendor.media.audio.hal.ms12.dtv.hdmi.ddp"
+#define  AVSYNC_MS12_DTV_HDMI_OUT_MAT_LATENCY_PROPERTY                "vendor.media.audio.hal.ms12.dtv.hdmi.mat"
+//STB_box passthrough hdmi
+#define  DTV_AVSYNC_MS12_HDMI_OUT_PASSTHROUGH_DD_LATENCY            (0)
+#define  DTV_AVSYNC_MS12_HDMI_OUT_PASSTHROUGH_DDP_LATENCY           (-100)
+#define  DTV_AVSYNC_MS12_HDMI_OUT_PASSTHROUGH_DD_LATENCY_PROPERTY         "vendor.media.audio.hal.ms12.dtv.passthrough.dd"
+#define  DTV_AVSYNC_MS12_HDMI_OUT_PASSTHROUGH_DDP_LATENCY_PROPERTY        "vendor.media.audio.hal.ms12.dtv.passthrough.ddp"
+
+/* end dtv MS12 tuning part */
 
 //channel define
 #define DEFAULT_CHANNELS 2

@@ -58,6 +58,7 @@ typedef enum {
 
 
 struct dtvsync_audio_policy {
+    dtvsync_policy last_audiopolicy;
     dtvsync_policy audiopolicy;
     int32_t  param1;
     int32_t  param2;
