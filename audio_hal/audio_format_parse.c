@@ -42,7 +42,7 @@
 #define WAIT_COUNT_MAX 30
 
 /*Find the position of 61937 sync word in the buffer*/
-static int seek_61937_sync_word(char *buffer, int size)
+int find_61937_sync_word(char *buffer, int size)
 {
     int i = -1;
     if (size < 4) {
@@ -271,7 +271,7 @@ int get_dts_stream_channels(const char *buffer, size_t buffer_size) {
     size_t lfe_value = 0;
     size_t bytes = 0;
 
-    pos_iec_header = seek_61937_sync_word((char *)buffer, (int)buffer_size);
+    pos_iec_header = find_61937_sync_word((char *)buffer, (int)buffer_size);
     if (pos_iec_header < 0) {
         return -1;
     }
@@ -383,7 +383,7 @@ int audio_type_parse(void *buffer, size_t bytes, int *package_size, audio_channe
 
     //DoDumpData(temp_buffer, bytes, CC_DUMP_SRC_TYPE_INPUT_PARSE);
 
-    pos_sync_word = seek_61937_sync_word((char*)temp_buffer, bytes);
+    pos_sync_word = find_61937_sync_word((char*)temp_buffer, bytes);
 
     if (pos_sync_word >= 0) {
         tmp_pc = (uint32_t*)(temp_buffer + pos_sync_word + 4);
@@ -824,7 +824,7 @@ static void* audio_type_parse_threadloop(void *data)
                 if (audio_type_status->audio_type != LPCM && audio_type_status->cur_audio_type == LPCM) {
                     enable_HW_resample(audio_type_status->mixer_handle, cur_samplerate);
                 } else if (audio_type_status->audio_type == LPCM && audio_type_status->cur_audio_type != LPCM){
-                    ALOGV("Raw data found: type(%d)\n", audio_type_status->cur_audio_type);
+                    ALOGI("Raw data found: type(%d)\n", audio_type_status->cur_audio_type);
                     enable_HW_resample(audio_type_status->mixer_handle, HW_RESAMPLE_DISABLE);
                 }
 

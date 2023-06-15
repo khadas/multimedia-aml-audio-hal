@@ -9208,6 +9208,19 @@ void *audio_patch_input_threadloop(void *data)
                     memset(patch->in_buf, 0, bytes_avail);
                 }
             }
+            cur_aformat = audio_parse_get_audio_type (patch->audio_parse_para);
+            if (cur_aformat != AUDIO_FORMAT_PCM_16_BIT) {
+                audio_raw_data_continuous_check(aml_dev, patch->audio_parse_para, patch->in_buf, read_bytes);
+            }
+
+            if (patch->start_mute) {
+                int flag = Stop_watch(patch->start_ts, patch->mdelay);
+                if (!flag) {
+                    patch->start_mute = false;
+                } else {
+                    memset(patch->in_buf, 0, read_bytes);
+                }
+            }
 
             if (getprop_bool("vendor.media.audiohal.indump")) {
                 aml_audio_dump_audio_bitstreams("/data/audio/alsa_in_read.raw",
@@ -9442,6 +9455,81 @@ void *audio_patch_output_threadloop(void *data)
     return (void *)0;
 }
 
+void *audio_patch_signal_detect_threadloop(void *data)
+{
+    struct aml_audio_patch *patch = (struct aml_audio_patch *)data;
+    struct audio_hw_device *dev = patch->dev;
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *) dev;
+    bool cur_hw_stable = false;
+    bool last_hw_stable = false;
+    int cur_type = 0;
+    int lat_type = 0;
+    int cur_sr = -1;
+    int last_sr = -1;
+    int cur_channel = -1;
+    int last_channel = -1;
+    audio_format_t cur_aformat = AUDIO_FORMAT_INVALID;
+    audio_format_t last_aformat = AUDIO_FORMAT_INVALID;
+    bool cur_raw_data_change = false;
+    bool last_raw_data_change = false;
+    struct timespec mute_start_ts;
+    int mute_mdelay = 120;
+    bool mute_flag = false;
+    bool in_mute = false;
+
+
+    ALOGD("%s: in", __func__);
+    prctl(PR_SET_NAME, (unsigned long)"audio_signal_detect");
+    aml_set_thread_priority("audio_signal_detect", patch->audio_signal_detect_threadID);
+
+    while (!patch->signal_detect_thread_exit) {
+        cur_hw_stable = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_HDMI_IN_AUDIO_STABLE);
+        cur_type = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_HDMIIN_AUDIO_TYPE);
+        cur_sr = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_HDMI_IN_SAMPLERATE);
+        cur_channel = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_HDMI_IN_CHANNELS);
+        cur_aformat = audio_parse_get_audio_type (patch->audio_parse_para);
+        cur_raw_data_change = patch->start_mute;
+
+        if ((!cur_hw_stable && cur_hw_stable != last_hw_stable) || (cur_type != lat_type)
+             || (cur_sr != last_sr) || (cur_channel != last_channel)
+             || (cur_raw_data_change && cur_raw_data_change  != last_raw_data_change)
+             || ((cur_aformat != last_aformat) && (cur_aformat == AUDIO_FORMAT_DTS || cur_aformat == AUDIO_FORMAT_DTS_HD) )) {// resolve dts resume pop noise
+            ALOGI("[%s:%d] hw_stable(%d)(%d) sr(%d)(%d) channel(%d)(%d) aformat(%d)(%d) raw_data_change(%d)(%d) type(%d)(%d)", __FUNCTION__, __LINE__,
+                cur_hw_stable, last_hw_stable, cur_sr, last_sr, cur_channel, last_channel, cur_aformat, last_aformat, cur_raw_data_change,
+                last_raw_data_change, cur_type, lat_type);
+            audiohal_send_msg_2_ms12(&aml_dev->ms12, MS12_MESG_TYPE_FLUSH);
+
+            set_aed_master_volume_mute(&aml_dev->alsa_mixer, true);
+            //set_dac_digital_volume_mute(&aml_dev->alsa_mixer, true);//TBD
+            clock_gettime(CLOCK_MONOTONIC, &mute_start_ts);
+            mute_flag = true;
+            ALOGD("%s: mute", __func__); /*Complete mute*/
+        }
+
+        if (mute_flag) {
+            in_mute = Stop_watch(mute_start_ts, mute_mdelay);
+            if (!in_mute) {
+                set_aed_master_volume_mute(&aml_dev->alsa_mixer, false);
+                //set_dac_digital_volume_mute(&aml_dev->alsa_mixer, false);//TBD
+                ALOGD("%s: unmute", __func__);
+                mute_flag = false;
+            }
+        }
+
+        lat_type = cur_type;
+        last_hw_stable = cur_hw_stable;
+        last_sr = cur_sr;
+        last_channel = cur_channel;
+        last_aformat = cur_aformat;
+        last_raw_data_change = cur_raw_data_change;
+        aml_audio_sleep(5*1000);
+    }
+
+    set_aed_master_volume_mute(&aml_dev->alsa_mixer, false);
+    //set_dac_digital_volume_mute(&aml_dev->alsa_mixer, false);//TBD
+    ALOGD("%s: exit and unmute", __func__);
+}
+
 static int create_patch_l(struct audio_hw_device *dev,
                         audio_devices_t input,
                         audio_devices_t output __unused)
@@ -9525,10 +9613,22 @@ static int create_patch_l(struct audio_hw_device *dev,
         }
     }
 
+    if (IS_DIGITAL_IN_HW(patch->input_src)) {
+        ret = pthread_create(&patch->audio_signal_detect_threadID, NULL,
+                            &audio_patch_signal_detect_threadloop, patch);
+        if (ret != 0) {
+            ALOGE("%s: Create signal detect thread failed", __func__);
+            goto err_signal_detect_thread;
+        }
+    }
+
     aml_dev->audio_patch = patch;
     ALOGD("%s: exit", __func__);
 
     return 0;
+err_signal_detect_thread:
+    patch->signal_detect_thread_exit = 1;
+    pthread_join(patch->audio_parse_threadID, NULL);
 err_parse_thread:
     patch->output_thread_exit = 1;
     pthread_join(patch->audio_output_threadID, NULL);
@@ -9576,6 +9676,11 @@ int release_patch_l(struct aml_audio_device *aml_dev)
     pthread_join(patch->audio_output_threadID, NULL);
     if (IS_DIGITAL_IN_HW(patch->input_src))
         exit_pthread_for_audio_type_parse(patch->audio_parse_threadID,&patch->audio_parse_para);
+
+    if (IS_DIGITAL_IN_HW(patch->input_src)) {
+        patch->signal_detect_thread_exit = 1;
+        pthread_join(patch->audio_signal_detect_threadID, NULL);
+    }
     patch->input_thread_exit = 1;
     pthread_join(patch->audio_input_threadID, NULL);
     ring_buffer_release(&patch->aml_ringbuffer);

@@ -162,4 +162,6 @@ int audio_parse_get_audio_samplerate(audio_type_parse_t *status);
 
 int eArcIn_audio_format_detection(struct aml_mixer_handle *mixer_handle);
 
+int find_61937_sync_word(char *buffer, int size);
+
 #endif

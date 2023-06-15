@@ -46,7 +46,7 @@
 #define FMT_UPDATE_THRESHOLD_MAX    (10)
 #define DOLBY_FMT_UPDATE_THRESHOLD  (5)
 #define DTS_FMT_UPDATE_THRESHOLD    (1)
-
+#define AED_DEFAULT_VOLUME          (831)
 
 static audio_format_t ms12_max_support_output_format() {
 #if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
@@ -55,6 +55,8 @@ static audio_format_t ms12_max_support_output_format() {
     return AUDIO_FORMAT_E_AC3;
 #endif
 }
+
+static pthread_mutex_t g_volume_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
 /*
@@ -1356,6 +1358,52 @@ int audio_route_set_spdif_mute(struct aml_mixer_handle *mixer_handle, int enable
     }
 }
 
+//check no-pcm to pcm change,such as non pcm file pause, no pcm file stop play in HDMI source
+void audio_raw_data_continuous_check(struct aml_audio_device *aml_dev, audio_type_parse_t *status, char *buffer, int size)
+{
+    audio_type_parse_t *audio_type_status = status;
+    struct aml_audio_patch* patch = aml_dev->audio_patch;
+    if (status == NULL) {
+        ALOGE("[%s:%d] status is NULL", __FUNCTION__, __LINE__);
+        return;
+    }
+
+    int sync_word_offset = find_61937_sync_word(buffer, size);
+    if (sync_word_offset >= 0) {
+        patch->sync_offset = sync_word_offset;
+        if (patch->start_mute) {
+            patch->start_mute = false;
+            patch->mdelay = 0;
+        }
+        if (patch->read_size > 0) {
+            patch->read_size = 0;
+        }
+        if (!patch->read_size) {
+            patch->read_size = size;
+            patch->read_size -= sync_word_offset;
+        }
+    } else if (patch->sync_offset >= 0) {
+        if ((patch->read_size < audio_type_status->package_size) && ((patch->read_size + size) > audio_type_status->package_size)) {
+            ALOGI("[%s:%d] find pcm data, read_size(%d) size(%d) package_size(%d)(%d)", __FUNCTION__, __LINE__,
+                patch->read_size, size, audio_type_status->package_size, patch->read_size + size);
+            clock_gettime(CLOCK_MONOTONIC, &patch->start_ts);
+            patch->start_mute = true;
+            patch->read_size = 0;
+            patch->mdelay = 900;
+        } else {
+            if (patch->start_mute) {
+                int flag = Stop_watch(patch->start_ts, patch->mdelay);
+                if (!flag) {
+                    patch->sync_offset = -1;
+                    patch->start_mute = false;
+                }
+            } else {
+                patch->read_size += size;
+            }
+        }
+    }
+}
+
 int reconfig_read_param_through_hdmiin(struct aml_audio_device *aml_dev,
                                        struct aml_stream_in *stream_in,
                                        ring_buffer_t *ringbuffer, int buffer_size)
@@ -1588,5 +1636,29 @@ int aml_audio_earc_get_latency(struct aml_audio_device *adev)
 
     latency = aml_mixer_ctrl_get_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_LATENCY);
     return latency;
+}
+
+void set_aed_master_volume_mute(struct aml_mixer_handle *mixer_handle, bool mute)
+{
+    static bool last_mute_state = false;
+    static int aed_master_volume = AED_DEFAULT_VOLUME;    // volume range: 0 ~ 1023
+
+    pthread_mutex_lock(&g_volume_lock);
+    if ((mixer_handle == NULL) || (last_mute_state == mute)) {
+        pthread_mutex_unlock(&g_volume_lock);
+        return;
+    }
+    ALOGI("[%s:%d] AED Matser Volume %smute, aed_master_volume is %d", __func__, __LINE__, mute?" ":"un", aed_master_volume);
+    if (mute) {
+        aed_master_volume = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_EQ_MASTER_VOLUME);
+        aml_mixer_ctrl_set_int(mixer_handle, AML_MIXER_ID_EQ_MASTER_VOLUME, 0);
+    } else {
+        if (aed_master_volume == 0) {
+            aed_master_volume = AED_DEFAULT_VOLUME;
+        }
+        aml_mixer_ctrl_set_int(mixer_handle, AML_MIXER_ID_EQ_MASTER_VOLUME, aed_master_volume);
+    }
+    last_mute_state = mute;
+    pthread_mutex_unlock(&g_volume_lock);
 }
 

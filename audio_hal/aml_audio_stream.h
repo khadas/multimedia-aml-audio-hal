@@ -263,6 +263,7 @@ struct aml_audio_patch {
     pthread_t audio_input_threadID;
     pthread_t audio_cmd_process_threadID;
     pthread_t audio_output_threadID;
+    pthread_t audio_signal_detect_threadID;
     pthread_t audio_parse_threadID;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
@@ -279,6 +280,7 @@ struct aml_audio_patch {
     int cmd_process_thread_exit;
     int input_thread_exit;
     int output_thread_exit;
+    int signal_detect_thread_exit;
     void *audio_parse_para;
     audio_devices_t input_src;
     audio_format_t  aformat;
@@ -409,6 +411,11 @@ struct aml_audio_patch {
     struct package *cur_package;
     bool skip_amadec_flag;
     struct aml_stream_out * dtv_aml_out;
+    int sync_offset;
+    int read_size;
+    struct timespec start_ts;
+    int mdelay;
+    bool start_mute;
 };
 
 stream_usecase_t convert_usecase_mask_to_stream_usecase(usecase_mask_t mask);
