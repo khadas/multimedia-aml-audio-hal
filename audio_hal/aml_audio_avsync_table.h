@@ -49,7 +49,7 @@
  *The result is about +9ms.
  */
 #define  AVSYNC_MS12_TUNNEL_DDP_LATENCY                  (40)
-#define  AVSYNC_MS12_TUNNEL_ATMOS_LATENCY                (20)
+#define  AVSYNC_MS12_TUNNEL_ATMOS_LATENCY                (0)
 
 #define  AVSYNC_MS12_NONTUNNEL_AC4_LATENCY               (70)
 #define  AVSYNC_MS12_TUNNEL_AC4_LATENCY                  (50)
@@ -64,8 +64,11 @@
 
 #define  AVSYNC_MS12_HDMI_ARC_OUT_PCM_LATENCY            (0)
 #define  AVSYNC_MS12_HDMI_ARC_OUT_DD_LATENCY             (0)
-#define  AVSYNC_MS12_HDMI_ARC_OUT_DDP_LATENCY            (120)
-#define  AVSYNC_MS12_HDMI_OUT_LATENCY                    (10)
+#define  AVSYNC_MS12_HDMI_ARC_OUT_DDP_LATENCY            (50)
+#define  AVSYNC_MS12_HDMI_OUT_PCM_LATENCY                (-20)
+#define  AVSYNC_MS12_HDMI_OUT_DD_LATENCY                 (0)
+#define  AVSYNC_MS12_HDMI_OUT_DDP_LATENCY                (0)
+#define  AVSYNC_MS12_HDMI_OUT_MAT_LATENCY                (-45)
 #define  AVSYNC_MS12_HDMI_SPEAKER_LATENCY                (0)
 
 #define  AVSYNC_MS12_NONTUNNEL_PCM_LATENCY_PROPERTY      "vendor.media.audio.hal.ms12.nontunnel.pcm"
@@ -87,6 +90,15 @@
 #define  AVSYNC_MS12_DDP_OUT_LATENCY_PROPERTY            "vendor.media.audio.hal.ms12.ddpout"
 #define  AVSYNC_MS12_DD_OUT_LATENCY_PROPERTY             "vendor.media.audio.hal.ms12.ddout"
 #define  AVSYNC_MS12_MAT_OUT_LATENCY_PROPERTY            "vendor.media.audio.hal.ms12.matout"
+
+#define  AVSYNC_MS12_HDMI_ARC_OUT_PCM_LATENCY_PROPERTY   "vendor.media.audio.hal.ms12.arc.pcm"
+#define  AVSYNC_MS12_HDMI_ARC_OUT_DD_LATENCY_PROPERTY    "vendor.media.audio.hal.ms12.arc.dd"
+#define  AVSYNC_MS12_HDMI_ARC_OUT_DDP_LATENCY_PROPERTY   "vendor.media.audio.hal.ms12.arc.ddp"
+#define  AVSYNC_MS12_HDMI_OUT_PCM_LATENCY_PROPERTY       "vendor.media.audio.hal.ms12.hdmi.pcm"
+#define  AVSYNC_MS12_HDMI_OUT_DD_LATENCY_PROPERTY        "vendor.media.audio.hal.ms12.hdmi.dd"
+#define  AVSYNC_MS12_HDMI_OUT_DDP_LATENCY_PROPERTY       "vendor.media.audio.hal.ms12.hdmi.ddp"
+#define  AVSYNC_MS12_HDMI_OUT_MAT_LATENCY_PROPERTY       "vendor.media.audio.hal.ms12.hdmi.mat"
+#define  AVSYNC_MS12_HDMI_SPEAKER_LATENCY_PROPERTY       "vendor.media.audio.hal.ms12.speaker"
 
 /* MS12 and Dolby Vision tunning part*/
 

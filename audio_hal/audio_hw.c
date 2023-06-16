@@ -4260,6 +4260,10 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
 
         /* update the DUT's EDID */
         update_edid_after_edited_audio_sad(adev, &adev->hdmi_descs.ddp_fmt);
+        if (adev->ms12_out && continous_mode(adev)) {
+            ALOGD("%s() active stream is ms12_out %p\n", __FUNCTION__, adev->ms12_out);
+            get_sink_format((struct audio_stream_out *)adev->ms12_out);
+        }
 
         //sysfs_set_sysfs_str(REPORT_DECODED_INFO, kvpairs);
         if ((eDolbyMS12Lib == adev->dolby_lib_type) && (adev->out_device & AUDIO_DEVICE_OUT_ALL_A2DP))
@@ -7401,6 +7405,29 @@ audio_format_t get_non_ms12_output_format(audio_format_t src_format, struct aml_
     return output_format;
 }
 
+static bool is_need_clean_up_ms12(struct audio_stream_out *stream, bool reset_decoder)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
+    struct aml_audio_device *adev = aml_out->dev;
+    struct dolby_ms12_desc *ms12 = &(adev->ms12);
+    bool is_compatible = false;
+
+    if (continous_mode(adev) && ms12->dolby_ms12_enable) {
+        is_compatible = is_ms12_output_compatible(stream, adev->sink_format, adev->optical_format);
+    }
+
+    if (is_compatible) {
+        reset_decoder = false;
+    }
+    ALOGI("[%s:%d] continous_mode(adev) %d, dolby_ms12_enable %d, is_compatible %d, reset_decoder %d",
+    __func__, __LINE__, continous_mode(adev), ms12->dolby_ms12_enable, is_compatible, reset_decoder);
+    if ((!is_bypass_dolbyms12(stream) && (reset_decoder == true)) || is_support_ms12_reset(stream)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 void config_output(struct audio_stream_out *stream, bool reset_decoder)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
@@ -7459,18 +7486,8 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
             }
 
         }
-        is_compatible = false;
-        reset_decoder = reset_decoder_stored;
-        ALOGI("continous_mode(adev) %d ms12->dolby_ms12_enable %d",continous_mode(adev), ms12->dolby_ms12_enable);
-        if (continous_mode(adev) && ms12->dolby_ms12_enable) {
-            is_compatible = is_ms12_output_compatible(stream, adev->sink_format, adev->optical_format);
-        }
 
-        if (is_compatible) {
-            reset_decoder = false;
-        }
-
-        if (!is_bypass_dolbyms12(stream) && (reset_decoder == true)) {
+        if (is_need_clean_up_ms12(stream, reset_decoder_stored)) {
             pthread_mutex_lock(&adev->lock);
             get_dolby_ms12_cleanup(&adev->ms12, false);
             adev->ms12_out = NULL;
@@ -7815,6 +7832,13 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, const void *buf
             ALOGI("%s aml_audio_hwsync_reset_apts ", __func__);
             aml_audio_hwsync_reset_apts(aml_out->hwsync);
             aml_audio_mediasync_util_init();
+        }
+    }
+
+    if (need_reconfig_output) {
+        /* Reset pts table and the payload offset ##SWPL-107272 */
+        if (is_need_clean_up_ms12(stream, need_reset_decoder)) {
+            aml_audio_hwsync_reset_apts(aml_out->hwsync);
         }
     }
 

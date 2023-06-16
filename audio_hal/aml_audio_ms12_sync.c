@@ -303,26 +303,54 @@ static int get_ms12_netflix_output_latency(audio_format_t output_format) {
 
 int get_ms12_port_latency( enum OUT_PORT port, audio_format_t output_format)
 {
+    char buf[PROPERTY_VALUE_MAX];
+    int ret = -1;
     int latency_ms = 0;
+    char *prop_name = NULL;
     switch (port)  {
         case OUTPORT_HDMI_ARC:
-            if (output_format == AUDIO_FORMAT_AC3)
+            if (output_format == AUDIO_FORMAT_AC3) {
                 latency_ms = AVSYNC_MS12_HDMI_ARC_OUT_DD_LATENCY;
-            else if (output_format == AUDIO_FORMAT_E_AC3)
+                prop_name = AVSYNC_MS12_HDMI_ARC_OUT_DD_LATENCY_PROPERTY;
+            } else if (output_format == AUDIO_FORMAT_E_AC3) {
                 latency_ms = AVSYNC_MS12_HDMI_ARC_OUT_DDP_LATENCY;
-            else
+                prop_name = AVSYNC_MS12_HDMI_ARC_OUT_DDP_LATENCY_PROPERTY;
+            } else {
                 latency_ms = AVSYNC_MS12_HDMI_ARC_OUT_PCM_LATENCY;
+                prop_name = AVSYNC_MS12_HDMI_ARC_OUT_PCM_LATENCY_PROPERTY;
+            }
             break;
         case OUTPORT_HDMI:
-            latency_ms = AVSYNC_MS12_HDMI_OUT_LATENCY;
+            if (output_format == AUDIO_FORMAT_AC3) {
+                latency_ms = AVSYNC_MS12_HDMI_OUT_DD_LATENCY;
+                prop_name = AVSYNC_MS12_HDMI_OUT_DD_LATENCY_PROPERTY;
+            } else if (output_format == AUDIO_FORMAT_E_AC3) {
+                latency_ms = AVSYNC_MS12_HDMI_OUT_DDP_LATENCY;
+                prop_name = AVSYNC_MS12_HDMI_OUT_DDP_LATENCY_PROPERTY;
+            } else if (output_format == AUDIO_FORMAT_MAT) {
+                latency_ms = AVSYNC_MS12_HDMI_OUT_MAT_LATENCY;
+                prop_name = AVSYNC_MS12_HDMI_OUT_MAT_LATENCY_PROPERTY;
+            } else {
+                latency_ms = AVSYNC_MS12_HDMI_OUT_PCM_LATENCY;
+                prop_name = AVSYNC_MS12_HDMI_OUT_PCM_LATENCY_PROPERTY;
+            }
             break;
         case OUTPORT_SPEAKER:
         case OUTPORT_AUX_LINE:
             latency_ms = AVSYNC_MS12_HDMI_SPEAKER_LATENCY;
+            prop_name = AVSYNC_MS12_HDMI_SPEAKER_LATENCY_PROPERTY;
             break;
         default :
             break;
     }
+
+    if (prop_name) {
+        ret = property_get(prop_name, buf, NULL);
+        if (ret > 0) {
+            latency_ms = atoi(buf);
+        }
+    }
+    ALOGV("%s outport =%d output format =0x%x latency ms =%d", __func__, port, output_format, latency_ms);
     return latency_ms;
 }
 
@@ -485,7 +513,7 @@ uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream)
         return a2dp_out_get_latency(adev) * ms12_out->hal_rate / 1000;
     }
 #endif
-    whole_latency_frames = config->start_threshold;
+    whole_latency_frames = hal_out->config.period_size * hal_out->config.period_count;
     if (!ms12_out->pcm || !pcm_is_ready(ms12_out->pcm)) {
         return whole_latency_frames / mul;
     }
