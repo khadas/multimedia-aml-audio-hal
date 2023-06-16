@@ -101,17 +101,7 @@ ssize_t aml_audio_spdif_output(struct audio_stream_out *stream, void **spdifout_
         spdif_config.is_dtscd = data_info->is_dtscd;
         spdif_config.rate = data_info->data_sr;
 
-        /* SWPL-94444 (T5D):When playing a ddp file, there is 10s of silence,
-        because the devices are opened in wrong order.
-        Add a judgment to ensure c0d1 is opened before c0d4 and c0d5.
-        Open spdif device first, and then open tdm device, which will
-        cause a block for 10 seconds. */
-        if (aml_dev->pcm_handle[0]) {
-            ret = aml_audio_spdifout_open(spdifout_handle, &spdif_config);
-        } else {
-            ALOGI("[%s:%d] c0d1 is not opened", __func__, __LINE__);
-            return 0;
-        }
+        ret = aml_audio_spdifout_open(spdifout_handle, &spdif_config);
         if (ret != 0) {
             return -1;
         }
