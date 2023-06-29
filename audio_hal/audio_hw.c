@@ -1487,14 +1487,7 @@ static int out_set_volume_l (struct audio_stream_out *stream, float left, float 
          * main_volume (after first mixing between main1/main2/UI sound)
          * for main input, or adjust system and UI sound mixing gain
          */
-        if (is_dolby_format || is_ms12_pcm_volume_control) {
-            if (out->volume_l != out->volume_r) {
-                ALOGW("%s, left:%f right:%f NOT match", __FUNCTION__, left, right);
-            }
-            ALOGI("dolby_ms12_set_main_volume %f", out->volume_l);
-            out->ms12_vol_ctrl = true;
-            set_ms12_main_volume(&adev->ms12, out->volume_l);
-        } else if (out->is_normal_pcm) {
+        if (out->is_normal_pcm) {
             /* system sound */
             int gain = 2560.0f * log10((adev->master_mute) ? 0.0f : adev->master_volume);
             char parm[32] = "";
@@ -1506,7 +1499,7 @@ static int out_set_volume_l (struct audio_stream_out *stream, float left, float 
             if (gain < (-96 << 7)) {
                 gain = -96 << 7;
             }
-            sprintf(parm, "-sys_syss_mixgain %d,200,0", gain);
+            sprintf(parm, "-sys_syss_mixgain %d,32,0", gain);
             aml_ms12_update_runtime_params(&(adev->ms12), parm);
             ALOGI("Set syss mixgain %d", gain);
 #ifdef USE_APP_MIXING
@@ -1526,6 +1519,18 @@ static int out_set_volume_l (struct audio_stream_out *stream, float left, float 
             aml_ms12_update_runtime_params(&(adev->ms12), parm);
             ALOGI("Set apps mixgain %d", gain);
 #endif
+        } else /*if (is_dolby_format || is_ms12_pcm_volume_control || esmode)*/ {
+            if (out->volume_l != out->volume_r) {
+                ALOGW("%s, left:%f right:%f NOT match", __FUNCTION__, left, right);
+            }
+            ALOGI("dolby_ms12_set_main_volume %f", out->volume_l);
+            out->ms12_vol_ctrl = true;
+            if (out->volume_l <= FLOAT_ZERO) {
+                set_ms12_main_audio_mute(&adev->ms12, true, 32);
+            } else {
+                set_ms12_main_audio_mute(&adev->ms12, false, 32);
+                set_ms12_main_volume(&adev->ms12, out->volume_l);
+            }
         }
     }
 
@@ -5303,6 +5308,10 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         if (ret >= 0) {
             int gain, duration, shape;
             ALOGI("vol_ease: value= %s", value);
+            if (adev->master_volume < FLOAT_ZERO) {
+                ret = 0;
+                goto exit;
+            }
             if (sscanf(value, "%d,%d,%d", &gain, &duration, &shape) == 3) {
                 char cmd[128] = {0};
                 sprintf(cmd, "-main1_mixgain %d,%d,%d -main2_mixgain %d,%d,%d -ui_mixgain %d,%d,%d",

@@ -491,6 +491,25 @@ void set_ms12_main_volume(struct dolby_ms12_desc *ms12, float volume) {
     dolby_ms12_set_main_volume(volume);
 }
 
+void set_ms12_main_audio_mute(struct dolby_ms12_desc *ms12, bool b_mute, unsigned int duration)
+{
+    ALOGI("%s set ms12 main mute=%d", __func__, b_mute);
+    char parm[64] = "";
+    /*
+    -sys_prim_mixgain can be used to control the main input to system mixer
+    - target gain at end of ramp in dB (range: -96 * 128..0), the step is 1/128 db, so the range is (-96,0)
+    - duration of ramp in milliseconds (range: 0..60000)
+    - shape of the ramp (0: linear, 1: in cube, 2: out cube)
+    */
+    if (b_mute) {
+        sprintf(parm, "%s %d,%d,%d", "-sys_prim_mixgain", -96 * 128, duration, 0);
+    } else {
+        sprintf(parm, "%s %d,%d,%d", "-sys_prim_mixgain", 0, duration, 0);
+    }
+    if ((strlen(parm)) > 0 && ms12)
+        aml_ms12_update_runtime_params(ms12, parm);
+    ms12->is_muted = b_mute;
+}
 
 
 static inline alsa_device_t usecase_device_adapter_with_ms12(alsa_device_t usecase_device, audio_format_t output_format)
