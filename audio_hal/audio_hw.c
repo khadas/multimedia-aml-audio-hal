@@ -10419,6 +10419,8 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
 
     aml_audio_patches_dump(aml_dev, fd);
     audio_patch_dump(aml_dev, fd);
+    audio_hal_info_dump(aml_dev, fd);
+
 //#ifdef ENABLE_BT_A2DP
 #ifndef BUILD_LINUX
     a2dp_hal_dump(aml_dev, fd);

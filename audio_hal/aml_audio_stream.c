@@ -1001,6 +1001,16 @@ void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
         dprintf(fd, "[AML_HAL]      -dd: %d, ddp: %d, mat: %d\n",
                 dd_is_support, ddp_is_support, mat_is_support);
     }
+    if (AUDIO_DEVICE_IN_HDMI == pstPatch->input_src) {
+        int stable = aml_mixer_ctrl_get_int (&aml_dev->alsa_mixer, AML_MIXER_ID_HDMI_IN_AUDIO_STABLE);
+        int type = aml_mixer_ctrl_get_int(&aml_dev->alsa_mixer, AML_MIXER_ID_HDMIIN_AUDIO_TYPE);
+        int sr = aml_mixer_ctrl_get_int(&aml_dev->alsa_mixer, AML_MIXER_ID_HDMI_IN_SAMPLERATE);
+        int ch = aml_mixer_ctrl_get_int(&aml_dev->alsa_mixer, AML_MIXER_ID_HDMI_IN_CHANNELS);
+        int packet = aml_mixer_ctrl_get_int(&aml_dev->alsa_mixer, AML_MIXER_ID_HDMIIN_AUDIO_PACKET);
+        dprintf(fd, "[AML_HAL]      HDMIIN info in driver:");
+        dprintf(fd, "\n[AML_HAL]            audio stable: %d, type: %d, sr: %d, ch: %d, packet: %d\n",
+                    stable, type, sr, ch, packet);
+    }
     dprintf(fd, "-------------[AML_HAL] DTV patch [%p]---------------\n", pstPatch);
     dprintf(fd, "[AML_HAL] is_dtv_src:%d,dtvin_buffer_inited:%d\n",pstPatch->is_dtv_src,pstPatch->dtvin_buffer_inited);
     if (SRC_DTV == aml_dev->patch_src)
@@ -1176,6 +1186,16 @@ void get_audio_indicator(struct aml_audio_device *dev, char *temp_buf) {
     }
 
     ALOGI("%s(), [%s]", __func__, temp_buf);
+}
+
+void audio_hal_info_dump(struct aml_audio_device* aml_dev, int fd)
+{
+    dprintf(fd, "\n-------------[AML_HAL] audio hal info---------------------\n");
+    dprintf(fd, "[AML_HAL]      format: %#10x, atmos: %d, decoding: %d, update_type: %d, \n", aml_dev->audio_hal_info.format,
+        aml_dev->audio_hal_info.is_dolby_atmos, aml_dev->audio_hal_info.is_decoding, aml_dev->audio_hal_info.update_type);
+    dprintf(fd, "[AML_HAL]      ch_num: %#10d, sr: %d, lfepresent: %d, channel_mode: %d\n", aml_dev->audio_hal_info.channel_number,
+        aml_dev->audio_hal_info.sample_rate, aml_dev->audio_hal_info.lfepresent, aml_dev->audio_hal_info.channel_mode);
+
 }
 
 static int update_audio_hal_info(struct aml_audio_device *adev, audio_format_t format, int atmos_flag)

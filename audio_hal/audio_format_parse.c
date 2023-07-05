@@ -814,7 +814,12 @@ static void* audio_type_parse_threadloop(void *data)
             if (auge_chip || txlx_chip) {
                 // get audio format from hw.
                 if (audio_type_status->input_dev == AUDIO_DEVICE_IN_HDMI) {
-                    audio_type_status->cur_audio_type = hdmiin_audio_format_detection(audio_type_status->mixer_handle);
+                    int stable = aml_mixer_ctrl_get_int (audio_type_status->mixer_handle, AML_MIXER_ID_HDMI_IN_AUDIO_STABLE);
+                    if (stable) {
+                        audio_type_status->cur_audio_type = hdmiin_audio_format_detection(audio_type_status->mixer_handle);
+                    } else {
+                        ALOGV("%s, %d. hdmi audio stable(%d)!", __func__, __LINE__, stable);
+                    }
                 } else if (audio_type_status->input_dev == AUDIO_DEVICE_IN_SPDIF) {
                     audio_type_status->cur_audio_type = spdifin_audio_format_detection(audio_type_status->mixer_handle);
                 } else if (audio_type_status->input_dev == AUDIO_DEVICE_IN_HDMI_ARC) {
