@@ -2062,7 +2062,7 @@ static int out_add_audio_effect(const struct audio_stream *stream, effect_handle
         }
     }
 
-    dev->native_postprocess.postprocessors[dev->native_postprocess.num_postprocessors++] = effect;
+    dev->native_postprocess.postprocessors[dev->native_postprocess.num_postprocessors] = effect;
 
     effect_descriptor_t tmpdesc;
     (*effect)->get_descriptor(effect, &tmpdesc);
@@ -2072,7 +2072,7 @@ static int out_add_audio_effect(const struct audio_stream *stream, effect_handle
             (dev->native_postprocess.libvx_exist) ? "true" : "false");
         /* specify effect order for virtualx. VX does downmix from 5.1 to 2.0 */
         i = dev->native_postprocess.num_postprocessors;
-        if (dev->native_postprocess.num_postprocessors > 1) {
+        if (dev->native_postprocess.num_postprocessors >= 1) {
             effect_handle_t tmp;
             tmp = dev->native_postprocess.postprocessors[i];
             dev->native_postprocess.postprocessors[i] = dev->native_postprocess.postprocessors[0];
@@ -2080,8 +2080,7 @@ static int out_add_audio_effect(const struct audio_stream *stream, effect_handle
             ALOGI("%s, add audio effect: Reorder VirtualX at the first of the effect chain.", __FUNCTION__);
         }
     }
-    ALOGI("%s, add audio effect: %s in audio hal, effect_handle: %p, total num of effects: %d",
-        __FUNCTION__, tmpdesc.name, effect, dev->native_postprocess.num_postprocessors);
+    dev->native_postprocess.num_postprocessors++;
 
     ALOGI("%s, add audio effect: %s in audio hal, effect_handle: %p, total num of effects: %d",
         __FUNCTION__, tmpdesc.name, effect, dev->native_postprocess.num_postprocessors);

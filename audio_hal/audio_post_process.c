@@ -33,8 +33,8 @@ static int check_dts_config(struct aml_native_postprocess *native_postprocess) {
 
     if (native_postprocess->effect_in_ch != cur_channels) {
 
-        ALOGD("%s, reconfig VX pre_channels = %d, cur_channels = %d, vx_force_stereo = %d",
-            __func__, native_postprocess->effect_in_ch,
+        ALOGD("%s, reconfig VX(%p) pre_channels = %d, cur_channels = %d, vx_force_stereo = %d",
+            __func__, native_postprocess->postprocessors[0], native_postprocess->effect_in_ch,
             cur_channels, native_postprocess->vx_force_stereo);
 
         VirtualX_reset(native_postprocess);
@@ -102,7 +102,7 @@ int audio_VX_post_process(struct aml_native_postprocess *native_postprocess, int
         in_buf.s16 = out_buf.s16 = in_buffer;
         ret = (*effect)->process(effect, &in_buf, &out_buf);
         if (ret < 0) {
-            ALOGE("postprocess failed\n");
+            ALOGE("[%s:%d]vx(%p) postprocess failed, ret %d\n", __func__, __LINE__, effect, ret);
         } else {
             ret = bytes/3;
         }
@@ -150,7 +150,7 @@ void VirtualX_Channel_reconfig(struct aml_native_postprocess *native_postprocess
                                     DTS_PARAM_CHANNEL_NUM,
                                     ch_num, EFFECT_CMD_SET_PARAM);
         if (ret != ch_num) {
-            ALOGE("Set VX input channel error: channel %d, ret = %d\n", ch_num, ret);
+            ALOGE("Set VX(%p) input channel error: channel %d, ret = %d\n", native_postprocess->postprocessors[0], ch_num, ret);
         }
     }
 
