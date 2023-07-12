@@ -513,7 +513,11 @@ uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream)
         return a2dp_out_get_latency(adev) * ms12_out->hal_rate / 1000;
     }
 #endif
-    whole_latency_frames = hal_out->config.period_size * hal_out->config.period_count;
+    if (adev->optical_format == AUDIO_FORMAT_PCM_16_BIT) {
+        whole_latency_frames = config->start_threshold;
+    } else {
+        whole_latency_frames = hal_out->config.period_size * hal_out->config.period_count;
+    }
     if (!ms12_out->pcm || !pcm_is_ready(ms12_out->pcm)) {
         return whole_latency_frames / mul;
     }

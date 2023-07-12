@@ -11046,6 +11046,11 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     if (0 != aml_audio_config_parser()) {
         ALOGE("%s() Audio Config file parsing error\n",__FUNCTION__);
     }
+    if (0 != aml_audio_avsync_parser()) {
+        ALOGE("%s() Audio Config file parsing error\n",__FUNCTION__);
+    } else {
+        audio_hal_avsync_latency_loading();
+    }
 
     /* init speaker tuning buffers */
     ret = ring_buffer_init(&(adev->spk_tuning_rbuf), spk_tuning_buf_size);

@@ -23,10 +23,14 @@
 #include <string.h>
 #include <hardware/audio.h>
 #include "aml_config_data.h"
+#define PROPERTY_VALUE_MAX  256
 
 
 #define AML_AUDIO_CONFIG_FILE_PATH "/etc/halaudio/aml_audio_config.json"
+#define AML_AUDIO_AVSYNC_FILE_PATH "/etc/halaudio/audio_hal_delay_base.json"
 cJSON *audio_config_jason = NULL;
+cJSON *audio_avsync_jason = NULL;
+
 
 int aml_audio_config_parser()
 {
@@ -36,6 +40,63 @@ int aml_audio_config_parser()
     } else {
         return -1;
     }
+}
+
+int aml_audio_avsync_parser()
+{
+    audio_avsync_jason = aml_config_parser(AML_AUDIO_AVSYNC_FILE_PATH);
+    if (audio_avsync_jason) {
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
+static unsigned int replacechar(char *dst,const char *src)
+{
+    unsigned int len = 0;
+
+    if (strlen(src) > PROPERTY_VALUE_MAX-1)
+        return len;
+
+    while (len < strlen(src)) {
+        if (src[len] == '.')
+            dst[len] = '_';
+        else
+            dst[len] = src[len];
+        len++;
+    }
+    dst[len] = '\0';
+    return len;
+}
+
+int audio_hal_avsync_latency_loading()
+{
+    if (!audio_avsync_jason) {
+        ALOGE("Error before: [%s]\n", cJSON_GetErrorPtr());
+    } else {
+        cJSON* child = audio_avsync_jason->child;
+        char var[PROPERTY_VALUE_MAX] = {0};
+        char val[PROPERTY_VALUE_MAX] = {0};
+        while (child) {
+            if (0 != strncmp(child->string,"__comment",strlen(child->string))) {
+                ALOGV("%s: %d\n", child->string, child->valueint);
+
+                replacechar(var,child->string);
+                //itoa(child->valueint,val,10);
+                sprintf(val, "%d", child->valueint);
+
+                if ((setenv(var, val, 1)) == 0) {
+                    ALOGI("setenv %s=%s success", var, val);
+                } else {
+                    ALOGE("setenv %s=%s failed", var, val);
+                }
+            }
+            child = child->next;
+        }
+        cJSON_Delete(audio_avsync_jason);
+    }
+    return 0;
 }
 
 int aml_get_jason_int_value(char* key,int defvalue)

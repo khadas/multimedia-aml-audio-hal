@@ -22,6 +22,8 @@
 #include "aml_config_parser.h"
 
 int aml_audio_config_parser();
+int aml_audio_avsync_parser();
+int audio_hal_avsync_latency_loading();
 int aml_get_jason_int_value(char* key,int defvalue);
 bool aml_get_codec_support(char* aformat);
 
