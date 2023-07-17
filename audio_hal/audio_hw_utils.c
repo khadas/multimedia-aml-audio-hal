@@ -1622,12 +1622,14 @@ bool is_disable_ms12_continuous(struct audio_stream_out *stream) {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
 
-    if ((aml_out->hal_internal_format == AUDIO_FORMAT_DTS)
-        || (aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD)) {
-        /*dts case, we need disable ms12 continuous mode*/
-        return true;
-    } else if (is_high_rate_pcm(stream) || (is_multi_channel_pcm(stream) && !aml_out->is_normal_pcm && !adev->is_netflix)) {
+    if (is_high_rate_pcm(stream) ||
         /*high bit rate pcm case, we need disable ms12 continuous mode (except for netflix)*/
+        (is_multi_channel_pcm(stream) && !aml_out->is_normal_pcm && !adev->is_netflix) ||
+        (aml_out->hal_internal_format == AUDIO_FORMAT_DTS) ||
+        (aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD) ||
+        (aml_out->hal_internal_format == AUDIO_FORMAT_DOLBY_TRUEHD) ||
+        (aml_out->hal_internal_format == AUDIO_FORMAT_MAT) ||
+        (aml_out->hal_internal_format == AUDIO_FORMAT_IEC61937)) {
         return true;
     } else if (aml_out->hal_internal_format == AUDIO_FORMAT_AC3 \
                || aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3) {
@@ -1637,8 +1639,6 @@ bool is_disable_ms12_continuous(struct audio_stream_out *stream) {
         } else {
             return true;
         }
-    } else if (aml_out->hal_format == AUDIO_FORMAT_IEC61937) {
-        return true;
     }
     return false;
 }

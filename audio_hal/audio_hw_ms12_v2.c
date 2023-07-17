@@ -3393,14 +3393,14 @@ bool is_rebuild_the_ms12_pipeline(    audio_format_t main_input_fmt, audio_forma
     ALOGD("%s line %d main_input_fmt %#x hal_internal_format %#x\n",__func__, __LINE__, main_input_fmt, hal_internal_format);
 
     bool is_ac4_alive = (main_input_fmt == AUDIO_FORMAT_AC4);
-    bool is_mat_alive = (main_input_fmt == AUDIO_FORMAT_MAT);
+    bool is_mat_alive = (main_input_fmt == AUDIO_FORMAT_MAT) || (main_input_fmt == AUDIO_FORMAT_DOLBY_TRUEHD);
     bool is_ott_format_alive = (main_input_fmt == AUDIO_FORMAT_AC3) || \
                                 ((main_input_fmt & AUDIO_FORMAT_E_AC3) == AUDIO_FORMAT_E_AC3) || \
                                 (main_input_fmt == AUDIO_FORMAT_PCM_16_BIT);
     ALOGD("%s line %d is_ac4_alive %d is_mat_alive %d is_ott_format_alive %d\n",__func__, __LINE__, is_ac4_alive, is_mat_alive, is_ott_format_alive);
 
     bool request_ac4_alive = (hal_internal_format == AUDIO_FORMAT_AC4);
-    bool request_mat_alive = (hal_internal_format == AUDIO_FORMAT_MAT);
+    bool request_mat_alive = (hal_internal_format == AUDIO_FORMAT_MAT) || (hal_internal_format == AUDIO_FORMAT_DOLBY_TRUEHD);
     bool request_ott_format_alive = (hal_internal_format == AUDIO_FORMAT_AC3) || \
                                 ((hal_internal_format & AUDIO_FORMAT_E_AC3) == AUDIO_FORMAT_E_AC3) || \
                                 (hal_internal_format == AUDIO_FORMAT_PCM_16_BIT);

@@ -3827,6 +3827,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         ALOGI("restore ms12 continuous mode");
         pthread_mutex_lock(&adev->ms12.lock);
         adev->continuous_audio_mode = 1;
+        out->restore_continuous = false;
         pthread_mutex_unlock(&adev->ms12.lock);
     }
 
@@ -7524,8 +7525,12 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
                 adev->ms12_main1_dolby_dummy = main1_dummy;
                 adev->ms12_ott_enable = ott_input;
                 /*AC4 does not support -ui (OTT sound) */
-                dolby_ms12_set_ott_sound_input_enable(aformat != AUDIO_FORMAT_AC4);
-                dolby_ms12_set_dolby_main1_as_dummy_file(aformat != AUDIO_FORMAT_AC4);
+                dolby_ms12_set_ott_sound_input_enable(aformat != AUDIO_FORMAT_AC4 &&
+                                                      aformat != AUDIO_FORMAT_MAT &&
+                                                      aformat != AUDIO_FORMAT_DOLBY_TRUEHD);
+                dolby_ms12_set_dolby_main1_as_dummy_file((aformat != AUDIO_FORMAT_AC4) &&
+                                                         (aformat != AUDIO_FORMAT_MAT) &&
+                                                         (aformat != AUDIO_FORMAT_DOLBY_TRUEHD));
             }
             ring_buffer_reset(&adev->spk_tuning_rbuf);
             adev->ms12.is_continuous_paused = false;
@@ -8096,6 +8101,12 @@ hwsync_rewrite:
             aml_out->hal_internal_format = cur_aformat;
             aml_out->hal_channel_mask = audio_parse_get_audio_channel_mask (patch->audio_parse_para);
             ALOGI ("%s hal_channel_mask %#x\n", __FUNCTION__, aml_out->hal_channel_mask);
+
+            if (aml_out->restore_continuous == true) {
+                ALOGI("restore ms12 continuous mode");
+                adev->continuous_audio_mode = 1;
+                aml_out->restore_continuous = false;
+            }
             if (aml_out->hal_internal_format == AUDIO_FORMAT_DTS ||
                 aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD) {
                 /*when switch from ms12 to dts, we should clean ms12 first*/
@@ -8931,12 +8942,11 @@ ssize_t out_write_new(struct audio_stream_out *stream,
                     aml_out->restore_continuous = true;
                     clock_gettime(CLOCK_MONOTONIC, &adev->ms12_exiting_start);
                 }
-            }
-            else if (is_need_reset_ms12_continuous(stream)) {
-                    ALOGI("Need reset MS12 continuous as main audio changed\n");
-                    adev->doing_reinit_ms12 = true;
-                    get_dolby_ms12_cleanup(&adev->ms12, false);
-                    adev->ms12_out = NULL;
+            } else if (is_need_reset_ms12_continuous(stream)) {
+                ALOGI("Need reset MS12 continuous as main audio changed\n");
+                adev->doing_reinit_ms12 = true;
+                get_dolby_ms12_cleanup(&adev->ms12, false);
+                adev->ms12_out = NULL;
             } else if (is_support_ms12_reset(stream)) {
                 ALOGI("is_support_ms12_reset true\n");
                 adev->doing_reinit_ms12 = true;

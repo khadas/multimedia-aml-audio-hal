@@ -457,7 +457,10 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
             (*row_index)++;
             ALOGD("%s() main1 %s", __FUNCTION__, mDolbyMain1FileName);
         }
-        if (mOTTSoundInputEnable == true && mAudioStreamOutFormat != AUDIO_FORMAT_AC4) {
+        if (mOTTSoundInputEnable == true &&
+            mAudioStreamOutFormat != AUDIO_FORMAT_AC4 &&
+            mAudioStreamOutFormat != AUDIO_FORMAT_DOLBY_TRUEHD &&
+            mAudioStreamOutFormat != AUDIO_FORMAT_MAT) {
             sprintf(ConfigParams[*row_index], "%s", "-iui");
             setInputCMDMask("-iui");
             (*row_index)++;
