@@ -4077,6 +4077,7 @@ static void set_device_connect_state(struct aml_audio_device *adev, struct str_p
 #ifdef BUILD_LINUX
                 if ((device & AUDIO_DEVICE_OUT_HDMI) && adev->is_STB) {
                     aml_audio_set_speaker_mute(adev, "true");
+                    adev->active_outport = OUTPORT_HDMI;
                 }
 #endif
                 update_sink_format_after_hotplug(adev);
@@ -4111,6 +4112,7 @@ static void set_device_connect_state(struct aml_audio_device *adev, struct str_p
                 }
 #ifdef BUILD_LINUX
                 if ((device & AUDIO_DEVICE_OUT_HDMI) && adev->is_STB) {
+                    adev->active_outport = OUTPORT_SPEAKER;
                     aml_audio_set_speaker_mute(adev, "false");
                 }
 #endif
