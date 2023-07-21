@@ -176,7 +176,9 @@ public:
     virtual int     DolbyMS12GetMainUnderrun();
 
     virtual int     DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration);
+    virtual int DolbyMS12GetAC4ActivePresentation(int *presentation_group_index);
 
+    virtual int DolbyMS12AC4DecCheckThePgiIsPresent(int presentation_group_index);
 
     // protected:
 

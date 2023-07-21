@@ -52,6 +52,7 @@
 #include "aml_dump_debug.h"
 #include "aml_dtvsync.h"
 #include "audio_media_sync_util.h"
+#include "audio_hw_ms12_common.h"
 
 #define DOLBY_DRC_LINE_MODE 0
 #define DOLBY_DRC_RF_MODE   1
@@ -821,6 +822,24 @@ int get_the_dolby_ms12_prepared(
     } else {
         ms12->dual_decoder_support = 0;
         associate_audio_mixing_enable = 0;
+    }
+    //update the runtime parameters after ms12 initialization is completed.
+    if (input_format == AUDIO_FORMAT_AC4) {
+        media_presentation_id = demux_info->media_presentation_id;
+        set_ms12_ac4_presentation_group_index(ms12, media_presentation_id);
+        ALOGI("%s line %d\n",__func__, __LINE__);
+        if (patch && demux_info) {
+            char first_lang[4] = {0};
+            dtv_convert_language_to_string(demux_info->media_first_lang,first_lang);
+            set_ms12_ac4_1st_preferred_language_code(ms12, first_lang);
+            char second_lang[4] = {0};
+            dtv_convert_language_to_string(demux_info->media_second_lang,second_lang);
+            set_ms12_ac4_2nd_preferred_language_code(ms12, second_lang);
+
+            int prefer_selection_type = (patch->is_dtv_src) ? PERFER_SELECTION_BY_LANGUAGE : PERFER_SELECTION_BY_AD_TYPE;
+            ALOGI("%s line %d 1st %c %c %c 2nd %c %c %c pat %d\n",__func__, __LINE__, first_lang[0], first_lang[1], first_lang[2], second_lang[0], second_lang[1], second_lang[2], prefer_selection_type);
+            set_ms12_ac4_prefer_presentation_selection_by_associated_type_over_language(ms12, prefer_selection_type);
+        }
     }
     ALOGI("+%s() dual_decoder_support %d optical =0x%x sink =0x%x sink max channel =%d\n",
         __FUNCTION__, ms12->dual_decoder_support, ms12->optical_format, ms12->sink_format, sink_max_channels);

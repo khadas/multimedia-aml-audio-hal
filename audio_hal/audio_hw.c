@@ -5084,6 +5084,17 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_MEDIA_PRESENTATION_ID, val);
             goto exit;
         }
+        ret = str_parms_get_int(parms, "hal_param_dtv_media_first_lang", &val);
+        if (ret >= 0) {
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_MEDIA_FIRST_LANG, val);
+            goto exit;
+        }
+
+        ret = str_parms_get_int(parms, "hal_param_dtv_media_second_lang", &val);
+        if (ret >= 0) {
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_MEDIA_SECOND_LANG, val);
+            goto exit;
+        }
     }
 #endif
     /* dvb cmd deal with end */
@@ -5697,10 +5708,28 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         return strdup(temp_buf);
     }
 #ifdef USE_DTV
-     else if (strstr (keys, "hal_param_dtv_latencyms") ) {
+    else if (strstr (keys, "hal_param_dtv_demuxidbase") ) {
+        sprintf(temp_buf, "hal_param_dtv_demuxidbase=%d", dtv_get_demuxidbase());
+        ALOGD("temp_buf %s", temp_buf);
+        return strdup(temp_buf);
+    }
+    else if (strstr (keys, "hal_param_dtv_latencyms") ) {
         int latancyms = dtv_patch_get_latency(adev);
         sprintf(temp_buf, "hal_param_dtv_latencyms=%d", latancyms);
         ALOGD("temp_buf %s", temp_buf);
+        return strdup(temp_buf);
+    }
+    else if (strstr (keys, "ac4_active_pres_id")) {
+       int active_id_offset = -1;
+        if ((eDolbyMS12Lib == adev->dolby_lib_type) && (adev->ms12.input_config_format == AUDIO_FORMAT_AC4)) {
+            //should use the dolby_ms12_get_ac4_active_presentation() before or after get_dolby_ms12_cleanup()
+            pthread_mutex_lock(&adev->ms12.lock);
+            if (adev->ms12.dolby_ms12_enable && (0 == dolby_ms12_get_ac4_active_presentation(&active_id_offset))) {
+                ALOGI ("dolby_ms12_get_ac4_active_presentation index offset is %d\n", active_id_offset);
+            }
+            pthread_mutex_unlock(&adev->ms12.lock);
+        }
+        sprintf(temp_buf, "ac4_active_pres_id=%d", active_id_offset);
         return strdup(temp_buf);
     }
 #endif

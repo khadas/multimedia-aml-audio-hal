@@ -75,6 +75,7 @@
 #include "aml_dts_dec_api.h"
 #include "audio_dtv_utils.h"
 #include "audio_media_sync_util.h"
+#include "audio_hw_ms12_common.h"
 
 #define DTV_SKIPAMADEC "vendor.dtv.audio.skipamadec"
 #define DTV_SYNCENABLE "vendor.media.dtvsync.enable"
@@ -260,6 +261,26 @@ static int get_video_discontinue(void)
     return pcr_vdiscontinue;
 }
 
+void  clean_dtv_demux_info(aml_demux_audiopara_t *demux_info) {
+    demux_info->demux_id = -1;
+    demux_info->security_mem_level  = -1;
+    demux_info->output_mode  = -1;
+    demux_info->has_video  = 0;
+    demux_info->main_fmt  = -1;
+    demux_info->main_pid  = -1;
+    demux_info->ad_fmt  = -1;
+    demux_info->ad_pid  = -1;
+    demux_info->dual_decoder_support = 0;
+    //demux_info->advol_level = 0;
+    //demux_info->mixing_level = -32;
+    demux_info->associate_audio_mixing_enable  = 0;
+    demux_info->media_sync_id  = -1;
+    demux_info->media_presentation_id  = -1;
+    demux_info->media_first_lang  = -1;
+    demux_info->media_second_lang  = -1;
+    demux_info->ad_package_status  = -1;
+}
+
 int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
 
     struct aml_audio_device *adev = (struct aml_audio_device *) dev;
@@ -395,7 +416,29 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                 pthread_mutex_unlock(&ms12->lock);
             }
             break;
+        case AUDIO_DTV_PATCH_CMD_SET_MEDIA_FIRST_LANG:
+            demux_info->media_first_lang = val;
+            char first_lang[4] = {0};
+            dtv_convert_language_to_string(demux_info->media_first_lang,first_lang);
+            ALOGI("media_first_lang %s,%x,%d",first_lang,val,val);
+            if (eDolbyMS12Lib == adev->dolby_lib_type_last) {
+                pthread_mutex_lock(&ms12->lock);
+                set_ms12_ac4_1st_preferred_language_code(ms12, first_lang);
+                pthread_mutex_unlock(&ms12->lock);
+            }
+            break;
 
+        case AUDIO_DTV_PATCH_CMD_SET_MEDIA_SECOND_LANG:
+            demux_info->media_second_lang = val;
+            char second_lang[4] = {0};
+            dtv_convert_language_to_string(demux_info->media_second_lang,second_lang);
+            ALOGI("media_second_lang %s,%x,%d",second_lang,val,val);
+            if (eDolbyMS12Lib == adev->dolby_lib_type_last) {
+                pthread_mutex_lock(&ms12->lock);
+                set_ms12_ac4_2nd_preferred_language_code(ms12, second_lang);
+                pthread_mutex_unlock(&ms12->lock);
+            }
+            break;
         case AUDIO_DTV_PATCH_CMD_CONTROL:
             if (patch == NULL) {
                 ALOGI("%s()the audio patch is NULL \n", __func__);
@@ -524,6 +567,9 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                     }
                 }
                 memset(demux_info, 0, sizeof(aml_demux_audiopara_t));
+                demux_info->media_presentation_id  = -1;
+                demux_info->media_first_lang  = -1;
+                demux_info->media_second_lang  = -1;
             } else {
                 if (patch == NULL) {
                     ALOGI("%s()the audio patch is NULL \n", __func__);
@@ -623,6 +669,9 @@ int dtv_patch_get_latency(struct aml_audio_device *aml_dev)
     return latencyms;
 }
 
+int dtv_get_demuxidbase() {
+    return DVB_DEMUX_ID_BASE;
+}
 
 static int dtv_patch_audio_info(void *args,unsigned char ori_channum,unsigned char lfepresent)
 {
@@ -3838,12 +3887,6 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     int ret = 0;
     // ALOGI("++%s live period_size %d\n", __func__, period_size);
     //pthread_mutex_lock(&aml_dev->patch_lock);
-    {
-        aml_dtv_audio_instances_t *dtv_audio_instances = (aml_dtv_audio_instances_t *)aml_dev->aml_dtv_audio_instances;
-        for (int index = 0; index < DVB_DEMUX_SUPPORT_MAX_NUM; index ++) {
-            dtv_audio_instances->demux_handle[index] = 0;
-        }
-    }
     if (aml_dev->audio_patch) {
         ALOGD("%s: patch exists, first release it", __func__);
         if (aml_dev->audio_patch->is_dtv_src) {
@@ -3851,6 +3894,15 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
             //release_dtv_patch_l(aml_dev);
         } else {
             release_patch_l(aml_dev);
+        }
+    }
+    {
+        aml_dtv_audio_instances_t *dtv_audio_instances = (aml_dtv_audio_instances_t *)aml_dev->aml_dtv_audio_instances;
+        for (int index = 0; index < DVB_DEMUX_SUPPORT_MAX_NUM; index ++) {
+            dtv_audio_instances->demux_handle[index] = 0;
+            dtv_audio_instances->demux_info[index].media_presentation_id = -1;
+            dtv_audio_instances->demux_info[index].media_first_lang = -1;
+            dtv_audio_instances->demux_info[index].media_second_lang = -1;
         }
     }
     patch = aml_audio_calloc(1, sizeof(*patch));
