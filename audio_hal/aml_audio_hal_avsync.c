@@ -1708,7 +1708,8 @@ static int dtv_get_ms12_port_latency(struct audio_stream_out *stream, enum OUT_P
                 latency_ms = DTV_AVSYNC_MS12_TV_SPEAKER_LATENCY;
                 prop_name = DTV_AVSYNC_MS12_TV_SPEAKER_LATENCY_PROPERTY;
             } else {
-                latency_ms = 0;
+                latency_ms = DTV_AVSYNC_MS12_STB_SPEAKER_LATENCY;
+                prop_name = DTV_AVSYNC_MS12_STB_SPEAKER_LATENCY_PROPERTY;
             }
             break;
         }

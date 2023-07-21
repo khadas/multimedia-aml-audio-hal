@@ -133,7 +133,9 @@
 #define  DTV_AVSYNC_MS12_AAC_LATENCY_PROPERTY         "vendor.media.audio.hal.ms12.dtv.aac"
 //port speaker
 #define  DTV_AVSYNC_MS12_TV_SPEAKER_LATENCY                  (0)
+#define  DTV_AVSYNC_MS12_STB_SPEAKER_LATENCY                 (-55)
 #define  DTV_AVSYNC_MS12_TV_SPEAKER_LATENCY_PROPERTY                  "vendor.media.audio.hal.ms12.tv.dtv.speaker"
+#define  DTV_AVSYNC_MS12_STB_SPEAKER_LATENCY_PROPERTY                 "vendor.media.audio.hal.ms12.stb.dtv.speaker"
 //port A2DP
 #define  DTV_AVSYNC_MS12_TV_MIX_A2DP_LATENCY                  (200)
 #define  DTV_AVSYNC_MS12_TV_MIX_A2DP_LATENCY_PROPERTY                 "vendor.media.audio.hal.ms12.tv.dtv.mix.a2dp"
