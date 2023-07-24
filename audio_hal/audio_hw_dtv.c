@@ -374,6 +374,16 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                 set_ms12_ad_mixing_level(ms12, adev->mixing_level);
                 pthread_mutex_unlock(&ms12->lock);
             }
+            if (eDolbyDcvLib == adev->dolby_lib_type) {
+                if (val > 0) {
+                    adev->associate_audio_mixing_enable = 1;
+                    demux_info->associate_audio_mixing_enable = adev->associate_audio_mixing_enable;
+                }
+                else {
+                    adev->associate_audio_mixing_enable = 0;
+                    demux_info->associate_audio_mixing_enable = adev->associate_audio_mixing_enable;
+                }
+            }
             pthread_mutex_unlock(&adev->lock);
             break;
         case AUDIO_DTV_PATCH_CMD_SET_MEDIA_PRESENTATION_ID:
