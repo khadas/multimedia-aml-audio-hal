@@ -1709,6 +1709,9 @@ int android_dev_convert_to_hal_dev(audio_devices_t android_dev, int *hal_dev_por
     case AUDIO_DEVICE_IN_TV_TUNER:
         *hal_dev_port = INPORT_TUNER;
         break;
+    case AUDIO_DEVICE_IN_FM_TUNER:
+        *hal_dev_port = INPORT_ATV;
+        break;
     case AUDIO_DEVICE_IN_SPDIF:
         *hal_dev_port = INPORT_SPDIF;
         break;
@@ -1725,6 +1728,9 @@ int android_dev_convert_to_hal_dev(audio_devices_t android_dev, int *hal_dev_por
         break;
     case AUDIO_DEVICE_IN_ECHO_REFERENCE:
         *hal_dev_port = INPORT_ECHO_REFERENCE;
+        break;
+    case AUDIO_DEVICE_IN_MEDIA:
+        *hal_dev_port = INPORT_MEDIA;
         break;
 /*
     case AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET:

@@ -3452,6 +3452,24 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
             out->volume_r_org = out->volume_l_org;
         }
     }
+    if (adev->is_TV) {
+        if (address && !strncmp(address, "AML_", 4)) {
+            ALOGI("%s default set gain 1.0", __func__);
+            adev->master_volume = 1.0;
+            if (adev->audio_patching && (adev->patch_src == SRC_DTV || adev->patch_src == SRC_HDMIIN)) {
+                /*Apply source gain for Digital Input using master_volume,
+                **but master_volume cannot be bigger than 1.0.
+                **Actually, it is NOT necessary to apply source gain for Digital Input.
+                */
+                ALOGI("%s,set gain for in_port:%s(%d),src_gain=%f", __func__, inputPort2Str(adev->active_inport), adev->active_inport, adev->src_gain[adev->active_inport]);
+                adev->master_volume = adev->src_gain[adev->active_inport];
+            }
+        } else {
+            adev->active_inport = INPORT_MEDIA;//MM source gain
+            ALOGI("%s,active_inport=%s,src_gain=%f",__func__,inputPort2Str(adev->active_inport),adev->src_gain[adev->active_inport]);
+            adev->master_volume = adev->src_gain[adev->active_inport];
+        }
+    }
     out->volume_l = adev->master_volume * out->volume_l_org;//out volume
     out->volume_r = adev->master_volume * out->volume_r_org;
     out->last_volume_l = 0.0;
@@ -6020,8 +6038,8 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         config->channel_mask = AUDIO_CHANNEL_IN_STEREO;
 
     android_dev_convert_to_hal_dev(devices, (int *)&inport);
-    adev->active_inport = inport;
-    adev->src_gain[inport] = 1.0;
+    //adev->active_inport = inport;
+    //adev->src_gain[inport] = 1.0;
 
     in = (struct aml_stream_in *)aml_audio_calloc(1, sizeof(struct aml_stream_in));
     if (!in) {
@@ -9586,6 +9604,16 @@ void *audio_patch_output_threadloop(void *data)
                     continue;
                 }
             }
+            if (aml_dev->audio_patching) {
+                float source_gain = 1.0;
+                if (aml_dev->patch_src == SRC_LINEIN)
+                    source_gain = aml_dev->src_gain[INPORT_LINEIN];
+                else if (aml_dev->patch_src == SRC_ATV)
+                    source_gain = aml_dev->src_gain[INPORT_ATV];
+
+                if (source_gain != 1.0)
+                    apply_volume(source_gain, patch->out_buf, sizeof(uint16_t), ret);//inorder to adjust analog audio data
+            }
 
             if (patch && patch->input_src == AUDIO_DEVICE_IN_HDMI) {
                 stream_check_reconfig_param(stream_out);
@@ -10191,10 +10219,8 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
             }
             input_src = android_input_dev_convert_to_hal_input_src(src_config->ext.device.type);
             aml_dev->active_inport = inport;
-            aml_dev->src_gain[inport] = 1.0;
-            //aml_dev->sink_gain[outport] = 1.0;
-            ALOGI("[%s:%d] dev->dev patch: inport:%s -> outport:%s, input_src:%s", __func__, __LINE__,
-                inputPort2Str(inport), outputPort2Str(outport), patchSrc2Str(input_src));
+            ALOGI("[%s:%d] dev->dev patch: inport:%s(active_inport:%d) -> outport:%s, input_src:%s", __func__, __LINE__,
+                inputPort2Str(inport), aml_dev->active_inport, outputPort2Str(outport), patchSrc2Str(input_src));
             ALOGI("[%s:%d] input dev:%#x, all output dev:%#x", __func__, __LINE__,
                 src_config->ext.device.type, aml_dev->out_device);
             if (inport == INPORT_TUNER) {
@@ -10325,7 +10351,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                 set_audio_source(&aml_dev->alsa_mixer, input_src, alsa_device_is_auge());
             }
             aml_dev->active_inport = inport;
-            aml_dev->src_gain[inport] = 1.0;
+            //aml_dev->src_gain[inport] = 1.0;
             if (inport == INPORT_HDMIIN || inport == INPORT_ARCIN || inport == INPORT_SPDIF) {
                 aml_dev2mix_parser_create(dev, src_config->ext.device.type);
             } else if ((inport == INPORT_TUNER) && (aml_dev->patch_src == SRC_DTV)){///zzz
@@ -10531,12 +10557,14 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     }
 
     dprintf(fd, "\n");
-    dprintf(fd, "[AML_HAL]      hdmi_format     : %10d |  active_outport    :    %s\n",
-        aml_dev->hdmi_format, outputPort2Str(aml_dev->active_outport));
+    dprintf(fd, "[AML_HAL]      hdmi_format     : %10d |  active_outport    :    %s | active_inport: %s\n",
+        aml_dev->hdmi_format, outputPort2Str(aml_dev->active_outport), inputPort2Str(aml_dev->active_inport));
     dprintf(fd, "[AML_HAL]      A2DP gain       : %10f |  patch_src         :    %s\n",
         aml_dev->sink_gain[OUTPORT_A2DP], patchSrc2Str(aml_dev->patch_src));
     dprintf(fd, "[AML_HAL]      SPEAKER gain    : %10f |  HDMI gain         :    %f\n",
         aml_dev->sink_gain[OUTPORT_SPEAKER], aml_dev->sink_gain[OUTPORT_HDMI]);
+    dprintf(fd, "[AML_HAL]      dtv_src gain: %10f |  atv gain: %f | hdmi gain: %f |  linein: %f | media gain: %f\n",
+        aml_dev->src_gain[INPORT_TUNER], aml_dev->src_gain[INPORT_ATV], aml_dev->src_gain[INPORT_HDMIIN], aml_dev->src_gain[INPORT_LINEIN], aml_dev->src_gain[INPORT_MEDIA]);
     dprintf(fd, "[AML_HAL]      ms12 main volume: %10f\n", aml_dev->ms12.main_volume);
     aml_audio_ease_t *audio_ease = aml_dev->audio_ease;
     if (audio_ease && fabs(audio_ease->current_volume) <= 1e-6) {
@@ -10700,6 +10728,7 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
     struct aml_audio_device *aml_dev = (struct aml_audio_device *) dev;
     enum OUT_PORT outport = OUTPORT_SPEAKER;
     enum IN_PORT inport = INPORT_HDMIIN;
+    float volume = 0.0;
     int ret = 0;
 
     if (config == NULL) {
@@ -10730,23 +10759,16 @@ static int adev_set_audio_port_config (struct audio_hw_device *dev, const struct
             ALOGI("\t- active outport is: %s", outputPort2Str(aml_dev->active_outport));
         } else if (config->role == AUDIO_PORT_ROLE_SOURCE) {
             android_dev_convert_to_hal_dev(config->ext.device.type, (int *)&inport);
-            if (inport == INPORT_TUNER) {
-                if (aml_dev->is_TV) {
-                    if (aml_dev->patch_src == SRC_DTV) {
-                        inport = INPORT_DTV;
-                    } else {
-                        inport = INPORT_ATV;
-                    }
-                } else {
-                   inport = INPORT_DTV;
-                }
+            volume = DbToAmpl(config->gain.values[0] / 100.0);
+            if (volume < FLOAT_ZERO) {
+                volume = 0.0;
             }
-            aml_dev->src_gain[inport] = DbToAmpl(config->gain.values[0] / 100.0);
+            aml_dev->src_gain[inport] = volume;
             ALOGI(" - set src device[%#x](inport:%s): volume db[%d], gain[%f]",
                   config->ext.device.type, inputPort2Str(inport),
                   config->gain.values[0], aml_dev->src_gain[inport]);
             ALOGI(" - now the source gains are:");
-            ALOGI(" - INPORT_DTV->gain[%f]", aml_dev->src_gain[INPORT_DTV]);
+            ALOGI(" - INPORT_DTV->gain[%f]", aml_dev->src_gain[INPORT_TUNER]);
             ALOGI(" - INPORT_ATV->gain[%f]", aml_dev->src_gain[INPORT_ATV]);
             ALOGI(" - INPORT_HDMI->gain[%f]", aml_dev->src_gain[INPORT_HDMIIN]);
             ALOGI(" - INPORT_AV->gain[%f]", aml_dev->src_gain[INPORT_LINEIN]);
@@ -11049,6 +11071,9 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->dts_post_gain = 1.0;
     for (i = 0; i < OUTPORT_MAX; i++) {
         adev->sink_gain[i] = 1.0f;
+    }
+    for (i = 0; i < INPORT_MAX; i++) {
+        adev->src_gain[i] = 1.0f;
     }
     adev->ms12_main1_dolby_dummy = true;
     adev->ms12_ott_enable = false;
