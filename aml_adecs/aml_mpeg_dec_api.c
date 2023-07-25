@@ -442,7 +442,7 @@ static int mad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
             ad_dec_pcm_data->data_len  = ad_dec_pcm_data->data_len * 2;
         }
 
-        if (mad_dec->ad_mixing_enable) {
+        if (mad_dec->ad_mixing_enable && ad_dec_pcm_data->data_len) {
             struct audioCfg data_cfg;
             int frames_written = 0;
             data_cfg.channelCnt = pAudioInfo.channels;

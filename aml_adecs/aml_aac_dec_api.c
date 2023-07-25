@@ -466,7 +466,7 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
             }
             ad_dec_pcm_data->data_len  = ad_dec_pcm_data->data_len * 2;
         }
-        if (aac_dec->ad_mixing_enable) {
+        if (aac_dec->ad_mixing_enable && ad_dec_pcm_data->data_len) {
             struct audioCfg data_cfg;
             int frames_written = 0;
             data_cfg.channelCnt = pAudioInfo.channels;
