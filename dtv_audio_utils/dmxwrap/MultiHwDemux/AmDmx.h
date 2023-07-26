@@ -175,6 +175,7 @@ private:
 #define ACODEC_FMT_MPEG1  26 // AFORMAT_MPEG-->mp3,AFORMAT_MPEG1-->mp1,AFROMAT_MPEG2-->mp2
 #define ACODEC_FMT_MPEG2  27
 #define ACODEC_FMT_WMAVOI 28
+#define ACODEC_FMT_AC4 29
 #define DMX_KERNEL_CLIENT   0x8000
 
 #ifdef CONFIG_AMLOGIC_DVB_COMPAT
@@ -232,6 +233,10 @@ enum dmx_audio_format {
     AUDIO_AAC_ADTS = 3,     /* AAC-ADTS */
     AUDIO_AAC_LOAS = 4,     /* AAC-LOAS */
     AUDIO_DTS = 5,          /* DTS */
+    MEDIA_TS_SYS = 6,   /* TS System information (PAT, PMT, etc) */
+    MEDIA_PES_SUB = 7,  /* PES format subtitle/audio stream */
+    MEDIA_PTS_PACK = 8, /* PTS pack in proprietary format */
+    AUDIO_AC4 = 9,      /* AC4 */
     AUDIO_MAX
 };
 
