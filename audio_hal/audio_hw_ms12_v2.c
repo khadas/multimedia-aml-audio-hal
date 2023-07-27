@@ -135,6 +135,7 @@
 //dap init mode
 #define DAP_CONTENT_PROC_MODE 1
 #define DAP_CONTENT_PROC_DEVICE_PROC_MODE 2
+#define  DVB_MEDIA_LANG_SIZE 3
 
 
 static const unsigned int ms12_muted_dd_raw[] = {
@@ -763,6 +764,14 @@ static void set_dolby_ms12_downmix_mode(struct aml_audio_device *adev)
     }
 
     dolby_ms12_set_downmix_modes(downmix_mode);
+}
+
+void dtv_convert_language_to_string(int language_int, char *language_string)
+{
+   char *ptr = (char *)(&language_int);
+   for (int i = 0; i < DVB_MEDIA_LANG_SIZE; i ++ ) {
+          language_string[i] = ptr[DVB_MEDIA_LANG_SIZE - i -1];
+   }
 }
 
 /*

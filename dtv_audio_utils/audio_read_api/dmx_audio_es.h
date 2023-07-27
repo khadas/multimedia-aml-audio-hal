@@ -10,7 +10,7 @@
 
 #define  DVB_DEMUX_ID_BASE 25
 #define  DVB_DEMUX_SUPPORT_MAX_NUM 6
-#define  DVB_MEDIA_LANG_SIZE 3
+
 
 typedef enum
 {
