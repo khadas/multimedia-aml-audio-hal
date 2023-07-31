@@ -834,7 +834,9 @@ int get_the_dolby_ms12_prepared(
     }
     //update the runtime parameters after ms12 initialization is completed.
     if (input_format == AUDIO_FORMAT_AC4) {
-        media_presentation_id = demux_info->media_presentation_id;
+        if (patch && adev->patch_src == SRC_DTV) {
+            media_presentation_id = demux_info->media_presentation_id;
+        }
         set_ms12_ac4_presentation_group_index(ms12, media_presentation_id);
         ALOGI("%s line %d\n",__func__, __LINE__);
         if (patch && demux_info) {
