@@ -1832,21 +1832,29 @@ int dtv_get_nonms12_port_latency(struct audio_stream_out * stream, enum OUT_PORT
         case OUTPORT_HDMI:
         {
             if (output_format == AUDIO_FORMAT_AC3) {
-                latency_ms = 0;
+                latency_ms = AVSYNC_NONMS12_DTV_HDMI_OUT_DD_LATENCY;
+                prop_name = AVSYNC_NONMS12_DTV_HDMI_OUT_DD_LATENCY_PROPERTY;
             }
             else if (output_format == AUDIO_FORMAT_E_AC3) {
-                latency_ms = 0;
+                latency_ms = AVSYNC_NONMS12_DTV_HDMI_OUT_DDP_LATENCY;
+                prop_name = AVSYNC_NONMS12_DTV_HDMI_OUT_DDP_LATENCY_PROPERTY;
             }
             else {
-                latency_ms = 0;
+                latency_ms = AVSYNC_NONMS12_DTV_HDMI_OUT_PCM_LATENCY;
+                prop_name = AVSYNC_NONMS12_DTV_HDMI_OUT_PCM_LATENCY_PROPERTY;
             }
             break;
         }
         case OUTPORT_SPEAKER:
         case OUTPORT_AUX_LINE:
         {
-            latency_ms = DTV_AVSYNC_NONMS12_TV_SPEAKER_LATENCY;
-            prop_name = DTV_AVSYNC_NONMS12_TV_SPEAKER_LATENCY_PROPERTY;
+            if (aml_dev->is_TV) {
+                latency_ms = DTV_AVSYNC_NONMS12_TV_SPEAKER_LATENCY;
+                prop_name = DTV_AVSYNC_NONMS12_TV_SPEAKER_LATENCY_PROPERTY;
+            } else {
+                latency_ms = DTV_AVSYNC_NONMS12_STB_SPEAKER_LATENCY;
+                prop_name = DTV_AVSYNC_NONMS12_STB_SPEAKER_LATENCY_PROPERTY;
+            }
             break;
         }
         default :

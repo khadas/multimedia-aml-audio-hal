@@ -101,7 +101,9 @@
 #define  DTV_AVSYNC_NONMS12_DDP_LATENCY_PROPERTY           "vendor.media.audio.hal.nonms12.dtv.ddp"
 //port speaker
 #define  DTV_AVSYNC_NONMS12_TV_SPEAKER_LATENCY                    (0)
+#define  DTV_AVSYNC_NONMS12_STB_SPEAKER_LATENCY                   (60)
 #define  DTV_AVSYNC_NONMS12_TV_SPEAKER_LATENCY_PROPERTY           "vendor.media.audio.hal.nonms12.tv.dtv.speaker"
+#define  DTV_AVSYNC_NONMS12_STB_SPEAKER_LATENCY_PROPERTY          "vendor.media.audio.hal.nonms12.stb.dtv.speaker"
 //port A2DP
 #define  DTV_AVSYNC_NONMS12_TV_MIX_A2DP_LATENCY                   (120)
 #define  DTV_AVSYNC_NONMS12_TV_MIX_A2DP_LATENCY_PROPERTY          "vendor.media.audio.hal.nonms12.tv.dtv.mix.a2dp"
@@ -117,6 +119,13 @@
 #define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_PT_DDP_LATENCY           (0)
 #define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_PT_DD_LATENCY_PROPERTY   "vendor.media.audio.hal.nonms12.dtv.pt.arc.dd"
 #define  DTV_AVSYNC_NONMS12_HDMI_ARC_OUT_PT_DDP_LATENCY_PROPERTY  "vendor.media.audio.hal.nonms12.dtv.pt.arc.ddp"
+//STB_box hdmi out
+#define  AVSYNC_NONMS12_DTV_HDMI_OUT_PCM_LATENCY                  (85)
+#define  AVSYNC_NONMS12_DTV_HDMI_OUT_DD_LATENCY                   (0)
+#define  AVSYNC_NONMS12_DTV_HDMI_OUT_DDP_LATENCY                  (100)
+#define  AVSYNC_NONMS12_DTV_HDMI_OUT_PCM_LATENCY_PROPERTY         "vendor.media.audio.hal.nonms12.dtv.hdmi.pcm"
+#define  AVSYNC_NONMS12_DTV_HDMI_OUT_DD_LATENCY_PROPERTY          "vendor.media.audio.hal.nonms12.dtv.hdmi.dd"
+#define  AVSYNC_NONMS12_DTV_HDMI_OUT_DDP_LATENCY_PROPERTY         "vendor.media.audio.hal.nonms12.dtv.hdmi.ddp"
 /* end dtv NONMS12 tuning part */
 
 /* dtv MS12 tuning part */
