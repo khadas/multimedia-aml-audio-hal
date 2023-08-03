@@ -1528,6 +1528,7 @@ static int out_set_volume_l (struct audio_stream_out *stream, float left, float 
             out->ms12_vol_ctrl = true;
             if (out->volume_l <= FLOAT_ZERO) {
                 set_ms12_main_audio_mute(&adev->ms12, true, 32);
+                adev->ms12.main_volume = out->volume_l;
             } else {
                 set_ms12_main_audio_mute(&adev->ms12, false, 32);
                 set_ms12_main_volume(&adev->ms12, out->volume_l);
