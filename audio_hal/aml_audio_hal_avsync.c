@@ -1203,7 +1203,7 @@ void process_pts_sync(unsigned int pcm_lancty, struct aml_audio_patch *patch,
 
 
     get_sysfs_uint(DTV_DECODER_CHECKIN_FIRSTAPTS_PATH, &checkin_firstapts);
-#ifdef USE_AMADEC
+#if defined(USE_AMADEC) && defined(USE_DTV)
     pts = lookpts = dtv_patch_get_pts();
 #endif
     if (pts == patch->last_valid_pts) {
