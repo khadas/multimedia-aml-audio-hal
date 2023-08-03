@@ -10055,7 +10055,10 @@ void *audio_patch_output_threadloop(void *data)
                     (aml_dev->patch_src == SRC_ATV || aml_dev->patch_src == SRC_HDMIIN ||
                     aml_dev->patch_src == SRC_LINEIN || aml_dev->patch_src == SRC_SPDIFIN)) {
 
-                aml_dev_try_avsync(patch);
+                if (aml_dev_try_avsync(patch) < 0) {
+                    ALOGE("%s(), aml_dev_try_avsync return error!", __func__);
+                    continue;
+                }
                 if (patch->skip_frames) {
                     //ALOGD("%s(), skip this period data for avsync!", __func__);
                     usleep(5);
