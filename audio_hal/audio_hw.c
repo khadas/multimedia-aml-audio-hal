@@ -8853,11 +8853,15 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
             if (aml_out->is_normal_pcm) {
                 aml_out->write = mixer_aux_buffer_write;
                 aml_out->write_func = MIXER_AUX_BUFFER_WRITE;
-                ALOGI("%s(),1 mixer_aux_buffer_write !", __FUNCTION__);
+                ALOGI("%s(), non continue mode mixer_aux_buffer_write !", __FUNCTION__);
+            } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
+                aml_out->write = mixer_app_buffer_write;
+                aml_out->write_func = MIXER_APP_BUFFER_WRITE;
+                ALOGI("%s(), non continue mode mixer_app_buffer_write !", __FUNCTION__);
             } else {
                 aml_out->write = mixer_main_buffer_write;
                 aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
-                ALOGI("%s(),1 mixer_main_buffer_write !", __FUNCTION__);
+                ALOGI("%s(), non continue mode mixer_main_buffer_write !", __FUNCTION__);
             }
         } else {
             /**
@@ -8866,7 +8870,7 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
              */
             aml_out->write = process_buffer_write;
             aml_out->write_func = PROCESS_BUFFER_WRITE;
-            ALOGI("[%s:%d],1 process_buffer_write ", __func__, __LINE__);
+            ALOGI("[%s:%d], non continue mode process_buffer_write ", __func__, __LINE__);
         }
     } else {
         /**
@@ -8877,14 +8881,15 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
         if (aml_out->is_normal_pcm) {
             aml_out->write = mixer_aux_buffer_write;
             aml_out->write_func = MIXER_AUX_BUFFER_WRITE;
-
+            ALOGI("%s(), continue mode mixer_aux_buffer_write !", __FUNCTION__);
         } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             aml_out->write = mixer_app_buffer_write;
             aml_out->write_func = MIXER_APP_BUFFER_WRITE;
-
+            ALOGI("%s(), continue mode mixer_app_buffer_write !", __FUNCTION__);
         } else {
             aml_out->write = mixer_main_buffer_write;
             aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
+            ALOGI("%s(), continue mode mixer_main_buffer_write !", __FUNCTION__);
         }
     }
 
