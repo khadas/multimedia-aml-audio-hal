@@ -45,12 +45,16 @@
 #define MAX_AVSYNC_GAP (10*90000)
 #define MAX_AVSYNC_WAIT_TIME (3*1000*1000)
 
-#define ALSA_DELAY_THRESHOLD_MS    (32)
+#define ALSA_DELAY_THRESHOLD_MS_NORMAL     (32)
+#define ALSA_DELAY_THRESHOLD_MS_LLP        (20)
 
 #define ALSA_DUMP_PROPERTY       "vendor.media.audiohal.alsadump"
 #define ALSA_OUTPUT_PCM_FILE     "/data/vendor/audiohal/alsa_pcm_write.raw"
 #define ALSA_OUTPUT_SPDIF_FILE   "/data/vendor/audiohal/alsa_spdif_write"
 
+#define ALSA_DELAY_THRESHOLD_MS ((alsa_llp_mode) ? ALSA_DELAY_THRESHOLD_MS_LLP : ALSA_DELAY_THRESHOLD_MS_NORMAL)
+
+static bool alsa_llp_mode;
 
 static int aml_audio_get_alsa_debug() {
     char buf[PROPERTY_VALUE_MAX];
@@ -146,6 +150,11 @@ static void alsa_write_rate_control(struct audio_stream_out *stream, size_t byte
         }
     }
     return;
+}
+
+void aml_alsa_set_llp(bool mode)
+{
+    alsa_llp_mode = mode;
 }
 
 int aml_alsa_output_open(struct audio_stream_out *stream) {

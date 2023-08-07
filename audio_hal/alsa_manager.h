@@ -90,4 +90,6 @@ int aml_alsa_output_resume_new(void *handle);
 
 void alsa_out_reconfig_params(struct audio_stream_out *stream);
 enum pcm_format convert_audio_format_2_alsa_format(audio_format_t format);
+
+void aml_alsa_set_llp(bool mode);
 #endif // _ALSA_MANAGER_H_

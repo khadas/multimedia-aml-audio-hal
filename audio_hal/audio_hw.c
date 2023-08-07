@@ -155,6 +155,8 @@
 #include "audio_hal_version.h"
 #include "audio_media_sync_util.h"
 
+#include "hal_scaletempo.h"
+
 #define CARD_AMLOGIC_BOARD 0
 /* ALSA ports for AML */
 #define PORT_I2S 0
@@ -203,6 +205,14 @@
 
 #define DISABLE_CONTINUOUS_OUTPUT "persist.vendor.audio.continuous.disable"
 
+#define LLP_BUFFER_NAME "llp_input"
+#define LLP_BUFFER_SIZE (256 * 6 * 2 * 20)
+
+#if 0
+static void *llp_input_threadloop(void *data);
+#else
+static int ms12_llp_callback(void *priv_data, void *info);
+#endif
 
 static const struct pcm_config pcm_config_out = {
     .channels = 2,
@@ -8472,6 +8482,11 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
     uint64_t enter_ns = 0;
     uint64_t leave_ns = 0;
 
+
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    ALOGI("[%lld.%9ld -- %d] mixer_aux_buffer_write %u", (long long)ts.tv_sec, ts.tv_nsec, gettid(), bytes);
+
     if (eDolbyMS12Lib == adev->dolby_lib_type && continous_mode(adev)) {
         enter_ns = aml_audio_get_systime_ns();
     }
@@ -8671,6 +8686,10 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
     } else {
         aml_out->last_frames_postion = aml_out->frame_write_sum;
     }
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    ALOGI("[%lld.%9ld] write %d bytes, system level %d ms", (long long)ts.tv_sec, ts.tv_nsec, bytes, dolby_ms12_get_system_buffer_avail(NULL) / frame_size / 48);
+
 
 #ifndef BUILD_LINUX
     /*if system sound return too quickly, it will causes audio flinger underrun*/
@@ -9195,6 +9214,29 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
         start_ease_in(adev);
     }
 
+    if (address && !strcmp(address, LLP_BUFFER_NAME)) {
+        aml_out->llp_buf = IpcBuffer_create(LLP_BUFFER_NAME, LLP_BUFFER_SIZE);
+        if (aml_out->llp_buf) {
+#if 0
+            if (!pthread_create(&aml_out->llp_input_threadID, NULL,
+                       &llp_input_threadloop, (struct audio_stream_out *)aml_out)) {
+                aml_out->llp_input_thread_created = true;
+                ALOGI("LLP input thread created");
+            } else {
+                IpcBuffer_destroy(aml_out->llp_buf);
+                aml_out->llp_buf = NULL;
+                ALOGE("LLP input thread failed to create");
+            }
+#else
+            setenv(LLP_BUFFER_NAME, "1", 1);
+            aml_alsa_set_llp(true);
+            dolby_ms12_register_scaletempo_callback(ms12_llp_callback, (void *)aml_out);
+#endif
+        } else {
+            ALOGE("LLP IPC buffer create failed.");
+        }
+    }
+
     if (aml_getprop_bool("vendor.media.audio.hal.debug")) {
         aml_out->debug_stream = 1;
     }
@@ -9269,6 +9311,28 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
         }
         aml_out->tsync_status = TSYNC_STATUS_STOP;
     }
+
+#if 0
+    if (aml_out->llp_input_thread_created) {
+        aml_out->llp_input_thread_exit = true;
+        pthread_join(aml_out->llp_input_threadID, NULL);
+        aml_out->llp_input_thread_created = false;
+    }
+
+    if (aml_out->llp_buf) {
+        IpcBuffer_destroy(aml_out->llp_buf);
+        aml_out->llp_buf = NULL;
+    }
+#else
+    if (aml_out->llp_buf) {
+        aml_alsa_set_llp(false);
+        dolby_ms12_register_scaletempo_callback(NULL, NULL);
+        unsetenv(LLP_BUFFER_NAME);
+        IpcBuffer_destroy(aml_out->llp_buf);
+        aml_out->llp_buf = NULL;
+    }
+#endif
+
     adev_close_output_stream(dev, stream);
     //adev->dual_decoder_support = false;
     //destroy_aec_reference_config(adev->aec);
@@ -9285,6 +9349,189 @@ static void ts_wait_time(struct timespec *ts, uint32_t time)
         ts->tv_nsec -=1000000000;
     }
 }
+
+#if 0
+static void *llp_input_threadloop(void *data)
+{
+    struct audio_stream_out *out = (struct audio_stream_out *)data;
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)out;
+    uint64_t rp = 0;
+    unsigned char zero[5*12*48];
+    unsigned char *in = IpcBuffer_get_ptr(LLP_BUFFER_NAME);
+    void *ipc_buffer = IpcBuffer_get_by_name(LLP_BUFFER_NAME);
+
+    memset(zero, 0, sizeof(zero));
+
+    //setenv("vendor_media_audiohal_ms12dump", "65535", 1);
+
+    while (!aml_out->llp_input_thread_exit) {
+        uint64_t wp = IpcBuffer_get_wr_pos(LLP_BUFFER_NAME);
+        unsigned level;
+        unsigned offset = rp % LLP_BUFFER_SIZE;
+        int nChannel = audio_channel_count_from_out_mask(aml_out->hal_channel_mask);
+        int alsa_level = aml_audio_out_get_ms12_latency_frames((struct audio_stream_out *)aml_out);
+        int main_input_level = dolby_ms12_get_main_buffer_avail(NULL) / nChannel / 2;
+        level = (wp - rp) % LLP_BUFFER_SIZE;
+        rp = wp - level;    // normalize
+        if ((level > 0) && (rp == 0)) {
+            dolby_ms12_flush_main_input_buffer();
+            setenv("main_llp", "1", 1);
+            aml_alsa_set_llp(true);
+        }
+        if (in) {
+            if ((level == 0) && ((main_input_level + alsa_level) < (15 * 48))) {
+                out_write_new(out, zero, sizeof(zero));
+                IpcBuffer_add_silence(ipc_buffer, sizeof(zero) / nChannel / 2);
+                out_write_new(out, zero, sizeof(zero));
+                IpcBuffer_add_silence(ipc_buffer, sizeof(zero) / nChannel / 2);
+                IpcBuffer_inc_underrun(ipc_buffer);
+                ALOGI("llp underrun, alsa_level = %d main_input_level = %d", alsa_level, main_input_level);
+            } else if (level <= (LLP_BUFFER_SIZE - offset)) {
+                out_write_new(out, in + offset, level);
+            } else {
+                unsigned copied = LLP_BUFFER_SIZE - offset;
+                out_write_new(out, in + offset, copied);
+                out_write_new(out, in, level - copied);
+            }
+        }
+
+        rp += level;
+
+        alsa_level = aml_audio_out_get_ms12_latency_frames((struct audio_stream_out *)aml_out);
+        main_input_level = dolby_ms12_get_main_buffer_avail(NULL) / nChannel / 2;
+        IpcBuffer_setWaterLevel(ipc_buffer, alsa_level + main_input_level);
+
+        ALOGI("llp wp = %" PRIu64 ", alsa_level = %d ms, ms12 input level = %d ms", wp, alsa_level / 48, main_input_level / 48);
+
+        aml_audio_sleep(5000);
+    }
+
+    unsetenv("main_llp");
+    aml_alsa_set_llp(false);
+
+    //setenv("vendor_media_audiohal_ms12dump", "0", 1);
+
+    ALOGI("Sys llp input thread exit.");
+
+    return NULL;
+}
+#else
+static int ms12_llp_callback(void *priv_data, void *info)
+{
+    struct aml_stream_out *aml_out;
+    aml_scaletempo_info_t *conf;
+    short *in;
+    unsigned offset, level;
+    uint64_t wp;
+    uint64_t wp_underrun = 0;
+    int nChannel, alsa_level;
+    bool fill_silence = false;
+    struct timespec ts;
+
+    if (priv_data == NULL || info == NULL) {
+        return -1;
+    }
+
+    aml_out = (struct aml_stream_out *)priv_data;
+    conf = (aml_scaletempo_info_t *)info;
+
+    if (!aml_out->llp_buf) {
+        return -1;
+    }
+
+    wp = IpcBuffer_get_wr_pos(LLP_BUFFER_NAME);
+    nChannel = audio_channel_count_from_out_mask(aml_out->hal_channel_mask);
+    level = (wp - aml_out->llp_rp) % LLP_BUFFER_SIZE;
+
+    alsa_level = aml_audio_out_get_ms12_latency_frames(aml_out);
+    if (alsa_level == aml_out->config.period_size * aml_out->config.period_count) {
+        alsa_level = 0;
+    }
+
+    if (level < 256 * nChannel * 2) {
+        if (alsa_level > 48 * 8) {
+            conf->output_samples = 0;
+            IpcBuffer_setMeta(aml_out->llp_buf, wp / nChannel / 2, alsa_level + level / nChannel / 2);
+            clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+            ALOGI("[%lld.%.9ld]Holding silence, alsa_level = %d, input_level = %d", (long long)ts.tv_sec, ts.tv_nsec, alsa_level / 48, level / nChannel / 2 / 48);
+            return 0;
+        }
+
+        fill_silence = true;
+        clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+        ALOGI("[%lld.%.9ld]llp underrun, fill silence", (long long)ts.tv_sec, ts.tv_nsec);
+
+        if (aml_out->llp_underrun_wp != wp) {
+            IpcBuffer_inc_underrun(aml_out->llp_buf);
+            aml_out->llp_underrun_wp = wp;
+            ALOGI("[%lld.%.9ld] inc underrun", (long long)ts.tv_sec, ts.tv_nsec);
+        }
+    }
+
+    aml_out->llp_rp = wp - level;    // normalize
+    offset = aml_out->llp_rp % LLP_BUFFER_SIZE;
+    in = (short *)(IpcBuffer_get_ptr(LLP_BUFFER_NAME) + offset);
+
+    conf->ch = nChannel;
+    conf->output_samples = 256;
+
+    /* TODO: Neon optimize vector conversion */
+    if (nChannel == 6) {
+        int i;
+        float *out_l   = (float *)conf->outputbuffer->ppdata[0];
+        float *out_r   = (float *)conf->outputbuffer->ppdata[1];
+        float *out_c   = (float *)conf->outputbuffer->ppdata[2];
+        float *out_lfe = (float *)conf->outputbuffer->ppdata[3];
+        float *out_ls  = (float *)conf->outputbuffer->ppdata[4];
+        float *out_rs  = (float *)conf->outputbuffer->ppdata[5];
+        if (fill_silence) {
+            for (i = 0; i < 256; i++) {
+                *out_l++   = (float)0;
+                *out_r++   = (float)0;
+                *out_c++   = (float)0;
+                *out_lfe++ = (float)0;
+                *out_ls++  = (float)0;
+                *out_rs++  = (float)0;
+            }
+        } else {
+            for (i = 0; i < 256; i++) {
+                *out_l++   = (float)(*in++) / 32768.0f;
+                *out_r++   = (float)(*in++) / 32768.0f;
+                *out_c++   = (float)(*in++) / 32768.0f;
+                *out_lfe++ = (float)(*in++) / 32768.0f;
+                *out_ls++  = (float)(*in++) / 32768.0f;
+                *out_rs++  = (float)(*in++) / 32768.0f;
+            }
+       }
+    } else if (nChannel == 2) {
+        int i;
+        float *out_l = (float *)conf->outputbuffer->ppdata[0];
+        float *out_r = (float *)conf->outputbuffer->ppdata[1];
+        if (fill_silence) {
+            for (i = 0; i < 256; i++) {
+                *out_l++ = (float)0;
+                *out_r++ = (float)0;
+            }
+        } else {
+            for (i = 0; i < 256; i++) {
+                *out_l++ = (float)(*in++) / 32768.0f;
+                *out_r++ = (float)(*in++) / 32768.0f;
+            }
+        }
+    }
+
+    if (!fill_silence) {
+        level -= 256 * nChannel * 2;
+        aml_out->llp_rp += nChannel * 2 * 256;
+    }
+
+    IpcBuffer_setMeta(aml_out->llp_buf, wp / nChannel / 2, alsa_level + level / nChannel / 2);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    ALOGI("[%lld.%.9ld] llp wp = %" PRIu64 ", rp = %" PRIu64 ", alsa_level = %d, llp input level = %d", (long long)ts.tv_sec, ts.tv_nsec, wp / 12, aml_out->llp_rp / 12, alsa_level, level / nChannel / 2);
+
+    return 0;
+}
+#endif
 
 // buffer/period ratio, bigger will add more latency
 void *audio_patch_input_threadloop(void *data)

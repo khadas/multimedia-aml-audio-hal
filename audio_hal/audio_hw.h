@@ -891,6 +891,16 @@ struct aml_stream_out {
 
     //DTV sync
     bool set_init_avsync_policy;
+
+    /* llp */
+    void *llp_buf;
+#if 0
+    bool llp_input_thread_created;
+    bool llp_input_thread_exit;
+    pthread_t llp_input_threadID;
+#endif
+    uint64_t llp_rp;
+    uint64_t llp_underrun_wp;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);

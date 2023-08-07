@@ -284,6 +284,11 @@ int dolby_ms12_set_sync(int sync);
 int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duration);
 
 /*@@
+    @brief register scaletempo callback
+*/
+int dolby_ms12_register_scaletempo_callback(void *callback, void *priv_data);
+
+/*@@
     @brief enable the mixer max frame size
 */
 int dolby_ms12_enable_mixer_max_size(int enable);
