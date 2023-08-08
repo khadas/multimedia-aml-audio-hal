@@ -73,6 +73,7 @@ struct dolby_ms12_desc {
     audio_channel_mask_t output_channelmask;
     int ms12_out_bytes;
     //audio_policy_forced_cfg_t force_use;
+    pthread_mutex_t ms12_argv_lock;
     int dolby_ms12_init_argc;
     char **dolby_ms12_init_argv;
     void *dolby_ms12_ptr;

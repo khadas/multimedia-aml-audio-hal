@@ -8912,11 +8912,6 @@ ssize_t out_write_new(struct audio_stream_out *stream,
         ALOGI("+<IN>%s: out_stream(%p) position(%zu)", __func__, stream, bytes);
     }
 
-    /*when there is data writing in this stream, we can add it to active stream*/
-    pthread_mutex_lock(&adev->lock);
-    adev->active_outputs[aml_out->usecase] = aml_out;
-    pthread_mutex_unlock(&adev->lock);
-
     if ((true == aml_out->hw_sync_mode)
         && (NULL != aml_out->hwsync->es_mediasync.mediasync)) {
         if (true == hwsync_header_valid(buffer))
@@ -9161,6 +9156,12 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
     }
     aml_out->codec_type = get_codec_type(aml_out->hal_internal_format);
     aml_out->continuous_mode_check = true;
+
+    /*when a new stream is opened here, we can add it to active stream*/
+    pthread_mutex_lock(&adev->lock);
+    adev->active_outputs[aml_out->usecase] = aml_out;
+    pthread_mutex_unlock(&adev->lock);
+
     /*In order to avoid the invalid adjustment of mastervol when there is no stream */
     out_set_volume_l((struct audio_stream_out *)aml_out, aml_out->volume_l_org, aml_out->volume_r_org);
 
