@@ -55,22 +55,29 @@ static void dump_demux_data(void *buffer, int size, const char* file_name)
     }
 }
 
-static void getAudioEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, const uint8_t *data, int len, void *user_data) {
-//(void)mDemuxWrapper;
-(void)fid;
-//(void)data;
-//(void)len;
-(void)user_data;
+#define getbit(x,y) (((x) >> (y))&1)
+#define NULL_INT64 0xffffffffffffffff
 
-    mEsDataInfo* mEsData = (mEsDataInfo*)aml_audio_malloc(sizeof(mEsDataInfo));
-    //ALOGI("getAudioEsData memorydebug %p\n",mEsData);
+static void getAudioEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, const uint8_t *data, int len, void *user_data) {
+    (void)fid;
+    (void)user_data;
     dmx_non_sec_es_header *es_header = (struct dmx_non_sec_es_header *)(data);
+    mEsDataInfo* mEsData = (mEsDataInfo*)aml_audio_malloc(sizeof(mEsDataInfo));
+
     if (len == (es_header->len + sizeof(struct dmx_non_sec_es_header))) {
         const unsigned char *data_es  = data + sizeof(struct dmx_non_sec_es_header);
         mEsData->data = (uint8_t*)malloc(es_header->len);
         memcpy(mEsData->data, data_es, es_header->len);
         mEsData->size = es_header->len;
-        mEsData->pts = es_header->pts;
+        if ((0 != getbit(es_header->pts_dts_flag, 0)) || (1 != getbit(es_header->pts_dts_flag, 1)))
+        {
+            mEsData->pts = NULL_INT64;  //set invalid pts flag: NULL_INT64
+        }
+        else
+        {
+            mEsData->pts = es_header->pts;
+        }
+
         mDemuxWrapper->last_queue_es_apts = es_header->pts;
         mEsData->used_size = 0;
         dump_demux_data((void *)data_es, es_header->len, DEMUX_AUDIO_DUMP_PATH);

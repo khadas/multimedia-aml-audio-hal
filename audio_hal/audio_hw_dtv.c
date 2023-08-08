@@ -3386,9 +3386,28 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
             pthread_mutex_unlock(&patch->mutex);
             continue;
         } else {
-          patch->cur_package = p_package;
-          if (media_sync_util->media_sync_debug)
-               ALOGI("[%s:%d] package pts:%llx,package size:%d", __FUNCTION__, __LINE__, p_package->pts, p_package->size);
+            patch->cur_package = p_package;
+            if (media_sync_util->media_sync_debug)
+                ALOGI("[%s:%d] package pts:%llx, package size:%d, dtv_first_apts_flag:%d", __FUNCTION__, __LINE__, p_package->pts, p_package->size, patch->dtv_first_apts_flag);
+
+            /* if first package pts is invalid, we need drop it */
+            if ((!patch->dtv_first_apts_flag) && (NULL_INT64 == p_package->pts))
+            {
+                if (p_package->data) {
+                    aml_audio_free(p_package->data);
+                    p_package->data = NULL;
+                }
+
+                if (p_package->ad_data) {
+                    aml_audio_free(p_package->ad_data);
+                    p_package->ad_data = NULL;
+                }
+                aml_audio_free(p_package);
+                p_package = NULL;
+                pthread_mutex_unlock(&patch->mutex);
+                continue;
+            }
+            patch->dtv_first_apts_flag = 1;
         }
 
         if (is_dolby_ms12_support_compression_format(patch->aformat) && eDolbyMS12Lib == aml_dev->dolby_lib_type) {

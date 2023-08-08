@@ -159,7 +159,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
 
         if (do_sync_flag) {
             if(patch->skip_amadec_flag) {
-                aml_dec->in_frame_pts = patch->cur_package->pts;
+                aml_dec->in_frame_pts = (NULL_INT64 == patch->cur_package->pts) ? aml_dec->out_frame_pts : patch->cur_package->pts;
             } else {
                 aml_dec->in_frame_pts = decoder_apts_lookup(patch->decoder_offset);
             }
@@ -279,6 +279,12 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                         patch->dtvsync->cur_outapts = aml_dec->out_frame_pts - decoder_latency - alsa_latency - tuning_delay;
 
                     }
+
+                    ALOGI_IF(adev->debug_flag, "[%s:%d], sr:%d, ch:%d, format:0x%x, alsa_latency:%d(ms), duration:%d, in_pts:%lld, "
+                        "out_pts:%lld, out_frames:%d, package_pts:%lld(%llx)", __func__, __LINE__,
+                        dec_pcm_data->data_sr, dec_pcm_data->data_ch, dec_pcm_data->data_format, alsa_latency/90, duration,
+                        aml_dec->in_frame_pts, aml_dec->out_frame_pts, out_frames, patch->cur_package->pts, patch->cur_package->pts);
+
                     //sync process here
                     if (adev->patch_src == SRC_DTV && patch && aml_out->dtvsync_enable) {
 

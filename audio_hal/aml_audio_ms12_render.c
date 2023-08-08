@@ -233,9 +233,9 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
         if (do_sync_flag) {
             if(patch->skip_amadec_flag) {
                 if (patch->cur_package)
-                    aml_dec->in_frame_pts = patch->cur_package->pts;
+                    aml_dec->in_frame_pts = (NULL_INT64 == patch->cur_package->pts) ? aml_dec->out_frame_pts : patch->cur_package->pts;
                 if (aml_dec->in_frame_pts == 0) {
-                     aml_dec->in_frame_pts = decoder_apts_lookup(patch->decoder_offset);
+                    aml_dec->in_frame_pts = decoder_apts_lookup(patch->decoder_offset);
                 }
             }
         }

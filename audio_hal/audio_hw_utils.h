@@ -80,6 +80,7 @@
 
 #define AVSYNC_NONMS12_AUDIO_HAL_EARC_LATENCY_DDP_PROPERTY "vendor.media.audio.hal.nonms12.earc_latency.ddp"
 #define AVSYNC_NONMS12_AUDIO_HAL_EARC_LATENCY_DDP (-40)
+#define NULL_INT64 0xffffffffffffffff
 
 int64_t aml_gettime(void);
 int get_sysfs_uint(const char *path, uint32_t *value);
