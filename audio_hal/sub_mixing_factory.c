@@ -244,7 +244,7 @@ static int consume_output_data(void *cookie, const void* buffer, size_t bytes)
 
     clock_gettime(CLOCK_MONOTONIC, &tval);
 
-    apply_volume_fade(out->last_volume_l, out->volume_l, in_buf_16, sizeof(uint16_t), channels, bytes);
+    set_mixer_inport_volume(audio_mixer, out->inputPortID, out->volume_l);
     out->last_volume_l = out->volume_l;
     out->last_volume_r = out->volume_r;
     if (out->hw_sync_mode && out->resample_outbuf != NULL) {
@@ -557,6 +557,9 @@ ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void *buffer
 
     clock_gettime(CLOCK_MONOTONIC, &tval);
     //begin_time = get_systime_ns();
+    set_mixer_inport_volume(audio_mixer, out->inputPortID, out->volume_l);
+    out->last_volume_l = out->volume_l;
+    out->last_volume_r = out->volume_r;
     written = aml_out_write_to_mixer(stream, buffer, bytes);
     if (written >= 0) {
         remain = bytes - written;
@@ -1173,7 +1176,7 @@ ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, const void *b
         }
         aml_audio_free(padding_buf);
     }
-    apply_volume_fade(aml_out->last_volume_l, aml_out->volume_l, in_buf_16, sizeof(uint16_t), channels, bytes);
+    set_mixer_inport_volume(sm->mixerData, aml_out->inputPortID, aml_out->volume_l);
     aml_out->last_volume_l = aml_out->volume_l;
     aml_out->last_volume_r = aml_out->volume_r;
 
@@ -1248,7 +1251,7 @@ ssize_t mixer_mmap_buffer_write_sm(struct audio_stream_out *stream, const void *
        aml_out->standby = false;
    }
 
-   apply_volume_fade(aml_out->last_volume_l, aml_out->volume_l, in_buf_16, sizeof(uint16_t), channels, bytes);
+   set_mixer_inport_volume(pstSubMixing->mixerData, aml_out->inputPortID, aml_out->volume_l);
    aml_out->last_volume_l = aml_out->volume_l;
    aml_out->last_volume_r = aml_out->volume_r;
 

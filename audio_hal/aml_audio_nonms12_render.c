@@ -251,7 +251,9 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                         appply_tone_16bit2ch(dec_pcm_data->buf, dec_pcm_data->data_len);
                     }
                 }
-                aml_audio_stream_volume_process(stream, dec_data, sizeof(int16_t), dec_pcm_data->data_ch, pcm_len);
+                if (!adev->useSubMix) {
+                    aml_audio_stream_volume_process(stream, dec_data, sizeof(int16_t), dec_pcm_data->data_ch, pcm_len);
+                }
 
                 if (dec_pcm_data->data_ch == 6) {
                     ret = audio_VX_post_process(VX_postprocess, (int16_t *)dec_data, pcm_len);

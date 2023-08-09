@@ -395,6 +395,7 @@ input_port *new_input_port(
     port->is_hwsync = false;
     port->consumed_bytes = 0;
     port->volume = volume;
+    port->last_volume = 0.0;
     list_init(&port->msg_list);
     //TODO
     //set_inport_hwsync(port);

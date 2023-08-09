@@ -115,6 +115,7 @@ typedef struct INPUT_PORT {
 
     meta_data_cbk_t meta_data_cbk;
     float volume;
+    float last_volume;
     struct fade_out fout;
     struct listnode msg_list;
     pthread_mutex_t msg_lock;

@@ -773,6 +773,8 @@ static int mixer_inports_read(struct amlAudioMixer *audio_mixer)
             }
             ret = mixer_read_inport(audio_mixer, in_port->ID, in_port->data, in_port->data_len_bytes);
             if (ret == (int)in_port->data_len_bytes) {
+                apply_volume_fade(in_port->last_volume, in_port->volume, in_port->data, sizeof(uint16_t), in_port->cfg.channelCnt, in_port->data_len_bytes);
+                in_port->last_volume = in_port->volume;
                 if (fade_out) {
                     struct aml_stream_out *out = (struct aml_stream_out *)in_port->notify_cbk_data;
                     audio_hwsync_t *hwsync = (out != NULL) ? (out->hwsync) : NULL;
