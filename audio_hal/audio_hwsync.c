@@ -315,8 +315,6 @@ void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out
         p_hwsync->hwsync_id = -1;
     }
 
-    p_hwsync->es_mediasync.in_apts = 0;
-    p_hwsync->es_mediasync.total_data_size = 0;
     memset(p_hwsync->pts_tab, 0, sizeof(apts_tab_t)*HWSYNC_APTS_NUM);
     pthread_mutex_init(&p_hwsync->lock, NULL);
     p_hwsync->payload_offset = 0;
