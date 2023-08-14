@@ -141,6 +141,7 @@ static inline bool is_digital_raw_format(audio_format_t format)
     case AUDIO_FORMAT_AAC_LATM:
     case AUDIO_FORMAT_VORBIS:
     case AUDIO_FORMAT_FLAC:
+    case AUDIO_FORMAT_PCM_LPCM_BLURAY:
         return true;
     default:
         return false;
@@ -176,10 +177,10 @@ static inline stream_usecase_t attr_to_usecase(uint32_t devices __unused,
 {
     // hwsync case
     if ((flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) && (format != AUDIO_FORMAT_IEC61937)) {
-        if (audio_is_linear_pcm(format)) {
-            return STREAM_PCM_HWSYNC;
-        } else if (is_digital_raw_format(format)) {
+        if (is_digital_raw_format(format)) {
             return STREAM_RAW_HWSYNC;
+        } else if (audio_is_linear_pcm(format)) {
+            return STREAM_PCM_HWSYNC;
         } else {
             return STREAM_USECASE_MAX;
         }
