@@ -841,6 +841,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                 }
 
                 p_hwsync->last_lookup_apts = apts_save;
+                policy.action = out->msync_action;
                 if (apts != out->msync_rendered_pts)
                     av_sync_audio_render(out->msync_session, apts, &policy);
                 out->msync_action_delta = policy.delta;
