@@ -506,6 +506,13 @@ static int mixer_output_write(struct amlAudioMixer *audio_mixer)
                 out_port->process(out_port, out_port->data_buf, out_port->bytes_avail);
                 out_port->write(out_port, out_port->processed_buf, out_port->processed_bytes);
             } else {
+#ifndef NO_AUDIO_CAP
+                pthread_mutex_lock(&adev->cap_buffer_lock);
+                if (adev->cap_buffer) {
+                    IpcBuffer_write(adev->cap_buffer, (const unsigned char *)out_port->data_buf, (int) out_port->bytes_avail);
+                }
+                pthread_mutex_unlock(&adev->cap_buffer_lock);
+#endif
                 out_port->write(out_port, out_port->data_buf, out_port->bytes_avail);
             }
         }
