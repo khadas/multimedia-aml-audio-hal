@@ -3454,8 +3454,13 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     }
 
     out->out_device = devices;
-    out->volume_l_org = 1.0;//stream volume
-    out->volume_r_org = 1.0;
+    if (address && !strncmp(address, "AML_DTV_SOURCE", 14)) {
+        out->volume_l_org = adev->audio_patch->dtv_volume;
+        out->volume_r_org = adev->audio_patch->dtv_volume;
+    } else {
+        out->volume_l_org = 1.0;//stream volume
+        out->volume_r_org = 1.0;
+    }
     if (adev->audio_focus_enable) {
         if (get_mmap_pcm_active_count(adev) >= 1 && !(flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) {
             ALOGI("TTS sound is playing, set volume ratio!!");
@@ -5122,6 +5127,12 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         ret = str_parms_get_int(parms, "hal_param_dtv_media_second_lang", &val);
         if (ret >= 0) {
             dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_MEDIA_SECOND_LANG, val);
+            goto exit;
+        }
+
+        ret = str_parms_get_int(parms, "hal_param_dtv_audio_volume", &val);
+        if (ret >= 0) {
+            dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_VOLUME, val);
             goto exit;
         }
     }

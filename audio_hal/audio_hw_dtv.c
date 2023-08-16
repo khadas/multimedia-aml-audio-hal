@@ -286,8 +286,10 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
     struct aml_audio_device *adev = (struct aml_audio_device *) dev;
     struct aml_audio_patch *patch = adev->audio_patch;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
+    struct audio_stream_out *stream_out = (struct audio_stream_out *)patch->dtv_aml_out;
     int has_audio = 1;
     int audio_sync_mode = 0;
+    float dtv_volume_switch = 1.0;
     aml_dtv_audio_instances_t *dtv_audio_instances =  (aml_dtv_audio_instances_t *)adev->aml_dtv_audio_instances;
     unsigned int path_id = val >> DVB_DEMUX_ID_BASE;
     ALOGI("%s %p path_id %d cmd %d val %d\n",__FUNCTION__,patch,path_id, cmd,val & ((1 << DVB_DEMUX_ID_BASE) - 1));
@@ -308,10 +310,23 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
         case AUDIO_DTV_PATCH_CMD_SET_OUTPUT_MODE:
             ALOGI("DTV sound mode %d ", val);
             demux_info->output_mode = val;
+            patch->mode = val;
             break;
         case AUDIO_DTV_PATCH_CMD_SET_MUTE:
             ALOGE ("Amlogic_HAL - %s: TV-Mute:%d.", __FUNCTION__,val);
             adev->tv_mute = val;
+            break;
+        case AUDIO_DTV_PATCH_CMD_SET_VOLUME:
+            dtv_volume_switch = (float)val / 100; // val range is [0, 100], conversion range is [0, 1]
+            if (patch->dtv_volume != dtv_volume_switch && dtv_volume_switch >= 0.0f && dtv_volume_switch <= 1.0f) {
+                patch->dtv_volume = dtv_volume_switch;
+                ALOGI ("dtv set volume:%f", patch->dtv_volume);
+                if (patch->dtv_aml_out) {
+                    stream_out->set_volume(stream_out, patch->dtv_volume, patch->dtv_volume);
+                }
+            } else {
+                ALOGE("[%s:%d] dtv set volume error! volume:%f", __func__, __LINE__, dtv_volume_switch);
+            }
             break;
         case AUDIO_DTV_PATCH_CMD_SET_HAS_VIDEO:
             demux_info->has_video = val;
@@ -2047,7 +2062,6 @@ void *audio_dtv_patch_output_threadloop(void *data)
     int write_bytes = DEFAULT_PLAYBACK_PERIOD_SIZE * PLAYBACK_PERIOD_COUNT;
     int ret;
     int apts_diff = 0;
-    enum IN_PORT inport = aml_dev->active_inport;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
     ALOGI("[audiohal_kpi]++%s created.", __FUNCTION__);
     // FIXME: get actual configs
@@ -2100,11 +2114,8 @@ void *audio_dtv_patch_output_threadloop(void *data)
         goto exit_open;
     }
     aml_out = (struct aml_stream_out *)stream_out;
+    patch->dtv_aml_out = aml_out;
     aml_out->dtvsync_enable = property_get_bool(DTV_SYNCENABLE, true);
-    if (inport == INPORT_TUNER) {
-        inport = INPORT_DTV;
-    }
-    stream_out->set_volume(stream_out, aml_dev->src_gain[inport], aml_dev->src_gain[inport]);
     ALOGI("++%s live create a output stream success now!!!\n ", __FUNCTION__);
 
     patch->out_buf_size = write_bytes * EAC3_MULTIPLIER;
@@ -3924,6 +3935,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     patch->is_dtv_src = true;
     patch->startplay_avsync_flag = 1;
     patch->ad_substream_checked_flag = false;
+    patch->dtv_volume = 1.0;
 
     patch->output_thread_exit = 0;
     patch->cmd_process_thread_exit = 0;

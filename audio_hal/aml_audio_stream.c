@@ -1015,6 +1015,7 @@ void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
     dprintf(fd, "[AML_HAL] is_dtv_src:%d,dtvin_buffer_inited:%d\n",pstPatch->is_dtv_src,pstPatch->dtvin_buffer_inited);
     if (SRC_DTV == aml_dev->patch_src)
     {
+        dprintf(fd, "[AML_HAL]      dtv_volume: %10f\n", pstPatch->dtv_volume);
         if (pstPatch->dtvin_buffer_inited)
         {
             if (pstPatch->dtvin_ringbuffer.size != 0) {
@@ -1195,7 +1196,7 @@ void audio_hal_info_dump(struct aml_audio_device* aml_dev, int fd)
     dprintf(fd, "\n-------------[AML_HAL] audio hal info---------------------\n");
     dprintf(fd, "[AML_HAL]      format: %#10x, atmos: %d, decoding: %d, update_type: %d, \n", aml_dev->audio_hal_info.format,
         aml_dev->audio_hal_info.is_dolby_atmos, aml_dev->audio_hal_info.is_decoding, aml_dev->audio_hal_info.update_type);
-    dprintf(fd, "[AML_HAL]      ch_num: %#10d, sr: %d, lfepresent: %d, channel_mode: %d\n", aml_dev->audio_hal_info.channel_number,
+    dprintf(fd, "[AML_HAL]      ch_num: %10d, sr: %d, lfepresent: %d, channel_mode: %d\n", aml_dev->audio_hal_info.channel_number,
         aml_dev->audio_hal_info.sample_rate, aml_dev->audio_hal_info.lfepresent, aml_dev->audio_hal_info.channel_mode);
 
 }
