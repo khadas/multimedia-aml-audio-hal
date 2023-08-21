@@ -167,6 +167,11 @@ static inline uint32_t hwsync_header_get_offset(uint8_t *header)
            ((uint32_t)header[19]);
 }
 
+static inline char hwsync_header_get_sub_version(uint8_t *header)
+{
+    return header[2];
+}
+
 static inline uint64_t get_pts_gap(uint64_t a, uint64_t b)
 {
     if (a >= b) {

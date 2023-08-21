@@ -8969,9 +8969,15 @@ ssize_t out_write_new(struct audio_stream_out *stream,
             size_t total_data_size = aml_out->hwsync->es_mediasync.total_data_size + hwsync_header_get_size(buffer);
             //aml_out->hwsync->es_mediasync.total_data_size += hwsync_header_get_size(buffer);
             audio_mediasync_util_t *media_sync_util = aml_audio_get_mediasync_util_handle();
+            char sub_version = hwsync_header_get_sub_version(buffer);
+            if (!sub_version)
+            {
+                apts = apts * 90 / 1000000;
+            }
+
             if (adev->debug_flag > 1) {
-                ALOGI("[%s:%d], total_data_size:%zu, apts:%lld, bytes:%zu, media_sync_util=%p", __func__, __LINE__,
-                    total_data_size, apts, bytes, media_sync_util);
+                ALOGI("[%s:%d], total_data_size:%zu, apts:0x%llx, bytes:%zu, sub_version:%d, media_sync_util=%p", __func__, __LINE__,
+                    total_data_size, apts, bytes, sub_version, media_sync_util);
             }
 
             if (is_dolby_ms12_support_compression_format(aml_out->hal_internal_format))
