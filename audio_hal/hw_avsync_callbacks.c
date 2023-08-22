@@ -301,11 +301,11 @@ int on_meta_data_cbk(void *cookie,
                 }
             }
         }
-        else if (out->msync_session && (pts != HWSYNC_PTS_NA)) {
+        else if (out->msync_session && (pts32 != HWSYNC_PTS_NA)) {
             struct audio_policy policy;
-            //uint64_t latency = out_get_latency(stream) * 90;
-            //uint32_t apts32 = (cur_pts - latency) & 0xffffffff;
-            av_sync_audio_render(out->msync_session, pts32, &policy);
+            uint32_t latency = out_get_outport_latency((struct audio_stream_out *)out) * 90;
+            uint32_t apts32 = (pts32 - latency) & 0xffffffff;
+            av_sync_audio_render(out->msync_session, apts32, &policy);
             /* TODO: for non-amaster mode, handle sync policy on audio side */
         }
     }

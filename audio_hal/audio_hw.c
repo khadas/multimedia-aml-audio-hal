@@ -7700,6 +7700,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, const void *buf
     struct aml_stream_out *ms12_out = (struct aml_stream_out *)adev->ms12_out;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     struct aml_audio_patch *patch = adev->audio_patch;
+    uint64_t ringbuf_latency = 0;
     int case_cnt;
     int ret = -1;
     void *output_buffer = NULL;
@@ -8004,9 +8005,15 @@ hwsync_rewrite:
                         else if (aml_out->avsync_type == AVSYNC_TYPE_MSYNC) {
                             struct audio_policy policy;
                             int latency = out_get_latency(stream) * 90;
+                            if (adev->useSubMix) {
+                                struct subMixing *sm = adev->sm;
+                                struct amlAudioMixer *audio_mixer = sm->mixerData;
+                                ringbuf_latency = mixer_get_inport_latency_frames(audio_mixer, aml_out->inputPortID) / 48 * 90;
+                                latency += ringbuf_latency;
+                            }
                             uint32_t apts32 = (cur_pts - latency) & 0xffffffff;
                             if (aml_getprop_bool("media.audiohal.ptslog"))
-                                ALOGI("apts:%d pts:%lld latency:%d", apts32, cur_pts, latency);
+                                ALOGI("apts:%d pts:%lld latency:%d ringbuf_%d_latency:%lld", apts32, cur_pts, latency, aml_out->inputPortID, ringbuf_latency);
                             aml_audio_hwsync_set_first_pts(aml_out->hwsync, apts32);
                             if (aml_out->msync_session)
                                 av_sync_audio_render(aml_out->msync_session, apts32, &policy);
@@ -8071,9 +8078,15 @@ hwsync_rewrite:
                         if (aml_out->msync_session && (cur_pts != HWSYNC_PTS_NA)) {
                             struct audio_policy policy;
                             uint64_t latency = out_get_latency(stream) * 90;
+                            if (adev->useSubMix) {
+                                struct subMixing *sm = adev->sm;
+                                struct amlAudioMixer *audio_mixer = sm->mixerData;
+                                ringbuf_latency = mixer_get_inport_latency_frames(audio_mixer, aml_out->inputPortID) / 48 * 90;
+                                latency += ringbuf_latency;
+                            }
                             uint32_t apts32 = (cur_pts - latency) & 0xffffffff;
                             if (aml_getprop_bool("media.audiohal.ptslog"))
-                                ALOGI("apts:%d pts:%lld latency:%lld", apts32, cur_pts, latency);
+                                ALOGI("apts:%d pts:%lld latency:%lld ringbuf_%d_latency:%lld", apts32, cur_pts, latency, aml_out->inputPortID, ringbuf_latency);
 
                             av_sync_audio_render(aml_out->msync_session, apts32, &policy);
                             /* TODO: for non-amaster mode, handle sync policy on audio side */
