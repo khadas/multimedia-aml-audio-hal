@@ -42,7 +42,7 @@
 #endif
 
 #define BUFF_CNT                    (4)
-#define SYS_BUFF_CNT                (4)
+#define SYS_BUFF_CNT                (50) //ringbuf:10*50ms
 #define DIRECT_BUFF_CNT             (8)
 #define MMAP_BUFF_CNT               (8) /* Sometimes the time interval between BT stack writes is 40ms. */
 
@@ -803,6 +803,9 @@ static ssize_t output_port_write_alsa(output_port *port, void *buffer, int bytes
         }
         if (written > 0 && getprop_bool("vendor.media.audiohal.inport")) {
             aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/audioOutPort.raw", buffer, written);
+        }
+        if (written > 0 && getprop_bool("vendor.media.audiohal.alsadump")) {
+            aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/alsa_pcm_write.raw", buffer, written);
         }
         //if (get_debug_value(AML_DEBUG_AUDIOHAL_LEVEL_DETECT)) {
         //    check_audio_level("alsa_out", buffer, written);

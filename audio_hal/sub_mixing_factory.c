@@ -587,7 +587,6 @@ ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void *buffer
         if (throttle_timeus > 0 && throttle_timeus < 200000) {
             AM_LOGV("throttle time %" PRId64 " us", throttle_timeus);
             if (throttle_timeus > 1800) {
-                usleep(throttle_timeus - 1800);
                 AM_LOGV("actual throttle %" PRId64 " us, since last %" PRId64 " us",
                         throttle_timeus, us_since_last_write);
             } else {
