@@ -282,7 +282,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                         adev->audio_hal_info.first_decoding_frame = true;
                         adev->audio_hal_info.is_decoding = true;
                         //ALOGI("[%s:%d] aml_decoder_stream_info %d %d", __func__, __LINE__, adev->dec_stream_info.dec_info.stream_ch, adev->dec_stream_info.dec_info.stream_sr);
-                        if (48000 != aml_out->hal_rate)
+                        if (48000 != aml_out->hal_rate || ms12->config_channel_mask != 0x3)
                         {
                             ms12->config_sample_rate  = aml_out->hal_rate = 48000;
                             ms12->config_channel_mask = 0x3;
@@ -323,9 +323,9 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                         mediasync_util->payload_offset += dec_pcm_data->data_len;
 
                         if (mediasync_util->media_sync_debug)
-                             ALOGI("out_frames %d, out_apts1 %llx, in_frame_pts %llx, out_frame_pts %llx, data_sr %d, frame_offset %zu",
+                             ALOGI("out_frames %d, out_apts1 %llx, in_frame_pts %llx, out_frame_pts %llx, data_sr %d, data_ch %d, frame_offset %zu",
                                     out_frames, out_apts, aml_dec->in_frame_pts, aml_dec->out_frame_pts,
-                                    dec_pcm_data->data_sr, mediasync_util->payload_offset);
+                                    dec_pcm_data->data_sr, dec_pcm_data->data_ch, mediasync_util->payload_offset);
                     }
                     aml_dec->out_frame_pts = aml_dec->in_frame_pts + (90 * out_frames /(dec_pcm_data->data_sr / 1000));
                     ret = aml_audio_ms12_process_wrapper(stream, dec_data, dec_pcm_data->data_len);
