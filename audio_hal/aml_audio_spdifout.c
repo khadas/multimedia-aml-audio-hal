@@ -32,6 +32,13 @@
 #include "alsa_manager.h"
 #include "dolby_lib_api.h"
 
+typedef enum {
+    MC_POST_PROCESS_NONE            = 0,
+    MC_POST_PROCESS_SWAP_C_LFE      = 1,
+    MC_POST_PROCESS_EXTEND_CHANNEL  = 2,
+    MC_POST_PROCESS_COMPACT_CHANNEL = 3,
+    MC_POST_PROCESS_MAX             = 4
+} mc_post_process_type_e;
 
 typedef struct spdifout_handle {
     int device_id; /*used for refer aml_dev->alsa_handle*/
@@ -46,12 +53,23 @@ typedef struct spdifout_handle {
     audio_channel_mask_t channel_mask;
     bool spdif_mute;
     uint32_t sample_rate;
-    bool need_extend_channel;
+    mc_post_process_type_e post_process_type;
     size_t buf_size;
     void * temp_buf;
     bool restore_hdmitx_selection;
 } spdifout_handle_t;
 
+typedef size_t (*mc_post_process_func)(void *input, size_t size, void *output);
+
+static size_t mc_swap_c_lfe(void *input, size_t bytes, void *output);
+static size_t mc_compact_channel(void *input, size_t bytes, void *output);
+
+static mc_post_process_func mc_post_process_funcs[MC_POST_PROCESS_MAX] = {
+    NULL,
+    mc_swap_c_lfe,
+    NULL,
+    mc_compact_channel
+};
 
 static int select_digital_device(struct spdifout_handle *phandle) {
     int device_id = DIGITAL_DEVICE;
@@ -358,15 +376,23 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
         if (EARC_DEVICE == device_id) {
             if (spdif_config->data_ch == 2 || spdif_config->data_ch == 8) {
                 stream_config.config.channel_mask = audio_channel_out_mask_from_count(spdif_config->data_ch);
+                if (spdif_config->data_ch == 8) {
+                    phandle->post_process_type = MC_POST_PROCESS_SWAP_C_LFE;
+                }
             } else if (spdif_config->data_ch > 2 && spdif_config->data_ch < 8) {
                 stream_config.config.channel_mask = audio_channel_out_mask_from_count(8);
                 phandle->out_data_ch = 8;
-                phandle->need_extend_channel = true;
+                phandle->post_process_type = MC_POST_PROCESS_EXTEND_CHANNEL;
             } else {
                 ALOGE("%s EARC not support channel %d", __func__, spdif_config->data_ch);
                 goto error;
             }
 
+        } else if (TDM_DEVICE == device_id) {
+            /* MC PCM output from MS12 is hard coded to 8ch */
+            if (spdif_config->data_ch == 8) {
+                phandle->post_process_type = MC_POST_PROCESS_COMPACT_CHANNEL;
+            }
         }
         stream_config.config.sample_rate  = spdif_config->rate;
         stream_config.config.format       = AUDIO_FORMAT_IEC61937;
@@ -389,6 +415,8 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
             ALOGI("%s set spdif format 0x%x", __func__, aml_spdif_format);
         } else if (phandle->spdif_port == PORT_I2S2HDMI) {
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_I2S2HDMI_FORMAT, aml_spdif_format);
+            aml_audio_select_spdif_to_hdmi(AML_TDM_C_TO_HDMITX);
+            phandle->restore_hdmitx_selection = 1;
             ALOGI("%s set i2s to hdmi format 0x%x", __func__, aml_spdif_format);
         } else if (phandle->spdif_port == PORT_SPDIFB) {
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_B_FORMAT, aml_spdif_format);
@@ -490,6 +518,54 @@ int aml_audio_spdifout_insert_pause(void *phandle, int frames)
     return ret;
 }
 
+/* 8ch -> 8ch with C/LFE swap, must support in-place operation */
+static size_t mc_swap_c_lfe(void *input, size_t bytes, void *output)
+{
+    /* input is 8ch AUDIO_FORMAT_PCM_16_BIT */
+    short *in = (short *)input;
+    short *out = (short *)output;
+    int frames = bytes / 8 / sizeof(short);
+    int i;
+
+    for (i = 0; i < frames; i++) {
+        short t;
+        *out++ = *in++;
+        *out++ = *in++;
+        t = *in++;
+        *out++ = *in++;
+        *out++ = t;
+        *out++ = *in++;
+        *out++ = *in++;
+        *out++ = *in++;
+        *out++ = *in++;
+    }
+
+    return frames * 8 * sizeof(short);
+}
+
+/* 8ch -> 6ch conversion with C/LFE swap, must support in-place operation */
+static size_t mc_compact_channel(void *input, size_t bytes, void *output)
+{
+    /* input is 8ch AUDIO_FORMAT_PCM_16_BIT */
+    short *in = (short *)input;
+    short *out = (short *)output;
+    int frames = bytes / 8 / sizeof(short);
+    int i;
+
+    for (i = 0; i < frames; i++, in+=2) {
+        short t;
+        *out++ = *in++;
+        *out++ = *in++;
+        t = *in++;
+        *out++ = *in++;
+        *out++ = t;
+        *out++ = *in++;
+        *out++ = *in++;
+    }
+
+    return frames * 6 * sizeof(short);
+}
+
 int aml_audio_spdifout_processs(void *phandle, void *buffer, size_t byte)
 {
     int ret = -1;
@@ -499,6 +575,8 @@ int aml_audio_spdifout_processs(void *phandle, void *buffer, size_t byte)
     size_t output_buffer_bytes = 0;
     int device_id = -1;
     bool b_mute = false;
+    void *write_p;
+    size_t write_size;
 
     void *alsa_handle = NULL;
     if (phandle == NULL) {
@@ -541,10 +619,26 @@ int aml_audio_spdifout_processs(void *phandle, void *buffer, size_t byte)
         memset(output_buffer, 0, output_buffer_bytes);
     }
 
-    if (output_buffer_bytes) {
-        ret = aml_alsa_output_write_new(alsa_handle, output_buffer, output_buffer_bytes);
+    write_p = output_buffer;
+    write_size = output_buffer_bytes;
+
+    if ((spdifout_phandle->post_process_type >= 0) && (spdifout_phandle->post_process_type < MC_POST_PROCESS_MAX) && mc_post_process_funcs[spdifout_phandle->post_process_type]) {
+        switch (spdifout_phandle->post_process_type) {
+            case MC_POST_PROCESS_EXTEND_CHANNEL:
+                /* TODO: prepare output buffer */
+                break;
+            case MC_POST_PROCESS_SWAP_C_LFE:
+            case MC_POST_PROCESS_COMPACT_CHANNEL:
+            default:
+                /* in-place */
+                break;
+        }
+        write_size = mc_post_process_funcs[spdifout_phandle->post_process_type](output_buffer, output_buffer_bytes, write_p);
     }
 
+    if (write_size) {
+        ret = aml_alsa_output_write_new(alsa_handle, write_p, write_size);
+    }
 
     return ret;
 }

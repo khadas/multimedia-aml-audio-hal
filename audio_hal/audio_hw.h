@@ -464,6 +464,7 @@ struct aml_audio_device {
     struct aml_hw_mixer hw_mixer;
     audio_format_t sink_format;
     unsigned int sink_max_channels;
+    bool sink_allow_max_channel;
     audio_format_t optical_format;
     audio_format_t sink_capability;
     audio_format_t last_sink_capability;

@@ -943,10 +943,11 @@ int get_the_dolby_ms12_prepared(
     if (adev->is_SBR)
         output_config = MS12_OUTPUT_MASK_SPEAKER;
 
-    /* earc AVR connected, so we enable multi channel pcm out*/
-    if (ATTEND_TYPE_EARC == aml_audio_earctx_get_type(adev)) {
-        output_config |= MS12_OUTPUT_MASK_MC;
-    }
+    /* MC output is always on as STEREO downmix output and it's used in either one of following conditions
+     * 1. eARC sink with max supported channel number >= 6
+     * 2. HDMI PCM output with max supported channel number >= 6 and also Netflix LLP 6ch PCM case (sink_allow_max_channel == true)
+     */
+    output_config |= MS12_OUTPUT_MASK_MC;
     set_dolby_ms12_drc_parameters(input_format, output_config);
 #if 0
     /*we reconfig the ms12 nodes depending on the user case when digital input case to refine ms12 perfermance*/
@@ -2706,7 +2707,10 @@ int mc_pcm_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_
 
     bitstream_out = &ms12->bitstream_out[bitstream_id];
 
-    if ((adev->sink_format != AUDIO_FORMAT_PCM_16_BIT) || (adev->sink_max_channels < 8) || ms12->is_bypass_ms12) {
+    if ((adev->sink_format != AUDIO_FORMAT_PCM_16_BIT) ||
+        (adev->sink_max_channels < 6) ||
+        (!adev->sink_allow_max_channel && (ATTEND_TYPE_EARC != aml_audio_earctx_get_type(adev))) ||
+        ms12->is_bypass_ms12) {
         if (bitstream_out->spdifout_handle) {
             ALOGI("%s close mc spdif handle =%p", __func__, bitstream_out->spdifout_handle);
             aml_audio_spdifout_close(bitstream_out->spdifout_handle);

@@ -9248,6 +9248,10 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
             setenv(LLP_BUFFER_NAME, "1", 1);
             aml_alsa_set_llp(true);
             dolby_ms12_register_scaletempo_callback(ms12_llp_callback, (void *)aml_out);
+            if (audio_channel_count_from_out_mask(aml_out->hal_channel_mask) == 6) {
+                /* Allow MS12 MC output when LLP input is 6ch */
+                adev->sink_allow_max_channel = true;
+            }
 #endif
         } else {
             ALOGE("LLP IPC buffer create failed.");
@@ -9347,6 +9351,7 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
         unsetenv(LLP_BUFFER_NAME);
         IpcBuffer_destroy(aml_out->llp_buf);
         aml_out->llp_buf = NULL;
+        adev->sink_allow_max_channel = false;
     }
 #endif
 
