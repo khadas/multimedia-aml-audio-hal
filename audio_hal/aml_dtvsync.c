@@ -665,7 +665,7 @@ dtvsync_process_res  aml_dtvsync_nonms12_process(struct audio_stream_out *stream
 
     } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_ADJUST_CLOCK) {
 
-        aml_dtvsync_adjustclock(stream, &m_audiopolicy);
+        //aml_dtvsync_adjustclock(stream, &m_audiopolicy);
         adev->underrun_mute_flag = false;
 
     } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_RESAMPLE) {
