@@ -8925,15 +8925,15 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
         if (aml_out->is_normal_pcm) {
             aml_out->write = mixer_aux_buffer_write;
             aml_out->write_func = MIXER_AUX_BUFFER_WRITE;
-            ALOGI("%s(), continue mode mixer_aux_buffer_write !", __FUNCTION__);
+            ALOGV("%s(), continue mode mixer_aux_buffer_write !", __FUNCTION__);
         } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             aml_out->write = mixer_app_buffer_write;
             aml_out->write_func = MIXER_APP_BUFFER_WRITE;
-            ALOGI("%s(), continue mode mixer_app_buffer_write !", __FUNCTION__);
+            ALOGV("%s(), continue mode mixer_app_buffer_write !", __FUNCTION__);
         } else {
             aml_out->write = mixer_main_buffer_write;
             aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
-            ALOGI("%s(), continue mode mixer_main_buffer_write !", __FUNCTION__);
+            ALOGV("%s(), continue mode mixer_main_buffer_write !", __FUNCTION__);
         }
     }
 
