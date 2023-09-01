@@ -316,6 +316,8 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
 static int get_audio_patch_by_src_dev(struct audio_hw_device *dev,
                                       audio_devices_t dev_type,
                                       struct audio_patch **p_audio_patch);
+static int set_hdmi_format(struct aml_audio_device *adev, int val);
+
 ssize_t out_write_new(struct audio_stream_out *stream,
                       const void *buffer,
                       size_t bytes);
@@ -4365,21 +4367,11 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     //add for fireos tv for Dolby audio setting
     ret = str_parms_get_int (parms, "hdmi_format", &val);
     if (ret >= 0 ) {
-        if (adev->hdmi_format != val)
-            adev->hdmi_format_updated = 1;
-        adev->hdmi_format = val;
-
-        /* update the DUT's EDID */
-        update_edid_after_edited_audio_sad(adev, &adev->hdmi_descs.ddp_fmt);
-        if (adev->ms12_out && continous_mode(adev)) {
-            ALOGD("%s() active stream is ms12_out %p\n", __FUNCTION__, adev->ms12_out);
-            get_sink_format((struct audio_stream_out *)adev->ms12_out);
+        ret = set_hdmi_format(adev, val);
+        if (ret < 0) {
+            ALOGE("[%s:%d], An error occurred during setting hdmi_format!", __func__, __LINE__);
+            return ret;
         }
-
-        //sysfs_set_sysfs_str(REPORT_DECODED_INFO, kvpairs);
-        if ((eDolbyMS12Lib == adev->dolby_lib_type) && (adev->out_device & AUDIO_DEVICE_OUT_ALL_A2DP))
-            adev->a2dp_no_reconfig_ms12 = aml_audio_get_systime() + 2000000;
-        ALOGI ("HDMI format: %d\n", adev->hdmi_format);
         goto exit;
     }
 
@@ -9034,6 +9026,34 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
     return 0;
 }
 
+static int set_hdmi_format(struct aml_audio_device *adev, int val)
+{
+    int ret = -1;
+    if (adev->hdmi_format == val) {
+        return 0;
+    }
+    adev->hdmi_format_updated = 1;
+    adev->hdmi_format = val;
+    /* update the DUT's EDID */
+    ret = update_edid_after_edited_audio_sad(adev, &adev->hdmi_descs.ddp_fmt);
+    if (ret < 0) {
+        ALOGE("[%s:%d], An error occurred during updating the DUT's EDID!", __func__, __LINE__);
+        return ret;
+    }
+    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+        if (continous_mode(adev)) {
+            ALOGD("%s() active stream is ms12_out %p\n", __FUNCTION__, adev->ms12_out);
+            get_sink_format((struct audio_stream_out *)adev->ms12_out);
+        }
+        if (adev->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
+            adev->a2dp_no_reconfig_ms12 = aml_audio_get_systime() + 2000000;
+        }
+    }
+    ALOGI("update HDMI format: %d\n", adev->hdmi_format);
+    return 0;
+}
+
+
 /* out_write entrance: every write goes in here. */
 ssize_t out_write_new(struct audio_stream_out *stream,
                       const void *buffer,
@@ -9044,6 +9064,15 @@ ssize_t out_write_new(struct audio_stream_out *stream,
     ssize_t ret = 0;
     write_func  write_func_p = NULL;
 
+#ifdef NO_SERVER
+    int val = 0;
+    val = get_digital_mode(&adev->alsa_mixer);
+    ret = set_hdmi_format(adev, val);
+    if (ret < 0) {
+        ALOGE("[%s:%d], An error occurred during setting hdmi_format !", __func__, __LINE__);
+        return ret;
+    }
+#endif
     adev->debug_flag = aml_audio_get_debug_flag();
     if (adev->debug_flag > 1) {
         ALOGI("+<IN>%s: out_stream(%p) position(%zu)", __func__, stream, bytes);

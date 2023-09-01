@@ -27,6 +27,7 @@ target_include_directories(spdifenc PRIVATE
 
 target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations -fPIC)
 
+option(DISABLE_SERVER "rm audio server" OFF)
 option(USE_DTV "Compile with DTV option" OFF)
 option(NO_USE_CAP "Don't support audio capture" OFF)
 option(USE_SC2 "Current platform is sc2" OFF)
@@ -44,6 +45,10 @@ add_definitions(-DMS12_V26_ENABLE)
 else()
 add_subdirectory("libms12_v24")
 add_definitions(-DMS12_V24_ENABLE)
+endif()
+
+if(DISABLE_SERVER)
+    add_definitions(-DNO_SERVER)
 endif()
 
 if(USE_DTV)

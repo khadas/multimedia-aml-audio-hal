@@ -72,6 +72,14 @@ static const char *str_compmode[] = {"custom mode, analog dialnorm","custom mode
 #define DD_MUTE_FRAME_SIZE 1536
 #define DDP_MUTE_FRAME_SIZE 6144
 
+enum audio_digital_mode {
+  AML_HAL_PCM = 0,
+  AML_HAL_DD = 1,
+  AML_HAL_AUTO = 2,
+  AML_HAL_BYPASS = 3,
+  AML_HAL_DDP = 4,
+};
+
 //add array of chip name,index is chip id
 static const char* aml_chip_name[]= {
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -461,6 +469,38 @@ int getprop_bool(const char *path)
         }
     }
     return 0;
+}
+
+/* To get digital mode, mapping between kctrl value and audio hal */
+static int map_digital_mode(int kctrl_value)
+{
+    switch (kctrl_value) {
+    case AML_HAL_PCM:
+        return PCM;
+    case AML_HAL_DD:
+        return DD;
+    case AML_HAL_AUTO:
+        return AUTO;
+    case AML_HAL_BYPASS:
+        return BYPASS;
+    case AML_HAL_DDP:
+        return DDP;
+    default:
+        AM_LOGW("KCTRL value was wrong! default set AUTO mode.\n");
+        return AUTO;
+    }
+}
+
+int get_digital_mode(struct aml_mixer_handle *mixer_handle)
+{
+    int ret = -1;
+
+    if (NULL == mixer_handle) {
+        return ret;
+    }
+
+    ret = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_DIGITAL_MODE);
+    return map_digital_mode(ret);
 }
 
 int check_chip_name(char *chip_name, unsigned int length,
