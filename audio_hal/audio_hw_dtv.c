@@ -539,6 +539,20 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                 }
             } else if (val == AUDIO_DTV_PATCH_CMD_CLOSE) {
                 ALOGI("AUDIO_DTV_PATCH_CMD_CLOSE demux_hanle %p,%d,%p,%p\n",demux_handle,adev->is_multi_demux, dtvsync->mediasync_new, dtvsync->mediasync);
+
+                //wait stop done, need wait input & output thread exit here for 40ms ease at stop cmd process
+                int wait_count = 0;
+                while ((0 != patch->output_thread_created) || (0 != patch->input_thread_created))
+                {
+                    aml_audio_sleep(20000); //20ms
+                    wait_count++;
+                    if (50 < wait_count)
+                    {
+                        ALOGI("[%s:%d], 1s timeout break!!!", __func__, __LINE__);
+                        break;
+                    }
+                }
+
                 if (adev->is_multi_demux) {
                     if (demux_handle) {
                         Stop_Dmx_Main_Audio(demux_handle);
@@ -3800,9 +3814,9 @@ exit:
 static int create_dtv_output_stream_thread(struct aml_audio_patch *patch)
 {
     int ret = 0;
-    ALOGI("++%s   ---- %d\n", __FUNCTION__, patch->ouput_thread_created);
+    ALOGI("++%s   ---- %d\n", __FUNCTION__, patch->output_thread_created);
 
-    if (patch->ouput_thread_created == 0) {
+    if (patch->output_thread_created == 0) {
         patch->output_thread_exit = 0;
         pthread_mutex_init(&patch->dtv_output_mutex, NULL);
         patch->dtv_replay_flag = true;
@@ -3827,7 +3841,7 @@ static int create_dtv_output_stream_thread(struct aml_audio_patch *patch)
 #endif
         }
 
-        patch->ouput_thread_created = 1;
+        patch->output_thread_created = 1;
     }
     ALOGI("--%s", __FUNCTION__);
     return 0;
@@ -3836,12 +3850,12 @@ static int create_dtv_output_stream_thread(struct aml_audio_patch *patch)
 static int release_dtv_output_stream_thread(struct aml_audio_patch *patch)
 {
     int ret = 0;
-    ALOGI("++%s   ---- %d\n", __FUNCTION__, patch->ouput_thread_created);
-    if (patch->ouput_thread_created == 1) {
+    ALOGI("++%s   ---- %d\n", __FUNCTION__, patch->output_thread_created);
+    if (patch->output_thread_created == 1) {
         patch->output_thread_exit = 1;
         pthread_join(patch->audio_output_threadID, NULL);
         pthread_mutex_destroy(&patch->dtv_output_mutex);
-        patch->ouput_thread_created = 0;
+        patch->output_thread_created = 0;
     }
     ALOGI("--%s", __FUNCTION__);
     return 0;
