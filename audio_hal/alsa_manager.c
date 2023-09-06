@@ -175,7 +175,7 @@ int aml_alsa_output_open(struct audio_stream_out *stream) {
                 , adev->default_alsa_ch/*audio_channel_count_from_out_mask(aml_out->hal_channel_mask)*/
                 , aml_out->config.rate
                 , aml_out->is_tv_platform
-                , continous_mode(adev)
+                , continuous_mode(adev)
                 , adev->game_mode);
             switch (output_format) {
                 case AUDIO_FORMAT_E_AC3:
@@ -886,7 +886,7 @@ int aml_alsa_output_open_new(void **handle, aml_stream_config_t * stream_config,
     channels = audio_channel_count_from_out_mask(stream_config->config.channel_mask);
     rate     = stream_config->config.sample_rate;
     get_hardware_config_parameters(config, format, adev->default_alsa_ch/*channels*/, rate, platform_is_tv,
-                continous_mode(adev), adev->game_mode);
+                continuous_mode(adev), adev->game_mode);
 
     config->channels = channels;
     config->rate     = rate;

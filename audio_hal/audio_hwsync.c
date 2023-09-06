@@ -39,7 +39,6 @@
 #include "audio_hwsync_wrap.h"
 #include "aml_audio_ms12_sync.h"
 #include "aml_audio_timer.h"
-#include "audio_hw_ms12.h"
 
 #include "tinyalsa_ext.h"
 
@@ -718,7 +717,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
             uint32_t apts_save = apts;
             apts -= latency_pts;
 
-            if (p_hwsync->eos && (eDolbyMS12Lib == adev->dolby_lib_type) && continous_mode(adev)) {
+            if (p_hwsync->eos && (eDolbyMS12Lib == adev->dolby_lib_type) && continuous_mode(adev)) {
                 return 0;
             }
 

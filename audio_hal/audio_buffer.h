@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Amlogic Corporation.
+ * Copyright (C) 2023 Amlogic Corporation.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef _AML_AUDIO_MS12_RENDER_H_
-#define _AML_AUDIO_MS12_RENDER_H_
 
-#include "audio_hw.h"
+#ifndef _AUDIO_BUFFER_
+#define _AUDIO_BUFFER_
 
-/**
- * @brief This function use aml audio decoder to process the audio data
- *
- * @returns the process result
- */
-int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *abuffer);
+
+struct audio_buffer {
+    bool b_pts_valid;
+    int format;
+    ssize_t size;
+    uint64_t pts; //unit 90k;
+    const void* buffer;
+};
 
 #endif
-

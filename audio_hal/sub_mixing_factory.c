@@ -40,6 +40,10 @@ static ssize_t out_write_subMixingPCM(struct audio_stream_out *stream,
 static int out_pause_subMixingPCM(struct audio_stream_out *stream);
 static int out_resume_subMixingPCM(struct audio_stream_out *stream);
 static int out_flush_subMixingPCM(struct audio_stream_out *stream);
+static ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, struct audio_buffer *abuffer);
+static ssize_t mixer_main_buffer_write_sm(struct audio_stream_out *stream, struct audio_buffer *abuffer);
+static ssize_t mixer_mmap_buffer_write_sm(struct audio_stream_out *stream, struct audio_buffer *abuffer);
+
 
 struct pcm *getSubMixingPCMdev(struct subMixing *sm)
 {
@@ -1091,17 +1095,22 @@ int outSubMixingWrite(
     sm->write(sm, buffer, bytes);
     return 0;
 }
-ssize_t mixer_main_buffer_write_sm (struct audio_stream_out *stream, const void *buffer,
-                                 size_t bytes)
+ssize_t mixer_main_buffer_write_sm (struct audio_stream_out *stream, struct audio_buffer *abuffer)
 {
     struct aml_stream_out       *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device     *adev = aml_out->dev;
     ssize_t                     write_bytes = 0;
+    const void *buffer = NULL;
+    size_t bytes = 0;
 
-    if (buffer == NULL || bytes == 0) {
+    if (abuffer == NULL || abuffer->size == 0) {
         AM_LOGW("stream:%p, buffer is null, or bytes:%zu invalid", stream, bytes);
         return -1;
     }
+
+    buffer = abuffer->buffer;
+    bytes = abuffer->size;
+
 
     if (adev->debug_flag) {
         AM_LOGD("stream:%p, out_device:%#x, bytes:%zu, format:%#x, hw_sync_mode:%d",
@@ -1131,12 +1140,13 @@ ssize_t mixer_main_buffer_write_sm (struct audio_stream_out *stream, const void 
     return bytes;
 }
 
-ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, const void *buffer,
-                               size_t bytes)
+ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, struct audio_buffer *abuffer)
 {
     struct aml_stream_out       *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device     *adev = aml_out->dev;
     struct subMixing            *sm = adev->sm;
+    const void *buffer = abuffer->buffer;
+    size_t bytes = abuffer->size;
     size_t                      in_frames = bytes / audio_stream_out_frame_size(stream);
     ssize_t                     bytes_written = 0;
     int channels = audio_channel_count_from_out_mask(aml_out->hal_channel_mask);
@@ -1241,13 +1251,15 @@ exit:
     return bytes;
 }
 
-ssize_t mixer_mmap_buffer_write_sm(struct audio_stream_out *stream, const void *buffer, size_t bytes)
+ssize_t mixer_mmap_buffer_write_sm(struct audio_stream_out *stream, struct audio_buffer *abuffer)
 {
    struct aml_stream_out    *aml_out = (struct aml_stream_out *) stream;
    struct aml_audio_device  *adev = aml_out->dev;
    struct subMixing         *pstSubMixing = adev->sm;
    ssize_t                  bytes_written = 0;
    int channels = audio_channel_count_from_out_mask(aml_out->hal_channel_mask);
+   const void *buffer = abuffer->buffer;
+   size_t bytes = abuffer->size;
    uint16_t *in_buf_16 = (uint16_t *)buffer;
 
    if (adev->debug_flag) {
@@ -1361,16 +1373,9 @@ static int usecase_change_validate_l_sm(struct aml_stream_out *aml_out, bool is_
     }
 
     if (STREAM_PCM_NORMAL == aml_out->usecase) {
-        //if (aml_dev->audio_patching) {
-        if (0) {
-            AM_LOGD("tv patching, mixer_aux_buffer_write!");
-            aml_out->write = mixer_aux_buffer_write;
-            aml_out->write_func = MIXER_AUX_BUFFER_WRITE;
-        } else {
-            aml_out->write = mixer_aux_buffer_write_sm;
-            aml_out->write_func = MIXER_AUX_BUFFER_WRITE_SM;
-            AM_LOGV("mixer_aux_buffer_write_sm !");
-        }
+        aml_out->write = mixer_aux_buffer_write_sm;
+        aml_out->write_func = MIXER_AUX_BUFFER_WRITE_SM;
+        AM_LOGV("mixer_aux_buffer_write_sm !");
     } else if (STREAM_PCM_MMAP == aml_out->usecase) {
         aml_out->write = mixer_mmap_buffer_write_sm;
         aml_out->write_func = MIXER_MMAP_BUFFER_WRITE_SM;
@@ -1397,7 +1402,7 @@ static ssize_t out_write_subMixingPCM(struct audio_stream_out *stream,
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
     ssize_t ret = 0;
-    //write_func  write_func_p = NULL;
+    struct audio_buffer abuffer = {0};
 
     AM_LOGV("out_stream(%p) position(%zu)", stream, bytes);
     aml_audio_trace_int("out_write_subMixingPCM", bytes);
@@ -1470,7 +1475,9 @@ static ssize_t out_write_subMixingPCM(struct audio_stream_out *stream,
     }
     pthread_mutex_unlock(&adev->lock);
     if (aml_out->write) {
-        ret = aml_out->write(stream, buffer, bytes);
+        abuffer.buffer = buffer;
+        abuffer.size = bytes;
+        ret = aml_out->write(stream, &abuffer);
     } else {
         AM_LOGE("NULL write function");
     }

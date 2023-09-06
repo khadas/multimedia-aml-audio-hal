@@ -58,7 +58,6 @@
 #include "dtv_patch_out.h"
 #endif
 #include "aml_audio_resampler.h"
-#include "audio_hw_ms12.h"
 #include "dolby_lib_api.h"
 #include "audio_dtv_ad.h"
 #include "alsa_device_parser.h"
@@ -185,13 +184,6 @@ unsigned long dtv_hal_get_pts(struct aml_audio_patch *patch,
     }
     patch->cur_outapts = val;
     return val;
-}
-
-static uint32_t out_get_latency(const struct audio_stream_out *stream)
-{
-    const struct aml_stream_out *out = (const struct aml_stream_out *)stream;
-    snd_pcm_sframes_t frames = out_get_latency_frames(stream);
-    return (frames * 1000) / out->config.rate;
 }
 
 static unsigned int compare_clock(unsigned int clock1, unsigned int clock2, unsigned int factor)

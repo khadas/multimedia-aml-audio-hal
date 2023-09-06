@@ -151,7 +151,6 @@ add_library(audio_hal SHARED
 	audio_hal/audio_format_parse.c
 	audio_hal/audio_hw.c
 	audio_hal/audio_hw_ms12_common.c
-	#audio_hal/audio_hw_ms12.c  by default, we compile V2,V1 is not used now. TBD
 	audio_hal/audio_hw_ms12_v2.c
 	audio_hal/aml_audio_ms12_sync.c
 	audio_hal/audio_hw_profile.c

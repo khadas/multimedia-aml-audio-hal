@@ -19,6 +19,7 @@
 #include <cutils/log.h>
 #include "aml_dec_api.h"
 #include "aml_malloc_debug.h"
+#include "audio_hw_utils.h"
 
 #define PCM_MAX_LENGTH (8192*2*2)
 
@@ -369,7 +370,7 @@ static inline int16_t av_clip_int16(int a)
         return a;
     }
 }
-static aml_dec_return_type_t convert_data_from_be_to_16bit_le(aml_dec_t * aml_dec, unsigned char*buffer, int in_bytes) {
+static aml_dec_return_type_t convert_data_from_be_to_16bit_le(aml_dec_t * aml_dec, const char *buffer, int in_bytes) {
     dec_data_info_t * dec_pcm_data = &aml_dec->dec_pcm_data;
     struct pcm_dec_t *pcm_dec = NULL;
     aml_pcm_config_t* pcm_config = NULL;
@@ -451,7 +452,7 @@ static aml_dec_return_type_t convert_data_from_be_to_16bit_le(aml_dec_t * aml_de
     dec_pcm_data->data_len = frame_num * 4;
     return AML_DEC_RETURN_TYPE_OK;
 }
-static aml_dec_return_type_t lpcm_process(aml_dec_t * aml_dec, unsigned char*buffer, int in_bytes)
+static aml_dec_return_type_t lpcm_process(aml_dec_t * aml_dec, const char *buffer, int in_bytes)
 {
     int header_size = 0;
     unsigned int header = 0;
@@ -504,7 +505,7 @@ static bool is_u8pcm(audio_format_t format)
     }
 }
 
-static aml_dec_return_type_t u8pcm_process(aml_dec_t * aml_dec, unsigned char*buffer, int in_bytes)
+static aml_dec_return_type_t u8pcm_process(aml_dec_t * aml_dec, const char*buffer, int in_bytes)
 {
     short *ouBuffer = NULL;
     dec_data_info_t *dec_pcm_data = &aml_dec->dec_pcm_data;
@@ -529,15 +530,18 @@ static aml_dec_return_type_t u8pcm_process(aml_dec_t * aml_dec, unsigned char*bu
     return AML_DEC_RETURN_TYPE_OK;
 }
 
-static int pcm_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int bytes)
+static int pcm_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
 {
     struct pcm_dec_t *pcm_dec = NULL;
     aml_pcm_config_t *pcm_config = NULL;
+    const char *buffer = abuffer->buffer;
+    int bytes = abuffer->size;
     int in_bytes = bytes;
     int src_channel = 0;
     int dst_channel = 0;
     int downmix_conf = 1;
     int downmix_size = 0;
+
     if (aml_dec == NULL) {
         ALOGE("%s aml_dec is NULL", __func__);
         return AML_DEC_RETURN_TYPE_FAIL;
@@ -631,6 +635,12 @@ static int pcm_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
         raw_in_data->data_format  = pcm_config->pcm_format;
         ALOGV("%s multi data_in=%d ch =%d out=%d ch=%d", __func__, bytes, pcm_config->channel, downmix_size, pcm_config->channel);
     }
+
+    dec_pcm_data->pts = abuffer->pts;
+
+    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+        dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, in_bytes);
+
     return in_bytes;
 }
 

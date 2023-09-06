@@ -54,6 +54,10 @@
 #define AM_LOGI(fmt, ...)  ALOGI("[%s:%d] " fmt, __func__,__LINE__, ##__VA_ARGS__)
 #define AM_LOGW(fmt, ...)  ALOGW("[%s:%d] " fmt, __func__,__LINE__, ##__VA_ARGS__)
 #define AM_LOGE(fmt, ...)  ALOGE("[%s:%d] " fmt, __func__,__LINE__, ##__VA_ARGS__)
+#define AM_LOGI_IF(cond, fmt, ...)          \
+        if(cond) {                        \
+            AM_LOGI(fmt, ##__VA_ARGS__);    \
+        }
 
 #define R_CHECK_RET(ret, fmt, ...)                                                              \
     if (ret != 0) {                                                                             \
@@ -110,6 +114,7 @@ int aml_audio_get_pcm_latency_offset(int format, bool is_netflix, stream_usecase
 int aml_audio_get_hwsync_latency_offset(bool b_raw);
 int aml_audio_get_ddp_frame_size();
 uint32_t out_get_outport_latency(const struct audio_stream_out *stream);
+uint32_t out_get_latency (const struct audio_stream_out *stream);
 uint32_t out_get_latency_frames(const struct audio_stream_out *stream);
 int aml_audio_get_spdif_tuning_latency(void);
 int aml_audio_get_arc_tuning_latency(audio_format_t arc_afmt);
@@ -137,7 +142,6 @@ int aml_audio_delay_timestamp(struct timespec *timestamp, int delay_time_ms);
 int halformat_convert_to_spdif(audio_format_t format, int ch_mask);
 int alsa_device_get_port_index(alsa_device_t alsa_device);
 int aml_set_thread_priority(char *pName, pthread_t threadId);
-uint32_t out_get_alsa_latency_frames(const struct audio_stream_out *stream);
 bool is_multi_channel_pcm(struct audio_stream_out *stream);
 bool is_high_rate_pcm(struct audio_stream_out *stream);
 bool is_disable_ms12_continuous(struct audio_stream_out *stream);

@@ -28,8 +28,6 @@
 #include <inttypes.h>
 #if defined(MS12_V26_ENABLE) || defined (MS12_V24_ENABLE)
 #include "audio_hw_ms12_v2.h"
-#else
-#include "audio_hw_ms12.h"
 #endif
 #include "audio_hw_ms12_common.h"
 #include "alsa_config_parameters.h"

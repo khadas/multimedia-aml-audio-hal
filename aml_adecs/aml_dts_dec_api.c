@@ -36,7 +36,7 @@
 
 #include "audio_hw.h"
 #include "aml_dts_dec_api.h"
-
+#include "audio_hw_utils.h"
 
 #ifdef BUILD_LINUX
 #define DOLBY_DTSHD_LIB_PATH "/usr/lib/libHwAudio_dtshd.so"
@@ -128,15 +128,6 @@ static int _dts_frame_scan(struct dca_dts_dec *dts_dec);
 static int _dts_pcm_output(struct dca_dts_dec *dts_dec);
 static int _dts_raw_output(struct dca_dts_dec *dts_dec);
 static int _dts_stream_type_mapping(unsigned int stream_type);
-
-static void endian16_convert(void *buf, int size)
-{
-    int i;
-    unsigned short *p = (unsigned short *)buf;
-    for (i = 0; i < size / 2; i++, p++) {
-      *p = ((*p & 0xff) << 8) | ((*p) >> 8);
-    }
-}
 
 static int _dts_syncword_scan(unsigned char *read_pointer, unsigned int *pTemp0)
 {
@@ -754,7 +745,7 @@ int dca_decoder_release_patch(aml_dec_t *aml_dec)
     return 1;
 }
 
-int dca_decoder_process_patch(aml_dec_t *aml_dec, unsigned char *buffer, int bytes)
+int dca_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer)
 {
     struct dca_dts_dec *dts_dec = NULL;
     struct aml_audio_device *adev = NULL;
@@ -763,6 +754,8 @@ int dca_decoder_process_patch(aml_dec_t *aml_dec, unsigned char *buffer, int byt
     dec_data_info_t *dec_raw_data = NULL;
     int frame_size = 0;
     int used_size = 0;
+    const char *buffer = abuffer->buffer;
+    int bytes = abuffer->size;
 
     if (!aml_dec || !buffer) {
         ALOGE("[%s:%d] Invalid parameter: %s %s", __func__, __LINE__, DCA_CHECK_NULL_STR(aml_dec), DCA_CHECK_NULL_STR(buffer));
@@ -870,10 +863,12 @@ int dca_decoder_process_patch(aml_dec_t *aml_dec, unsigned char *buffer, int byt
         if ((dts_dec->outlen_pcm > 0) && (used_size > 0)) {
             /* Cache a lot of data, needs to be decoded multiple times. */
             aml_dec->frame_cnt++;
-            return AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN;
-        } else {
-            return AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN;
         }
+        dec_pcm_data->pts = abuffer->pts;
+
+        AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d",
+            dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size);
+        return AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN;
     } else if (frame_size == 0) {
         return AML_DEC_RETURN_TYPE_CACHE_DATA;
     } else {

@@ -23,6 +23,7 @@
 #include "aml_volume_utils.h"
 #include "aml_malloc_debug.h"
 #include "adec-armdec-mgt.h"
+#include "audio_buffer.h"
 
 #define ACODEC_FMT_NULL -1
 #define ACODEC_FMT_MPEG 0
@@ -114,6 +115,7 @@ typedef struct dec_data_info {
     int data_ch;
     int data_sr;
     bool is_dtscd;
+    uint64_t pts; //unit 90k;
     //int data_bitwidth;
 } dec_data_info_t;
 
@@ -131,6 +133,7 @@ typedef struct aml_dec {
     int frame_cnt;
     int fragment_left_size;
     void *dev;
+    int debug_level;
 } aml_dec_t;
 
 typedef struct aml_dcv_config {
@@ -228,7 +231,7 @@ typedef union aml_dec_info {
 
 typedef int (*F_Init)(aml_dec_t **ppaml_dec, aml_dec_config_t * dec_config);
 typedef int (*F_Release)(aml_dec_t *aml_dec);
-typedef int (*F_Process)(aml_dec_t *aml_dec, unsigned char* buffer, int bytes);
+typedef int (*F_Process)(aml_dec_t *aml_dec, struct audio_buffer *abuffer);
 typedef int (*F_Config)(aml_dec_t *aml_dec, aml_dec_config_type_t config_type, aml_dec_config_t * dec_config);
 typedef int (*F_Info)(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_dec_info_t * dec_info);
 
@@ -243,7 +246,7 @@ typedef struct aml_dec_func {
 int aml_decoder_init(aml_dec_t **aml_dec, audio_format_t format, aml_dec_config_t * dec_config);
 int aml_decoder_release(aml_dec_t *aml_dec);
 int aml_decoder_info(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_dec_info_t * dec_info);
-int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int * used_bytes);
+int aml_decoder_process(aml_dec_t *aml_dec, struct audio_buffer *abuffer, int * used_bytes);
 int aml_decoder_set_config(aml_dec_t *aml_dec, aml_dec_config_type_t config_type, aml_dec_config_t * dec_config);
 void aml_decoder_calc_coefficient(unsigned char ad_fade,float * mix_coefficient,float * ad_coefficient);
 int aml_decoder_get_info(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_dec_info_t * dec_info);

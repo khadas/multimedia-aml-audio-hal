@@ -22,6 +22,7 @@
 #include "aml_dec_api.h"
 #include "audio_data_process.h"
 #include "aml_malloc_debug.h"
+#include "audio_hw_utils.h"
 
 #define FLAC_LIB_PATH "/usr/lib/libflac-aml.so"
 #define FLAC_MAX_LENGTH (1024 * 64)
@@ -225,7 +226,7 @@ static int flac_decoder_release(aml_dec_t *aml_decoder)
     return 0;
 }
 
-static int flac_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, int bytes)
+static int flac_decoder_process(aml_dec_t *aml_decoder, struct audio_buffer *abuffer)
 {
     int ret = 0;
     int used_size = 0;
@@ -238,6 +239,8 @@ static int flac_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, i
     aml_flac_config_t *flac_config = &flac_decoder->flac_config;
     flac_decoder_operations_t *flac_operation = &flac_decoder->flac_operation;
     dec_data_info_t *dec_pcm_data = &aml_decoder->dec_pcm_data;
+    const char *buffer = abuffer->buffer;
+    int bytes = abuffer->size;
 
     if (aml_decoder == NULL) {
         ALOGE("%s[%d]: aml_decoder is NULL", __FUNCTION__, __LINE__);
@@ -305,9 +308,10 @@ static int flac_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, i
     flac_decoder->stream_info.stream_ch = dec_pcm_data->data_ch;
     flac_decoder->stream_info.stream_sr = dec_pcm_data->data_sr;
     dec_pcm_data->data_format = flac_config->flac_format;
+    dec_pcm_data->pts = abuffer->pts;
     dump_flac_data(dec_pcm_data->buf, dec_pcm_data->data_len, "/data/flac_output.pcm");
-    ALOGV("%s[%d]: used_size_return %d, decoder pcm len %d, buffer len %d", __FUNCTION__, __LINE__, used_size_return, dec_pcm_data->data_len,
-        dec_pcm_data->buf_size);
+    AM_LOGI_IF(aml_decoder->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+        dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, used_size_return);
 
     return used_size_return;
 }

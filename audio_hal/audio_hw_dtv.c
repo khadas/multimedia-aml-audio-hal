@@ -57,8 +57,6 @@
 #include "aml_audio_resampler.h"
 #if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
 #include "audio_hw_ms12_v2.h"
-#else
-#include "audio_hw_ms12.h"
 #endif
 #include "dolby_lib_api.h"
 #include "audio_dtv_ad.h"

@@ -23,6 +23,8 @@
 #include "aml_dec_api.h"
 #include "audio_data_process.h"
 #include "aml_malloc_debug.h"
+#include "audio_hw_utils.h"
+
 
 #define FAAD_LIB_PATH "/vendor/lib/libfaad-ahal.so"
 #define FAAD_LIB_PATH1 "/usr/lib/libfaad-ahal.so"//Linux Platform so is in /usr/lib/
@@ -66,6 +68,7 @@ struct aac_dec_t {
     void *pdecoder;
     char remain_data[AAC_REMAIN_BUFFER_SIZE];
     int remain_size;
+    uint64_t remain_data_pts; //unit 90k;
     bool ad_decoder_supported;
     bool ad_mixing_enable;
     int advol_level;
@@ -306,11 +309,13 @@ static void dump_faad_data(void *buffer, int size, char *file_name)
 }
 
 
-static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int bytes)
+static int faad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
 {
     struct aac_dec_t *aac_dec = NULL;
     aml_faad_config_t *aac_config = NULL;
     AudioInfo pAudioInfo,pADAudioInfo;
+    int bytes = abuffer->size;
+    char * buffer = abuffer->buffer;
     if (aml_dec == NULL) {
         ALOGE("%s aml_dec is NULL", __func__);
         return -1;
@@ -326,9 +331,11 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
     int used_size = 0;
     int used_size_return = 0;
     int mark_remain_size = aac_dec->remain_size;
-    ALOGV("remain_size %d bytes %d ad_decoder_supported %d ad_mixing_enable %d advol_level %d mixer_level %d",
+    AM_LOGI_IF(aml_dec->debug_level, "remain_size %d bytes %d ad_decoder_supported %d ad_mixing_enable %d advol_level %d mixer_level %d",
         aac_dec->remain_size ,bytes, aac_dec->ad_decoder_supported, aac_dec->ad_mixing_enable, aac_dec->advol_level,aac_dec->mixer_level );
     if (bytes > 0) {
+        if (!aac_dec->remain_size)
+            aac_dec->remain_data_pts = abuffer->pts;
         memcpy(aac_dec->remain_data + aac_dec->remain_size, buffer, bytes);
         aac_dec->remain_size += bytes;
     }
@@ -345,16 +352,18 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
               ALOGE("decode len %d  > buf_size %d ", dec_pcm_data->data_len, dec_pcm_data->buf_size);
               break;
           }
-          ALOGV("decode_len %d in %d pcm_len %d used_size %d", decode_len,  aac_dec->remain_size , pcm_len, used_size);
+          AM_LOGI_IF(aml_dec->debug_level, "decode_len %d in %d pcm_len %d used_size %d", decode_len,  aac_dec->remain_size , pcm_len, used_size);
 
           if (dec_pcm_data->data_len) {
               aac_dec->remain_size = aac_dec->remain_size - used_size;
+              dec_pcm_data->pts = aac_dec->remain_data_pts;
               if (used_size >= mark_remain_size) {
                   used_size_return = used_size - mark_remain_size;
                   aac_dec->remain_size = 0;
               } else {
                    used_size_return = 0;
                    aac_dec->remain_size = mark_remain_size - used_size;
+                   aac_dec->remain_data_pts = aac_dec->remain_data_pts + dec_pcm_data->data_len /( 2 * dec_pcm_data->data_ch) * 1000 * 90 /dec_pcm_data->data_sr;
                    memmove(aac_dec->remain_data, aac_dec->remain_data + used_size, aac_dec->remain_size );
               }
               break;
@@ -368,10 +377,9 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
             } else {
                 memmove(aac_dec->remain_data, aac_dec->remain_data + used_size, aac_dec->remain_size );
             }
-
           }
           used_size_return = bytes;
-          ALOGV("decode_len %d in %d pcm_len %d used_size %d aac_dec->remain_size %d", decode_len,  bytes, pcm_len, used_size, aac_dec->remain_size);
+          AM_LOGI_IF(aml_dec->debug_level, "decode_len %d in %d pcm_len %d used_size %d aac_dec->remain_size %d", decode_len,  bytes, pcm_len, used_size, aac_dec->remain_size);
           break;
       }
     }
@@ -401,11 +409,11 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
         used_size = 0;
         if (aml_dec->ad_size > 0) {
             if ((aml_dec->ad_size + aac_dec->ad_remain_size) > AAC_REMAIN_BUFFER_SIZE) {
-                 ALOGE("aac_dec->ad_remain_size %d > %d  ,overflow", aac_dec->ad_remain_size , AAC_REMAIN_BUFFER_SIZE );
+                 AM_LOGE("aac_dec->ad_remain_size %d > %d  ,overflow", aac_dec->ad_remain_size , AAC_REMAIN_BUFFER_SIZE );
                  aac_dec->ad_remain_size = 0;
                  memset(aac_dec->ad_remain_data , 0 , AAC_REMAIN_BUFFER_SIZE);
             }
-                
+
             memcpy(aac_dec->ad_remain_data + aac_dec->ad_remain_size, aml_dec->ad_data, aml_dec->ad_size);
             aac_dec->ad_remain_size += aml_dec->ad_size;
             aml_dec->ad_size = 0;
@@ -416,18 +424,18 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
         }
 
         ad_dec_pcm_data->data_len = 0;
-        ALOGV("aac_dec->ad_remain_size %d", aac_dec->ad_remain_size);
+        AM_LOGI_IF(aml_dec->debug_level, "aac_dec->ad_remain_size %d", aac_dec->ad_remain_size);
         while (aac_dec->ad_remain_size > used_size &&  !aac_dec->ad_need_cache_frames && dec_pcm_data->data_len) {
             int pcm_len = AAC_MAX_LENGTH;
             int decode_len = ad_faad_op->decode(ad_faad_op, (char *)(ad_dec_pcm_data->buf + ad_dec_pcm_data->data_len), &pcm_len, (char *)aac_dec->ad_remain_data + used_size, aac_dec->ad_remain_size - used_size);
-            ALOGV("ad decode_len %d in %d pcm_len %d used_size %d", decode_len,  aac_dec->ad_remain_size, pcm_len, used_size);
+            AM_LOGI_IF(aml_dec->debug_level, "ad decode_len %d in %d pcm_len %d used_size %d", decode_len,  aac_dec->ad_remain_size, pcm_len, used_size);
             if (decode_len > 0) {
                 used_size += decode_len;
                 ad_dec_pcm_data->data_len += pcm_len;
                 if (ad_dec_pcm_data->data_len > ad_dec_pcm_data->buf_size) {
                     ALOGV("decode len %d ", ad_dec_pcm_data->data_len);
                 }
-                
+
                 if(ad_dec_pcm_data->data_len) {
                     memmove(aac_dec->ad_remain_data, aac_dec->ad_remain_data + used_size, aac_dec->ad_remain_size );
                     aac_dec->ad_remain_size = aac_dec->ad_remain_size - used_size;
@@ -445,10 +453,10 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
                        } else {
                            memmove(aac_dec->ad_remain_data, aac_dec->ad_remain_data + used_size, aac_dec->ad_remain_size);
                        }
-                    }       
+                    }
                 }
 
-                ALOGV("ad aac_dec->ad_remain_size %d ad_dec_pcm_data->data_len %d used_size %d", aac_dec->ad_remain_size, ad_dec_pcm_data->data_len, used_size);
+                AM_LOGI_IF(aml_dec->debug_level, "ad aac_dec->ad_remain_size %d ad_dec_pcm_data->data_len %d used_size %d", aac_dec->ad_remain_size, ad_dec_pcm_data->data_len, used_size);
                 break;
             }
         }
@@ -505,7 +513,8 @@ static int faad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int b
     }
     ad_dec_pcm_data->data_len  = 0;
     dump_faad_data(dec_pcm_data->buf, dec_pcm_data->data_len, "/data/faad_output.pcm");
-    ALOGV("decode len %d buffer len %d used_size_return %d", dec_pcm_data->data_len, dec_pcm_data->buf_size,used_size_return);
+    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+        dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, used_size_return);
     return used_size_return;
 }
 

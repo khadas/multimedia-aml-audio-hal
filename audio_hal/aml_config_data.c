@@ -22,6 +22,7 @@
 #include <cutils/log.h>
 #include <string.h>
 #include <hardware/audio.h>
+#include "aml_config_parser.h"
 #include "aml_config_data.h"
 #define PROPERTY_VALUE_MAX  256
 

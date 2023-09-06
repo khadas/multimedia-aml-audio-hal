@@ -82,7 +82,7 @@ struct dolby_ddp_dec {
 
 int dcv_decoder_init_patch(aml_dec_t ** ppaml_dec, aml_dec_config_t * dec_config);
 int dcv_decoder_release_patch(aml_dec_t * aml_dec);
-int dcv_decoder_process_patch(aml_dec_t * aml_dec, unsigned char*buffer, int bytes);
+int dcv_decoder_process_patch(aml_dec_t * aml_dec, struct audio_buffer *abuffer);
 int dcv_decoder_get_framesize(unsigned char*buffer, int bytes, int* p_head_offset);
 int is_ad_substream_supported(unsigned char *buffer,int bytes);
 int dcv_decoder_config(aml_dec_t * aml_dec, aml_dec_config_type_t config_type, aml_dec_config_t * dec_config);

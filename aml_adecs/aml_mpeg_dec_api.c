@@ -23,6 +23,7 @@
 #include "aml_dec_api.h"
 #include "audio_data_process.h"
 #include "aml_malloc_debug.h"
+#include "audio_hw_utils.h"
 
 #define MAD_LIB_PATH "/vendor/lib/libmad-ahal.so"
 #define MAD_LIB_PATH1 "/usr/lib/libmad-ahal.so"//Linux Platform so is in /usr/lib/
@@ -62,6 +63,7 @@ struct mad_dec_t {
     void *pdecoder;
     char remain_data[MAD_REMAIN_BUFFER_SIZE];
     int remain_size;
+    uint64_t remain_data_pts; //unit 90k;
     bool ad_decoder_supported;
     bool ad_mixing_enable;
     int advol_level;
@@ -284,11 +286,13 @@ static void dump_mad_data(void *buffer, int size, char *file_name)
 }
 
 
-static int mad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int bytes)
+static int mad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
 {
     struct mad_dec_t *mad_dec = NULL;
     aml_mad_config_t *mad_config = NULL;
     AudioInfo pAudioInfo,pADAudioInfo;
+    const char *buffer = abuffer->buffer;
+    int bytes = abuffer->size;
     if (aml_dec == NULL) {
         ALOGE("%s aml_dec is NULL", __func__);
         return -1;
@@ -304,7 +308,7 @@ static int mad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
     int used_size = 0;
     int used_size_return = 0;
     int mark_remain_size = mad_dec->remain_size;
-    ALOGV("remain_size %d bytes %d ad_decoder_supported %d ad_mixing_enable %d advol_level %d mixer_level %d",
+    AM_LOGI_IF(aml_dec->debug_level, "remain_size %d bytes %d ad_decoder_supported %d ad_mixing_enable %d advol_level %d mixer_level %d",
         mad_dec->remain_size ,bytes, mad_dec->ad_decoder_supported, mad_dec->ad_mixing_enable, mad_dec->advol_level,mad_dec->mixer_level );
     if (bytes > 0) {
         if ((mad_dec->remain_size  + bytes >=  MAD_REMAIN_BUFFER_SIZE) || (mad_dec->remain_size < 0)) {
@@ -314,6 +318,8 @@ static int mad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
            dec_pcm_data->data_len = 0;
            return bytes;
         } else {
+            if (!mad_dec->remain_size)
+                mad_dec->remain_data_pts = abuffer->pts;
             memcpy(mad_dec->remain_data + mad_dec->remain_size, buffer, bytes);
             mad_dec->remain_size += bytes;
         }
@@ -333,6 +339,7 @@ static int mad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
               break;
           }
           if (dec_pcm_data->data_len) {
+              dec_pcm_data->pts = mad_dec->remain_data_pts;
               if (used_size >= mark_remain_size) {
                   used_size_return = used_size - mark_remain_size;
                   mad_dec->remain_size = 0;
@@ -480,7 +487,9 @@ static int mad_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int by
     }
     ad_dec_pcm_data->data_len  = 0;
     dump_mad_data(dec_pcm_data->buf, dec_pcm_data->data_len, "/data/mad_output.pcm");
-    ALOGV("used_size_return %d decode len %d buffer len %d ", used_size_return, dec_pcm_data->data_len, dec_pcm_data->buf_size);
+
+    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+        dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, used_size_return);
     return used_size_return;
 }
 

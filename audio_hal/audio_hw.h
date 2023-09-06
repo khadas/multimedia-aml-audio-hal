@@ -32,6 +32,7 @@
 #endif
 
 #define ADD_AUDIO_DELAY_INTERFACE
+#include "audio_buffer.h"
 #include "audio_hwsync.h"
 #include "audio_post_process.h"
 #include "aml_hw_mixer.h"
@@ -786,7 +787,7 @@ struct aml_stream_out {
     int is_normal_pcm;
     unsigned int card;
     alsa_device_t device;
-    ssize_t (*write)(struct audio_stream_out *stream, const void *buffer, size_t bytes);
+    ssize_t (*write)(struct audio_stream_out *stream, struct audio_buffer *abuffer);
     enum stream_status status;
     audio_format_t hal_internal_format;
     bool dual_output_flag;
@@ -969,7 +970,7 @@ struct aml_stream_in {
 typedef  int (*do_standby_func)(struct aml_stream_out *out);
 typedef  int (*do_startup_func)(struct aml_stream_out *out);
 
-static inline int continous_mode(struct aml_audio_device *adev)
+static inline int continuous_mode(struct aml_audio_device *adev)
 {
     return adev->continuous_audio_mode;
 }
@@ -1144,8 +1145,6 @@ ssize_t out_write_new(struct audio_stream_out *stream,
                       const void *buffer,
                       size_t bytes);
 int out_standby_new(struct audio_stream *stream);
-ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buffer,
-                               size_t bytes);
 int dsp_process_output(struct aml_audio_device *adev, void *in_buffer,
                        size_t bytes);
 int release_patch_l(struct aml_audio_device *adev);

@@ -125,6 +125,7 @@ int aml_decoder_init(aml_dec_t **ppaml_dec, audio_format_t format, aml_dec_confi
     dec_config->ad_pan = 0;
     aml_dec_handel->ad_data = NULL;
     aml_dec_handel->ad_size = 0;
+    aml_dec_handel->debug_level = aml_audio_property_get_int("vendor.media.audio.hal.decoder", 0);
     return ret;
 
 ERROR:
@@ -256,7 +257,7 @@ static void UpdateDecodeInfo_ChannelConfiguration(char *sysfs_buf, int ch_num) {
     sysfs_set_sysfs_str(REPORT_DECODED_INFO, sysfs_buf);
 }
 
-int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int *used_bytes)
+int aml_decoder_process(aml_dec_t *aml_dec, struct audio_buffer *abuffer, int *used_bytes)
 {
     int ret = -1;
     aml_dec_func_t *dec_fun = NULL;
@@ -287,7 +288,7 @@ int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int
     }
     /*if we have fragment size output*/
     if (aml_dec->fragment_left_size > 0) {
-        ALOGV("[%s:%d] fragment_left_size=%d ", __func__, __LINE__, aml_dec->fragment_left_size);
+        ALOGI("[%s:%d] fragment_left_size=%d ", __func__, __LINE__, aml_dec->fragment_left_size);
         frame_size = audio_bytes_per_sample(dec_pcm_data->data_format) * dec_pcm_data->data_ch;
         fragment_size = AML_DEC_FRAGMENT_FRAMES * frame_size;
         memmove(dec_pcm_data->buf, (unsigned char *)dec_pcm_data->buf + fragment_size, aml_dec->fragment_left_size);
@@ -311,7 +312,7 @@ int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int
     raw_in_data->data_len = 0;
 
     if (dec_fun->f_process) {
-        ret = dec_fun->f_process(aml_dec, buffer, bytes);
+        ret = dec_fun->f_process(aml_dec, abuffer);
     } else {
         ALOGE("[%s:%d] f_process is null", __func__, __LINE__);
         return -1;
@@ -360,7 +361,7 @@ int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int
       *used_bytes = ret;
        return AML_DEC_RETURN_TYPE_OK;
     } else {
-       *used_bytes = bytes;
+       *used_bytes = abuffer->size;
        return ret;
     }
 

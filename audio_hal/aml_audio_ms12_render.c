@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "aml_audio_ms12_render"
+#define LOG_TAG "audio_hw_ms12_render"
 //#define LOG_NDEBUG 0
 
 #include <unistd.h>
@@ -29,7 +29,7 @@
 
 #include "dolby_lib_api.h"
 #include "aml_volume_utils.h"
-#include "audio_hw_ms12.h"
+#include "audio_hw_ms12_v2.h"
 #include "aml_audio_timer.h"
 #include "alsa_config_parameters.h"
 
@@ -40,8 +40,6 @@
 
 #define MS12_MAIN_WRITE_LOOP_THRESHOLD                  (2000)
 #define AUDIO_IEC61937_FRAME_SIZE 4
-
-extern unsigned long decoder_apts_lookup(unsigned int offset);
 
 int aml_audio_get_cur_ms12_latency(struct audio_stream_out *stream) {
 
@@ -74,15 +72,17 @@ int aml_audio_get_cur_ms12_latency(struct audio_stream_out *stream) {
 
 }
 
-int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, const void *write_buf, size_t write_bytes)
+int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio_buffer *abuffer)
 
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
-    int return_bytes = write_bytes;
+    int write_bytes = abuffer->size;
+    int return_bytes = abuffer->size;
     int ret = 0;
     int total_write = 0;
-    void *buffer = (void *)write_buf;
+    void *buffer = (void *)abuffer->buffer;
+    const void *write_buf = abuffer->buffer;
     struct aml_audio_patch *patch = adev->audio_patch;
     int write_retry = 0;
     size_t used_size = 0;
@@ -99,15 +99,46 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, const void *
             __func__, __LINE__, aml_out->hal_format, output_format, adev->sink_format);
     }
 
-    //sync process here
-    /*if (adev->patch_src  == SRC_DTV ) {
-        if (adev->audio_patch && adev->audio_patch->avsync_callback)
-            adev->audio_patch->avsync_callback(adev->audio_patch,aml_out);
-    }*/
-
-
     remain_size = dolby_ms12_get_main_buffer_avail(NULL);
     dolby_ms12_get_pcm_output_size(&all_pcm_len1, &all_zero_len);
+
+    if (aml_out->hw_sync_mode && aml_out->hwsync) {
+
+        // missing code with aml_audio_hwsync_checkin_apts, need to add for netflix tunnel mode. zzz
+        if (abuffer->pts != HWSYNC_PTS_NA) {
+            aml_audio_hwsync_checkin_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, abuffer->pts);
+        }
+#ifndef BUILD_LINUX
+        // dolby_ms12_hwsync_checkin_pts checkin PTS info to MS12's global PTS sync table, which
+        // is only used by UDC decoder to detect PTS gap for NTS. On Linux, audio gap for timestamp
+        // is sent from upper layer directly and the gap detection is not needed.
+        if (continuous_mode(adev) && !audio_is_linear_pcm(aml_out->hal_internal_format) && adev->is_netflix) {
+            dolby_ms12_hwsync_checkin_pts(aml_out->hwsync->payload_offset, abuffer->pts);
+        }
+#endif
+        aml_out->hwsync->payload_offset += abuffer->size;
+        //change
+        // when msync is used, the original first apts->audio start logic from legacy amaster tsync
+        // implementation in hw_write() is moved to this place when main input samples are injected
+        // because the sync policy return from msync side may need block when audio starts to play.
+        if (aml_out->hwsync->first_apts_flag == false && AVSYNC_TYPE_MSYNC == aml_out->avsync_type) {
+            // may be blocked by msync_cond for initial playback timing control
+            // the first checkin pts should be consumed by aml_audio_hwsync_audio_process for av_sync_audio_start
+            //aml_audio_hwsync_audio_process(aml_out->hwsync, 0, NULL);
+            aml_audio_hwsync_audio_process(aml_out->hwsync, 0, 0, NULL);
+            // when dropping is needed at av_sync_audio_start
+            // reset payload_offset since the data will not be
+            // sent to MS12 pipeline. The consumed bytes number
+            // from MS12 should match PTS checkin record from
+            // payload_offset
+            if (aml_out->msync_action == AV_SYNC_AA_DROP) {
+                aml_out->hwsync->payload_offset = 0;
+                ALOGI("MSYNC start dropping @0x%llx, %d bytes", aml_out->hwsync->first_apts, abuffer->size);
+                goto exit;
+            }
+
+        }
+    }
 
     if (is_bypass_dolbyms12(stream)) {
         if (adev->debug_flag) {
@@ -118,7 +149,7 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, const void *
             hw_write (stream, output_buffer, output_buffer_bytes, output_format);
     } else {
         /*not continuous mode, we use sink gain control the volume*/
-        if (!continous_mode(adev)) {
+        if (!continuous_mode(adev)) {
             /*when it is non continuous mode, we bypass data here*/
             dolby_ms12_bypass_process(stream, write_buf, write_bytes);
         }
@@ -168,10 +199,12 @@ re_write:
     if (patch && patch->skip_amadec_flag)
         patch->decoder_offset += remain_size + write_bytes - size;
 
+exit:
+
     return return_bytes;
 
 }
-int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, size_t bytes)
+int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *abuffer)
 {
     int ret = -1;
     int dec_used_size = 0;
@@ -179,7 +212,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
     int left_bytes = 0;
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
-    int return_bytes = bytes;
+    int return_bytes = abuffer->size;
     struct aml_audio_patch *patch = adev->audio_patch;
     void *output_buffer = NULL;
     size_t output_buffer_bytes = 0;
@@ -207,15 +240,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
     }
 
     if (bypass_aml_dec) {
-        if (do_sync_flag) {
-            if(patch->skip_amadec_flag) {
-                if (patch->cur_package->pts == 0) {
-                    patch->cur_package->pts = decoder_apts_lookup(patch->decoder_offset);
-                }
-            }
-        }
-
-        ret = aml_audio_ms12_process_wrapper(stream, buffer, bytes);
+        ret = aml_audio_ms12_process_wrapper(stream, abuffer);
         if (true == do_sync_flag) {
             if (aml_out->alsa_status_changed) {
                 ALOGI("[%s:%d] aml_out->alsa_running_status %d", __FUNCTION__, __LINE__, aml_out->alsa_running_status);
@@ -230,43 +255,31 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
         aml_dec_t *aml_dec = aml_out->aml_dec;
         aml_dec_info_t dec_info;
         audio_mediasync_util_t * mediasync_util = aml_audio_get_mediasync_util_handle();
-        if (do_sync_flag) {
-            if(patch->skip_amadec_flag) {
-                if (patch->cur_package)
-                    aml_dec->in_frame_pts = (NULL_INT64 == patch->cur_package->pts) ? aml_dec->out_frame_pts : patch->cur_package->pts;
-                if (aml_dec->in_frame_pts == 0) {
-                    aml_dec->in_frame_pts = decoder_apts_lookup(patch->decoder_offset);
-                }
-            }
-        }
-        else if (esmode_flag)
-        {
-            aml_dec->in_frame_pts = aml_out->hwsync->es_mediasync.in_apts;
-        }
+        struct audio_buffer ainput;
+        ainput.buffer = abuffer->buffer;
+        ainput.size = abuffer->size;
+        ainput.pts = abuffer->pts;
 
-        if ((do_sync_flag) || (esmode_flag))
-        {
-            if (false == mediasync_util->record_flag)
-            {
-                mediasync_util->es_last_apts = aml_dec->in_frame_pts;
-                mediasync_util->record_flag  = true;
-            }
-            else
-            {
-                aml_dec->in_frame_pts = mediasync_util->es_last_apts;
-            }
+        if (do_sync_flag) {
+            if (patch->cur_package)
+                aml_dec->in_frame_pts = (NULL_INT64 == patch->cur_package->pts) ? aml_dec->out_frame_pts : patch->cur_package->pts;
+            ainput.pts = aml_dec->in_frame_pts;
         }
 
         if (aml_dec) {
             dec_data_info_t * dec_pcm_data = &aml_dec->dec_pcm_data;
             dec_data_info_t * dec_raw_data = &aml_dec->dec_raw_data;
             dec_data_info_t * raw_in_data  = &aml_dec->raw_in_data;
-            left_bytes = bytes;
-            int dec_count = 0;
+            left_bytes = abuffer->size;
+            struct audio_buffer pcm_abuffer = {0};
+
             do {
-                if (adev->debug_flag)
-                    ALOGI("left_bytes %d dec_used_size %d", left_bytes, dec_used_size);
-                ret = aml_decoder_process(aml_dec, (unsigned char *)buffer + dec_used_size, left_bytes, &used_size);
+
+                ainput.buffer = abuffer->buffer + dec_used_size;
+                ainput.size = left_bytes;
+
+                AM_LOGI_IF(adev->debug_flag, "in pts:0x%llx (%lld ms) size: %d", ainput.pts, ainput.pts/90, ainput.size);
+                ret = aml_decoder_process(aml_dec, &ainput, &used_size);
 
                 if (ret < 0) {
                     ALOGI("aml_decoder_process error");
@@ -274,8 +287,10 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                 }
                 left_bytes -= used_size;
                 dec_used_size += used_size;
-                ALOGV("%s() ret =%d pcm len =%d raw len=%d", __func__, ret, dec_pcm_data->data_len, dec_raw_data->data_len);
-                // write pcm data
+                AM_LOGI_IF(adev->debug_flag, "out pts:0x%llx (%lld ms) pcm len =%d raw len=%d used_size %d total used size %d left_bytes =%d",
+                    dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len,dec_raw_data->data_len,
+                    used_size, dec_used_size, left_bytes);
+
                 if (dec_pcm_data->data_len > 0) {
                     if (adev->audio_hal_info.first_decoding_frame == false) {
                         aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &adev->dec_stream_info);
@@ -288,7 +303,9 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                             ms12->config_channel_mask = 0x3;
                         }
                     }
-                    mediasync_util->record_flag = false;
+                    out_frames = dec_pcm_data->data_len / (2 * dec_pcm_data->data_ch);
+                    aml_dec->out_frame_pts = dec_pcm_data->pts;
+
                     void  *dec_data = (void *)dec_pcm_data->buf;
                     if ((adev->audio_patch != NULL) &&
                         (adev->patch_src == SRC_DTV || adev->patch_src == SRC_HDMIIN) &&
@@ -310,12 +327,11 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                              dec_pcm_data->data_len = aml_out->resample_handle->resample_size;
                          }
                     }
-                    out_frames += dec_pcm_data->data_len / (2 * dec_pcm_data->data_ch);
 
                     if ((do_sync_flag) || (esmode_flag))
                     {
                         int64_t out_apts;
-                        out_apts = (0 == dec_count) ? aml_dec->in_frame_pts : aml_dec->out_frame_pts;
+                        out_apts = aml_dec->out_frame_pts;
                         if (aml_audio_mediasync_util_checkin_apts(mediasync_util, mediasync_util->payload_offset, out_apts) < 0) {
                             ALOGE("[%s:%d] checkin apts(%llx) data_size(%zu) fail",
                                 __FUNCTION__, __LINE__, out_apts, mediasync_util->payload_offset);
@@ -323,14 +339,19 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, const void *buffer, s
                         mediasync_util->payload_offset += dec_pcm_data->data_len;
 
                         if (mediasync_util->media_sync_debug)
-                             ALOGI("out_frames %d, out_apts1 %llx, in_frame_pts %llx, out_frame_pts %llx, data_sr %d, data_ch %d, frame_offset %zu",
+                             ALOGI("out_frames %d, out_apts %llx, in_frame_pts %llx, out_frame_pts %llx, data_sr %d, data_ch %d, frame_offset %zu",
                                     out_frames, out_apts, aml_dec->in_frame_pts, aml_dec->out_frame_pts,
                                     dec_pcm_data->data_sr, dec_pcm_data->data_ch, mediasync_util->payload_offset);
                     }
-                    aml_dec->out_frame_pts = aml_dec->in_frame_pts + (90 * out_frames /(dec_pcm_data->data_sr / 1000));
-                    ret = aml_audio_ms12_process_wrapper(stream, dec_data, dec_pcm_data->data_len);
+                    //for next loop
+                    ainput.pts = dec_pcm_data->pts + out_frames * 1000 * 90 /dec_pcm_data->data_sr;
+                    aml_dec->out_frame_pts = ainput.pts;
+                    pcm_abuffer.size = dec_pcm_data->data_len;
+                    pcm_abuffer.buffer = dec_data;
+                    pcm_abuffer.pts = aml_dec->out_frame_pts;
+                    pcm_abuffer.format = AUDIO_FORMAT_PCM_16_BIT;
+                    ret = aml_audio_ms12_process_wrapper(stream, &pcm_abuffer);
                 }
-                dec_count++;
             } while ((left_bytes > 0) || aml_dec->fragment_left_size);
         }
     }

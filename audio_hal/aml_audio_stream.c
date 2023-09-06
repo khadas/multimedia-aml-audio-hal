@@ -39,8 +39,6 @@
 
 #if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
 #include "audio_hw_ms12_v2.h"
-#else
-#include "audio_hw_ms12.h"
 #endif
 #define min(a,b)            (((a) < (b)) ? (a) : (b))
 #define FMT_UPDATE_THRESHOLD_MAX    (10)
@@ -909,6 +907,8 @@ void aml_stream_out_dump(struct aml_stream_out *aml_out, int fd)
         dprintf(fd, "    usecase: %s\n", usecase2Str(aml_out->usecase));
         dprintf(fd, "    out device: %#x\n", aml_out->out_device);
         dprintf(fd, "    tv source stream: %d\n", aml_out->tv_src_stream);
+        dprintf(fd, "    format: %#x\n", aml_out->hal_internal_format);
+        dprintf(fd, "    paused: %d\n", aml_out->pause_status);
         dprintf(fd, "    status: %d\n", aml_out->status);
         dprintf(fd, "    standby: %d\n", aml_out->standby);
         dprintf(fd, "    vol: %f, org vol:%f\n", aml_out->volume_l, aml_out->volume_l_org);
@@ -1576,7 +1576,7 @@ int stream_check_reconfig_param(struct audio_stream_out *stream)
                 AUDIO_FORMAT_PCM_16_BIT,
                 audio_channel_count_from_out_mask(ms12->output_channelmask),
                 ms12->output_samplerate,
-                out->is_tv_platform, continous_mode(adev),
+                out->is_tv_platform, continuous_mode(adev),
                 adev->game_mode);
 
             alsa_out_reconfig_params(stream);
@@ -1615,7 +1615,7 @@ int update_sink_format_after_hotplug(struct aml_audio_device *adev)
         get_sink_format(stream);
     }
     else {
-        if (adev->ms12_out && continous_mode(adev)) {
+        if (adev->ms12_out && continuous_mode(adev)) {
             ALOGD("%s() active stream is ms12_out %p\n", __FUNCTION__, adev->ms12_out);
             get_sink_format((struct audio_stream_out *)adev->ms12_out);
         }

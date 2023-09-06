@@ -1036,6 +1036,12 @@ static bool is_4x_rate_fmt(audio_format_t afmt)
         (afmt == AUDIO_FORMAT_DOLBY_TRUEHD);
 }
 
+uint32_t out_get_latency (const struct audio_stream_out *stream)
+{
+    const struct aml_stream_out *out = (const struct aml_stream_out *) stream;
+    return (out_get_latency_frames (stream) * 1000) / out->config.rate;
+}
+
 uint32_t out_get_latency_frames(const struct audio_stream_out *stream)
 {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
@@ -1067,39 +1073,6 @@ uint32_t out_get_latency_frames(const struct audio_stream_out *stream)
     }
     return frames / mul;
 }
-
-uint32_t out_get_alsa_latency_frames(const struct audio_stream_out *stream)
-{
-    struct aml_stream_out *out = (struct aml_stream_out *)stream;
-    struct aml_audio_device *adev = out->dev;
-    audio_format_t afmt = get_output_format((struct audio_stream_out *)stream);
-    snd_pcm_sframes_t frames = 0;
-    uint32_t whole_latency_frames;
-    int ret = 0;
-    int mul = 1;
-    unsigned int device = out->device;
-
-    out->pcm = adev->pcm_handle[device];
-
-    if (is_4x_rate_fmt(afmt))
-        mul = 4;
-//#ifdef ENABLE_BT_A2DP
-#ifndef BUILD_LINUX
-    if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {
-        return a2dp_out_get_latency(adev) * out->hal_rate / 1000;
-    }
-#endif
-    whole_latency_frames = out->config.period_size * out->config.period_count / 2;
-    if (!out->pcm || !pcm_is_ready(out->pcm)) {
-        return whole_latency_frames / mul;
-    }
-    ret = pcm_ioctl(out->pcm, SNDRV_PCM_IOCTL_DELAY, &frames);
-    if (ret < 0) {
-        return whole_latency_frames / mul;
-    }
-    return frames / mul;
-}
-
 
 int aml_audio_get_spdif_tuning_latency(void)
 {

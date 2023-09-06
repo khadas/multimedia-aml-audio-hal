@@ -25,7 +25,6 @@
 #include <ion_4.12.h>
 
 #include "audio_hw.h"
-#include "audio_hw_ms12.h"
 #include "audio_hw_utils.h"
 #include "audio_virtual_buf.h"
 

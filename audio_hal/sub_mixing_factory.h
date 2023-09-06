@@ -85,10 +85,6 @@ struct pcm *getSubMixingPCMdev(struct subMixing *sm);
 int subMixingOutputRestart(struct aml_audio_device *adev);
 
 void subMixingDump(int s32Fd, const struct aml_audio_device *pstAmlDev);
-ssize_t mixer_aux_buffer_write_sm(struct audio_stream_out *stream, const void *buffer,
-                               size_t bytes);
-ssize_t mixer_main_buffer_write_sm(struct audio_stream_out *stream, const void *buffer,
-                               size_t bytes);
 
 int subMixingSetSinkGain(struct aml_audio_device *adev, void *sink_gain);
 int subMixingSetEQData(struct aml_audio_device *adev, void *eq_data);

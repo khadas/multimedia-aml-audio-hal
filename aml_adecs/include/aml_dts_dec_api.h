@@ -113,7 +113,7 @@ struct dca_dts_dec {
 
 int dca_decoder_init_patch(aml_dec_t **ppaml_dec, aml_dec_config_t * dec_config);
 int dca_decoder_release_patch(aml_dec_t *aml_dec);
-int dca_decoder_process_patch(aml_dec_t *aml_dec, unsigned char*buffer, int bytes);
+int dca_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer);
 /*
     If @aml_dec is NULL, static param will take effect after decoder init.
     If @aml_dec is normal, static/runtime param will take effect after decoder init.

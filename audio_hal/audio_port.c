@@ -467,7 +467,7 @@ err_rbuf_init:
 
 void set_inport_volume(input_port *port, float vol)
 {
-    AM_LOGD("volume %f", vol);
+    //AM_LOGD("volume %f", vol);
     port->volume = vol;
 }
 

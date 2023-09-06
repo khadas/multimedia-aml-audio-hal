@@ -23,8 +23,6 @@
 #include "a2dp_hal.h"
 #if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
 #include "audio_hw_ms12_v2.h"
-#else
-#include "audio_hw_ms12.h"
 #endif
 #include "aml_audio_avsync_table.h"
 #include "aml_audio_spdifout.h"
@@ -445,7 +443,7 @@ uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream, bool ignor
     int mul = 1;
     unsigned int device;
 
-    if (continous_mode(adev)) {
+    if (continuous_mode(adev)) {
         ms12_out = adev->ms12_out;
     } else {
         ms12_out = hal_out;

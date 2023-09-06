@@ -21,6 +21,7 @@
 #include "aml_dec_api.h"
 #include "audio_data_process.h"
 #include "aml_malloc_debug.h"
+#include "audio_hw_utils.h"
 
 
 #define VORBIS_LIB_PATH "/usr/lib/libvorbis-ahal.so"
@@ -325,7 +326,7 @@ static int vorbis_ad_decoder_process(aml_dec_t *aml_decoder, unsigned char *buff
     return 0;
 }
 
-static int vorbis_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, int bytes)
+static int vorbis_decoder_process(aml_dec_t *aml_decoder, struct audio_buffer *abuffer)
 {
     int ret = 0;
     int used_size = 0;
@@ -338,6 +339,8 @@ static int vorbis_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer,
     aml_vorbis_config_t *vorbis_config = &vorbis_decoder->vorbis_config;
     vorbis_decoder_operations_t *vorbis_operation = &vorbis_decoder->vorbis_operation;
     dec_data_info_t *dec_pcm_data = &aml_decoder->dec_pcm_data;
+    const char *buffer = abuffer->buffer;
+    int bytes = abuffer->size;
 
     if (aml_decoder == NULL) {
         ALOGE("%s[%d]: aml_decoder is NULL", __FUNCTION__, __LINE__);
@@ -399,10 +402,11 @@ static int vorbis_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer,
     dec_pcm_data->data_sr = pAudioInfo.samplerate;
     dec_pcm_data->data_ch = pAudioInfo.channels;
     dec_pcm_data->data_format = vorbis_config->vorbis_format;
+    dec_pcm_data->pts = abuffer->pts;
     dump_vorbis_data(dec_pcm_data->buf, dec_pcm_data->data_len, "/data/vorbis_output.pcm");
-    ALOGV("%s[%d]: used_size_return %d, decoder pcm len %d, buffer len %d", __FUNCTION__, __LINE__, used_size_return, dec_pcm_data->data_len,
-        dec_pcm_data->buf_size);
 
+    AM_LOGI_IF(aml_decoder->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+        dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, used_size_return);
     return used_size_return;
 }
 

@@ -36,6 +36,7 @@
 
 #include "aml_ddp_dec_api.h"
 #include "aml_ac3_parser.h"
+#include "audio_hw_utils.h"
 
 enum {
     EXITING_STATUS = -1001,
@@ -680,7 +681,7 @@ int is_ad_substream_supported(unsigned char *buffer,int write_len) {
     return 0;
 
 }
-int dcv_decoder_process_patch(aml_dec_t * aml_dec, unsigned char *buffer, int bytes)
+int dcv_decoder_process_patch(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
 {
     int mSample_rate = 0;
     int mFrame_size = 0;
@@ -701,6 +702,8 @@ int dcv_decoder_process_patch(aml_dec_t * aml_dec, unsigned char *buffer, int by
     int ad_substream_supported = 0;
     struct dolby_ddp_dec *ddp_dec = (struct dolby_ddp_dec *)aml_dec;
     int last_remain_size = ddp_dec->remain_size;
+    const char *buffer = abuffer->buffer;
+    int bytes = abuffer->size;
 
     ddp_dec->outlen_pcm = 0;
     ddp_dec->outlen_raw = 0;
@@ -921,6 +924,11 @@ int dcv_decoder_process_patch(aml_dec_t * aml_dec, unsigned char *buffer, int by
     ddp_dec->remain_size = 0;
     /* Fixme: sometimes here total_used_size - last_remain_size is larger than bytes about 8bytes. */
     ret = ((total_used_size - last_remain_size) > bytes) ? bytes : (total_used_size - last_remain_size);
+    dec_pcm_data->pts = abuffer->pts;
+
+    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+        dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, ret);
+
     return ret;
 
 EXIT:

@@ -22,6 +22,8 @@
 #include "aml_dec_api.h"
 #include "aml_malloc_debug.h"
 #include "aml_adpcm_dec_api.h"
+#include "audio_hw_utils.h"
+
 #define PCM_MAX_LENGTH (8192*2*2)
 #define ADPCM_REMAIN_BUFFER_SIZE (4096 * 10)
 #define ADPCM_LIB_PATH "/usr/lib/libadpcm-aml.so"
@@ -352,10 +354,12 @@ static void dump_data(void *buffer, int size, char *file_name)
     }
 }
 
-static int adpcm_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int bytes)
+static int adpcm_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
 {
     struct adpcm_dec_t *adpcm_dec = NULL;
     aml_adpcm_config_t *adpcm_config = NULL;
+    int bytes = abuffer->size;
+    const char *buffer = abuffer->buffer;
     int in_bytes = bytes, pcm_len = PCM_MAX_LENGTH, decode_len = 0;;
     int src_channel = 0, mark_remain_size = 0, used_size_return = 0;;
     int dst_channel = 0, used_size = 0;
@@ -440,7 +444,9 @@ static int adpcm_decoder_process(aml_dec_t * aml_dec, unsigned char*buffer, int 
     dec_pcm_data->data_sr = adpcm_config->samplerate;
     dec_pcm_data->data_ch = 2;
     dec_pcm_data->data_format = adpcm_config->pcm_format;
-    ALOGV("%s end: data_in=%d ch =%d out_sz=%d ch=%d", __func__, bytes, adpcm_config->channel, downmix_size, 2);
+    dec_pcm_data->pts = abuffer->pts;
+    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+        dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, used_size_return);
 
     return used_size;
 }

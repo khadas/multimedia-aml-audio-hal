@@ -19,7 +19,14 @@
 #include <cJSON.h>
 #include <stdbool.h>
 
-#include "aml_config_parser.h"
+#define TV_PLATFORM  "TV_Platform"
+#define STB_PLATFORM "STB_Platform"
+#define DUAL_SPDIF "Dual_Spdif_Support"
+#define FORCE_DDP "Ms12_Force_Ddp_Out"
+#define AUDIO_DELAY_MAX "Audio_Delay_Max"
+#define USE_SUB_MIX "Sub_Mix_Enable"
+#define Audio_Focus_Enable "Audio_Focus_Enable"
+#define STB_MS12_DAP_MODE "Stb_dolby_ms12_dap_init_mode"
 
 int aml_audio_config_parser();
 int aml_audio_avsync_parser();

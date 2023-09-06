@@ -149,21 +149,23 @@ size_t aml_dev2mix_parser_process(struct aml_stream_in *in, unsigned char *buffe
     dec_data_info_t         *dec_pcm_data = &aml_dec->dec_pcm_data;
     int                     time_out_cnt = 0;
     size_t                  read_bytes = 0;
+    struct audio_buffer ainput;
     do {
         aml_alsa_input_read(&in->stream, parser->temp_buffer, period_read_size);
-        int cur_writed_byte = 0;
-        int cur_writed_byte_cnt = 0;
+        int cur_written_byte = 0;
+        int cur_written_byte_cnt = 0;
         int decoder_ret = -1;
         do {
-            decoder_ret = aml_decoder_process(aml_dec, parser->temp_buffer + cur_writed_byte_cnt,
-                period_read_size - cur_writed_byte_cnt, &cur_writed_byte);
-            cur_writed_byte_cnt += cur_writed_byte;
-            ALOGV("[%s:%d] cur_writed_byte_cnt:%d, use:%d", __func__, __LINE__, cur_writed_byte_cnt, cur_writed_byte);
+            ainput.buffer = parser->temp_buffer + cur_written_byte_cnt;
+            ainput.size = period_read_size - cur_written_byte_cnt;
+            decoder_ret = aml_decoder_process(aml_dec, &ainput, &cur_written_byte);
+            cur_written_byte_cnt += cur_written_byte;
+            ALOGV("[%s:%d] cur_written_byte_cnt:%d, use:%d", __func__, __LINE__, cur_written_byte_cnt, cur_written_byte);
             if (decoder_ret == AML_DEC_RETURN_TYPE_CACHE_DATA) {
                 break;
             }
             ALOGV("[%s:%d] data_len:%d, cur_writed_byte_cnt:%d, cur_writed_byte:%d, data_sr:%d", __func__, __LINE__,
-                dec_pcm_data->data_len, cur_writed_byte_cnt, cur_writed_byte, dec_pcm_data->data_sr);
+                dec_pcm_data->data_len, cur_written_byte_cnt, cur_written_byte, dec_pcm_data->data_sr);
             void  *dec_data = (void *)dec_pcm_data->buf;
             if (dec_pcm_data->data_len > 0) {
                 if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE) {
@@ -181,7 +183,7 @@ size_t aml_dev2mix_parser_process(struct aml_stream_in *in, unsigned char *buffe
                     ALOGW("[%s:%d] need written:%d, actually written:%d", __func__, __LINE__, dec_pcm_data->data_len, ret);
                 }
             }
-        } while (cur_writed_byte_cnt < period_read_size || aml_dec->fragment_left_size || decoder_ret == AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN);
+        } while (cur_written_byte_cnt < period_read_size || aml_dec->fragment_left_size || decoder_ret == AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN);
 
         /* here to fix pcm switch to raw nosie issue ,it is caused by hardware format detection later than output
         so we delay pcm output one frame to work around the issue,but it has a negative effect on av sync when normal
