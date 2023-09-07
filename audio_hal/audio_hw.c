@@ -9063,6 +9063,10 @@ ssize_t out_write_new(struct audio_stream_out *stream,
     struct aml_audio_device *adev = aml_out->dev;
     ssize_t ret = 0;
     write_func  write_func_p = NULL;
+    if (NULL == buffer) {
+        ALOGE("[%s:%d], buffer is NULL, out_stream(%p) position(%zu)", __func__, __LINE__, stream, bytes);
+        return bytes;
+    }
 
 #ifdef NO_SERVER
     int val = 0;
@@ -9073,6 +9077,7 @@ ssize_t out_write_new(struct audio_stream_out *stream,
         return ret;
     }
 #endif
+
     adev->debug_flag = aml_audio_get_debug_flag();
     if (adev->debug_flag > 1) {
         ALOGI("+<IN>%s: out_stream(%p) position(%zu)", __func__, stream, bytes);
@@ -9407,6 +9412,7 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
     aml_audio_ease_close(aml_out->audio_stream_ease);
 
     /* call legacy close to reuse codes */
+    pthread_mutex_lock(&adev->lock);
     if (adev->active_outputs[aml_out->usecase] == aml_out) {
         adev->active_outputs[aml_out->usecase] = NULL;
     } else {
@@ -9417,6 +9423,7 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
             }
         }
     }
+    pthread_mutex_unlock(&adev->lock);
 
     if (adev->useSubMix) {
         if (aml_out->is_normal_pcm ||
@@ -9788,11 +9795,13 @@ void *audio_patch_input_threadloop(void *data)
                     memset(patch->in_buf, 0, bytes_avail);
                 }
             }
-            cur_aformat = audio_parse_get_audio_type (patch->audio_parse_para);
-            if (cur_aformat != AUDIO_FORMAT_PCM_16_BIT) {
-                audio_raw_data_continuous_check(aml_dev, patch->audio_parse_para, patch->in_buf, read_bytes);
-            }
 
+            if (IS_DIGITAL_IN_HW(patch->input_src)) {
+                cur_aformat = audio_parse_get_audio_type (patch->audio_parse_para);
+                if (cur_aformat != AUDIO_FORMAT_PCM_16_BIT) {
+                    audio_raw_data_continuous_check(aml_dev, patch->audio_parse_para, patch->in_buf, read_bytes);
+                }
+            }
             if (patch->start_mute) {
                 int flag = Stop_watch(patch->start_ts, patch->mdelay);
                 if (!flag) {
@@ -10262,17 +10271,21 @@ int release_patch_l(struct aml_audio_device *aml_dev)
         ALOGD("%s(), no patch to release", __func__);
         goto exit;
     }
+
     patch->output_thread_exit = 1;
     pthread_join(patch->audio_output_threadID, NULL);
-    if (IS_DIGITAL_IN_HW(patch->input_src))
-        exit_pthread_for_audio_type_parse(patch->audio_parse_threadID,&patch->audio_parse_para);
+
+    patch->input_thread_exit = 1;
+    pthread_join(patch->audio_input_threadID, NULL);
 
     if (IS_DIGITAL_IN_HW(patch->input_src)) {
         patch->signal_detect_thread_exit = 1;
         pthread_join(patch->audio_signal_detect_threadID, NULL);
     }
-    patch->input_thread_exit = 1;
-    pthread_join(patch->audio_input_threadID, NULL);
+
+    if (IS_DIGITAL_IN_HW(patch->input_src))
+        exit_pthread_for_audio_type_parse(patch->audio_parse_threadID,&patch->audio_parse_para);
+
     ring_buffer_release(&patch->aml_ringbuffer);
     aml_audio_free(patch);
     aml_dev->audio_patch = NULL;

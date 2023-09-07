@@ -1811,6 +1811,7 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12, bool set_non_continuous
     }
 
     adev->doing_cleanup_ms12 = true;
+    ms12->dolby_ms12_init_flags = false;
 
     ALOGI("++%s(), locked", __FUNCTION__);
     ALOGI("%s() dolby_ms12_set_quit_flag %d", __FUNCTION__, is_quit);
@@ -1843,7 +1844,6 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12, bool set_non_continuous
     ms12->main_input_rate = DDP_OUTPUT_SAMPLE_RATE;
     ms12->main_buffer_min_level = 0xFFFFFFFF;
     ms12->main_buffer_max_level = 0;
-    ms12->dolby_ms12_init_flags = false;
 
     audio_virtual_buf_close(&ms12->system_virtual_buf_handle);
     aml_ac3_parser_close(ms12->ac3_parser_handle);

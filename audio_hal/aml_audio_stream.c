@@ -1295,9 +1295,11 @@ void update_audio_format(struct aml_audio_device *adev, audio_format_t format)
 {
     int atmos_flag = 0;
     int update_type = TYPE_PCM;
+    pthread_mutex_lock (&adev->lock);
     bool is_dolby_active = dolby_stream_active(adev);
-    bool is_dolby_format = is_dolby_ms12_support_compression_format(format);
     bool is_dts_active = dts_stream_active(adev);
+    pthread_mutex_unlock (&adev->lock);
+    bool is_dolby_format = is_dolby_ms12_support_compression_format(format);
     /*
      *for dolby & pcm case or dolby case
      *to update the dolby stream's format

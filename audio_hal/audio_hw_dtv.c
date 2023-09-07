@@ -555,6 +555,7 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
 
                 if (adev->is_multi_demux) {
                     if (demux_handle) {
+                        pthread_mutex_lock(&adev->dtv_lock);
                         Stop_Dmx_Main_Audio(demux_handle);
                         if (demux_info->dual_decoder_support)
                             Stop_Dmx_AD_Audio(demux_handle);
@@ -564,6 +565,8 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                         Close_Dmx_Audio(demux_handle);
                         demux_handle = NULL;
                         dtv_audio_instances->demux_handle[path_id] = NULL;
+                        pthread_mutex_unlock(&adev->dtv_lock);
+
                         pthread_mutex_lock(&dtvsync->ms_lock);
                         if ((dtvsync->mediasync_new != NULL)) {
                             ALOGI("close mediasync_new:%p, mediasync:%p", dtvsync->mediasync_new, dtvsync->mediasync);
@@ -577,9 +580,11 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                     if (patch->skip_amadec_flag) {
                         if (demux_handle) {
                             if (demux_info->dual_decoder_support) {
+                                pthread_mutex_lock(&adev->dtv_lock);
                                 Stop_Dmx_AD_Audio(demux_handle);
                                 Destroy_Dmx_AD_Audio(demux_handle);
                                 Close_Dmx_Audio(demux_handle);
+                                pthread_mutex_unlock(&adev->dtv_lock);
                             }
                             demux_handle = NULL;
                             dtv_audio_instances->demux_handle[path_id] = NULL;

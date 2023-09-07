@@ -187,7 +187,8 @@ bool ms12_msg_list_is_empty(struct dolby_ms12_desc *ms12)
 int audiohal_send_msg_2_ms12(struct dolby_ms12_desc *ms12, ms12_mesg_type_t mesg_type)
 {
     int ret = -1;
-    if (0 != ms12->ms12_mesg_threadID) {
+
+    if (0 != ms12->ms12_mesg_threadID && ms12->dolby_ms12_init_flags == true) {
         struct ms12_mesg_desc *mesg_p = aml_audio_calloc(1, sizeof(struct ms12_mesg_desc));
 
         if (NULL == mesg_p) {
@@ -268,7 +269,7 @@ Repop_Mesg:
         ALOGD("%s(), msg type: %s", __func__, mesg_type_2_string[mesg_p->mesg_type]);
         pthread_mutex_unlock(&ms12->mutex);
 
-        while (NULL == ms12->ms12_main_stream_out && true != ms12->CommThread_ExitFlag) {
+        while ((NULL == ms12->ms12_main_stream_out && true != ms12->CommThread_ExitFlag ) || (false == ms12->dolby_ms12_init_flags)) {
             ALOGV("%s  ms12_out:%p, waiting ==> ms12_main_stream_out:%p", __func__,adev->ms12_out,ms12->ms12_main_stream_out);
             aml_audio_sleep(5000); //sleep 5ms
         };
