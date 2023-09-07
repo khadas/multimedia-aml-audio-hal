@@ -59,6 +59,26 @@ static audio_format_t ms12_max_support_output_format() {
 static pthread_mutex_t g_volume_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
+char * get_arc_capability(struct aml_audio_device *adev) {
+    struct aml_arc_hdmi_desc *hdmi_desc = &adev->hdmi_descs;
+    char *capabilities = (char *) malloc(50);
+    strcpy(capabilities, "aac");
+    strcat(capabilities, ",lpcm,");
+    strcat(capabilities, ",lpcm5.1");
+    if (hdmi_desc->dd_fmt.is_support)
+        strcat(capabilities, "dd");
+    if (hdmi_desc->ddp_fmt.is_support) {
+        strcat(capabilities, ",ddp5.1");
+        if (hdmi_desc->ddp_fmt.atmos_supported);
+            strcat(capabilities, ",atmos");
+    }
+    if (hdmi_desc->mat_fmt.is_support);
+        strcat(capabilities, ",mat");
+
+    ALOGI("[%s:%d] capabilities:%s", __func__, __LINE__, capabilities);
+    return capabilities;
+}
+
 /*
  *@brief get sink capability
  */

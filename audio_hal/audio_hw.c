@@ -5902,6 +5902,10 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         ALOGI("temp_buf %s", temp_buf);
         return strdup(temp_buf);
     }
+    else if (strstr (keys, "get_arc_capability")) {
+        ALOGI("capability: %s", get_arc_capability(adev));
+        return strdup(get_arc_capability(adev));
+    }
     return strdup("");
 }
 
