@@ -398,6 +398,27 @@ int update_edid_after_edited_audio_sad(struct aml_audio_device *adev, struct for
             memmove(EDID_cur_array + TLV_HEADER_SIZE - SAD_SIZE, EDID_cur_array, available_edid_len);
 
             available_edid_len -= SAD_SIZE;
+            for (int cnt = 0; cnt < EDID_ARRAY_MAX_LEN; cnt++) {
+                ALOGV("%s line %d EDID_cur_array(%d) [%#x]\n",  __func__, __LINE__, cnt, EDID_cur_array[cnt]);
+            }
+
+            /* when DDP Library inside, EDID should ignore MAT after DUT is connected to eARC.*/
+            if (adev->dolby_lib_type_last == eDolbyDcvLib) {
+                int edid_length = available_edid_len;
+                for (int i = 0; i < available_edid_len / SAD_SIZE; ) {
+                    char AudioFormatCodes = (EDID_cur_array[TLV_HEADER_SIZE + 3*i] >> 3) & 0xF;
+                    if (AudioFormatCodes == AML_HDMI_FORMAT_MAT) {
+                        char *pr = &EDID_cur_array[TLV_HEADER_SIZE + 3*i];
+                        memmove(pr, (pr + 3), (edid_length - 3*i - 3));
+                        edid_length -= 3;
+                        ALOGW("%s line %d will remove MAT codec %d \n", __func__, __LINE__, AudioFormatCodes);
+                        break;
+                    } else {
+                        i++;
+                    }
+                }
+                available_edid_len = edid_length;
+            }
 
             unsigned int *protocol_ptr = (unsigned int *)EDID_cur_array;
 
