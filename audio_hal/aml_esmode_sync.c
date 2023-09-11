@@ -473,7 +473,7 @@ void aml_hwsynces_ms12_get_policy_continue(struct audio_stream_out *stream)
     if (adev->debug_flag > 0) {
         static int64_t beforepts = 0;
         static int64_t beforepts1 = 0;
-        ALOGI("%s, do ms12_1 get m_audiopolicy=%d=%s, param1=%u, param2=%u, cur_pts=0x%llx,cur_outpts=0x%llx,diff_cur_pts=%lld,diff_cur_outpts=%lld \n", __func__,
+        ALOGI("%s, do ms12_1 get es m_audiopolicy=%d=%s, param1=%u, param2=%u, cur_pts=0x%llx,cur_outpts=0x%llx,diff_cur_pts=%lld,diff_cur_outpts=%lld \n", __func__,
             m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
             m_audiopolicy.param1, m_audiopolicy.param2,
             p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, p_esmediasync->out_start_apts - beforepts1, p_esmediasync->cur_outapts - beforepts);
@@ -492,18 +492,13 @@ sync_process_res aml_hwsynces_ms12_process_policy_continue(void *priv_data, aml_
     struct aml_audio_device *adev = aml_out->dev;
     struct mediasync_a_policy *async_policy = NULL;
     audio_mediasync_util_t* media_sync_util = aml_audio_get_mediasync_util_handle();
-    pthread_mutex_lock(&aml_out->hwsync->lock);
+
+    pthread_mutex_lock(&aml_out_write->hwsync->lock);
     async_policy = &(aml_out_write->hwsync->es_mediasync.apolicy);
-    pthread_mutex_unlock(&aml_out->hwsync->lock);
+    pthread_mutex_unlock(&aml_out_write->hwsync->lock);
 
     if (media_sync_util->media_sync_debug || async_policy->audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT)
         ALOGI("[%s:%d]es cur policy:%d(%s),last policy:%d(%s), prm1:%d, prm2:%d\n", __FUNCTION__, __LINE__,
-                async_policy->audiopolicy, mediasyncAudiopolicyType2Str(async_policy->audiopolicy),
-                async_policy->last_audiopolicy, mediasyncAudiopolicyType2Str(async_policy->last_audiopolicy),
-                async_policy->param1, async_policy->param2);
-
-    if (media_sync_util->media_sync_debug || async_policy->audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT)
-        ALOGI("[%s:%d]cur policy:%d(%s),last policy:%d(%s), prm1:%d, prm2:%d\n", __FUNCTION__, __LINE__,
                 async_policy->audiopolicy, mediasyncAudiopolicyType2Str(async_policy->audiopolicy),
                 async_policy->last_audiopolicy, mediasyncAudiopolicyType2Str(async_policy->last_audiopolicy),
                 async_policy->param1, async_policy->param2);
@@ -543,7 +538,7 @@ void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
     memset(&m_audiopolicy, 0, sizeof(m_audiopolicy));
     pthread_mutex_lock(&aml_out->hwsync->lock);
     audio_hwsync_mediasync_t *p_esmediasync = &(aml_out->hwsync->es_mediasync);
-    p_esmediasync->out_start_apts = aml_out->hwsync->es_mediasync.in_apts;
+    //p_esmediasync->out_start_apts = aml_out->hwsync->es_mediasync.in_apts;
     pthread_mutex_unlock(&aml_out->hwsync->lock);
     do {
         mediasync_wrap_AudioProcess(p_esmediasync->mediasync, p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
@@ -574,9 +569,10 @@ sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_
     struct audio_stream_out *stream_out = (struct audio_stream_out *)aml_out;
     struct aml_audio_device *adev = aml_out->dev;
     struct mediasync_a_policy *async_policy = NULL;
-    pthread_mutex_lock(&aml_out->hwsync->lock);
+
+    pthread_mutex_lock(&aml_out_write->hwsync->lock);
     async_policy = &(aml_out_write->hwsync->es_mediasync.apolicy);
-    pthread_mutex_unlock(&aml_out->hwsync->lock);
+    pthread_mutex_unlock(&aml_out_write->hwsync->lock);
 
     if (adev->debug_flag)
         ALOGI("[%s:%d] es cur_policy:%d, prm1:%d, prm2:%d", __func__, __LINE__, async_policy->audiopolicy, async_policy->param1, async_policy->param2);

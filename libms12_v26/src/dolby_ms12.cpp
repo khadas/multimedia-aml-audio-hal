@@ -544,3 +544,13 @@ extern "C" int dolby_ms12_enable_mixer_max_size(int enable)
     return -1;
 }
 
+extern "C" int dolby_ms12_register_scaletempo_callback(void *callback, void *priv_data)
+{
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12RegisterScaletempoCallback((android::scaletempo_callback)callback, priv_data);
+    } else {
+        return -1;
+    }
+}
+

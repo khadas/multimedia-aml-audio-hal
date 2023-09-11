@@ -180,7 +180,6 @@ public:
     virtual int DolbyMS12GetAC4ActivePresentation(int *presentation_group_index);
 
     virtual int DolbyMS12AC4DecCheckThePgiIsPresent(int presentation_group_index);
-
     virtual int     DolbyMS12RegisterScaletempoCallback(scaletempo_callback callback, void *priv_data);
 
     // protected:

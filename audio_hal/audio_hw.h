@@ -63,6 +63,7 @@
 #include "aml_dec_api.h"
 #include "aml_dts_dec_api.h"
 #include "audio_format_parse.h"
+#include "hal_scaletempo.h"
 
 /* number of frames per period */
 /*
@@ -668,6 +669,8 @@ struct aml_audio_device {
     bool spdif_independent;  /*spdif output can be independent with HDMI output*/
     aml_dec_info_t dec_stream_info;
     /* -End- */
+
+    bool user_setting_scaletempo;
 };
 
 struct meta_data {
@@ -902,6 +905,8 @@ struct aml_stream_out {
 #endif
     uint64_t llp_rp;
     uint64_t llp_underrun_wp;
+    bool enable_scaletempo;
+    struct scale_tempo * scaletempo;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);

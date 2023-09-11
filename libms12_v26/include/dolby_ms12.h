@@ -288,6 +288,11 @@ int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duration);
 */
 int dolby_ms12_enable_mixer_max_size(int enable);
 
+/*@@
+    @brief dolby_ms12_register_scaletempo_callback
+*/
+int dolby_ms12_register_scaletempo_callback(void *callback, void *priv_data);
+
 #ifdef __cplusplus
 }
 #endif

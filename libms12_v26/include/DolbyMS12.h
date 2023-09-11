@@ -176,7 +176,7 @@ public:
     virtual int     DolbyMS12GetMainUnderrun();
 
     virtual int     DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration);
-
+    virtual int     DolbyMS12RegisterScaletempoCallback(scaletempo_callback callback, void *priv_data);
 
     // protected:
 

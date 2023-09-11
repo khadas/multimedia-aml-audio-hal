@@ -982,5 +982,19 @@ int DolbyMS12::DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration)
     return ret;
 }
 
+int DolbyMS12::DolbyMS12RegisterScaletempoCallback(scaletempo_callback callback, void *priv_data)
+{
+    int ret = 0;
+    ALOGV("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12RegisterScaletempoCallback) {
+        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
+        return -1;
+    }
+
+    ret = (*FuncDolbyMS12RegisterScaletempoCallback)(callback, priv_data);
+    ALOGV("-%s() ret %d", __FUNCTION__, ret);
+    return ret;
+}
+
 /*--------------------------------------------------------------------------*/
 }   // namespace android

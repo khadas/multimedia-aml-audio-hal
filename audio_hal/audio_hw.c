@@ -1066,9 +1066,60 @@ static void hwsync_mediasync_outset(struct aml_audio_device *adev, struct aml_st
     mediasync_wrap_setParameter(adev->hw_mediasync, MEDIASYNC_KEY_AUDIOFORMAT, &audio_format);
     out->output_speed = 1.0f;
     *sync_enable = ret_set_id ? 1 : 0;
-    ALOGI("[%s:%d]:The current sync type: MediaSync %d,%d,%x", __FUNCTION__, __LINE__,*sync_enable,hw_sync_id,out->hal_format);
+    ALOGI("[%s:%d]:The current sync type: MediaSync %d,%d,%x, hw_mediasync:%p", __FUNCTION__, __LINE__,*sync_enable,hw_sync_id,out->hal_format, adev->hw_mediasync);
 }
 
+static void playback_rate_set (struct audio_stream *stream, float rate)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev = aml_out->dev;
+
+    if (false == aml_out->enable_scaletempo)
+    {
+        ALOGE("[%s:%d]:set rate:%f fail, need enable_scaletempo first", __FUNCTION__, __LINE__, rate);
+        goto exit;
+    }
+
+    hal_scaletempo_update_rate(aml_out->scaletempo, rate);
+
+    /* msync */
+    if (NULL != aml_out->msync_session)
+    {
+        av_sync_set_speed(aml_out->msync_session, rate);
+    }
+    /* mediasync & es mode */
+    else if ((true == aml_out->hw_sync_mode) && (NULL != aml_out->hwsync))
+    {
+        if (NULL == aml_out->hwsync->es_mediasync.mediasync)
+        {
+            ALOGE("[%s:%d]:aml_out->hwsync->es_mediasync.mediasync NULL fail", __FUNCTION__, __LINE__);
+            goto exit;
+        }
+        mediasync_wrap_setPlaybackRate(aml_out->hwsync->es_mediasync.mediasync, rate);
+    }
+    /* mediasync & ts mode */
+    else
+    {
+        struct aml_audio_patch *patch = NULL;
+        patch = adev->audio_patch;
+        if (NULL == patch)
+        {
+            ALOGE("[%s:%d]:patch NULL fail", __FUNCTION__, __LINE__);
+            goto exit;
+        }
+
+        if (NULL == patch->dtvsync)
+        {
+            ALOGE("[%s:%d]:patch->dtvsync NULL fail", __FUNCTION__, __LINE__);
+            goto exit;
+        }
+
+        mediasync_wrap_setPlaybackRate(patch->dtvsync->mediasync, rate);
+    }
+
+exit:
+    return;
+}
 
 static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
 {
@@ -1366,6 +1417,15 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
             goto exit;
         }
     }
+
+    ret = str_parms_get_str (parms, "playback_rate", value, sizeof (value));
+    if (ret >= 0) {
+        float rate = atof(value);
+        ALOGI("change rate to %f, format:0x%x, enable %d", rate, out->hal_format, out->enable_scaletempo);
+        playback_rate_set(stream, rate);
+        goto exit;
+    }
+
 exit:
     str_parms_destroy (parms);
 
@@ -3629,6 +3689,13 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         aml_ac4_parser_open(&out->ac4_parser_handle);
     }
 
+    if (adev->user_setting_scaletempo) {
+        out->enable_scaletempo = true;
+        hal_scaletempo_init(&out->scaletempo);
+        dolby_ms12_register_scaletempo_callback(ms12_scaletempo, out);
+        ALOGI("%s %d, enable scaletempo %p", __FUNCTION__, __LINE__, out);
+    }
+
     out->flags = flags;
     out->ddp_frame_size = aml_audio_get_ddp_frame_size();
     out->resample_handle = NULL;
@@ -3869,10 +3936,20 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         adev->dolby_lib_type = adev->dolby_lib_type_last;
         ALOGI("%s restore dolby lib =%d", __func__, adev->dolby_lib_type);
     }
+
     //we muted in aml_audio_hwsync_find_frame when find eos, here recover mute
     if (adev->dolby_lib_type != eDolbyMS12Lib && is_dolby_format(out->hal_internal_format)) {
         set_aed_master_volume_mute(&adev->alsa_mixer, false);
     }
+
+    if (out->enable_scaletempo == true) {
+        ALOGI("%s %d, release scaletempo %p", __FUNCTION__, __LINE__, out);
+        out->enable_scaletempo = false;
+        dolby_ms12_register_scaletempo_callback(NULL, NULL);
+        hal_scaletempo_release(out->scaletempo);
+        out->scaletempo = NULL;
+    }
+
     pthread_mutex_unlock(&out->lock);
     adev->audio_hal_info.is_decoding = false;
     adev->audio_hal_info.first_decoding_frame = false;
@@ -5517,6 +5594,17 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             start_ease_out(adev);
         }
         ALOGE ("gst_pause: fade out\n");
+
+        goto exit;
+    }
+
+    ret = str_parms_get_int(parms, "enable_scaletempo", &val);
+    if (ret >= 0) {
+        if (val == 1)
+            adev->user_setting_scaletempo = true;
+        else
+            adev->user_setting_scaletempo = false;
+        ALOGI("audio enable_scaletempo: %s\n", adev->user_setting_scaletempo? "enable": "disable");
         goto exit;
     }
 

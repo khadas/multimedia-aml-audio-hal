@@ -302,6 +302,9 @@ int dolby_ms12_get_main_audio_info(int *sample_rate, int *acmod, int *b_lfe);
 int dolby_ms12_get_ac4_active_presentation(int *presentation_group_index);
 //whether the given presentation group index is present in a bitstream
 int dolby_ms12_ac4dec_check_the_pgi_is_present(int presentation_group_index);
+
+int dolby_ms12_register_scaletempo_callback(void *callback, void *priv_data);
+
 #ifdef __cplusplus
 }
 #endif

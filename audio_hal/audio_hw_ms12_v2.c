@@ -53,6 +53,7 @@
 #include "aml_dtvsync.h"
 #include "audio_media_sync_util.h"
 #include "audio_hw_ms12_common.h"
+#include "hal_scaletempo.h"
 
 #define DOLBY_DRC_LINE_MODE 0
 #define DOLBY_DRC_RF_MODE   1
@@ -892,6 +893,7 @@ int get_the_dolby_ms12_prepared(
             goto Err;
         }
         /* copy stream information */
+        ALOGI("%s %d, release out %p enable %d, scaletempo %p", __FUNCTION__, __LINE__, aml_out, aml_out->enable_scaletempo, aml_out->scaletempo);
         memcpy(out, aml_out, sizeof(struct aml_stream_out));
         if (adev->is_TV) {
             out->is_tv_platform  = 1;
@@ -910,7 +912,7 @@ int get_the_dolby_ms12_prepared(
                 goto Err_audioeffect_tmp_buf;
             }
         }
-        ALOGI("%s create ms12 stream %p,original stream %p", __func__, out, aml_out);
+        ALOGI("%s create ms12 stream %p scaletempo %p,original stream %p", __func__, out, out->scaletempo, aml_out);
     } else {
         out = aml_out;
     }
@@ -969,6 +971,12 @@ int get_the_dolby_ms12_prepared(
     if (ms12->dolby_ms12_enable) {
         //register Dolby MS12 callback
         dolby_ms12_register_output_callback(ms12_output, (void *)out);
+        if (aml_out->enable_scaletempo) {
+            if (out->scaletempo) {
+                hal_scaletempo_force_init(out->scaletempo);
+            }
+            dolby_ms12_register_scaletempo_callback(ms12_scaletempo, (void *)out);
+        }
         ms12->device = usecase_device_adapter_with_ms12(out->device,AUDIO_FORMAT_PCM_16_BIT/* adev->sink_format*/);
         ALOGI("%s out [dual_output_flag %d] adev [format sink %#x optical %#x] ms12 [output-format %#x device %d]",
               __FUNCTION__, out->dual_output_flag, adev->sink_format, adev->optical_format, ms12->output_config, ms12->device);
@@ -3569,4 +3577,21 @@ int dolby_ms12_main_pipeline_latency_frames(struct audio_stream_out *stream) {
     return latency_frames;
 }
 
+//data type: 32bit float little-endian non-interleaved
+//data type: 32bit float little-endian non-interleaved
+int ms12_scaletempo(void *priv_data, void *info) {
+    if (priv_data == NULL || info == NULL) {
+        return -1;
+    }
 
+    struct aml_stream_out *aml_out = (struct aml_stream_out *)priv_data;
+
+    if (!aml_out->enable_scaletempo || aml_out->scaletempo == NULL) {
+        ALOGI("%s %d: error parameters enable %d ", __func__, __LINE__, aml_out->enable_scaletempo);
+        return -1;
+    }
+
+    hal_scaletempo_process(aml_out->scaletempo, (aml_scaletempo_info_t *)info);
+
+    return 0;
+}
