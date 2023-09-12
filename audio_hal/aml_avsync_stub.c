@@ -82,5 +82,11 @@ void log_set_level(int level)
     return;
 }
 
+int av_sync_set_speed(void *sync, float speed)
+{
+    ALOGE("[%s():%d] stub function error!", __func__, __LINE__);
+    return;
+}
+
 #endif
 
