@@ -3577,6 +3577,17 @@ int dolby_ms12_main_pipeline_latency_frames(struct audio_stream_out *stream) {
     return latency_frames;
 }
 
+void set_ms12_encoder_chmod_locking(struct dolby_ms12_desc *ms12, bool is_lock_on)
+{
+    char parm[64] = "";
+
+    sprintf(parm, "%s %d", "-chmod_locking", is_lock_on);
+    if ((strlen(parm)) > 0 && ms12)
+        aml_ms12_update_runtime_params(ms12, parm);
+
+    dolby_ms12_set_encoder_channel_mode_locking_mode(is_lock_on);
+}
+
 //data type: 32bit float little-endian non-interleaved
 //data type: 32bit float little-endian non-interleaved
 int ms12_scaletempo(void *priv_data, void *info) {

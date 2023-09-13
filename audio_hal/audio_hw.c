@@ -4731,6 +4731,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         }
         ALOGI("%s:%d is_netflix %d(%s)", __FUNCTION__, __LINE__, adev->is_netflix, value);
 
+        set_ms12_encoder_chmod_locking(&(adev->ms12), adev->is_netflix);
         set_ms12_acmod2ch_lock(&(adev->ms12), !adev->is_netflix);
         goto exit;
     }
@@ -4751,6 +4752,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             {
                 bool acmod2ch_lock = !val;
                 //when in netflix, we should always keep ddp5.1, exit netflix we can output ddp2ch
+                set_ms12_encoder_chmod_locking(&(adev->ms12), !acmod2ch_lock);
                 set_ms12_acmod2ch_lock(&(adev->ms12), acmod2ch_lock);
             }
 
@@ -7708,7 +7710,7 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
             }
 
             /*netflix always ddp 5.1 output, other case we need output ddp 2ch*/
-            if (continous_mode(adev) && main1_dummy && !adev->is_netflix) {
+            if (continous_mode(adev) && main1_dummy && !adev->is_netflix && !is_multi_channel_pcm(stream)) {
                 set_ms12_acmod2ch_lock(&adev->ms12, true);
             }
 

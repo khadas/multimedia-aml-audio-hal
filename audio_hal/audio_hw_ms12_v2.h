@@ -320,4 +320,6 @@ void set_ms12_main_audio_mute(struct dolby_ms12_desc *ms12, bool b_mute, unsigne
 
 int ms12_scaletempo(void *priv_data, void *info);
 
+void set_ms12_encoder_chmod_locking(struct dolby_ms12_desc *ms12, bool is_lock_on);
+
 #endif //end of _AUDIO_HW_MS12_H_
