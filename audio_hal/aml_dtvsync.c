@@ -723,16 +723,19 @@ void aml_dtvsync_ms12_get_policy(struct audio_stream_out *stream)
         if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
             if (m_audiopolicy.param1 == -1) {
                 usleep(15000);
+            } else if (1000000 < m_audiopolicy.param1) {
+                ALOGE("Invalid hold parameter, m_audiopolicy.param1:%d, change sleep to 1s now!", m_audiopolicy.param1);
+                usleep(1000000);
             } else {
                 usleep(m_audiopolicy.param1);
             }
         }
 
-        if (adev->audio_patch && adev->audio_patch->output_thread_exit == 1) {
-            ALOGI("input exit, break now");
+        if (adev->audio_patch
+            && ((adev->audio_patch->input_thread_exit == 1) || (adev->audio_patch->output_thread_exit == 1))) {
+            ALOGI("input exit, break now.");
             break;
         }
-
     } while (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
     dtvsync->apolicy.audiopolicy= (dtvsync_policy)m_audiopolicy.audiopolicy;
     dtvsync->apolicy.param1 = m_audiopolicy.param1;
