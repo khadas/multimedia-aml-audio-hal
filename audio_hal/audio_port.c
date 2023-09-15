@@ -53,7 +53,7 @@ static ssize_t input_port_write(input_port *port, const void *buffer, int bytes)
     int written = 0;
 
     written = ring_buffer_write(port->r_buf, data, bytes, UNCOVER_WRITE);
-    if (getprop_bool("vendor.media.audiohal.inport")) {
+    if (aml_audio_property_get_bool("vendor.media.audiohal.inport", false)) {
         if (port->enInPortType == AML_MIXER_INPUT_PORT_PCM_SYSTEM)
             aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/inportSys.raw", buffer, written);
         else if (port->enInPortType == AML_MIXER_INPUT_PORT_PCM_DIRECT)
@@ -759,7 +759,7 @@ static ssize_t output_port_post_process(output_port *port, void *buffer, int byt
         audio_post_process(&adev->native_postprocess, effect_tmp_buf, frames);
     }
 
-    if (aml_getprop_bool("vendor.media.audiohal.outdump")) {
+    if (aml_audio_property_get_bool("vendor.media.audiohal.outdump", false)) {
         aml_audio_dump_audio_bitstreams("/data/audio/audio_spk.pcm",
         effect_tmp_buf, bytes);
     }
@@ -947,10 +947,10 @@ static ssize_t output_port_write_alsa(output_port *port, void *buffer, int bytes
             }
 
         }
-        if (written > 0 && getprop_bool("vendor.media.audiohal.inport")) {
+        if (written > 0 && aml_audio_property_get_bool("vendor.media.audiohal.inport", false)) {
             aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/audioOutPort.raw", buffer, written);
         }
-        if (written > 0 && getprop_bool("vendor.media.audiohal.alsadump")) {
+        if (written > 0 && aml_audio_property_get_bool("vendor.media.audiohal.alsadump", false)) {
             aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/alsa_pcm_write.raw", buffer, written);
         }
         //if (get_debug_value(AML_DEBUG_AUDIOHAL_LEVEL_DETECT)) {

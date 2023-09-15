@@ -39,8 +39,6 @@ typedef enum DEVICE_TYPE {
 
 
 static int get_ms12_dv_tunnel_input_latency(audio_format_t input_format) {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     switch (input_format) {
@@ -67,18 +65,13 @@ static int get_ms12_dv_tunnel_input_latency(audio_format_t input_format) {
     }
 
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
 
     return latency_ms;
 }
 
 static int get_ms12_nontunnel_input_latency(audio_format_t input_format) {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     switch (input_format) {
@@ -103,10 +96,7 @@ static int get_ms12_nontunnel_input_latency(audio_format_t input_format) {
 
     }
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
 
     return latency_ms;
@@ -114,8 +104,6 @@ static int get_ms12_nontunnel_input_latency(audio_format_t input_format) {
 
 
 static int get_ms12_tunnel_input_latency(audio_format_t input_format) {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     switch (input_format) {
@@ -142,10 +130,7 @@ static int get_ms12_tunnel_input_latency(audio_format_t input_format) {
     }
 
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
 
     return latency_ms;
@@ -153,8 +138,6 @@ static int get_ms12_tunnel_input_latency(audio_format_t input_format) {
 
 
 static int get_ms12_netflix_nontunnel_input_latency(audio_format_t input_format) {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     switch (input_format) {
@@ -174,10 +157,7 @@ static int get_ms12_netflix_nontunnel_input_latency(audio_format_t input_format)
 
     }
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
 
     return latency_ms;
@@ -185,8 +165,6 @@ static int get_ms12_netflix_nontunnel_input_latency(audio_format_t input_format)
 
 
 static int get_ms12_netflix_tunnel_input_latency(audio_format_t input_format) {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     switch (input_format) {
@@ -208,10 +186,7 @@ static int get_ms12_netflix_tunnel_input_latency(audio_format_t input_format) {
     }
 
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
 
     return latency_ms;
@@ -219,8 +194,6 @@ static int get_ms12_netflix_tunnel_input_latency(audio_format_t input_format) {
 
 
 static int get_ms12_output_latency(audio_format_t output_format) {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     switch (output_format) {
@@ -249,10 +222,7 @@ static int get_ms12_output_latency(audio_format_t output_format) {
     }
 
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
     ALOGV("%s output format =0x%x latency ms =%d", __func__, output_format, latency_ms);
     return latency_ms;
@@ -260,8 +230,6 @@ static int get_ms12_output_latency(audio_format_t output_format) {
 }
 
 static int get_ms12_netflix_output_latency(audio_format_t output_format) {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     switch (output_format) {
@@ -290,10 +258,7 @@ static int get_ms12_netflix_output_latency(audio_format_t output_format) {
     }
 
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
     ALOGV("%s output format =0x%x latency ms =%d", __func__, output_format, latency_ms);
     return latency_ms;
@@ -303,8 +268,6 @@ static int get_ms12_netflix_output_latency(audio_format_t output_format) {
 
 int get_ms12_port_latency( enum OUT_PORT port, audio_format_t output_format)
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     switch (port)  {
@@ -345,10 +308,7 @@ int get_ms12_port_latency( enum OUT_PORT port, audio_format_t output_format)
     }
 
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
     ALOGV("%s outport =%d output format =0x%x latency ms =%d", __func__, port, output_format, latency_ms);
     return latency_ms;
@@ -393,7 +353,7 @@ static int get_ms12_tunnel_latency_offset(enum OUT_PORT port
     int input_latency_ms = 0;
     int output_latency_ms = 0;
     int port_latency_ms = 0;
-    int is_dv = getprop_bool(MS12_OUTPUT_5_1_DDP); /* suppose that Dolby Vision is under test */
+    int is_dv = aml_audio_property_get_bool(MS12_OUTPUT_5_1_DDP, false); /* suppose that Dolby Vision is under test */
     bool is_tunnel = true;
 
     if (is_netflix) {
@@ -426,8 +386,6 @@ static int get_ms12_tunnel_latency_offset(enum OUT_PORT port
 
 int get_ms12_atmos_latency_offset(bool tunnel, bool is_netflix)
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     if (is_netflix) {
@@ -451,18 +409,13 @@ int get_ms12_atmos_latency_offset(bool tunnel, bool is_netflix)
             latency_ms = AVSYNC_MS12_NONTUNNEL_ATMOS_LATENCY;
         }
     }
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        latency_ms = atoi(buf);
-    }
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
 
 int get_ms12_bypass_latency_offset(bool tunnel)
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     if (tunnel) {
@@ -474,10 +427,7 @@ int get_ms12_bypass_latency_offset(bool tunnel)
         prop_name = AVSYNC_MS12_NONTUNNEL_BYPASS_LATENCY_PROPERTY;
         latency_ms = AVSYNC_MS12_NONTUNNEL_BYPASS_LATENCY;
     }
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        latency_ms = atoi(buf);
-    }
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
@@ -574,18 +524,13 @@ static int aml_audio_output_ddp_atmos(struct audio_stream_out *stream)
 }
 
 static int get_ms12_tunnel_video_delay(void) {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
 
     prop_name= AVSYNC_MS12_TUNNEL_VIDEO_DELAY_PROPERTY;
     latency_ms = AVSYNC_MS12_TUNNEL_VIDEO_DELAY;
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
     ALOGV("%s latency ms =%d", __func__, latency_ms);
     return latency_ms;
@@ -712,8 +657,6 @@ int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream, boo
 }
 
 static int get_nonms12_netflix_tunnel_input_latency(audio_format_t input_format) {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     switch (input_format) {
@@ -735,10 +678,7 @@ static int get_nonms12_netflix_tunnel_input_latency(audio_format_t input_format)
     }
 
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
 
     return latency_ms;

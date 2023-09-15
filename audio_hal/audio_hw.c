@@ -1674,7 +1674,7 @@ exit1:
             uint32_t apts32 = out->hwsync->last_apts_from_header;
             int latency = out_get_latency(stream);
             struct audio_policy policy;
-            if (aml_getprop_bool("media.audiohal.ptslog"))
+            if (aml_audio_property_get_bool("media.audiohal.ptslog", false))
                 ALOGI("apts:%d, latency:%d ms", apts32, latency);
             av_sync_audio_render(out->msync_session, apts32, &policy);
             if (latency > 0 && latency < 100)
@@ -2824,7 +2824,7 @@ static void inread_proc_aec(struct audio_stream_in *stream,
     int cleaned_samples_per_channel = 0;
     size_t bytes_per_sample =
         audio_bytes_per_sample(stream->common.get_format(&stream->common));
-    int enable_dump = getprop_bool("vendor.media.audio_hal.aec.outdump");
+    int enable_dump = aml_audio_property_get_bool("vendor.media.audio_hal.aec.outdump", false);
     if (enable_dump) {
         aml_audio_dump_audio_bitstreams("/data/tmp/audio_mix.raw",
                 read_buf_16, in_frames*2*2*2);
@@ -3121,7 +3121,7 @@ exit:
         ALOGE("AEC debug: Could not open file aec_in_timestamps.txt!");
     }
 #endif
-    if (ret >= 0 && getprop_bool("vendor.media.audiohal.indump")) {
+    if (ret >= 0 && aml_audio_property_get_bool("vendor.media.audiohal.indump", false)) {
         aml_audio_dump_audio_bitstreams("/data/audio/alsa_read.raw",
             buffer, bytes);
     }
@@ -4761,8 +4761,8 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             goto exit;
             ALOGI("%s continuous_audio_mode set to %d\n", __func__ , val);
             char buf[PROPERTY_VALUE_MAX] = {0};
-            ret = property_get(DISABLE_CONTINUOUS_OUTPUT, buf, NULL);
-            if (ret > 0) {
+            char *str = aml_audio_property_get_str(DISABLE_CONTINUOUS_OUTPUT, buf, NULL);
+            if (str != NULL) {
                 sscanf(buf, "%d", &disable_continuous);
                 ALOGI("%s[%s] disable_continuous %d\n", DISABLE_CONTINUOUS_OUTPUT, buf, disable_continuous);
             }
@@ -6766,7 +6766,7 @@ ssize_t audio_hal_data_processing_ms12v2(struct audio_stream_out *stream,
     int j, ret;
     uint32_t latency_frames = 0;
     uint64_t total_frame = 0;
-    int enable_dump = aml_getprop_bool("vendor.media.audiohal.outdump");
+    int enable_dump = aml_audio_property_get_bool("vendor.media.audiohal.outdump", false);
     if (adev->debug_flag) {
         ALOGD("%s,size %zu,format %x,ch %d\n",__func__,bytes,output_format,nchannels);
     }
@@ -7009,7 +7009,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                 audio_post_process(&adev->native_postprocess, effect_tmp_buf, out_frames);
             }
 
-            if (aml_getprop_bool("vendor.media.audiohal.outdump")) {
+            if (aml_audio_property_get_bool("vendor.media.audiohal.outdump", false)) {
                 aml_audio_dump_audio_bitstreams("/data/audio/audio_spk.pcm",
                     effect_tmp_buf, bytes);
             }
@@ -8111,7 +8111,7 @@ hwsync_rewrite:
                             uint32_t first_vpts = 0;
                             uint32_t apts_gap = 0;
                             uint32_t video_started = 0;
-                            int64_t start_wait_threshold_ms = property_get_int64("vendor.media.audio_hal.waitthresholdus", APTS_TSYNC_START_WAIT_THRESHOLD_US);
+                            int64_t start_wait_threshold_ms = aml_audio_property_get_int("vendor.media.audio_hal.waitthresholdus", APTS_TSYNC_START_WAIT_THRESHOLD_US);
 
                             apts32 = cur_pts & 0xffffffff;
                             aml_hwsync_get_tsync_video_started(aml_out->hwsync, &video_started);
@@ -8156,7 +8156,7 @@ hwsync_rewrite:
                                 latency += ringbuf_latency;
                             }
                             uint32_t apts32 = (cur_pts - latency) & 0xffffffff;
-                            if (aml_getprop_bool("media.audiohal.ptslog"))
+                            if (aml_audio_property_get_bool("media.audiohal.ptslog", false))
                                 ALOGI("apts:%d pts:%lld latency:%d ringbuf_%d_latency:%lld", apts32, cur_pts, latency, aml_out->inputPortID, ringbuf_latency);
                             aml_audio_hwsync_set_first_pts(aml_out->hwsync, apts32);
                             if (aml_out->msync_session)
@@ -8229,7 +8229,7 @@ hwsync_rewrite:
                                 latency += ringbuf_latency;
                             }
                             uint32_t apts32 = (cur_pts - latency) & 0xffffffff;
-                            if (aml_getprop_bool("media.audiohal.ptslog"))
+                            if (aml_audio_property_get_bool("media.audiohal.ptslog", false))
                                 ALOGI("apts:%d pts:%lld latency:%lld ringbuf_%d_latency:%lld", apts32, cur_pts, latency, aml_out->inputPortID, ringbuf_latency);
 
                             av_sync_audio_render(aml_out->msync_session, apts32, &policy);
@@ -8784,7 +8784,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, const void *buff
             ms12->sys_audio_skip += bytes / frame_size;
         }
         usleep(bytes_written * 1000000 / frame_size / out_get_sample_rate(&stream->common));
-        if (getprop_bool("vendor.media.audiohal.mixer")) {
+        if (aml_audio_property_get_bool("vendor.media.audiohal.mixer", false)) {
             aml_audio_dump_audio_bitstreams("/data/audio/mixerAux.raw", buffer, bytes);
         }
     }
@@ -9423,7 +9423,7 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
         }
     }
 
-    if (aml_getprop_bool("vendor.media.audio.hal.debug")) {
+    if (aml_audio_property_get_bool("vendor.media.audio.hal.debug", false)) {
         aml_out->debug_stream = 1;
     }
 
@@ -9854,7 +9854,7 @@ void *audio_patch_input_threadloop(void *data)
                 }
             }
 
-            if (getprop_bool("vendor.media.audiohal.indump")) {
+            if (aml_audio_property_get_bool("vendor.media.audiohal.indump", false)) {
                 aml_audio_dump_audio_bitstreams("/data/audio/alsa_in_read.raw",
                     patch->in_buf, read_bytes);
             }
@@ -9949,17 +9949,12 @@ void *audio_patch_output_threadloop(void *data)
     stream_config.format = patch->out_format;
 
 #ifdef DOLBY_MS12_INPUT_FORMAT_TEST
-    char buf[PROPERTY_VALUE_MAX] = {0};
-    int prop_ret = -1;
     int format = 0;
-    prop_ret = property_get("vendor.dolby.ms12.input.format", buf, NULL);
-    if (prop_ret > 0) {
-        format = atoi(buf);
-        if (format == 1) {
-            stream_config.format = AUDIO_FORMAT_AC3;
-        } else if (format == 2) {
-            stream_config.format = AUDIO_FORMAT_E_AC3;
-        }
+    format = aml_audio_property_get_int("vendor.dolby.ms12.input.format", format);
+    if (format == 1) {
+        stream_config.format = AUDIO_FORMAT_AC3;
+    } else if (format == 2) {
+        stream_config.format = AUDIO_FORMAT_E_AC3;
     }
 #endif
     /*
@@ -10599,8 +10594,8 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
     enum IN_PORT inport = INPORT_HDMIIN;
     unsigned int i = 0;
     int ret = -1;
-    aml_dev->no_underrun_max = property_get_int32("vendor.media.audio_hal.nounderrunmax", 60);
-    aml_dev->start_mute_max = property_get_int32("vendor.media.audio_hal.startmutemax", 50);
+    aml_dev->no_underrun_max = aml_audio_property_get_int("vendor.media.audio_hal.nounderrunmax", 60);
+    aml_dev->start_mute_max = aml_audio_property_get_int("vendor.media.audio_hal.startmutemax", 50);
 
     if ((src_config->ext.device.type == AUDIO_DEVICE_IN_WIRED_HEADSET) || (src_config->ext.device.type == AUDIO_DEVICE_IN_BLUETOOTH_BLE)) {
         ALOGD("bluetooth voice search is in use, bypass adev_create_audio_patch()!!\n");
@@ -10968,7 +10963,7 @@ static int adev_release_audio_patch(struct audio_hw_device *dev,
 #endif
 #if defined(IS_ATOM_PROJECT)
 #ifdef DEBUG_VOLUME_CONTROL
-    int vol = property_get_int32("vendor.media.audio_hal.volume", -1);
+    int vol = aml_audio_property_get_int("vendor.media.audio_hal.volume", -1);
     if (vol != -1)
         aml_dev->sink_gain[OUTPORT_SPEAKER] = (float)vol;
 else
@@ -11553,8 +11548,8 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->dual_spdif_support = aml_get_jason_int_value(DUAL_SPDIF,0);
     adev->ms12_force_ddp_out = aml_get_jason_int_value(FORCE_DDP,0);
 #else
-    adev->dual_spdif_support = property_get_bool("ro.vendor.platform.is.dualspdif", false);
-    adev->ms12_force_ddp_out = property_get_bool("ro.vendor.platform.is.forceddp", false);
+    adev->dual_spdif_support = aml_audio_property_get_bool("ro.vendor.platform.is.dualspdif", false);
+    adev->ms12_force_ddp_out = aml_audio_property_get_bool("ro.vendor.platform.is.forceddp", false);
 #endif
     adev->spdif_enable = true;
     adev->dolby_ms12_dap_init_mode = aml_get_jason_int_value(STB_MS12_DAP_MODE, 0);
@@ -11565,8 +11560,8 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         adev->continuous_audio_mode_default = 1;
     }
     /*we can use property to debug it*/
-    ret = property_get(DISABLE_CONTINUOUS_OUTPUT, buf, NULL);
-    if (ret > 0) {
+    char *str = aml_audio_property_get_str(DISABLE_CONTINUOUS_OUTPUT, buf, NULL);
+    if (str != NULL) {
         sscanf(buf, "%d", &disable_continuous);
         if (!disable_continuous) {
             adev->continuous_audio_mode_default = 1;
@@ -11580,7 +11575,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     open_mixer_handle(&adev->alsa_mixer);
 
     /* Set the earctx mode by the property, only need set false */
-    earctx_mode = property_get_bool("persist.sys.vendor.earc_settings", true);
+    earctx_mode = aml_audio_property_get_bool("persist.sys.vendor.earc_settings", true);
     if (!earctx_mode) {
     aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_EARC_TX_EARC_MODE, earctx_mode);
     ALOGI("eARC_TX eARC Mode get from property: %d\n", earctx_mode);
@@ -11677,7 +11672,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 #else
     /* for stb/ott, fixed 2 channels speaker output for alsa*/
     adev->default_alsa_ch = 2;
-    adev->is_STB = property_get_bool("ro.vendor.platform.is.stb", false);
+    adev->is_STB = aml_audio_property_get_bool("ro.vendor.platform.is.stb", false);
     ALOGI("%s(), OTT platform", __func__);
 #endif
 #endif

@@ -194,15 +194,7 @@ static const unsigned int ms12_muted_ddp_raw[] = {
 
 
 static int get_ms12_dump_enable(int dump_type) {
-
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
-    int value = 0;
-
-    ret = property_get(MS12_DUMP_PROPERTY, buf, NULL);
-    if (ret > 0) {
-        value = strtol (buf, NULL, 0);
-    }
+    int value  = aml_audio_property_get_int(MS12_DUMP_PROPERTY, 0);
     return (value & dump_type);
 }
 
@@ -358,12 +350,9 @@ int get_the_dolby_ms12_prepared(
 
 #ifdef DOLBY_MS12_OUTPUT_FORMAT_TEST
     {
-        char buf[PROPERTY_VALUE_MAX];
-        int prop_ret = -1;
-        int out_format = 0;
-        prop_ret = property_get("vendor.dolby.ms12.output.format", buf, NULL);
-        if (prop_ret > 0) {
-            out_format = atoi(buf);
+        int out_format = -1;
+        out_format = aml_audio_property_get_int("vendor.dolby.ms12.output.format", out_format);
+        if (out_format != -1) {
             if (out_format == 0) {
                 ms12->sink_format = AUDIO_FORMAT_PCM_16_BIT;
                 ALOGI("DOLBY_MS12_OUTPUT_FORMAT_TEST %d\n", (unsigned int)ms12->sink_format);

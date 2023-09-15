@@ -44,7 +44,7 @@
 
 static void dump(const void *buffer, int size, char *file_name)
 {
-    if (aml_getprop_bool("media.audiohal.tempodump")) {
+    if (aml_audio_property_get_bool("media.audiohal.tempodump", false)) {
         FILE *fp1;
         fp1 = fopen(file_name, "a+");
         if (fp1) {

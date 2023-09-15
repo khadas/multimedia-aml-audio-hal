@@ -132,7 +132,7 @@ static void *outMmapThread(void *pArg) {
             } else {
                 out_write_new(&out->stream, pu8TempBufferAddr, MMAP_WRITE_SIZE_BYTE);
             }
-            if (aml_getprop_bool("vendor.media.audiohal.outdump")) {
+            if (aml_audio_property_get_bool("vendor.media.audiohal.outdump", false)) {
                 if (fp1) {
                     fwrite(pu8TempBufferAddr, 1, MMAP_WRITE_SIZE_BYTE, fp1);
                 }
@@ -179,7 +179,7 @@ static int outMmapStart(const struct audio_stream_out *stream)
         ALOGE("[%s:%d] exit threadloop", __func__, __LINE__);
         return -ENOSYS;
     }
-    if (aml_getprop_bool("vendor.media.audiohal.outdump")) {
+    if (aml_audio_property_get_bool("vendor.media.audiohal.outdump", false)) {
         fp1 = fopen("/data/audio/pcm_mmap", "a+");
     }
     pstParam->u32FramePosition = 0;
@@ -205,7 +205,7 @@ static int outMmapStop(const struct audio_stream_out *stream)
     }
 
     //dolby_ms12_app_flush();
-    if (aml_getprop_bool("vendor.media.audiohal.outdump")) {
+    if (aml_audio_property_get_bool("vendor.media.audiohal.outdump", false)) {
         if (fp1) {
             fclose(fp1);
             fp1 = NULL;

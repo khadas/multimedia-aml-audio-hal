@@ -82,6 +82,10 @@
 #define AVSYNC_NONMS12_AUDIO_HAL_EARC_LATENCY_DDP (-40)
 #define NULL_INT64 0xffffffffffffffff
 
+char *aml_audio_property_get_str(const char *key, char *value, const char *default_value);
+bool aml_audio_property_get_bool(const char *key, const bool default_value);
+int aml_audio_property_get_int(const char *key, const int default_value);
+float aml_audio_property_get_float(const char *key, const float default_value);
 int64_t aml_gettime(void);
 int get_sysfs_uint(const char *path, uint32_t *value);
 int sysfs_set_sysfs_str(const char *path, const char *val);
@@ -90,7 +94,6 @@ int get_sysfs_int(const char *path);
 int mystrstr(char *mystr, char *substr) ;
 void set_codec_type(int type);
 int get_codec_type(int format);
-int getprop_bool(const char *path);
 unsigned char codec_type_is_raw_data(int type);
 int mystrstr(char *mystr, char *substr);
 void *convert_audio_sample_for_output(int input_frames, int input_format, int input_ch, void *input_buf, int *out_size/*,float lvol*/);

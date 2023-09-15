@@ -182,7 +182,7 @@ ssize_t write_to_sco(struct aml_audio_device *adev, audio_config_base_t *config,
 
     if (bt->pcm_bt) {
         pcm_write(bt->pcm_bt, bt->bt_out_buffer, out_frames * frame_size);
-        if (getprop_bool("vendor.media.audiohal.btpcm"))
+        if (aml_audio_property_get_bool("vendor.media.audiohal.btpcm", false))
             aml_audio_dump_audio_bitstreams("/data/audio/sco_8.raw", bt->bt_out_buffer, out_frames * frame_size);
     }
     return bytes;

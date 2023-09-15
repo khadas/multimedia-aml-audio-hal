@@ -243,6 +243,113 @@ static const unsigned int muted_frame_atmos[DDP_MUTE_FRAME_SIZE] = {
              0,          0,          0,          0,          0,          0,          0,          0,          0,    0x30000, 0x19b76198,          0,          0,          0,          0,          0,
 };
 
+static unsigned int replacechar(char *dst,const char *src)
+{
+    unsigned int len = 0;
+
+    if (strlen(src) > PROPERTY_VALUE_MAX-1)
+        return len;
+
+    while (len < strlen(src)) {
+        if (src[len] == '.')
+            dst[len] = '_';
+        else
+            dst[len] = src[len];
+        len++;
+    }
+    dst[len] = '\0';
+    return len;
+}
+
+char *aml_audio_property_get_str(const char *key, char *value, const char *default_value) {
+
+    int len = 0;
+    char str[PROPERTY_VALUE_MAX] = {0};
+    replacechar(str,key);
+    char *result = getenv(str);
+    if (result == NULL) {
+        if (default_value) {
+           len = strnlen(default_value, PROPERTY_VALUE_MAX - 1);
+           memcpy(value, default_value, len);
+           value[len] = '\0';
+        } else {
+            return NULL;
+        }
+    } else {
+       len = strnlen(result, PROPERTY_VALUE_MAX - 1);
+       memcpy(value, result, len);
+       value[len] = '\0';
+    }
+    return value;
+}
+
+
+
+bool aml_audio_property_get_bool(const char *key, const bool default_value) {
+
+    int len = 0;
+    char str[PROPERTY_VALUE_MAX] = {0};
+    char buf[PROPERTY_VALUE_MAX] = {0};
+    replacechar(str,key);
+    char *result = getenv(str);
+    if (result == NULL) {
+       return default_value;
+    } else {
+        len = strnlen(result, PROPERTY_VALUE_MAX - 1);
+        memcpy(buf, result, len);
+        buf[len] = '\0';
+
+        if (len == 1) {
+            char ch = buf[0];
+            if (ch == '0' || ch == 'n') {
+                return false;
+            } else if (ch == '1' || ch == 'y') {
+                return true;
+            }
+        } else if (len > 1) {
+            if (!strcmp(buf, "no") || !strcmp(buf, "false") || !strcmp(buf, "off")) {
+                return false;
+            } else if (!strcmp(buf, "yes") || !strcmp(buf, "true") || !strcmp(buf, "on")) {
+                return true;
+            }
+        }
+    }
+}
+
+int aml_audio_property_get_int(const char *key, const int default_value) {
+
+    int len = 0;
+    char str[PROPERTY_VALUE_MAX] = {0};
+    char buf[PROPERTY_VALUE_MAX] = {0};
+    replacechar(str,key);
+    char *result = getenv(str);
+    if (result == NULL) {
+       return default_value;
+    } else {
+       len = strnlen(result, PROPERTY_VALUE_MAX - 1);
+       memcpy(buf, result, len);
+       buf[len] = '\0';
+       return atoi(buf);
+    }
+}
+
+float aml_audio_property_get_float(const char *key, const float default_value) {
+
+    int len = 0;
+    char str[PROPERTY_VALUE_MAX] = {0};
+    char buf[PROPERTY_VALUE_MAX] = {0};
+    replacechar(str,key);
+    char *result = getenv(str);
+    if (result == NULL) {
+        return default_value;
+    } else {
+       len = strnlen(result, PROPERTY_VALUE_MAX - 1);
+       memcpy(buf, result, len);
+       buf[len] = '\0';
+       return atof(buf);
+    }
+}
+
 int64_t aml_gettime(void)
 {
     struct timeval tv;
@@ -458,19 +565,7 @@ int get_codec_type(int format)
         return TYPE_PCM;
     }
 }
-int getprop_bool(const char *path)
-{
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
 
-    ret = property_get(path, buf, NULL);
-    if (ret > 0) {
-        if (strcasecmp(buf, "true") == 0 || strcmp(buf, "1") == 0) {
-            return 1;
-        }
-    }
-    return 0;
-}
 
 /* To get digital mode, mapping between kctrl value and audio hal */
 static int map_digital_mode(int kctrl_value)
@@ -508,10 +603,8 @@ int check_chip_name(char *chip_name, unsigned int length,
                     struct aml_mixer_handle *mixer_handle)
 {
     char buf[PROPERTY_VALUE_MAX] = {'\0'};
-    int ret = 0;
-
-    ret = property_get("ro.board.platform", buf, NULL);
-    if (ret > 0) {
+    char *ret = aml_audio_property_get_str("ro.board.platform", buf, NULL);
+    if (ret != NULL) {
         if (strncasecmp(buf, chip_name, length) == 0) {
             return true;
         }
@@ -712,26 +805,16 @@ int aml_audio_start_trigger(void *stream)
 
 int aml_audio_get_debug_flag()
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int debug_flag = 0;
-    ret = property_get("vendor.media.audio.hal.debug", buf, NULL);
-    if (ret > 0) {
-        debug_flag = atoi(buf);
-    }
+    debug_flag = aml_audio_property_get_int("vendor.media.audio.hal.debug", debug_flag);
     return debug_flag;
 }
 
 int aml_audio_get_default_alsa_output_ch()
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     /* default 8 channels for TV product */
     int chan_num =  8;
-    ret = property_get("ro.vendor.platform.alsa.spk.ch", buf, NULL);
-    if (ret > 0) {
-        chan_num = atoi(buf);
-    }
+    chan_num = aml_audio_property_get_int("ro.vendor.platform.alsa.spk.ch", chan_num);
     return chan_num;
 }
 
@@ -742,10 +825,9 @@ to detect TV/SBR product, audio HAL can also use that.
 bool aml_audio_check_sbr_product()
 {
     char buf[PROPERTY_VALUE_MAX] ={0};
-    int ret = -1;
     char *sbr_str = NULL;
-    ret = property_get("ro.vendor.platform.hdmi.device_type", buf, NULL);
-    if (ret > 0) {
+    char *ret = aml_audio_property_get_str("ro.vendor.platform.hdmi.device_type", buf, NULL);
+    if (ret != NULL) {
         sbr_str = strstr(buf,"5");
         if (sbr_str)
             return true;
@@ -756,10 +838,8 @@ bool aml_audio_check_sbr_product()
 int aml_audio_debug_set_optical_format()
 {
     char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
-
-    ret = property_get("vendor.media.audio.hal.optical", buf, NULL);
-    if (ret > 0) {
+    char *ret = aml_audio_property_get_str("vendor.media.audio.hal.optical", buf, NULL);
+    if (ret != NULL) {
         if (strcasecmp(buf, "pcm") == 0 || strcmp(buf, "0") == 0) {
             return TYPE_PCM;
         }
@@ -793,41 +873,29 @@ int aml_audio_dump_audio_bitstreams(const char *path, const void *buf, size_t by
 //Tune the eARC with non-tunnel for earc-ddp
 int aml_audio_get_earc_latency_offset(int aformat)
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     (void)aformat;
 
     prop_name = AVSYNC_NONMS12_AUDIO_HAL_EARC_LATENCY_DDP_PROPERTY;
     latency_ms = AVSYNC_NONMS12_AUDIO_HAL_EARC_LATENCY_DDP;
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        latency_ms = atoi(buf);
-    }
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
 int aml_audio_get_arc_latency_offset(int aformat)
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     (void)aformat;
     prop_name = "vendor.media.audio.hal.arc_latency.ddp";
     latency_ms = 0;
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        latency_ms = atoi(buf);
-    }
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
 int aml_audio_get_ddp_latency_offset(int aformat,  bool dual_spdif)
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     (void)aformat;
@@ -841,17 +909,12 @@ int aml_audio_get_ddp_latency_offset(int aformat,  bool dual_spdif)
     } else {
         latency_ms = -48;
     }
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        latency_ms = atoi(buf);
-    }
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
 int aml_audio_get_pcm_latency_offset(int aformat, bool is_netflix, stream_usecase_t usecase)
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     (void)aformat;
@@ -872,18 +935,13 @@ int aml_audio_get_pcm_latency_offset(int aformat, bool is_netflix, stream_usecas
                break;
         };
     }
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        latency_ms = atoi(buf);
-    }
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
 
 int aml_audio_get_hwsync_latency_offset(bool b_raw)
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
     if (!b_raw) {
@@ -893,10 +951,7 @@ int aml_audio_get_hwsync_latency_offset(bool b_raw)
         prop_name = "vendor.media.audio.hal.hwsync_latency.ddp";
         latency_ms = -45; // left offset -30 --> -50 --> -45
     }
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        latency_ms = atoi(buf);
-    }
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
@@ -904,13 +959,8 @@ int aml_audio_get_hwsync_latency_offset(bool b_raw)
 int aml_audio_get_ddp_frame_size()
 {
     int frame_size = DDP_FRAME_SIZE;
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     char *prop_name = "vendor.media.audio.hal.frame_size";
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        frame_size = atoi(buf);
-    }
+    frame_size = aml_audio_property_get_int(prop_name, frame_size);
     return frame_size;
 }
 
@@ -1015,24 +1065,15 @@ uint32_t out_get_alsa_latency_frames(const struct audio_stream_out *stream)
 int aml_audio_get_spdif_tuning_latency(void)
 {
     char *prop_name = "persist.vendor.audio.hal.spdif_ltcy_ms";
-    char buf[PROPERTY_VALUE_MAX];
     int latency_ms = 0;
-    int ret = -1;
-
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        latency_ms = atoi(buf);
-    }
-
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
 int aml_audio_get_arc_tuning_latency(audio_format_t arc_fmt)
 {
     char *prop_name = NULL;
-    char buf[PROPERTY_VALUE_MAX];
     int latency_ms = 0;
-    int ret = -1;
 
     switch (arc_fmt) {
     case AUDIO_FORMAT_PCM_16_BIT:
@@ -1049,19 +1090,13 @@ int aml_audio_get_arc_tuning_latency(audio_format_t arc_fmt)
         return 0;
     }
 
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        latency_ms = atoi(buf);
-    }
-
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
 int aml_audio_get_src_tune_latency(enum patch_src_assortion patch_src) {
     char *prop_name = NULL;
-    char buf[PROPERTY_VALUE_MAX];
     int latency_ms = 0;
-    int ret = -1;
 
     switch (patch_src)
     {
@@ -1079,12 +1114,7 @@ int aml_audio_get_src_tune_latency(enum patch_src_assortion patch_src) {
         return 0;
     }
 
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0)
-    {
-        latency_ms = atoi(buf);
-    }
-
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
@@ -1153,9 +1183,7 @@ uint64_t get_systime_ns(void)
 int aml_audio_get_hdmi_latency_offset(audio_format_t source_format,
                                       audio_format_t sink_format,int ms12_enable)
 {
-    char buf[PROPERTY_VALUE_MAX];
     char *prop_name = NULL;
-    int ret = -1;
     int latency_ms = 0;
 
     if (source_format == AUDIO_FORMAT_PCM_16_BIT || source_format == AUDIO_FORMAT_PCM_32_BIT) {
@@ -1189,19 +1217,13 @@ int aml_audio_get_hdmi_latency_offset(audio_format_t source_format,
                 latency_ms = -95;
         }
     }
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0)
-    {
-        latency_ms = atoi(buf);
-    }
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 
 int aml_audio_get_speaker_latency_offset(int aformat ,int ms12_enable)
 {
-    char buf[PROPERTY_VALUE_MAX];
     char *prop_name = NULL;
-    int ret = -1;
     int latency_ms = 0;
 
     (void)aformat;
@@ -1216,12 +1238,7 @@ int aml_audio_get_speaker_latency_offset(int aformat ,int ms12_enable)
         prop_name = "vendor.media.audio.hal.speaker_latency.raw";
         latency_ms = 80;
     }
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0)
-    {
-        latency_ms = atoi(buf);
-    }
-
+    latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     return latency_ms;
 }
 int aml_audio_get_latency_offset( enum OUT_PORT port, audio_format_t source_format,
@@ -1463,18 +1480,14 @@ int aml_audio_data_handle(struct audio_stream_out *stream, const void* buffer, s
 
 int aml_audio_compensate_video_delay( int enable) {
     int video_delay = 0;
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     char *prop_name = NULL;
 
     if (enable) {
         /*alsa delay is about 80, the MS12 tunning delay is about 70*/
         video_delay = 150;
         prop_name = "vendor.media.audio.hal.video_delay_time";
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            video_delay = atoi(buf);
-        }
+        video_delay = aml_audio_property_get_int(prop_name, video_delay);
+
     }
     ALOGI("set video delay=%d", video_delay);
     set_sysfs_int("/sys/class/video/video_delay_time", video_delay);
@@ -1484,16 +1497,10 @@ int aml_audio_compensate_video_delay( int enable) {
 
 int aml_audio_get_ms12_timestamp_offset(void)
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     char *prop_name = NULL;
-    int delay_time_ms = 0;
-    delay_time_ms = 100;
+    int delay_time_ms = 100;
     prop_name = "vendor.media.audio.hal.delay_timestamp";
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        delay_time_ms = atoi(buf);
-    }
+    delay_time_ms = aml_audio_property_get_int(prop_name, delay_time_ms);
 
     return delay_time_ms;
 }
@@ -2042,14 +2049,8 @@ int convert_audio_format_2_period_mul(audio_format_t format)
 ******************************************************************************/
 int aml_audio_trace_debug_level(void)
 {
-    char buf[PROPERTY_VALUE_MAX] = {'\0'};
-    int ret = -1;
     int debug_level = 0;
-    ret = property_get("vendor.audio.hal.trace.debug", buf, NULL);
-    if (ret > 0) {
-        debug_level = atoi(buf);
-    }
-
+    debug_level = aml_audio_property_get_int("vendor.audio.hal.trace.debug", debug_level);
     //ALOGV("%s:  debug_level:%d", __func__, debug_level);
     return debug_level;
 }
@@ -2107,13 +2108,8 @@ void check_audio_level(const char *name, const void *buffer, size_t bytes) {
 float aml_audio_get_focus_volume_ratio()
 {
     int ratio = 50;
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     char *prop_name = "audio.focus.volume.ratio";
-    ret = property_get(prop_name, buf, NULL);
-    if (ret > 0) {
-        ratio = atoi(buf);
-    }
+    ratio = aml_audio_property_get_int(prop_name, ratio);
 
     if (ratio == 0) {
         ratio = 1;

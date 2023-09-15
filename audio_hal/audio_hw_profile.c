@@ -773,7 +773,7 @@ char*  get_hdmi_sink_cap_new(const char *keys, audio_format_t format, struct aml
              * "vendor.media.audiohal.mat_1_0" with value 1.
              */
             if (audio_cap_item->dep_value == 0x1) {
-                int force_truehd = aml_getprop_bool("vendor.media.audiohal.avr.mat_1_0");
+                int force_truehd = aml_audio_property_get_bool("vendor.media.audiohal.avr.mat_1_0", false);
                 if (force_truehd) {
                     audio_cap_item->dep_value = 0x0;
                     ALOGD("JUST For DEBUG!!! Convert the MAT's dep_value from 1 to 0 for TrueHD!\n");

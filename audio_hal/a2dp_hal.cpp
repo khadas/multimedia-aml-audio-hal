@@ -440,7 +440,7 @@ ssize_t a2dp_out_write(struct aml_audio_device *adev, audio_config_base_t *confi
         memset((void*)wr_buff, 0, wr_size);
     }
 
-    if (property_get_int32("vendor.media.audiohal.a2dpdump", 0) > 0) {
+    if (aml_audio_property_get_int("vendor.media.audiohal.a2dpdump", 0) > 0) {
         FILE *fp = fopen("/data/audio/a2dp.pcm", "a+");
         if (fp) {
             int flen = fwrite((char *)wr_buff, 1, wr_size, fp);
@@ -460,7 +460,7 @@ ssize_t a2dp_out_write(struct aml_audio_device *adev, audio_config_base_t *confi
 
 uint32_t a2dp_out_get_latency(struct aml_audio_device *adev) {
     (void *)adev;
-    return property_get_int32("vendor.media.a2dp.latency", 200);
+    return aml_audio_property_get_int("vendor.media.a2dp.latency", 200);
 }
 
 int a2dp_out_set_parameters(struct aml_audio_device *adev, const char *kvpairs) {

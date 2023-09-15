@@ -48,13 +48,8 @@
 
 static int aml_audio_get_hwsync_flag()
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int debug_flag = 0;
-    ret = property_get("vendor.media.audio.hal.hwsync", buf, NULL);
-    if (ret > 0) {
-        debug_flag = atoi(buf);
-    }
+    debug_flag = aml_audio_property_get_int("vendor.media.audio.hal.hwsync", debug_flag);
     return debug_flag;
 }
 
@@ -69,16 +64,9 @@ static bool check_support_mediasync()
     struct utsname info;
     int kernel_version_major = 4;
     int kernel_version_minor = 9;
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
 
-    ret = property_get("vendor.media.omx.use.omx2", buf, NULL);
-    if (ret > 0) {
-        if (strcasecmp(buf, "true") == 0 || strcmp(buf, "1") == 0) {
-            return true;
-        } else if (strcasecmp(buf, "false") == 0 || strcmp(buf, "0") == 0){
-            return false;
-        }
+    if (getenv("vendor_media_omx_use_omx2")) {
+        return aml_audio_property_get_bool("vendor.media.omx.use.omx2", 0);
     }
 
     if (uname(&info) || sscanf(info.release, "%d.%d", &kernel_version_major, &kernel_version_minor) <= 0) {
@@ -185,7 +173,7 @@ void aml_hwsync_wait_video_start(audio_hwsync_t *p_hwsync)
         return;
     }
 
-    waitcount = property_get_int32("vender.media.audio.hal.waitvpts.count", 100);
+    waitcount = aml_audio_property_get_int("vender.media.audio.hal.waitvpts.count", 100);
     aml_hwsync_wrap_wait_video_start(p_hwsync, waitcount);
     return;
 }
@@ -199,7 +187,7 @@ void aml_hwsync_wait_video_drop(audio_hwsync_t *p_hwsync, uint32_t cur_pts)
         return;
     }
 
-    waitcount = property_get_int32("vender.media.audio.hal.waitvpts.count", 100);
+    waitcount = aml_audio_property_get_int("vender.media.audio.hal.waitvpts.count", 100);
     aml_hwsync_wrap_wait_video_drop(p_hwsync, cur_pts, waitcount);
     return;
 }
@@ -624,7 +612,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     ALOGV("%s,================", __func__);
     if (p_adjust_ms) *p_adjust_ms = 0;
 
-    int pts_log = aml_getprop_bool("media.audiohal.ptslog");
+    int pts_log = aml_audio_property_get_bool("media.audiohal.ptslog", false);
     int force_action = 0;
 
 
@@ -846,7 +834,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
                 out->msync_rendered_pts = apts;
                 clock_gettime(CLOCK_MONOTONIC_RAW, &out->msync_rendered_ts);
 
-                force_action = aml_getprop_int("media.audiohal.action");
+                force_action = aml_audio_property_get_int("media.audiohal.action", 0);
                 /* 0: default, no force action
                  * 1: AA_RENDER
                  * 2: AA_DROP

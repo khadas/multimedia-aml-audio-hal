@@ -797,7 +797,7 @@ static int mixer_inports_read(struct amlAudioMixer *audio_mixer)
                     set_inport_state(in_port, ACTIVE);
                 }
                 update_inport_avail(in_port);
-                if (getprop_bool("vendor.media.audiohal.inport") &&
+                if (aml_audio_property_get_bool("vendor.media.audiohal.inport", false) &&
                         (in_port->enInPortType == AML_MIXER_INPUT_PORT_PCM_DIRECT)) {
                         aml_audio_dump_audio_bitstreams("/data/audio/inportDirectFade.raw",
                                 in_port->data, in_port->data_len_bytes);
@@ -1169,7 +1169,7 @@ static int mixer_do_mixing_16bit(struct amlAudioMixer *audio_mixer)
             continue;
         }
         is_data_valid = true;
-        if (getprop_bool("vendor.media.audiohal.indump")) {
+        if (aml_audio_property_get_bool("vendor.media.audiohal.indump", false)) {
             char acFilePathStr[ENUM_TYPE_STR_MAX_LEN];
             sprintf(acFilePathStr, "/data/audio/%s_%d", mixerInputType2Str(in_port->enInPortType), in_port->ID);
             aml_audio_dump_audio_bitstreams(acFilePathStr, in_port->data, in_port->data_len_bytes);
@@ -1224,7 +1224,7 @@ static int mixer_do_mixing_16bit(struct amlAudioMixer *audio_mixer)
     pthread_mutex_lock(&audio_mixer->outport_locks[port_index]);
 
     memcpy(out_port->data_buf, audio_mixer->out_tmp_buffer, audio_mixer->tmp_buffer_size);
-    if (getprop_bool("vendor.media.audiohal.outdump")) {
+    if (aml_audio_property_get_bool("vendor.media.audiohal.outdump", false)) {
         sprintf(acFilePathStr, "/data/audio/audio_mixed_%dch", need_output_ch);
         aml_audio_dump_audio_bitstreams(acFilePathStr, out_port->data_buf, audio_mixer->tmp_buffer_size);
     }

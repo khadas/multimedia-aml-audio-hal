@@ -230,15 +230,7 @@ static const unsigned int ms12_muted_ddp_raw[] = {
 static int nbytes_of_dolby_ms12_downmix_output_pcm_frame();
 
 static int get_ms12_dump_enable(int dump_type) {
-
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
-    int value = 0;
-
-    ret = property_get(MS12_DUMP_PROPERTY, buf, NULL);
-    if (ret > 0) {
-        value = strtol (buf, NULL, 0);
-    }
+    int value = aml_audio_property_get_int(MS12_DUMP_PROPERTY, 0);
     return (value & dump_type);
 }
 
@@ -757,11 +749,8 @@ static void set_dolby_ms12_downmix_mode(struct aml_audio_device *adev)
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     int downmix_mode = DOWNMIX_MODE_LtRt; // Lt/Rt is default mode
     char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
-    int value = 0;
-
-    ret = property_get(MS12_DOWNMIX_MODE_PROPERTY, buf, NULL);
-    if (ret > 0) {
+    char *ret = aml_audio_property_get_str(MS12_DOWNMIX_MODE_PROPERTY, buf, NULL);
+    if (ret != NULL) {
         if (strcasecmp(buf, "Lt/Rt") == 0) {
             downmix_mode = DOWNMIX_MODE_LtRt;
         }
@@ -809,7 +798,7 @@ int get_the_dolby_ms12_prepared(
 #ifdef BUILD_LINUX
     bool output_5_1_ddp = adev->is_netflix;//netflix need output 5.1 ddp
 #else
-    bool output_5_1_ddp = getprop_bool(MS12_OUTPUT_5_1_DDP);
+    bool output_5_1_ddp = aml_audio_property_get_bool(MS12_OUTPUT_5_1_DDP, false);
 #endif
     unsigned int sink_max_channels = 2;
     int media_presentation_id = -1,mixing_level = 0,ad_vol = 100;
@@ -3186,14 +3175,9 @@ void dolby_ms12_app_flush()
 
 void dolby_ms12_enable_debug()
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int level = 0;
-    int ret = -1;
-
-    ret = property_get("vendor.audio.dolbyms12.debug", buf, NULL);
-    if (ret > 0)
+    int level = aml_audio_property_get_int("vendor.audio.dolbyms12.debug", 0);
+    if (level > 0)
     {
-        level = strtol (buf, NULL, 0);
         dolby_ms12_set_debug_level(level);
     }
 }

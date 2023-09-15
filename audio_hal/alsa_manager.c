@@ -57,14 +57,7 @@
 static bool alsa_llp_mode;
 
 static int aml_audio_get_alsa_debug() {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
-    int debug_flag = 0;
-    ret = property_get("vendor.media.audio.hal.alsa", buf, NULL);
-    if (ret > 0) {
-        debug_flag = atoi(buf);
-    }
-    return debug_flag;
+    return aml_audio_property_get_int("vendor.media.audio.hal.alsa", 0);
 }
 
 /*
@@ -519,7 +512,7 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
 
 write:
 
-    if (getprop_bool(ALSA_DUMP_PROPERTY)) {
+    if (aml_audio_property_get_bool(ALSA_DUMP_PROPERTY, false)) {
         aml_audio_dump_audio_bitstreams(ALSA_OUTPUT_PCM_FILE, buffer, bytes);
     }
 
@@ -1034,7 +1027,7 @@ size_t aml_alsa_output_write_new(void *handle, const void *buffer, size_t bytes)
             ALOGW("[%s:%d] format =0x%x alsa underrun", __func__, __LINE__, alsa_handle->format);
         }
     }
-    if (getprop_bool(ALSA_DUMP_PROPERTY)) {
+    if (aml_audio_property_get_bool(ALSA_DUMP_PROPERTY, false)) {
         char file_name[128] = { 0 };
         if (alsa_handle->format == AUDIO_FORMAT_AC3) {
             snprintf(file_name, 128, "%s.%s", ALSA_OUTPUT_SPDIF_FILE, "dd");

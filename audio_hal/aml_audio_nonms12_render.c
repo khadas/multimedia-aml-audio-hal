@@ -247,7 +247,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, const void *buffer
                 }
 
                 /*process the stream volume before mix*/
-                if (property_get_bool("vendor.media.decoder.tone",false)) {
+                if (aml_audio_property_get_bool("vendor.media.decoder.tone",false)) {
                     if (2 == dec_pcm_data->data_ch) {
                         appply_tone_16bit2ch(dec_pcm_data->buf, dec_pcm_data->data_len);
                     }

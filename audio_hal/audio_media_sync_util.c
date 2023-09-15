@@ -43,13 +43,8 @@ static pthread_mutex_t g_mediasync_util_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static int aml_audio_get_media_sync_flag()
 {
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int debug_flag = 0;
-    ret = property_get("audio.media.sync.util.debug", buf, NULL);
-    if (ret > 0) {
-        debug_flag = atoi(buf);
-    }
+    debug_flag = aml_audio_property_get_int("audio.media.sync.util.debug", debug_flag);
     return debug_flag;
 }
 

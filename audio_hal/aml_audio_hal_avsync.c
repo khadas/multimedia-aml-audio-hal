@@ -144,7 +144,7 @@ unsigned long dtv_hal_get_pts(struct aml_audio_patch *patch,
     struct aml_audio_device * aml_dev = (struct aml_audio_device*)adev;
 
     get_sysfs_uint(DTV_DECODER_CHECKIN_FIRSTAPTS_PATH, &checkin_firstapts);
-    if (aml_dev->is_multi_demux && !property_get_bool("vendor.dtv.use_tsync_check",false)) {
+    if (aml_dev->is_multi_demux && !aml_audio_property_get_bool("vendor.dtv.use_tsync_check",false)) {
 #ifdef USE_DTV
         if (aml_audio_swcheck_lookup_apts(0,patch->decoder_offset,&pts) == -1) {
             pts = 0;
@@ -570,8 +570,8 @@ static void dtv_adjust_output_clock_continue(struct aml_audio_patch * patch, int
     int time_cost = 0;
     static int last_div = 0;
     int adjust_interval = 0;
-    patch->i2s_div_factor = property_get_int32(PROPERTY_AUDIO_TUNING_CLOCK_FACTOR, DEFAULT_TUNING_CLOCK_FACTOR);
-    adjust_interval = property_get_int32("vendor.media.audio_hal.adjtime", 1000);
+    patch->i2s_div_factor = aml_audio_property_get_int(PROPERTY_AUDIO_TUNING_CLOCK_FACTOR, DEFAULT_TUNING_CLOCK_FACTOR);
+    adjust_interval = aml_audio_property_get_int("vendor.media.audio_hal.adjtime", 1000);
     if (last_div != patch->i2s_div_factor) {
         ALOGI("new_div=%d, adjust_interval=%d ms,spdif_format_set=%d\n",
             patch->i2s_div_factor, adjust_interval, patch->spdif_format_set);
@@ -768,8 +768,8 @@ static int dtv_calc_abuf_level(struct aml_audio_patch *patch, struct aml_stream_
 void dtv_do_drop_pcm(int avail, struct aml_audio_patch *patch)
 {
     ring_buffer_t *ringbuffer = &(patch->aml_ringbuffer);
-    int drop_threshold = property_get_int32(PROPERTY_AUDIO_DROP_THRESHOLD, DEFAULT_AUDIO_DROP_THRESHOLD_MS);
-    int least_cachetime = property_get_int32(PROPERTY_AUDIO_LEAST_CACHE, DEFAULT_AUDIO_LEAST_CACHE_MS);
+    int drop_threshold = aml_audio_property_get_int(PROPERTY_AUDIO_DROP_THRESHOLD, DEFAULT_AUDIO_DROP_THRESHOLD_MS);
+    int least_cachetime = aml_audio_property_get_int(PROPERTY_AUDIO_LEAST_CACHE, DEFAULT_AUDIO_LEAST_CACHE_MS);
     int least_size;
     int ap_diff_ms = patch->dtv_apts_lookup / 90;
     int drop_size = 48 * 4 * ap_diff_ms;
@@ -1097,7 +1097,7 @@ static void do_pll2_by_pts(unsigned int pcrpts, struct aml_audio_patch *patch,
         return;
     }
     if (aml_dev->bHDMIARCon) {
-        int arc_delay = aml_getprop_int(PROPERTY_LOCAL_ARC_LATENCY) / 1000;
+        int arc_delay = aml_audio_property_get_int(PROPERTY_LOCAL_ARC_LATENCY, 0) / 1000;
 #ifdef USE_DTV
         if (get_video_delay() != -arc_delay) {
             ALOGI("arc:video_delay moved from %d ms to %d ms", get_video_delay(), -arc_delay);
@@ -1306,7 +1306,7 @@ void dtv_out_apts_biggerthan_vpts(struct aml_audio_patch* patch)
 
     struct audio_hw_device *dev = patch->dev;
     struct aml_audio_device *aml_dev = (struct aml_audio_device *)dev;
-    int strategy_mode = property_get_int32("vendor.media.audio.strategy.aptsbigger", 1);
+    int strategy_mode = aml_audio_property_get_int("vendor.media.audio.strategy.aptsbigger", 1);
 
     if (get_tsync_pcr_debug()) {
         ALOGI("avsync startplay pcrpts = 0x%lx, demux_pcr = 0x%x --\n",
@@ -1334,7 +1334,7 @@ void dtv_out_vpts_biggerthan_apts(struct aml_audio_patch* patch)
 {
     struct audio_hw_device *dev = patch->dev;
     struct aml_audio_device *aml_dev = (struct aml_audio_device *)dev;
-    int strategy_mode = property_get_int32("vendor.media.audio.strategy.vptsbigger", 4);
+    int strategy_mode = aml_audio_property_get_int("vendor.media.audio.strategy.vptsbigger", 4);
 
     if (patch->startplay_avsync_flag) {
         if ((strategy_mode >= STRATEGY_A_NORMAL_V_SHOW_BLOCK) &&
@@ -1391,9 +1391,9 @@ void dtv_avsync_startplay_strategy(struct aml_audio_patch *patch)
     }
 #endif
     int default_time= DEFAULT_SYSTEM_TIME;
-    int avdiff_time_adjust = property_get_int32("vendor.media.audio.avdifftime", 3);
-    int startplay_strategy_aptsbigger = property_get_int32("vendor.media.audio.strategy.aptsbigger", 1);
-    int startplay_strategy_vptsbigger = property_get_int32("vendor.media.audio.strategy.vptsbigger", 3);
+    int avdiff_time_adjust = aml_audio_property_get_int("vendor.media.audio.avdifftime", 3);
+    int startplay_strategy_aptsbigger = aml_audio_property_get_int("vendor.media.audio.strategy.aptsbigger", 1);
+    int startplay_strategy_vptsbigger = aml_audio_property_get_int("vendor.media.audio.strategy.vptsbigger", 3);
 
     dtv_avsync_get_ptsinfo(patch);
     if (patch->startplay_firstvpts >patch->startplay_first_checkinapts)
@@ -1477,12 +1477,12 @@ void dtv_avsync_process(struct aml_audio_patch* patch, struct aml_stream_out* st
     get_sysfs_uint(TSYNC_PCRSCR, &pcrpts);
     get_sysfs_uint(TSYNC_FIRST_VPTS, &firstvpts);
 
-    int switch_flag = property_get_int32("vendor.media.audio.strategy.switch", 0);
+    int switch_flag = aml_audio_property_get_int("vendor.media.audio.strategy.switch", 0);
 
     if (patch->dtv_decoder_state != AUDIO_DTV_PATCH_DECODER_STATE_RUNING) {
         return;
     }
-    if (getprop_bool("vendor.media.audio.syncshow")) {
+    if (aml_audio_property_get_bool("vendor.media.audio.syncshow", false)) {
         if (patch->dtv_has_video && patch->show_first_frame == 0) {
             patch->show_first_frame = get_sysfs_int(VIDEO_FIRST_FRAME_SHOW) || get_sysfs_int(VIDEO_FIRST_FRAME_SHOW_2);
             ALOGI("dtv_avsync_process: patch->show_first_frame=%d, firstvpts=0x%x, pcrpts=0x%x, cache:%dms",
@@ -1492,7 +1492,7 @@ void dtv_avsync_process(struct aml_audio_patch* patch, struct aml_stream_out* st
 #ifdef USE_DTV
     aml_dev->audio_discontinue = get_audio_discontinue();
 #endif
-    audio_output_delay = aml_getprop_int(PROPERTY_LOCAL_PASSTHROUGH_LATENCY);
+    audio_output_delay = aml_audio_property_get_int(PROPERTY_LOCAL_PASSTHROUGH_LATENCY, 0);
 
     if (patch->last_audio_delay != audio_output_delay) {
         patch->last_audio_delay = audio_output_delay;
@@ -1547,7 +1547,7 @@ void dtv_avsync_process(struct aml_audio_patch* patch, struct aml_stream_out* st
         } else if (aml_dev->start_mute_count++ > aml_dev->start_mute_max) {
             ALOGI("timeout force clear start_mute_flag 0\n");
             aml_dev->start_mute_flag = 0;
-        } else if (getprop_bool("vendor.media.audio.syncshow")) {
+        } else if (aml_audio_property_get_bool("vendor.media.audio.syncshow", false)) {
             ALOGI("need sync show, clear start_mute_flag\n");
             aml_dev->start_mute_flag = 0;
         }
@@ -1581,8 +1581,6 @@ static int dtv_get_ms12_input_latency(struct audio_stream_out *stream, audio_for
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *aml_dev = aml_out->dev;
     struct aml_audio_patch *patch = (struct aml_audio_patch *)aml_dev->audio_patch;
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
 
@@ -1618,10 +1616,7 @@ static int dtv_get_ms12_input_latency(struct audio_stream_out *stream, audio_for
         break;
     }
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
 
     //ALOGI("%s IN input_format(%d), latency_ms(%d), prop_name(%s)", __func__, input_format, latency_ms, prop_name);
@@ -1635,8 +1630,6 @@ static int dtv_get_ms12_port_latency(struct audio_stream_out *stream, enum OUT_P
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *aml_dev = aml_out->dev;
     struct aml_audio_patch *patch = (struct aml_audio_patch *)aml_dev->audio_patch;
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
 
@@ -1731,10 +1724,7 @@ static int dtv_get_ms12_port_latency(struct audio_stream_out *stream, enum OUT_P
             break;
     }
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
 
 
@@ -1766,8 +1756,6 @@ static int dtv_get_nonms12_input_latency(struct audio_stream_out *stream, audio_
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *aml_dev = aml_out->dev;
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
 
@@ -1793,10 +1781,7 @@ static int dtv_get_nonms12_input_latency(struct audio_stream_out *stream, audio_
     }
 
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
 
     return latency_ms;
@@ -1807,8 +1792,6 @@ int dtv_get_nonms12_port_latency(struct audio_stream_out * stream, enum OUT_PORT
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *aml_dev = aml_out->dev;
-    char buf[PROPERTY_VALUE_MAX];
-    int ret = -1;
     int latency_ms = 0;
     char *prop_name = NULL;
 
@@ -1862,10 +1845,7 @@ int dtv_get_nonms12_port_latency(struct audio_stream_out * stream, enum OUT_PORT
     }
 
     if (prop_name) {
-        ret = property_get(prop_name, buf, NULL);
-        if (ret > 0) {
-            latency_ms = atoi(buf);
-        }
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
     }
     return latency_ms;
 }
@@ -1883,7 +1863,7 @@ static int dtv_get_nonms12_offset_latency(struct audio_stream_out *stream)
     input_latency_ms = dtv_get_nonms12_input_latency(stream, aml_out->hal_internal_format);
     port_latency_ms = dtv_get_nonms12_port_latency(stream, aml_dev->active_outport, aml_dev->sink_format);
     latency_ms = input_latency_ms + output_latency_ms + port_latency_ms;
-    ALOGV("%s total latency %d(ms) hal_fmt %x(%d ms) opt_fmt %x(%d ms) port %d(%d ms)", __func__, latency_ms,
+    ALOGI("%s total latency %d(ms) hal_fmt %x(%d ms) opt_fmt %x(%d ms) port %d(%d ms)", __func__, latency_ms,
         aml_out->hal_internal_format, input_latency_ms, aml_dev->sink_format, output_latency_ms,
         aml_dev->active_outport, port_latency_ms);
     return latency_ms;
@@ -1908,10 +1888,10 @@ int dtv_avsync_get_apts_latency(struct audio_stream_out *stream)
     if (aml_dev->cap_buffer) {
         tuning_ms += aml_dev->cap_delay;
     } else {
-        tuning_ms += aml_getprop_int(PROPERTY_LOCAL_PASSTHROUGH_LATENCY);
+        tuning_ms += aml_audio_property_get_int(PROPERTY_LOCAL_PASSTHROUGH_LATENCY, 0);
     }
 #else
-    tuning_ms += aml_getprop_int(PROPERTY_LOCAL_PASSTHROUGH_LATENCY);
+    tuning_ms += aml_audio_property_get_int(PROPERTY_LOCAL_PASSTHROUGH_LATENCY, 0);
 #endif
     if (aml_dev->is_TV) {
         video_delay = 0;
