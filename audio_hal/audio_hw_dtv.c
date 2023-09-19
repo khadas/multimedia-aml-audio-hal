@@ -3391,7 +3391,7 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
                ALOGI("[%s:%d] package pts:%llx,package size:%d", __FUNCTION__, __LINE__, p_package->pts, p_package->size);
         }
 
-        if (is_dolby_ms12_support_compression_format(patch->aformat)) {
+        if (is_dolby_ms12_support_compression_format(patch->aformat) && eDolbyMS12Lib == aml_dev->dolby_lib_type) {
             if (aml_audio_mediasync_util_checkin_apts(media_sync_util, media_sync_util->payload_offset, p_package->pts) < 0) {
                 ALOGE("[%s:%d] checkin apts(%llx) data_size(%zu)(%d) fail",
                     __FUNCTION__, __LINE__, p_package->pts, media_sync_util->payload_offset, p_package->size);
