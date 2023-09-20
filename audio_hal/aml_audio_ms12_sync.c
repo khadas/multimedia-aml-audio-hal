@@ -482,7 +482,7 @@ int get_ms12_bypass_latency_offset(bool tunnel)
 }
 
 
-uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream)
+uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream, bool ignore_default)
 {
     struct aml_stream_out *hal_out = (struct aml_stream_out *)stream;
     snd_pcm_sframes_t frames = 0;
@@ -518,6 +518,10 @@ uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream)
     } else {
         whole_latency_frames = hal_out->config.period_size * hal_out->config.period_count;
     }
+
+    if (ignore_default)
+        whole_latency_frames = 0;
+
     if (!ms12_out->pcm || !pcm_is_ready(ms12_out->pcm)) {
         return whole_latency_frames / mul;
     }
@@ -615,7 +619,7 @@ int aml_audio_get_ms12_tunnel_latency(struct audio_stream_out *stream)
     }
 
    /*we need get the correct ms12 out pcm */
-    alsa_delay = (int32_t)out_get_ms12_latency_frames(stream);
+    alsa_delay = (int32_t)out_get_ms12_latency_frames(stream, false);
     //ALOGI("latency_frames =%d", latency_frames);
     tunning_delay = get_ms12_tunnel_latency_offset(adev->active_outport,
                                                       out->hal_internal_format,
@@ -666,7 +670,7 @@ int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream, boo
     int video_delay = 0;
 
     /*we need get the correct ms12 out pcm */
-    alsa_delay = (int32_t)out_get_ms12_latency_frames(stream);
+    alsa_delay = (int32_t)out_get_ms12_latency_frames(stream, false);
 
     if (adev->is_netflix) {
         input_latency_ms = get_ms12_netflix_tunnel_input_latency(out->hal_internal_format);
@@ -886,7 +890,7 @@ int aml_audio_get_ms12_presentation_position(const struct audio_stream_out *stre
 
 
 uint32_t aml_audio_out_get_ms12_latency_frames(struct audio_stream_out *stream) {
-    return out_get_ms12_latency_frames(stream);
+    return out_get_ms12_latency_frames(stream, false);
 }
 
 int aml_audio_ms12_update_presentation_position(struct audio_stream_out *stream) {

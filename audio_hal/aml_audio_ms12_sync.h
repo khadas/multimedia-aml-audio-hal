@@ -25,7 +25,7 @@ int aml_audio_get_ms12_presentation_position(const struct audio_stream_out *stre
 
 uint32_t aml_audio_out_get_ms12_latency_frames(struct audio_stream_out *stream);
 
-uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream);
+uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream, bool ignore_default);
 
 uint32_t out_get_ms12_bitstream_latency_ms(struct audio_stream_out *stream);
 

@@ -9603,7 +9603,7 @@ static int ms12_llp_callback(void *priv_data, void *info)
     nChannel = audio_channel_count_from_out_mask(aml_out->hal_channel_mask);
     level = (wp - aml_out->llp_rp) % LLP_BUFFER_SIZE;
 
-    alsa_level = aml_audio_out_get_ms12_latency_frames(aml_out);
+    alsa_level = out_get_ms12_latency_frames(aml_out, true);
     if (alsa_level == aml_out->config.period_size * aml_out->config.period_count) {
         alsa_level = 0;
     }

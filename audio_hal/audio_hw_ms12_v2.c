@@ -2861,7 +2861,7 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
     if ((do_sync_flag || esmode_flag)
         && audio_is_linear_pcm(output_format) && (2 == ms12_info->output_ch))
     {
-        int alsa_latency = out_get_ms12_latency_frames(stream_out) * 90 / 48; //90 *(out_get_alsa_latency_frames(stream_out)  * 1000) / aml_out->config.rate;
+        int alsa_latency = out_get_ms12_latency_frames(stream_out, false) * 90 / 48; //90 *(out_get_alsa_latency_frames(stream_out)  * 1000) / aml_out->config.rate;
         int tuning_delay = dtv_avsync_get_apts_latency(stream_out);
         uint64_t consumed = dolby_ms12_get_consumed_sum(stream_out);//dolby_ms12_get_main_bytes_consumed(stream_out);
         audio_mediasync_util_t *mediasync_util = aml_audio_get_mediasync_util_handle();
