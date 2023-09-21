@@ -357,13 +357,13 @@ reinit_buffers (struct scale_tempo * st)
   st->bytes_stride_scaled = st->bytes_stride * st->scale;
   st->frames_stride_scaled = st->bytes_stride_scaled / st->bytes_per_frame;
 
-  st->buf_output = aml_audio_realloc(st->buf_output, st->bytes_stride * 4);
+  st->buf_output = aml_audio_realloc(st->buf_output, st->bytes_stride * MAX_SUPPORT_BUFFER_SCALE);
   if (!st->buf_output) {
     ALOGE("%s %d: scale_tempo %p, OOM", __func__, __LINE__, st);
     goto exit;
   }
   st->bytes_to_output = 0;
-  st->output_max_bytes = st->bytes_stride * 4;
+  st->output_max_bytes = st->bytes_stride * MAX_SUPPORT_BUFFER_SCALE;
 
   st->buf_input = (char*) aml_audio_realloc(st->buf_input, st->bytes_stride * 4);
   if (!st->buf_input) {

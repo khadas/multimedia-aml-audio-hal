@@ -33,6 +33,9 @@
 #include <stdbool.h>
 #include <pthread.h>
 
+//8 equal to X0.25, for queue will cached one buffer, so max 2(buffer) x 4(1/0.25) = 8
+#define MAX_SUPPORT_BUFFER_SCALE   (8)
+
 struct scale_tempo
 {
   double scale;
