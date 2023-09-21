@@ -4256,6 +4256,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     char value[AUDIO_HAL_CHAR_MAX_LEN] = {0};
     int val = 0;
     int ret = 0;
+    float val_f = 0.0;
 
     ALOGI ("%s(kv: %s)", __FUNCTION__, kvpairs);
     parms = str_parms_create_str (kvpairs);
@@ -4266,6 +4267,13 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         } else {
             adev->low_power = true;
         }
+        goto exit;
+    }
+
+    ret = str_parms_get_float (parms, "noise_gate", &val_f);
+    if (ret >= 0) {
+        adev->aml_ng_level = val_f;
+        ALOGI ("adev->aml_ng_level set to %f\n", adev->aml_ng_level);
         goto exit;
     }
 
