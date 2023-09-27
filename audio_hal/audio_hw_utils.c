@@ -81,6 +81,12 @@ enum audio_digital_mode {
   AML_HAL_DDP = 4,
 };
 
+enum audio_output_select {
+    AUDIO_OUTPUT_CVBS = 0,
+    AUDIO_OUTPUT_HDMI = 1,
+    AUDIO_OUTPUT_SPDIF = 2,
+};
+
 //add array of chip name,index is chip id
 static const char* aml_chip_name[]= {
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -573,7 +579,7 @@ int get_codec_type(int format)
 
 
 /* To get digital mode, mapping between kctrl value and audio hal */
-static int map_digital_mode(int kctrl_value)
+static enum digital_format map_digital_mode(int kctrl_value)
 {
     switch (kctrl_value) {
     case AML_HAL_PCM:
@@ -592,7 +598,24 @@ static int map_digital_mode(int kctrl_value)
     }
 }
 
-int get_digital_mode(struct aml_mixer_handle *mixer_handle)
+/* To get output select, mapping between kctrl value and audio hal */
+static enum OUT_PORT map_output_sel(int kctrl_value)
+{
+    switch (kctrl_value) {
+    case AUDIO_OUTPUT_CVBS:
+        return OUTPORT_SPEAKER;
+    case AUDIO_OUTPUT_HDMI:
+        return OUTPORT_HDMI;
+    case AUDIO_OUTPUT_SPDIF:
+        return OUTPORT_SPDIF;
+    default:
+        AM_LOGW("KCTRL value was wrong! default set CVBS output.\n");
+        return OUTPORT_SPEAKER;
+    }
+}
+
+
+enum digital_format get_digital_mode(struct aml_mixer_handle *mixer_handle)
 {
     int ret = -1;
 
@@ -602,6 +625,17 @@ int get_digital_mode(struct aml_mixer_handle *mixer_handle)
 
     ret = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_DIGITAL_MODE);
     return map_digital_mode(ret);
+}
+
+enum OUT_PORT get_output_select(struct aml_mixer_handle *mixer_handle)
+{
+    int ret = -1;
+    if (NULL == mixer_handle) {
+        return ret;
+    }
+
+    ret = aml_mixer_ctrl_get_int(mixer_handle, AML_MIXER_ID_OUTPUT_SELECT);
+    return map_output_sel(ret);
 }
 
 int check_chip_name(char *chip_name, unsigned int length,

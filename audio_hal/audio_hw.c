@@ -9114,12 +9114,22 @@ ssize_t out_write_new(struct audio_stream_out *stream,
     }
 
 #ifdef NO_SERVER
-    int val = 0;
-    val = get_digital_mode(&adev->alsa_mixer);
-    ret = set_hdmi_format(adev, val);
+    int digital_mode = 0;
+    int output_sel = 0;
+
+    digital_mode = get_digital_mode(&adev->alsa_mixer);
+    ret = set_hdmi_format(adev, digital_mode);
     if (ret < 0) {
         ALOGE("[%s:%d], An error occurred during setting hdmi_format !", __func__, __LINE__);
         return ret;
+    }
+
+    output_sel = get_output_select(&adev->alsa_mixer);
+    if (aml_out->is_sink_format_prepared && output_sel != adev->active_outport) {
+        adev->active_outport = output_sel;
+        get_sink_format(&aml_out->stream);
+    } else {
+        adev->active_outport = output_sel;
     }
 #endif
 

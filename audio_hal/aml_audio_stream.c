@@ -487,6 +487,12 @@ void get_sink_format(struct audio_stream_out *stream)
         aml_out->dual_output_flag = false;
     }
 
+#ifdef NO_SERVER
+    if (adev->active_outport == OUTPORT_SPDIF && adev->optical_format >= AUDIO_FORMAT_AC3) {
+        adev->optical_format = AUDIO_FORMAT_AC3;
+    }
+#endif
+
     ALOGI("%s sink_format %#x max channel =%d optical_format %#x, dual_output %d\n",
            __FUNCTION__, adev->sink_format, adev->sink_max_channels, adev->optical_format, aml_out->dual_output_flag);
     return ;
