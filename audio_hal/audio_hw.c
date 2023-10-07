@@ -9055,7 +9055,7 @@ static int set_hdmi_format(struct aml_audio_device *adev, int val)
         return ret;
     }
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
-        if (continous_mode(adev)) {
+        if (continous_mode(adev) && adev->ms12_out) {
             ALOGD("%s() active stream is ms12_out %p\n", __FUNCTION__, adev->ms12_out);
             get_sink_format((struct audio_stream_out *)adev->ms12_out);
         }
