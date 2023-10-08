@@ -394,10 +394,7 @@ static audio_format_t ms12_get_audio_hal_format(audio_format_t hal_format)
 {
     if (hal_format == AUDIO_FORMAT_E_AC3_JOC) {
         return AUDIO_FORMAT_E_AC3;
-    } else if (hal_format == AUDIO_FORMAT_MP2 ||
-               hal_format == AUDIO_FORMAT_MP3 ||
-               hal_format == AUDIO_FORMAT_AAC ||
-               hal_format == AUDIO_FORMAT_AAC_LATM ) {
+    } else if (!is_dolby_ms12_support_compression_format(hal_format) && !is_dts_format(hal_format)) {
         return AUDIO_FORMAT_PCM_16_BIT;
     } else {
         return hal_format;
@@ -797,7 +794,7 @@ int get_the_dolby_ms12_prepared(
     int media_presentation_id = -1,mixing_level = 0,ad_vol = 100;
     ALOGI("\n+%s()", __FUNCTION__);
     pthread_mutex_lock(&ms12->lock);
-    ALOGI("++%s(), locked", __FUNCTION__);
+    ALOGI("++%s(), locked. input_format %x", __FUNCTION__, input_format);
     ms12->optical_format = adev->optical_format;
     ms12->sink_format    = adev->sink_format;
     sink_max_channels    = adev->sink_max_channels;
@@ -3192,8 +3189,8 @@ bool is_bypass_dolbyms12(struct audio_stream_out *stream)
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
     audio_format_t hal_internal_format = ms12_get_audio_hal_format(aml_out->hal_internal_format);
-    bool is_dts = is_dts_format(hal_internal_format);
-    bool is_dolby_audio = is_dolby_format(hal_internal_format);
+    bool is_dts = is_dts_format(aml_out->hal_internal_format);
+    bool is_dolby_audio = is_dolby_format(aml_out->hal_internal_format);
 
     return (is_dts
             || is_high_rate_pcm(stream)
