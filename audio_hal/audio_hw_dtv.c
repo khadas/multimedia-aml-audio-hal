@@ -2210,6 +2210,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
     patch->out_buf = NULL;
 exit_outbuf:
     adev_close_output_stream_new(dev, stream_out);
+    patch->dtv_aml_out = NULL;
 exit_open:
     if (aml_dev->audio_ease) {
         aml_dev->patch_start = false;
@@ -3485,6 +3486,7 @@ exit_outbuf:
     ALOGI("patch->output_thread_exit %d", patch->output_thread_exit);
     //set_dolby_ms12_runtime_sync(&(aml_dev->ms12), 0);//set normal output policy to ms12  //discontinue mode mask
     adev_close_output_stream_new(dev, stream_out);
+    patch->dtv_aml_out = NULL;
 exit_open:
     if (aml_dev->audio_ease) {
         aml_dev->patch_start = false;
