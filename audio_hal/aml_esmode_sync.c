@@ -536,6 +536,12 @@ void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
     struct aml_audio_device *adev = aml_out->dev;
     struct mediasync_audio_policy m_audiopolicy;
     memset(&m_audiopolicy, 0, sizeof(m_audiopolicy));
+
+    if (!(MEDIA_SYNC_ESMODE(aml_out)))
+    {
+        return;
+    }
+
     pthread_mutex_lock(&aml_out->hwsync->lock);
     audio_hwsync_mediasync_t *p_esmediasync = &(aml_out->hwsync->es_mediasync);
     //p_esmediasync->out_start_apts = aml_out->hwsync->es_mediasync.in_apts;
@@ -556,23 +562,28 @@ void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
                 usleep(m_audiopolicy.param1);
             }
         }
-    } while (aml_out->hwsync && (aml_out->pause_status == false) && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
+    } while (aml_out->hwsync && aml_out->hw_sync_mode && (aml_out->pause_status == false) && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
     p_esmediasync->apolicy.audiopolicy= (audio_policy)m_audiopolicy.audiopolicy;
     p_esmediasync->apolicy.param1 = m_audiopolicy.param1;
     p_esmediasync->apolicy.param2 = m_audiopolicy.param2;
     return;
 }
 
-sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_info_t *ms12_info, struct aml_stream_out *aml_out_write)
+sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_info_t *ms12_info)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)priv_data;//ms12out
     struct audio_stream_out *stream_out = (struct audio_stream_out *)aml_out;
     struct aml_audio_device *adev = aml_out->dev;
     struct mediasync_a_policy *async_policy = NULL;
 
-    pthread_mutex_lock(&aml_out_write->hwsync->lock);
-    async_policy = &(aml_out_write->hwsync->es_mediasync.apolicy);
-    pthread_mutex_unlock(&aml_out_write->hwsync->lock);
+    if (!(MEDIA_SYNC_ESMODE(aml_out)))
+    {
+        return;
+    }
+
+    pthread_mutex_lock(&aml_out->hwsync->lock);
+    async_policy = &(aml_out->hwsync->es_mediasync.apolicy);
+    pthread_mutex_unlock(&aml_out->hwsync->lock);
 
     if (adev->debug_flag)
         ALOGI("[%s:%d] es cur_policy:%d, prm1:%d, prm2:%d", __func__, __LINE__, async_policy->audiopolicy, async_policy->param1, async_policy->param2);

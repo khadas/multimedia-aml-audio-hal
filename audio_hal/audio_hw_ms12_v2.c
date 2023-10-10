@@ -2765,21 +2765,6 @@ int mc_pcm_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_
     return ret;
 }
 
-//tsplayer esmod flag  is AUDIO_OUTPUT_FLAG_PRIMARY | AUDIO_OUTPUT_FLAG_HW_AV_SYNC
-//gstplay mediasync flag is AUDIO_OUTPUT_FLAG_DIRECT | AUDIO_OUTPUT_FLAG_HW_AV_SYNC
-static inline struct aml_stream_out *hwsync_active(struct aml_audio_device *adev)
-{
-    int i = 0;
-    struct aml_stream_out *out = NULL;
-    for (i = 0 ; i < STREAM_USECASE_MAX; i++) {
-        out = adev->active_outputs[i];
-        if (out && (out->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC)) {
-            return out;
-        }
-    }
-    return NULL;
-}
-
 uint64_t dolby_ms12_get_consumed_sum(struct audio_stream_out *stream)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
@@ -2843,7 +2828,15 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
         }
     }
 
-    if ((SRC_DTV == adev->patch_src) && adev->audio_patching) {
+    if (MEDIA_SYNC_ESMODE(aml_out))
+    {
+        ALOGI_IF(debug_flag, "[%s:%d] stream_out:%p, aml_out:%p, hal_internal_format:0x%x",
+                __func__, __LINE__, stream_out, aml_out, aml_out->hal_internal_format);
+        in_aformat  = aml_out->hal_internal_format;
+        audiopolicy = aml_out->hwsync->es_mediasync.apolicy.audiopolicy;
+    }
+    else if ((SRC_DTV == adev->patch_src) && adev->audio_patching)
+    {
         pthread_mutex_lock(&adev->dtv_patch_lock);
         patch = adev->audio_patch;
         if (patch) {
@@ -2854,26 +2847,7 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
         pthread_mutex_unlock(&adev->dtv_patch_lock);
     }
 
-    struct aml_stream_out *aml_out_write = NULL;
-    bool esmode_flag = false;
-    if (!do_sync_flag)
-    {
-        aml_out_write = hwsync_active(adev);
-        ALOGV("[%s:%d] stream_out:%p, aml_out_write:%p", __func__, __LINE__, stream_out, aml_out_write);
-
-        if (aml_out_write && aml_out_write->hwsync && (AVSYNC_TYPE_MEDIASYNC == aml_out_write->avsync_type) && aml_out_write->hwsync->use_mediasync)
-        {
-            ALOGI_IF(debug_flag, "[%s:%d] stream_out:%p, aml_out_write:%p, aml_out:%p, hal_internal_format:0x%x",
-                    __func__, __LINE__, stream_out, aml_out_write, aml_out, aml_out_write->hal_internal_format);
-            stream_out = aml_out_write;
-            aml_out = (struct audio_stream_out *)aml_out_write;
-            esmode_flag = true;
-            in_aformat  = aml_out_write->hal_internal_format;
-            audiopolicy = aml_out->hwsync->es_mediasync.apolicy.audiopolicy;
-        }
-    }
-
-    if ((do_sync_flag || esmode_flag)
+    if ((do_sync_flag || MEDIA_SYNC_ESMODE(aml_out))
         && audio_is_linear_pcm(output_format) && (2 == ms12_info->output_ch))
     {
         int alsa_latency = out_get_ms12_latency_frames(stream_out, false) * 90 / 48; //90 *(out_get_alsa_latency_frames(stream_out)  * 1000) / aml_out->config.rate;
@@ -2927,7 +2901,7 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
                     aml_dtvsync_ms12_get_policy(stream_out);
                 }
             }
-            else
+            else if (MEDIA_SYNC_ESMODE(aml_out))
             {
                 pthread_mutex_lock(&aml_out->hwsync->lock);
                 aml_out->hwsync->es_mediasync.cur_outapts = estimated_pts - alsa_latency - tuning_delay;
@@ -2964,9 +2938,9 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
         if (do_sync_flag && aml_out->dtvsync_enable) {
             process_result = aml_dtvsync_ms12_process_policy(priv_data, ms12_info);
         }
-        else if (esmode_flag)
+        else if (MEDIA_SYNC_ESMODE(aml_out))
         {
-            process_result = aml_hwsynces_ms12_process_policy(priv_data, ms12_info, aml_out_write);
+            process_result = aml_hwsynces_ms12_process_policy(priv_data, ms12_info);
         }
 
         if (DTVSYNC_AUDIO_DROP == process_result)

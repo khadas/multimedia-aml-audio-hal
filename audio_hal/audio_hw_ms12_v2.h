@@ -47,6 +47,10 @@
 #define MIXER_SECONDARY_INPUT 1
 #define MIXER_SYSTEM_INPUT    2
 
+#define MEDIA_SYNC_ESMODE(aml_out)                               \
+     ((aml_out) && (aml_out)->hwsync && (aml_out)->hw_sync_mode \
+     && (AVSYNC_TYPE_MEDIASYNC == (aml_out)->avsync_type)        \
+     && (aml_out)->hwsync->use_mediasync)
 
 /**
  *  @brief Supported channel modes, independent on module or codec.

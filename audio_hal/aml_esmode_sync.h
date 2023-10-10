@@ -19,7 +19,7 @@
 #include "audio_hwsync.h"
 #include "audio_hw_ms12_v2.h"
 
-sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_info_t *ms12_info, struct aml_stream_out *aml_out_write);
+sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_info_t *ms12_info);
 void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream);
 sync_process_res  aml_hwmediasync_nonms12_process(struct audio_stream_out *stream, int duration, bool *speed_enabled);
 
