@@ -112,6 +112,14 @@ typedef enum {
     AM_AOUT_OUTPUT_LRMIX       /**< mix left and right channel*/
 } AM_AOUT_OutputMode_t;
 
+/**\brief Audio downmix mode*/
+typedef enum {
+    AM_DOWNMIX_LTRT,    /** surround-compatible */
+    AM_DOWNMIX_LORO,    /** Stereo */
+    AM_DOWNMIX_ARIB,    /** for he-aac */
+    AM_DOWNMIX_MAX
+} AM_DownMixMode_t;
+
 enum {
     ATTEND_TYPE_NONE = 0,
     ATTEND_TYPE_ARC,

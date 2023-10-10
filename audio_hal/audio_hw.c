@@ -5535,6 +5535,10 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                 if (strstr(parm+1, "-dap_drc")) {
                     aml_audio_set_drc_control(strstr(parm+1, "-dap_drc"), &adev->dap_drc_control);
                 }
+                if (strstr(parm+1, "-dmx")) {
+                    adev->downmix_type = atoi(parm+5);//refer to enum: AM_DownMixMode_t
+                    ALOGE("%s, downmix_type %d", parm+5, adev->downmix_type);
+                }
                 aml_ms12_update_runtime_params(&(adev->ms12), parm+1);
             }
             pthread_mutex_unlock(&adev->lock);
@@ -11040,6 +11044,8 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     dprintf(fd, "[AML_HAL]      ms12 main volume: %10f\n", aml_dev->ms12.main_volume);
     dprintf(fd, "[AML_HAL]      decoder DRC control: %#x\n", aml_dev->decoder_drc_control);
     dprintf(fd, "[AML_HAL]      DAP DRC control: %#x\n", aml_dev->dap_drc_control);
+    dprintf(fd, "[AML_HAL]      downmix type: %d\n", aml_dev->downmix_type);
+    dprintf(fd, "[AML_HAL]      dap bypass: %d\n", aml_dev->ms12.dap_bypass_enable);
     aml_audio_ease_t *audio_ease = aml_dev->audio_ease;
     if (audio_ease && fabs(audio_ease->current_volume) <= 1e-6) {
         dprintf(fd, "[AML_HAL] ease out muted. start:%f target:%f\n", audio_ease->start_volume, audio_ease->target_volume);
@@ -11613,6 +11619,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->audio_patch = NULL;
     memset(&adev->dts_hd, 0, sizeof(struct dca_dts_dec));
     adev->sound_track_mode = 0;
+    adev->downmix_type = AM_DOWNMIX_LTRT;
     adev->mixing_level = 0;
     adev->advol_level = 100;
     adev->aml_dtv_audio_instances = aml_audio_calloc(1, sizeof(aml_dtv_audio_instances_t));

@@ -114,13 +114,6 @@
 #define MS12_OUTPUT_5_1_DDP "vendor.media.audio.ms12.output.5_1_ddp"
 #define MS12_TV_TUNING "vendor.media.audio.ms12.tv_tuning"
 
-// Downmix Mode start
-#define DOWNMIX_MODE_LtRt (0)
-#define DOWNMIX_MODE_LoRo (1)
-
-/* for HE-AAC, currently, it is not used at all. */
-#define DOWNMIX_MODE_ARIB (2)
-
 #define MS12_DOWNMIX_MODE_PROPERTY "vendor.media.audio.ms12.downmixmode"
 // Downmix Mode end
 
@@ -747,19 +740,19 @@ static int set_dolby_ms12_dap_init_mode(struct aml_audio_device *adev)
 static void set_dolby_ms12_downmix_mode(struct aml_audio_device *adev)
 {
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    int downmix_mode = DOWNMIX_MODE_LtRt; // Lt/Rt is default mode
+    int downmix_mode = adev->downmix_type; // Lt/Rt is default mode
     char buf[PROPERTY_VALUE_MAX];
     char *ret = aml_audio_property_get_str(MS12_DOWNMIX_MODE_PROPERTY, buf, NULL);
     if (ret != NULL) {
         if (strcasecmp(buf, "Lt/Rt") == 0) {
-            downmix_mode = DOWNMIX_MODE_LtRt;
+            downmix_mode = AM_DOWNMIX_LTRT;
         }
         else if (strcasecmp(buf, "Lo/Ro") == 0) {
-            downmix_mode = DOWNMIX_MODE_LoRo;
+            downmix_mode = AM_DOWNMIX_LORO;
         }
         else if (strcasecmp(buf, "ARIB") == 0) {
             /* for HE-AAC, currently, it is not used at all. */
-            downmix_mode = DOWNMIX_MODE_ARIB;
+            downmix_mode = AM_DOWNMIX_ARIB;
         }
     }
 
