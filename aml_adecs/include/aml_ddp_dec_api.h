@@ -29,6 +29,8 @@ typedef enum  {
     DDP_CONFIG_OUT_CH, //static param
     DDP_CONFIG_AD_PCMSCALE, //runtime param
     DDP_CONFIG_MAIN_PCMSCALE,//runtime param
+    DDP_CONFIG_DRC_CONTROL,//runtime param
+    DDP_CONFIG_DOWNMIX_TYPE,//runtime param
 } ddp_config_type_t;
 
 typedef enum  {

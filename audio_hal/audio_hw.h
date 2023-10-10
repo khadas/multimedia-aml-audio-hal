@@ -663,6 +663,9 @@ struct aml_audio_device {
     int minfo_atmos_flag;
 #endif
     bool audio_focus_enable;
+    uint32_t decoder_drc_control;
+    uint32_t dap_drc_control;
+    int downmix_type;
 
     /* board specific json configs */
     int hdmitx_src; /* HDMITX src select for TDM */

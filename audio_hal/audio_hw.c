@@ -5527,12 +5527,41 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
                     adev->atoms_lock_flag = 1;
                 } else if (strcmp(parm+1, "-atmos_lock 0") == 0) {
                     adev->atoms_lock_flag = 0;
+                } else if (strstr(parm+1, "-drc")) {
+                    aml_audio_set_drc_control(parm+1, &adev->decoder_drc_control);
+                    //dap drc default same with decoder drc
+                    adev->dap_drc_control = adev->decoder_drc_control;
+                }
+                if (strstr(parm+1, "-dap_drc")) {
+                    aml_audio_set_drc_control(strstr(parm+1, "-dap_drc"), &adev->dap_drc_control);
                 }
                 aml_ms12_update_runtime_params(&(adev->ms12), parm+1);
             }
             pthread_mutex_unlock(&adev->lock);
             goto exit;
         }
+    }
+
+    ret = str_parms_get_str(parms, "drc_mode", value, sizeof(value));
+    if (ret >= 0) {
+        char *parm = strstr(kvpairs, "=");
+        pthread_mutex_lock(&adev->lock);
+        if (parm) {
+            if (strstr(parm+1, "-drc")) {
+                aml_audio_set_drc_control(parm+1, &adev->decoder_drc_control);
+                //dap drc default same with decoder drc
+                adev->dap_drc_control = adev->decoder_drc_control;
+            }
+
+            if (eDolbyMS12Lib == adev->dolby_lib_type) {
+                if (strstr(parm+1, "-dap_drc")) {
+                    aml_audio_set_drc_control(strstr(parm+1, "-dap_drc"), &adev->dap_drc_control);
+                }
+                aml_ms12_update_runtime_params(&(adev->ms12), parm+1);
+            }
+        }
+        pthread_mutex_unlock(&adev->lock);
+        goto exit;
     }
 
     ret = str_parms_get_str(parms, "bypass_dap", value, sizeof(value));
@@ -10999,6 +11028,8 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     dprintf(fd, "[AML_HAL]      dtv_src gain: %10f |  atv gain: %f | hdmi gain: %f |  linein: %f | media gain: %f\n",
         aml_dev->src_gain[INPORT_TUNER], aml_dev->src_gain[INPORT_ATV], aml_dev->src_gain[INPORT_HDMIIN], aml_dev->src_gain[INPORT_LINEIN], aml_dev->src_gain[INPORT_MEDIA]);
     dprintf(fd, "[AML_HAL]      ms12 main volume: %10f\n", aml_dev->ms12.main_volume);
+    dprintf(fd, "[AML_HAL]      decoder DRC control: %#x\n", aml_dev->decoder_drc_control);
+    dprintf(fd, "[AML_HAL]      DAP DRC control: %#x\n", aml_dev->dap_drc_control);
     aml_audio_ease_t *audio_ease = aml_dev->audio_ease;
     if (audio_ease && fabs(audio_ease->current_volume) <= 1e-6) {
         dprintf(fd, "[AML_HAL] ease out muted. start:%f target:%f\n", audio_ease->start_volume, audio_ease->target_volume);
@@ -11374,6 +11405,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->hw_device.get_audio_port = adev_get_audio_port;
     adev->hw_device.dump = adev_dump;
     adev->hdmi_format = AUTO;
+
     card = alsa_device_get_card_index();
     if ((card < 0) || (card > 7)) {
         ALOGE("error to get audio card");
@@ -11730,6 +11762,10 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     if (adev->hdmitx_src != -1) {
         adev->spdif_independent = true;
     }
+
+    //set DRC default as RF
+    aml_audio_set_drc_control("-drc 1 -bs 0 -cs 0", &adev->decoder_drc_control);
+    aml_audio_set_drc_control("-dap_drc 1 -b 0 -c 0", &adev->dap_drc_control);
 
     ALOGD("%s: exit  dual_spdif_support(%d)", __func__, adev->dual_spdif_support);
     return 0;

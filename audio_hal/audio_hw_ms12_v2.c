@@ -629,21 +629,46 @@ static void ms12_close_all_spdifout(struct dolby_ms12_desc *ms12) {
         memset(bitstream_out, 0, sizeof(struct bitstream_out_desc));
     }
 }
-void dynamic_set_dolby_ms12_drc_parameters(struct dolby_ms12_desc *ms12)
+
+void dynamic_set_dap_drc_parameters(struct dolby_ms12_desc *ms12, unsigned int mode_control)
+{
+    int drc_mode = 0;
+    int drc_cut = 0;
+    int drc_boost = 0;
+    int dolby_ms12_dap_drc_mode = DOLBY_DRC_RF_MODE;
+    if (!ms12) {
+        ALOGE("%s() input ms12 is NULL!\n", __FUNCTION__);
+        return ;
+    }
+
+    if (aml_audio_get_drc_mode(&drc_mode, &drc_cut, &drc_boost, mode_control) == 0) {
+        dolby_ms12_dap_drc_mode = (drc_mode == DDPI_UDC_COMP_LINE) ? DOLBY_DRC_LINE_MODE : DOLBY_DRC_RF_MODE;
+    }
+    set_ms12_drc_boost_value(ms12, drc_boost);
+    set_ms12_drc_cut_value(ms12, drc_cut);
+#ifdef MS12_V26_ENABLE
+    set_ms12_drc_mode_dap_output(ms12, dolby_ms12_dap_drc_mode);
+#else
+    set_ms12_drc_mode_for_multichannel_and_dap_output(ms12, dolby_ms12_dap_drc_mode);
+#endif
+    ALOGI("%s dynamic set dap_drc %s",
+        __FUNCTION__, (dolby_ms12_dap_drc_mode == DOLBY_DRC_RF_MODE) ? "RF MODE" : "LINE MODE");
+}
+
+void dynamic_set_dolby_ms12_drc_parameters(struct dolby_ms12_desc *ms12, unsigned int mode_control)
 {
     int drc_mode = 0;
     int drc_cut = 0;
     int drc_boost = 0;
     int dolby_ms12_drc_mode = DOLBY_DRC_RF_MODE;
-    int dolby_ms12_dap_drc_mode = DOLBY_DRC_RF_MODE;
 
     if (!ms12) {
         ALOGE("%s() input ms12 is NULL!\n", __FUNCTION__);
         return ;
     }
 
-    //if (0 == aml_audio_get_dolby_drc_mode(&drc_mode, &drc_cut, &drc_boost))
-       // dolby_ms12_drc_mode = (drc_mode == DDPI_UDC_COMP_LINE) ? DOLBY_DRC_LINE_MODE : DOLBY_DRC_RF_MODE;
+    if (0 == aml_audio_get_drc_mode(&drc_mode, &drc_cut, &drc_boost, mode_control))
+        dolby_ms12_drc_mode = drc_mode;
 
     /*
      * if main input is hdmi-in/dtv/other-source PCM
@@ -660,36 +685,33 @@ void dynamic_set_dolby_ms12_drc_parameters(struct dolby_ms12_desc *ms12)
     ALOGI("%s dynamic set drc %s boost %d cut %d", __FUNCTION__,
         (dolby_ms12_drc_mode == DOLBY_DRC_RF_MODE) ? "RF MODE" : "LINE MODE", drc_boost, drc_cut);
 
-    if (ms12->output_config & MS12_OUTPUT_MASK_DAP) {
-        int ret = aml_audio_get_dolby_dap_drc_mode(&drc_mode, &drc_cut, &drc_boost);
-        if (ret == 0) {
-            dolby_ms12_dap_drc_mode = (drc_mode == DDPI_UDC_COMP_LINE) ? DOLBY_DRC_LINE_MODE : DOLBY_DRC_RF_MODE;
-        } else {
-            dolby_ms12_dap_drc_mode = dolby_ms12_drc_mode;
-        }
-        set_ms12_drc_boost_value(ms12, drc_boost);
-        set_ms12_drc_cut_value(ms12, drc_cut);
-#ifdef MS12_V26_ENABLE
-        set_ms12_drc_mode_dap_output(ms12, dolby_ms12_dap_drc_mode);
-#else
-        set_ms12_drc_mode_for_multichannel_and_dap_output(ms12, dolby_ms12_dap_drc_mode);
-#endif
-        ALOGI("%s dynamic set dap_drc %s",
-            __FUNCTION__, (dolby_ms12_dap_drc_mode == DOLBY_DRC_RF_MODE) ? "RF MODE" : "LINE MODE");
-    }
-
 }
 
-void set_dolby_ms12_drc_parameters(audio_format_t input_format, int output_config_mask)
+void set_dap_drc_parameters(struct dolby_ms12_desc *ms12, unsigned int mode_control)
 {
-    int dolby_ms12_drc_mode = DOLBY_DRC_RF_MODE;
     int dolby_ms12_dap_drc_mode = DOLBY_DRC_RF_MODE;
     int drc_mode = 0;
     int drc_cut = 0;
     int drc_boost = 0;
 
-    //if (0 == aml_audio_get_dolby_drc_mode(&drc_mode, &drc_cut, &drc_boost))
-        //dolby_ms12_drc_mode = (drc_mode == DDPI_UDC_COMP_LINE) ? DOLBY_DRC_LINE_MODE : DOLBY_DRC_RF_MODE;
+    int ret = aml_audio_get_drc_mode(&drc_mode, &drc_cut, &drc_boost, mode_control);
+    if (ret == 0) {
+        dolby_ms12_dap_drc_mode = (drc_mode == DDPI_UDC_COMP_LINE) ? DOLBY_DRC_LINE_MODE : DOLBY_DRC_RF_MODE;
+    }
+    dolby_ms12_set_dap_drc_mode(dolby_ms12_dap_drc_mode);
+    ALOGI("%s dolby_ms12_set_dap_drc_mode %s",
+        __FUNCTION__, (dolby_ms12_dap_drc_mode == DOLBY_DRC_RF_MODE) ? "RF MODE" : "LINE MODE");
+}
+
+void set_dolby_ms12_drc_parameters(audio_format_t input_format, int output_config_mask, unsigned int mode_control)
+{
+    int dolby_ms12_drc_mode = DOLBY_DRC_RF_MODE;
+    int drc_mode = 0;
+    int drc_cut = 0;
+    int drc_boost = 0;
+
+    if (0 == aml_audio_get_drc_mode(&drc_mode, &drc_cut, &drc_boost, mode_control))
+        dolby_ms12_drc_mode = drc_mode;
     //for mul-pcm
     dolby_ms12_set_drc_boost(drc_boost);
     dolby_ms12_set_drc_cut(drc_cut);
@@ -711,18 +733,6 @@ void set_dolby_ms12_drc_parameters(audio_format_t input_format, int output_confi
     dolby_ms12_set_multichannel_drc_mode(dolby_ms12_drc_mode);
 #endif
     ALOGI("%s dolby_ms12_set_drc_mode %s", __FUNCTION__, (dolby_ms12_drc_mode == DOLBY_DRC_RF_MODE) ? "RF MODE" : "LINE MODE");
-
-    if (output_config_mask & MS12_OUTPUT_MASK_DAP) {
-        int ret = aml_audio_get_dolby_dap_drc_mode(&drc_mode, &drc_cut, &drc_boost);
-        if (ret == 0) {
-            dolby_ms12_dap_drc_mode = (drc_mode == DDPI_UDC_COMP_LINE) ? DOLBY_DRC_LINE_MODE : DOLBY_DRC_RF_MODE;
-        } else {
-            dolby_ms12_dap_drc_mode = dolby_ms12_drc_mode;
-        }
-        dolby_ms12_set_dap_drc_mode(dolby_ms12_dap_drc_mode);
-        ALOGI("%s dolby_ms12_set_dap_drc_mode %s",
-            __FUNCTION__, (dolby_ms12_dap_drc_mode == DOLBY_DRC_RF_MODE) ? "RF MODE" : "LINE MODE");
-    }
 }
 
 static int set_dolby_ms12_dap_init_mode(struct aml_audio_device *adev)
@@ -950,7 +960,10 @@ int get_the_dolby_ms12_prepared(
      * 2. HDMI PCM output with max supported channel number >= 6 and also Netflix LLP 6ch PCM case (sink_allow_max_channel == true)
      */
     output_config |= MS12_OUTPUT_MASK_MC;
-    set_dolby_ms12_drc_parameters(input_format, output_config);
+    set_dolby_ms12_drc_parameters(input_format, output_config, adev->decoder_drc_control);
+    if (ms12->output_config & MS12_OUTPUT_MASK_DAP) {
+        set_dap_drc_parameters(ms12, adev->dap_drc_control);
+    }
 #if 0
     /*we reconfig the ms12 nodes depending on the user case when digital input case to refine ms12 perfermance*/
     if (patch && \
@@ -1289,7 +1302,9 @@ int dolby_ms12_main_process(
 
         if (!aml_out->is_ms12_main_decoder) {
             dolby_ms12_main_open(stream);
-            dynamic_set_dolby_ms12_drc_parameters(ms12);
+            dynamic_set_dolby_ms12_drc_parameters(ms12, adev->decoder_drc_control);
+            if (ms12->output_config & MS12_OUTPUT_MASK_DAP)
+                dynamic_set_dap_drc_parameters(ms12, adev->dap_drc_control);
         }
 
         /*this status is only updated in hw_write, continuous mode also need it*/

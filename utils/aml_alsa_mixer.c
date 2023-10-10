@@ -99,6 +99,7 @@ static struct aml_mixer_list gAmlMixerList[] = {
     {AML_MIXER_ID_ARC_EARC_SPDIFOUT_REG_MUTE,    "ARC eARC Spdifout Reg Mute"},
     {AML_MIXER_ID_EARC_TX_CA,           "eARC_TX Channel Allocation"},
     {AML_MIXER_ID_DIGITAL_MODE,         "Audio Digital Mode"},
+    {AML_MIXER_ID_DRC_CONTROL,          "Audio DRC Control"},
     {AML_MIXER_ID_AML_CHIP_ID,          "AML chip id"},
     {AML_MIXER_ID_TVIN_VIDEO_DELAY,     "TVIN VIDEO DELAY"},
     {AML_MIXER_ID_TVIN_VIDEO_MIN_DELAY, "TVIN VIDEO MIN DELAY"},

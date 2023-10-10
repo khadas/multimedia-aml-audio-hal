@@ -63,7 +63,9 @@ typedef enum {
     AML_DEC_CONFIG_MIXER_LEVEL, //runtime param
     AML_DEC_CONFIG_OUTPUT_CHANNEL,  //runtime/static param
     AML_DEC_CONFIG_FADE,
-    AML_DEC_CONFIG_PAN
+    AML_DEC_CONFIG_PAN,
+    AML_DEC_CONFIG_DRC_CONTROL,
+    AML_DEC_CONFIG_DOWNMIX_TYPE
 } aml_dec_config_type_t;
 
 typedef enum {
@@ -211,6 +213,8 @@ typedef struct aml_dec_config {
     int  mixer_level;   /* AML_DEC_CONFIG_MIXER_LEVEL */
     unsigned char ad_fade;
     unsigned char ad_pan;
+    int drc_control; /*config the drc control*/
+    int downmix_type; /*config the dowmmix cfg*/
 } aml_dec_config_t;
 
 

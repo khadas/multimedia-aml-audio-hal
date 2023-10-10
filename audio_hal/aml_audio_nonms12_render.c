@@ -635,6 +635,11 @@ int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t f
         dec_config->advol_level = adev->advol_level;
         ALOGI("mixer_level %d adev->associate_audio_mixing_enable %d",adev->mixing_level, demux_info->associate_audio_mixing_enable);
     }
+#ifdef NO_SERVER
+    adev->decoder_drc_control = aml_audio_get_drc_control(&adev->alsa_mixer);
+#endif
+    dec_config->drc_control = adev->decoder_drc_control;
+    dec_config->downmix_type = adev->downmix_type;
 
     switch (format) {
     case AUDIO_FORMAT_AC3:
