@@ -668,7 +668,7 @@ void dynamic_set_dolby_ms12_drc_parameters(struct dolby_ms12_desc *ms12, unsigne
     }
 
     if (0 == aml_audio_get_drc_mode(&drc_mode, &drc_cut, &drc_boost, mode_control))
-        dolby_ms12_drc_mode = drc_mode;
+        dolby_ms12_drc_mode = (drc_mode == DDPI_UDC_COMP_LINE) ? DOLBY_DRC_LINE_MODE : DOLBY_DRC_RF_MODE;
 
     /*
      * if main input is hdmi-in/dtv/other-source PCM
@@ -711,7 +711,7 @@ void set_dolby_ms12_drc_parameters(audio_format_t input_format, int output_confi
     int drc_boost = 0;
 
     if (0 == aml_audio_get_drc_mode(&drc_mode, &drc_cut, &drc_boost, mode_control))
-        dolby_ms12_drc_mode = drc_mode;
+        dolby_ms12_drc_mode = (drc_mode == DDPI_UDC_COMP_LINE) ? DOLBY_DRC_LINE_MODE : DOLBY_DRC_RF_MODE;
     //for mul-pcm
     dolby_ms12_set_drc_boost(drc_boost);
     dolby_ms12_set_drc_cut(drc_cut);
