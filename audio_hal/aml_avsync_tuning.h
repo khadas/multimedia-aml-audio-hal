@@ -30,16 +30,26 @@
 #define AVSYNC_SKIP_CNT (0)
 
 #define MAT_MULTIPLIER 16
-#define MS12_DECODER_LATENCY 32
-#define MS12_ENCODER_LATENCY 32
-#define MS12_PIPELINE_LATENCY 6
-#define MS12_DD_DDP_BUFERR_LATENCY 10
-#define MS12_MAT_BUFERR_LATENCY 10
-#define MS12_DAP_LATENCY 0
-#define AVR_LATENCY (60)
-#define AVR_RAW_PCM_LATENCY (20)
-#define AVR_LATENCY_PCM (10)
 #define AVSYNC_TIMEOUT_CNT (300) /* 300*10ms */
+
+#define MS12_DECODER_LATENCY              (32)
+#define MS12_ENCODER_LATENCY              (32)
+#define MS12_PIPELINE_LATENCY             (6)
+#define MS12_DD_DDP_BUFFER_LATENCY        (10)
+#define MS12_MAT_BUFFER_LATENCY           (10)
+#define MS12_DAP_LATENCY                  (0)
+#define AVR_LATENCY                       (60)
+#define AVR_RAW_PCM_LATENCY               (20)
+#define AVR_LATENCY_PCM                   (10)
+#define MS12_DECODER_LATENCY_PROPERTY            "audio.hal.hdmi.ms12.decoder"
+#define MS12_ENCODER_LATENCY_PROPERTY            "audio.hal.hdmi.ms12.encoder"
+#define MS12_PIPELINE_LATENCY_PROPERTY           "audio.hal.hdmi.ms12.pipeline"
+#define MS12_DD_DDP_BUFFER_LATENCY_PROPERTY      "audio.hal.hdmi.ms12.dd.ddp.buffer"
+#define MS12_MAT_BUFFER_LATENCY_PROPERTY         "audio.hal.hdmi.ms12.mat.buffer"
+#define MS12_DAP_LATENCY_PROPERTY                "audio.hal.hdmi.ms12.dap"
+#define AVR_LATENCY_PROPERTY                     "audio.hal.hdmi.ms12.avr"
+#define AVR_RAW_PCM_LATENCY_PROPERTY             "audio.hal.hdmi.ms12.avr.rawpcm"
+#define AVR_LATENCY_PCM_PROPERTY                 "audio.hal.hdmi.ms12.avr.pcm"
 
 struct aml_audio_patch;
 struct aml_audio_device;

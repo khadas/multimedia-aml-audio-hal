@@ -251,6 +251,124 @@ static int ringbuffer_seek(struct aml_audio_patch *patch, int tune_val)
     return tune_val;
 }
 
+static int hdmi_get_ms12_decoder_latency()
+{
+    int latency_ms = 0;
+    char *prop_name = NULL;
+    prop_name= MS12_DECODER_LATENCY_PROPERTY;
+    latency_ms = MS12_DECODER_LATENCY;
+    if (prop_name) {
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
+    }
+    ALOGV("%s latency ms =%d", __func__, latency_ms);
+    return latency_ms;
+}
+
+static int hdmi_get_ms12_pipeline_latency()
+{
+    int latency_ms = 0;
+    char *prop_name = NULL;
+    prop_name= MS12_PIPELINE_LATENCY_PROPERTY;
+    latency_ms = MS12_PIPELINE_LATENCY;
+    if (prop_name) {
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
+    }
+    ALOGV("%s latency ms =%d", __func__, latency_ms);
+    return latency_ms;
+}
+
+static int hdmi_get_ms12_dap_latency()
+{
+    int latency_ms = 0;
+    char *prop_name = NULL;
+    prop_name= MS12_DAP_LATENCY_PROPERTY;
+    latency_ms = MS12_DAP_LATENCY;
+    if (prop_name) {
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
+    }
+    ALOGV("%s latency ms =%d", __func__, latency_ms);
+    return latency_ms;
+}
+
+static int hdmi_get_ms12_encoder_latency()
+{
+    int latency_ms = 0;
+    char *prop_name = NULL;
+    prop_name= MS12_ENCODER_LATENCY_PROPERTY;
+    latency_ms = MS12_ENCODER_LATENCY;
+    if (prop_name) {
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
+    }
+    ALOGV("%s latency ms =%d", __func__, latency_ms);
+    return latency_ms;
+}
+
+static int hdmi_get_ms12_dd_ddp_buffer_latency()
+{
+    int latency_ms = 0;
+    char *prop_name = NULL;
+    prop_name= MS12_DD_DDP_BUFFER_LATENCY_PROPERTY;
+    latency_ms = MS12_DD_DDP_BUFFER_LATENCY;
+    if (prop_name) {
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
+    }
+    ALOGV("%s latency ms =%d", __func__, latency_ms);
+    return latency_ms;
+}
+
+static int hdmi_get_ms12_mat_buffer_latency()
+{
+    int latency_ms = 0;
+    char *prop_name = NULL;
+    prop_name= MS12_MAT_BUFFER_LATENCY_PROPERTY;
+    latency_ms = MS12_MAT_BUFFER_LATENCY;
+    if (prop_name) {
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
+    }
+    ALOGV("%s latency ms =%d", __func__, latency_ms);
+    return latency_ms;
+}
+
+static int hdmi_get_avr_pcm_latency()
+{
+    int latency_ms = 0;
+    char *prop_name = NULL;
+    prop_name= AVR_LATENCY_PCM_PROPERTY;
+    latency_ms = AVR_LATENCY_PCM;
+    if (prop_name) {
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
+    }
+    ALOGV("%s latency ms =%d", __func__, latency_ms);
+    return latency_ms;
+}
+
+static int hdmi_get_avr_dd_ddp_latency()
+{
+    int latency_ms = 0;
+    char *prop_name = NULL;
+    prop_name= AVR_LATENCY_PROPERTY;
+    latency_ms = AVR_LATENCY;
+    if (prop_name) {
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
+    }
+    ALOGV("%s latency ms =%d", __func__, latency_ms);
+    return latency_ms;
+}
+
+static int hdmi_get_avr_raw_pcm_latency()
+{
+    int latency_ms = 0;
+    char *prop_name = NULL;
+    prop_name= AVR_RAW_PCM_LATENCY_PROPERTY;
+    latency_ms = AVR_RAW_PCM_LATENCY;
+    if (prop_name) {
+        latency_ms = aml_audio_property_get_int(prop_name, latency_ms);
+    }
+    ALOGV("%s latency ms =%d", __func__, latency_ms);
+    return latency_ms;
+}
+
+
 int aml_dev_sample_audio_path_latency(struct aml_audio_device *aml_dev, char *latency_details)
 {
     struct aml_stream_in *in = aml_dev->active_input;
@@ -289,18 +407,20 @@ int aml_dev_sample_audio_path_latency(struct aml_audio_device *aml_dev, char *la
         aml_dev->ms12_out) {
 
         audio_format_t format = aml_dev->ms12_out->hal_internal_format;
-        int ms12_latency_decoder = MS12_DECODER_LATENCY;
-        int ms12_latency_pipeline = MS12_PIPELINE_LATENCY;
-        int ms12_latency_dap = MS12_DAP_LATENCY;
-        int ms12_latency_encoder = MS12_ENCODER_LATENCY;
+        int ms12_latency_decoder = hdmi_get_ms12_decoder_latency();
+        int ms12_latency_pipeline = hdmi_get_ms12_pipeline_latency();
+        int ms12_latency_dap = hdmi_get_ms12_dap_latency();
+        int ms12_latency_encoder = hdmi_get_ms12_encoder_latency();
+        int ms12_dd_ddp_buffer = hdmi_get_ms12_dd_ddp_buffer_latency();
+        int ms12_mat_buffer = hdmi_get_ms12_mat_buffer_latency();
 
         ms12_ltcy += ms12_latency_pipeline;
 
         if (!audio_is_linear_pcm(format)) {
             if ((format == AUDIO_FORMAT_AC3) || (format == AUDIO_FORMAT_E_AC3))
-                ms12_ltcy += ms12_latency_decoder + MS12_DD_DDP_BUFERR_LATENCY;
+                ms12_ltcy += ms12_latency_decoder + ms12_dd_ddp_buffer;
             else if ((format == AUDIO_FORMAT_MAT) || (format == AUDIO_FORMAT_DOLBY_TRUEHD))
-                ms12_ltcy += ms12_latency_decoder + MS12_MAT_BUFERR_LATENCY;
+                ms12_ltcy += ms12_latency_decoder + ms12_mat_buffer;
         }
 
         if (aml_dev->sink_format == AUDIO_FORMAT_PCM_16_BIT) {
@@ -356,13 +476,17 @@ int aml_dev_sample_audio_path_latency(struct aml_audio_device *aml_dev, char *la
         patch->audio_latency.alsa_in_latency = 0;
     }
 
+    int avr_pcm_ltcy = hdmi_get_avr_pcm_latency();
+    int avr_dd_ddp_ltcy = hdmi_get_avr_dd_ddp_latency();
+    int avr_raw_pcm_ltcy = hdmi_get_avr_raw_pcm_latency();
+
     if (aml_dev->sink_format == AUDIO_FORMAT_PCM_16_BIT) {
         out_path_ltcy = alsa_out_i2s_ltcy + spk_tuning_ltcy;
         alsa_output_latency = alsa_out_i2s_ltcy;
         /* In AVR case, for PCM only AVR or UI setting to PCM */
         /* add more 10ms AVR latency */
         if (aml_dev->active_outport == OUTPORT_HDMI_ARC) {
-            alsa_output_latency += AVR_LATENCY_PCM;
+            alsa_output_latency += avr_pcm_ltcy;
         }
     } else if (aml_dev->sink_format == AUDIO_FORMAT_AC3 ||
             aml_dev->sink_format == AUDIO_FORMAT_E_AC3 ||
@@ -370,11 +494,11 @@ int aml_dev_sample_audio_path_latency(struct aml_audio_device *aml_dev, char *la
         if ((aml_dev->optical_format == AUDIO_FORMAT_AC3) ||
             (aml_dev->optical_format == AUDIO_FORMAT_E_AC3)) {
             /* For dd/ddp output of AVR, add more 80ms latency */
-            out_path_ltcy = alsa_out_spdif_ltcy + AVR_LATENCY;
+            out_path_ltcy = alsa_out_spdif_ltcy + avr_dd_ddp_ltcy;
             alsa_output_latency = alsa_out_spdif_ltcy;
         } else if (aml_dev->optical_format == AUDIO_FORMAT_MAT) {
             /* For mat output of AVR, add more 20ms latency */
-            out_path_ltcy = alsa_out_spdif_ltcy + AVR_RAW_PCM_LATENCY;
+            out_path_ltcy = alsa_out_spdif_ltcy + avr_raw_pcm_ltcy;
             alsa_output_latency = alsa_out_spdif_ltcy;
         } else {
             out_path_ltcy = alsa_out_spdif_ltcy;
@@ -516,7 +640,7 @@ int aml_dev_try_avsync(struct aml_audio_patch *patch)
     int ret = 0;
 
     if (!patch) {
-        return 0;
+        return -EINVAL;
     }
     aml_dev = (struct aml_audio_device *)patch->dev;
     in = (struct audio_stream_in *)aml_dev->active_input;
@@ -532,7 +656,7 @@ int aml_dev_try_avsync(struct aml_audio_patch *patch)
             aml_dev_avsync_reset(patch);
             ALOGI(" timeout to tune avsync! error status = %d", ret);
         }
-        return 0;
+        return ret;
     }
 
     if (patch->is_avsync_start == false) {
