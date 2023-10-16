@@ -21,9 +21,9 @@
 #include <stdint.h>
 #include <cutils/log.h>
 #include <system/audio.h>
-#include <audio_utils/spdif/SPDIFEncoder.h>
 #include <tinyalsa/asoundlib.h>
 #include <cutils/properties.h>
+#include "SPDIFEncoder.h"
 #include "SPDIFEncoderAD.h"
 #include "aml_android_utils.h"
 

@@ -15,6 +15,12 @@ add_subdirectory("audio_hal/libaudioprocessing")
 add_library(spdifenc STATIC
 	utils/SPDIFEncoderAD.cpp
 	utils/spdifenc_wrap.cpp
+	utils/spdif/AC3FrameScanner.cpp
+	utils/spdif/BitFieldParser.cpp
+	utils/spdif/DTSFrameScanner.cpp
+	utils/spdif/FrameScanner.cpp
+    utils/spdif/MatFrameScanner.cpp
+	utils/spdif/SPDIFEncoder.cpp
 )
 
 target_include_directories(spdifenc PRIVATE
@@ -23,7 +29,9 @@ target_include_directories(spdifenc PRIVATE
 	./include/utils
 	./include/basic_utils
 	./utils/tinyalsa/include
-	./utils/include)
+	./utils/include
+	./utils/include/spdif
+	./utils/spdif)
 
 target_compile_options(spdifenc PRIVATE -Wno-deprecated-declarations -fPIC)
 
@@ -241,6 +249,7 @@ target_include_directories(audio_hal PRIVATE
 	./aml_parser/include
 	./aml_parser
 	./utils/include
+	./utils/include/spdif
 	./utils/tinyalsa/include
 	./utils/cJSON
 	./amlogic_AQ_tools

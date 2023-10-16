@@ -540,7 +540,7 @@ struct audio_stream_in {
      * \param[out] position address at which the mmap read/write position should be returned.
      *
      * \return 0 if the position is successfully returned.
-     *         -ENODATA if the position cannot be retreived
+     *         -ENODATA if the position cannot be retrieved
      *         -ENOSYS if called before mmap_read_position()
      */
     int (*get_mmap_position)(const struct audio_stream_in *stream,

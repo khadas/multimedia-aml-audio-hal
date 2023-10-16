@@ -25,8 +25,8 @@
 #include <sound/asound.h>
 #include <cutils/log.h>
 #include <system/audio.h>
-#include <audio_utils/spdif/SPDIFEncoder.h>
 
+#include "SPDIFEncoder.h"
 #include <tinyalsa/asoundlib.h>
 #include <cutils/properties.h>
 #include <string.h>
