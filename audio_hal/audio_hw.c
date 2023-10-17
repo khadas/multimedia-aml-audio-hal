@@ -3963,6 +3963,39 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     ALOGI("%s: exit", __func__);
 }
 
+static void adev_Updata_ActiveOutport(struct aml_audio_device *adev, char *OutputDestination) {
+    enum OUT_PORT outport = OUTPORT_SPEAKER;
+    int output_destination = atoi(OutputDestination);
+    ALOGI("[%s:%d] OutputDestination=%#x", __func__, __LINE__, output_destination);
+    switch (output_destination) {
+        case (AUDIO_DEVICE_OUT_REMOTE_SUBMIX):
+            outport = OUTPORT_REMOTE_SUBMIX;
+            break;
+        case (AUDIO_DEVICE_OUT_WIRED_HEADPHONE):
+            outport = OUTPORT_HEADPHONE;
+            break;
+        case (AUDIO_DEVICE_OUT_HDMI_ARC):
+            outport = OUTPORT_HDMI_ARC;
+            break;
+        case (AUDIO_DEVICE_OUT_SPEAKER):
+            outport = OUTPORT_SPEAKER;
+            break;
+        case (AUDIO_DEVICE_OUT_HDMI):
+            outport = OUTPORT_HDMI;
+            break;
+        case (AUDIO_DEVICE_OUT_SPDIF):
+            outport = OUTPORT_SPDIF;
+            break;
+        case (AUDIO_DEVICE_OUT_LINE):
+            outport = OUTPORT_AUX_LINE;
+            break;
+        default:
+            outport = OUTPORT_MAX;
+            break;
+    }
+    adev->active_outport = outport;
+}
+
 
 static int aml_audio_output_routing(struct audio_hw_device *dev,
                                     enum OUT_PORT outport,
@@ -5640,6 +5673,13 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         else
             adev->user_setting_scaletempo = false;
         ALOGI("audio enable_scaletempo: %s\n", adev->user_setting_scaletempo? "enable": "disable");
+        goto exit;
+    }
+
+    ret = str_parms_get_str(parms,"OutputDestination", value , sizeof(value));
+    if (ret >= 0) {
+        ALOGI("%s:OutputDestination=%s",__func__,value);
+        adev_Updata_ActiveOutport(adev,value);
         goto exit;
     }
 
@@ -7568,7 +7608,7 @@ ssize_t hw_write (struct audio_stream_out *stream
             //ms12 internal buffer avail(main/associate/system)
             if (adev->ms12.dolby_ms12_enable == true) {
                 ALOGI("%s MS12 buffer avail main %d associate %d system %d\n",
-                      __FUNCTION__, dolby_ms12_get_main_buffer_avail(NULL), dolby_ms12_get_associate_buffer_avail(), dolby_ms12_get_system_buffer_avail(NULL));
+                    __FUNCTION__, dolby_ms12_get_main_buffer_avail(NULL), dolby_ms12_get_associate_buffer_avail(), dolby_ms12_get_system_buffer_avail(NULL));
             }
         }
 
