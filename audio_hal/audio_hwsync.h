@@ -53,6 +53,14 @@
 #define HWSYNC_PTS_EOS UINT64_MAX
 #define HWSYNC_PTS_NA  (UINT64_MAX-1)
 
+#define MEDIA_SYNC_ESMODE(aml_out)                               \
+     ((aml_out) && (aml_out)->hwsync && (aml_out)->hw_sync_mode \
+     && (AVSYNC_TYPE_MEDIASYNC == (aml_out)->avsync_type)        \
+     && (aml_out)->hwsync->use_mediasync)
+
+#define MEDIA_SYNC_TSMODE(aml_out)                               \
+     ((aml_out) && (aml_out)->hwsync && (aml_out)->dtvsync_enable)
+
 enum hwsync_status {
     CONTINUATION,  // good sync condition
     ADJUSTMENT,    // can be adjusted by discarding or padding data
@@ -123,6 +131,7 @@ typedef struct  audio_hwsync {
     int version_num;
     bool use_mediasync;
     audio_hwsync_mediasync_t es_mediasync;
+    //aml_dtvsync_t dtvsync;
     int hwsync_id;
     uint64_t last_output_pts;
     struct timespec  last_timestamp;

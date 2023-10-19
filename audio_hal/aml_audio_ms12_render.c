@@ -214,24 +214,8 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
     struct aml_audio_device *adev = aml_out->dev;
     int return_bytes = abuffer->size;
     struct aml_audio_patch *patch = adev->audio_patch;
-    void *output_buffer = NULL;
-    size_t output_buffer_bytes = 0;
     int out_frames = 0;
-    int ms12_delayms = 0;
     bool bypass_aml_dec = false;
-    bool do_sync_flag = adev->patch_src  == SRC_DTV && patch && patch->skip_amadec_flag;
-    int64_t hw_esmode_apts = 0;
-
-    bool esmode_flag = false;
-    if (aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) && aml_out->hwsync->use_mediasync)
-    {
-        esmode_flag = true;
-    }
-
-    if (!patch || !aml_out->dtvsync_enable)
-    {
-        do_sync_flag = 0;
-    }
 
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     if (is_dolby_ms12_support_compression_format(aml_out->hal_internal_format)
@@ -241,10 +225,11 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
 
     if (bypass_aml_dec) {
         ret = aml_audio_ms12_process_wrapper(stream, abuffer);
-        if (true == do_sync_flag) {
+        if (MEDIA_SYNC_TSMODE(aml_out)) {
             if (aml_out->alsa_status_changed) {
                 ALOGI("[%s:%d] aml_out->alsa_running_status %d", __FUNCTION__, __LINE__, aml_out->alsa_running_status);
-                aml_dtvsync_setParameter(patch->dtvsync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
+                //aml_dtvsync_setParameter(patch->dtvsync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
+                mediasync_wrap_setParameter(aml_out->hwsync->es_mediasync.mediasync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
                 aml_out->alsa_status_changed = false;
             }
         }
@@ -260,9 +245,9 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
         ainput.size = abuffer->size;
         ainput.pts = abuffer->pts;
 
-        if (do_sync_flag) {
-            if (patch->cur_package)
-                aml_dec->in_frame_pts = (NULL_INT64 == patch->cur_package->pts) ? aml_dec->out_frame_pts : patch->cur_package->pts;
+        if ((MEDIA_SYNC_TSMODE(aml_out)) || (MEDIA_SYNC_ESMODE(aml_out)))
+        {
+            aml_dec->in_frame_pts = (NULL_INT64 == ainput.pts) ? aml_dec->out_frame_pts : ainput.pts;
             ainput.pts = aml_dec->in_frame_pts;
         }
 
@@ -328,7 +313,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
                          }
                     }
 
-                    if ((do_sync_flag) || (esmode_flag))
+                    if ((MEDIA_SYNC_TSMODE(aml_out)) || (MEDIA_SYNC_ESMODE(aml_out)))
                     {
                         int64_t out_apts;
                         out_apts = aml_dec->out_frame_pts;

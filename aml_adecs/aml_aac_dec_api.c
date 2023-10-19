@@ -353,6 +353,12 @@ static int faad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffe
               break;
           }
           AM_LOGI_IF(aml_dec->debug_level, "decode_len %d in %d pcm_len %d used_size %d", decode_len,  aac_dec->remain_size , pcm_len, used_size);
+          faad_op->getinfo(faad_op,&pAudioInfo);
+          aac_dec->stream_info.stream_sr = pAudioInfo.samplerate;
+          aac_dec->stream_info.stream_ch = pAudioInfo.channels;
+          aac_dec->stream_info.stream_error_num = pAudioInfo.error_num;
+          aac_dec->stream_info.stream_drop_num = pAudioInfo.drop_num;
+          aac_dec->stream_info.stream_decode_num = pAudioInfo.decode_num;
 
           if (dec_pcm_data->data_len) {
               aac_dec->remain_size = aac_dec->remain_size - used_size;
@@ -363,7 +369,7 @@ static int faad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffe
               } else {
                    used_size_return = 0;
                    aac_dec->remain_size = mark_remain_size - used_size;
-                   aac_dec->remain_data_pts = aac_dec->remain_data_pts + dec_pcm_data->data_len /( 2 * dec_pcm_data->data_ch) * 1000 * 90 /dec_pcm_data->data_sr;
+                   aac_dec->remain_data_pts = aac_dec->remain_data_pts + dec_pcm_data->data_len /( 2 * pAudioInfo.channels) * 1000 * 90 /pAudioInfo.samplerate;
                    memmove(aac_dec->remain_data, aac_dec->remain_data + used_size, aac_dec->remain_size );
               }
               break;
@@ -386,12 +392,6 @@ static int faad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffe
 
     aac_dec->total_raw_size += used_size_return;
     aac_dec->total_pcm_size += dec_pcm_data->data_len;
-    faad_op->getinfo(faad_op,&pAudioInfo);
-    aac_dec->stream_info.stream_sr = pAudioInfo.samplerate;
-    aac_dec->stream_info.stream_ch = pAudioInfo.channels;
-    aac_dec->stream_info.stream_error_num = pAudioInfo.error_num;
-    aac_dec->stream_info.stream_drop_num = pAudioInfo.drop_num;
-    aac_dec->stream_info.stream_decode_num = pAudioInfo.decode_num;
 
     if (pAudioInfo.channels == 1 && dec_pcm_data->data_len) {
             int16_t *samples_data = (int16_t *)dec_pcm_data->buf;

@@ -3340,8 +3340,18 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
         ALOGE("live open output stream fail, ret = %d", ret);
         goto exit_open;
     }
+
     aml_out = (struct aml_stream_out *)stream_out;
     patch->dtv_aml_out = aml_out;
+
+    if (aml_out->hwsync)
+    {
+        pthread_mutex_lock(&aml_out->hwsync->lock);
+        aml_out->hwsync->es_mediasync.mediasync    = patch->dtvsync->mediasync;
+        aml_out->hwsync->es_mediasync.mediasync_id = patch->dtvsync->mediasync_id;
+        pthread_mutex_unlock(&aml_out->hwsync->lock);
+    }
+
     ALOGI("++%s live create a output stream success now!!!\n ", __FUNCTION__);
     patch->out_buf_size = write_bytes * EAC3_MULTIPLIER;
     patch->out_buf = aml_audio_calloc(1, patch->out_buf_size);
@@ -3360,8 +3370,6 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
     prctl(PR_SET_NAME, (unsigned long)"dtv_output_data");
     aml_out->output_speed = 1.0f;
     aml_out->dtvsync_enable = aml_audio_property_get_bool(DTV_SYNCENABLE, true);
-    audio_mediasync_util_t* media_sync_util = aml_audio_get_mediasync_util_handle();
-    ALOGI("output_speed=%f,dtvsync_enable=%d,media_sync_util=%p", aml_out->output_speed, aml_out->dtvsync_enable, media_sync_util);
     while (!patch->output_thread_exit) {
 
         if (patch->dtv_decoder_state == AUDIO_DTV_PATCH_DECODER_STATE_PAUSE) {
@@ -3381,9 +3389,7 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
             continue;
         } else {
             patch->cur_package = p_package;
-            if (media_sync_util->media_sync_debug)
-                ALOGI("[%s:%d] package pts:%llx, package size:%d, dtv_first_apts_flag:%d", __FUNCTION__, __LINE__, p_package->pts, p_package->size, patch->dtv_first_apts_flag);
-
+            ALOGI_IF(aml_dev->debug_flag, "[%s:%d] package pts:%llx, package size:%d, dtv_first_apts_flag:%d", __FUNCTION__, __LINE__, p_package->pts, p_package->size, patch->dtv_first_apts_flag);
             /* if first package pts is invalid, we need drop it */
             if ((!patch->dtv_first_apts_flag) && (NULL_INT64 == p_package->pts))
             {
@@ -3404,12 +3410,11 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
             patch->dtv_first_apts_flag = 1;
         }
 
-        if (is_dolby_ms12_support_compression_format(patch->aformat) && eDolbyMS12Lib == aml_dev->dolby_lib_type) {
-            if (aml_audio_mediasync_util_checkin_apts(media_sync_util, media_sync_util->payload_offset, p_package->pts) < 0) {
-                ALOGE("[%s:%d] checkin apts(%llx) data_size(%zu)(%d) fail",
-                    __FUNCTION__, __LINE__, p_package->pts, media_sync_util->payload_offset, p_package->size);
-            }
-            media_sync_util->payload_offset += p_package->size;
+        if (aml_out->hwsync)
+        {
+            pthread_mutex_lock(&aml_out->hwsync->lock);
+            aml_out->hwsync->es_mediasync.in_apts = patch->cur_package->pts;
+            pthread_mutex_unlock(&aml_out->hwsync->lock);
         }
 
         aml_out->output_speed = aml_audio_get_output_speed(aml_out);

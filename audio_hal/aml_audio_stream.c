@@ -1078,12 +1078,11 @@ void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
                 pstPatch->dtv_resample.input_sr, pstPatch->dtv_resample.output_sr,pstPatch->dtv_resample.channels);
         if (pstPatch->dtvsync)
         {
-            dprintf(fd, "[AML_HAL] use_mediasync:%d,mediasync %p,mediasync_new %p,mediasync_id %d,cur_outapts %lld,out_start_apts %lld,out_end_apts %lld\n",
-                    pstPatch->dtvsync->use_mediasync,pstPatch->dtvsync->mediasync,pstPatch->dtvsync->mediasync_new,
+            dprintf(fd, "[AML_HAL] mediasync %p,mediasync_new %p,mediasync_id %d,cur_outapts %lld,out_start_apts %lld,out_end_apts %lld\n",
+                    pstPatch->dtvsync->mediasync,pstPatch->dtvsync->mediasync_new,
                     pstPatch->dtvsync->mediasync_id,pstPatch->dtvsync->cur_outapts,
                     pstPatch->dtvsync->out_start_apts,pstPatch->dtvsync->out_end_apts);
-            dprintf(fd, "[AML_HAL] cur_speed:%d,pcm_dropping %d,duration %d,apolicy %d,param1 %d,param2 %d\n",
-                    pstPatch->dtvsync->cur_speed,pstPatch->dtvsync->pcm_dropping,pstPatch->dtvsync->duration,
+            dprintf(fd, "[AML_HAL] apolicy %d,param1 %d,param2 %d\n",
                     pstPatch->dtvsync->apolicy.audiopolicy,pstPatch->dtvsync->apolicy.param1,
                     pstPatch->dtvsync->apolicy.param2);
         }

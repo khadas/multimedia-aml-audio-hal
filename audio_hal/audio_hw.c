@@ -3615,7 +3615,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
     }
 
-    if (out->hw_sync_mode) {
+    //if (out->hw_sync_mode) mask for dtv mediasync
+    {
         out->hwsync = aml_audio_calloc(1, sizeof(audio_hwsync_t));
         if (!out->hwsync) {
             ALOGE("%s, malloc hwsync failed", __func__);
@@ -9060,23 +9061,23 @@ hwsync_rewrite:
         if ((cur_pts > 0xffffffff) && (cur_pts != HWSYNC_PTS_NA) && (cur_pts != HWSYNC_PTS_EOS)) {
             ALOGE("APTS exeed the max 32bit value");
         }
+    }
 
-        if (NULL != aml_out->hwsync->es_mediasync.mediasync) {
-            audio_mediasync_util_t *media_sync_util = aml_audio_get_mediasync_util_handle();
-            size_t total_data_size = aml_out->hwsync->es_mediasync.total_data_size + hwsync_outsize;
-            if (is_dolby_ms12_support_compression_format(aml_out->hal_internal_format))
-            {
-                if (0 > aml_audio_mediasync_util_checkin_apts(media_sync_util, total_data_size, cur_pts))
-                {
-                    ALOGE("[%s:%d], checkin apts(%llx) data_size(%zu) total_data_size(%zu)fail", __func__, __LINE__, cur_pts, bytes, total_data_size);
-                }
-            }
-
+    if (aml_out->hwsync && (NULL != aml_out->hwsync->es_mediasync.mediasync)) {
+        if (true != aml_out->hw_sync_mode)  //DTV
+        {
             pthread_mutex_lock(&aml_out->hwsync->lock);
-            aml_out->hwsync->es_mediasync.total_data_size = total_data_size;
-            aml_out->hwsync->es_mediasync.in_apts = cur_pts;
+            cur_pts = aml_out->hwsync->es_mediasync.in_apts;
             pthread_mutex_unlock(&aml_out->hwsync->lock);
-
+        }
+        audio_mediasync_util_t *media_sync_util = aml_audio_get_mediasync_util_handle();
+        if ((is_dolby_ms12_support_compression_format(aml_out->hal_internal_format)) && (eDolbyMS12Lib == adev->dolby_lib_type))
+        {
+            if (0 > aml_audio_mediasync_util_checkin_apts(media_sync_util, media_sync_util->payload_offset, cur_pts))
+            {
+                ALOGE("[%s:%d], checkin apts(%llx) data_size(%zu) payload_offset(%zu)fail", __func__, __LINE__, cur_pts, bytes, media_sync_util->payload_offset);
+            }
+            media_sync_util->payload_offset += write_bytes;
         }
     }
 
