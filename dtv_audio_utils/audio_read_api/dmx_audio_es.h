@@ -44,6 +44,7 @@ typedef struct aml_demux__audiopara {
     struct mAudioEsDataInfo *mEsData;
     struct mAudioEsDataInfo *mADEsData;
     struct package *dtv_package;
+    struct package *dtv_ad_package;
     uint8_t ad_fade;
     uint8_t ad_pan;
 } aml_demux_audiopara_t;

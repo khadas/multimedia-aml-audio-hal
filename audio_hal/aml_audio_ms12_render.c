@@ -122,21 +122,21 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio
         total_write = 0;
 re_write:
         if (adev->debug_flag) {
-            ALOGI("%s dolby_ms12_main_process before write_bytes %zu!\n", __func__, write_bytes);
+            ALOGI("%s dolby_ms12_main_process before write_bytes %zu, pts %llx!\n", __func__, write_bytes, abuffer->pts);
         }
 
         used_size = 0;
-        ret = dolby_ms12_main_process(stream, (char*)write_buf + total_write, write_bytes, &used_size);
+        ret = dolby_ms12_main_process(stream, abuffer, &used_size);
         if (ret == 0) {
             if (adev->debug_flag) {
                 ALOGI("%s dolby_ms12_main_process return %d, return used_size %zu!\n", __FUNCTION__, ret, used_size);
             }
-            if (used_size < write_bytes && write_retry < MS12_MAIN_WRITE_LOOP_THRESHOLD) {
+            if (used_size < abuffer->size && write_retry < MS12_MAIN_WRITE_LOOP_THRESHOLD) {
                 if (adev->debug_flag) {
-                    ALOGI("%s dolby_ms12_main_process used  %zu,write total %zu,left %zu\n", __FUNCTION__, used_size, write_bytes, write_bytes - used_size);
+                    ALOGI("%s dolby_ms12_main_process used  %zu,write total %zu,left %zu\n", __FUNCTION__, used_size, abuffer->size, abuffer->size - used_size);
                 }
-                total_write += used_size;
-                write_bytes -= used_size;
+                abuffer->buffer += used_size;
+                abuffer->size -= used_size;
                 /*if ms12 doesn't consume any data, we need sleep*/
                 if (used_size == 0) {
                     aml_audio_sleep(1000);
@@ -150,7 +150,7 @@ re_write:
                 }
             }
             if (write_retry >= MS12_MAIN_WRITE_LOOP_THRESHOLD) {
-                ALOGE("%s main write retry time output,left %zu", __func__, write_bytes);
+                ALOGE("%s main write retry time output,left %zu", __func__, abuffer->size);
                 //bytes -= write_bytes;
                 ms12_write_failed = 1;
             }

@@ -120,11 +120,9 @@ struct cmd_node {
 struct package {
     char *data;//buf ptr
     int size;  //package size
-    char *ad_data;//ad buf ptr
-    int  ad_size;//apackage size
     struct package * next;//next ptr
     uint64_t pts;
-    uint64_t ad_pts;
+    int split_frame_size;
 };
 
 typedef struct {
@@ -146,6 +144,8 @@ void init_cmd_list(struct cmd_node *dtv_cmd_list);
 
 void deinit_cmd_list(struct cmd_node *dtv_cmd_list);
 int dtv_patch_add_cmd(struct cmd_node *dtv_cmd_list,int cmd, int path_id);
+bool dtv_package_is_full(package_list *list);
+bool dtv_package_is_empty(package_list *list);
 
 
 int dtv_patch_get_cmd(struct cmd_node *dtv_cmd_list,int *cmd, int *path_id);

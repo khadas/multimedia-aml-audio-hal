@@ -64,6 +64,7 @@
 #include "aml_dec_api.h"
 #include "aml_dts_dec_api.h"
 #include "audio_format_parse.h"
+#include "aml_audio_heaacparser.h"
 #include "hal_scaletempo.h"
 
 /* number of frames per period */
@@ -484,6 +485,8 @@ struct aml_audio_device {
     struct pcm_config ms12_config;
     int mixing_level;
     int advol_level;
+    uint8_t ad_fade;
+    uint8_t ad_pan;
     bool ad_switch_enable;
     bool associate_audio_mixing_enable;
     bool need_reset_for_dual_decoder;
@@ -845,6 +848,8 @@ struct aml_stream_out {
     bool restore_dolby_lib_type;
     bool continuous_mode_check;
     void * ac4_parser_handle;
+    void * heaac_parser_handle;
+    struct heaac_parser_info heaac_info;
     int64_t last_mmap_nano_second;
     int32_t last_mmap_position;
     uint64_t main_input_ns;

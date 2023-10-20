@@ -1752,7 +1752,10 @@ static int out_pause_new (struct audio_stream_out *stream)
           __func__, stream, aml_out->pause_status, aml_dev->dolby_lib_type, aml_dev->continuous_audio_mode, aml_out->with_header, aml_dev->ms12.dolby_ms12_enable, aml_dev->ms12.is_continuous_paused);
 
     aml_audio_trace_int("out_pause_new", 1);
-
+    if (aml_out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM) {
+        ALOGI("%s(), do nothing for AD stream\n", __func__);
+        return 0;
+    }
     pthread_mutex_lock (&aml_dev->lock);
     pthread_mutex_lock (&aml_out->lock);
 
@@ -1842,6 +1845,10 @@ static int out_resume_new (struct audio_stream_out *stream)
 
     ALOGI("%s(), stream(%p),standby = %d,pause_status = %d\n", __func__, stream, aml_out->standby, aml_out->pause_status);
     aml_audio_trace_int("out_resume_new", 1);
+    if (aml_out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM) {
+        ALOGI("%s(), do nothing for AD stream\n", __func__);
+        return 0;
+    }
     pthread_mutex_lock(&aml_dev->lock);
     pthread_mutex_lock(&aml_out->lock);
     /* a stream should fail to resume if not previously paused */
@@ -1907,6 +1914,10 @@ static int out_flush_new (struct audio_stream_out *stream)
     out->input_bytes_size = 0;
 
     aml_audio_trace_int("out_flush_new", 1);
+    if (out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM) {
+        ALOGI("%s(), do nothing for AD stream\n", __func__);
+        return 0;
+    }
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         if (out->total_write_size == 0) {
             out->pause_status = false;
@@ -2013,7 +2024,10 @@ int insert_output_bytes (struct aml_stream_out *out, size_t size)
         once_write_size = insert_size > 8192 ? 8192 : insert_size;
         if (eDolbyMS12Lib == adev->dolby_lib_type && !is_bypass_dolbyms12(stream)) {
             size_t used_size = 0;
-            ret = dolby_ms12_main_process(stream, insert_buf, once_write_size, &used_size);
+            struct audio_buffer abuffer = {0};
+            abuffer.buffer = insert_buf;
+            abuffer.size = once_write_size;
+            ret = dolby_ms12_main_process(stream, &abuffer, &used_size);
             if (ret) {
                 ALOGW("dolby_ms12_main_process cost size %zu,input size %zu,check!!!!", once_write_size, used_size);
             }
@@ -3600,7 +3614,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         memset(out->audioeffect_tmp_buffer, 0, out->config.period_size * 6);
     }
 
-    if (eDolbyMS12Lib == adev->dolby_lib_type)
+    if (eDolbyMS12Lib == adev->dolby_lib_type && !(flags & AUDIO_OUTPUT_FLAG_AD_STREAM))
     {//clean pts
         struct renderpts_item *frame_item = NULL;
         struct listnode *item = NULL;
@@ -3620,7 +3634,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     }
 
     //if (out->hw_sync_mode) mask for dtv mediasync
-    {
+    if (!(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         out->hwsync = aml_audio_calloc(1, sizeof(audio_hwsync_t));
         if (!out->hwsync) {
             ALOGE("%s, malloc hwsync failed", __func__);
@@ -8197,6 +8211,69 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
     return bytes;
 
 }
+ssize_t mixer_ad_buffer_write (struct audio_stream_out *stream, struct audio_buffer *abuffer)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev = aml_out->dev;
+    struct aml_stream_out *ms12_out = (struct aml_stream_out *)adev->ms12_out;
+    int ret = -1, write_retry = 0;
+    size_t used_size = 0, total_bytes = abuffer->size;
+
+    if (abuffer == NULL || aml_out == NULL) {
+        AM_LOGE ("invalid abuffer %p, out %p\n", abuffer, aml_out);
+        return -1;
+    }
+
+    AM_LOGI_IF(adev->debug_flag, "useSubMix:%d, db_lib:%d, hal_format:0x%x, usecase:0x%x, usecase_masks:0x%x. out:%p, in %zu",
+            adev->useSubMix, adev->dolby_lib_type, aml_out->hal_format, aml_out->usecase, adev->usecase_masks, aml_out, total_bytes);
+
+    if (abuffer->buffer == NULL || abuffer->size == 0) {
+        AM_LOGE ("invalid abuffer content, buf %p, sz %d\n", abuffer->buffer, abuffer->size);
+        return -1;
+    }
+
+    if (aml_out->standby) {
+        aml_out->standby = false;
+    }
+
+    if ((eDolbyMS12Lib == adev->dolby_lib_type) && !is_bypass_dolbyms12(stream)) {
+        ms12_out = (struct aml_stream_out *)adev->ms12_out;
+        if (ms12_out == NULL) {
+            // add protection here
+            AM_LOGI("ERRPR ms12_out = NULL,adev->ms12_out = %p", adev->ms12_out);
+            return total_bytes;
+        }
+    }
+
+    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+re_write:
+        ret = dolby_ms12_ad_process(stream, abuffer, &used_size);
+        if (ret == 0) {
+            if (used_size < abuffer->size && write_retry < 400) {
+                AM_LOGI_IF(adev->debug_flag, "dolby_ms12_ad_process used  %zu,write total %zu,left %zu\n", used_size, total_bytes, abuffer->size - used_size);
+                abuffer->buffer += used_size;
+                abuffer->size -= used_size;
+                aml_audio_sleep(10000);
+                if (adev->debug_flag >= 2) {
+                    AM_LOGI("sleeep 10ms\n");
+                }
+                write_retry++;
+                if (adev->ms12.dolby_ms12_enable) {
+                    goto re_write;
+                }
+            }
+            if (write_retry >= 400) {
+                AM_LOGE("write retry time output, left %zu", abuffer->size);
+                /* adjust payload_offset when there are unwritten bytes */
+            }
+        } else {
+            AM_LOGE("dolby_ms12_ad_process failed %d", ret);
+        }
+    }
+ad_exit:
+    AM_LOGI_IF(adev->debug_flag, "return %zu!\n", total_bytes);
+    return total_bytes;
+}
 
 ssize_t mixer_app_buffer_write(struct audio_stream_out *stream, struct audio_buffer *abuffer)
 {
@@ -8355,7 +8432,7 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
     /* new output case entered, so no masks has been set to the out stream */
     if (!aml_out->dev_usecase_masks) {
         aml_dev->usecase_cnt[aml_out->usecase]++;
-        if ((1 << aml_out->usecase) & aml_dev->usecase_masks) {
+        if (((1 << aml_out->usecase) & aml_dev->usecase_masks) && (!aml_out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM))  {
             ALOGE("[%s:%d], usecase: %s already exists!!, aml_out:%p", __func__,  __LINE__, usecase2Str(aml_out->usecase), aml_out);
             return -EINVAL;
         }
@@ -8380,6 +8457,9 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
                 aml_out->write = mixer_app_buffer_write;
                 aml_out->write_func = MIXER_APP_BUFFER_WRITE;
                 ALOGI("%s(), non continue mode mixer_app_buffer_write !", __FUNCTION__);
+            } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM) {
+                aml_out->write = mixer_ad_buffer_write;
+                ALOGI("[%s:%d], mixer_ad_buffer_write !", __func__, __LINE__);
             } else {
                 aml_out->write = mixer_main_buffer_write;
                 aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
@@ -8408,6 +8488,9 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
             aml_out->write = mixer_app_buffer_write;
             aml_out->write_func = MIXER_APP_BUFFER_WRITE;
             ALOGV("%s(), continue mode mixer_app_buffer_write !", __FUNCTION__);
+        } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM) {
+            aml_out->write = mixer_ad_buffer_write;
+            ALOGV("[%s:%d], mixer_ad_buffer_write !", __func__, __LINE__);
         } else {
             aml_out->write = mixer_main_buffer_write;
             aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
@@ -10455,6 +10538,9 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     dprintf(fd, "[AML_HAL]      master volume: %10f, mute: %d\n", aml_dev->master_volume, aml_dev->master_mute);
     aml_decoder_info_dump(aml_dev, fd);
     aml_adev_stream_out_dump(aml_dev, fd);
+    dprintf(fd, "\n[AML_HAL]      usecase_masks: %#x\n", aml_dev->usecase_masks);
+    dprintf(fd, "[AML_HAL]      dual: %d, mixing %d, ad_vol %d\n", aml_dev->dual_decoder_support, aml_dev->mixing_level, aml_dev->advol_level);
+    dprintf(fd, "\nAML stream outs:\n");
 
 #ifdef AML_MALLOC_DEBUG
         aml_audio_debug_malloc_showinfo(MEMINFO_SHOW_PRINT);

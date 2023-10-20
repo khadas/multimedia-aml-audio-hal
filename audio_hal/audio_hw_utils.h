@@ -27,6 +27,7 @@
 
 #define ENUM_TYPE_STR_MAX_LEN                           (100)
 #define REPORT_DECODED_INFO  "/sys/class/amaudio/codec_report_info"
+#define IEC61937_PAPB (0xf8724e1f)
 
 
 #define ENUM_TYPE_TO_STR_DEFAULT_STR            "INVALID_ENUM"

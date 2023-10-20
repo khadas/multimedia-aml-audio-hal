@@ -90,17 +90,33 @@ int get_the_dolby_ms12_prepared(
  *
  * input parameters
  *     stream: audio_stream_out handle
- *     buffer: data buffer address
- *     bytes: data size
+ *     abuffer: data buffer address
  * output parameters
  *     used_size: buffer used size
  */
 int dolby_ms12_main_process(
-    struct audio_stream_out *stream
-    , const void *buffer
-    , size_t bytes
-    , size_t *used_size);
+    struct audio_stream_out *stream,
+    struct audio_buffer *abuffer,
+    size_t *use_size);
 
+/*
+ *@brief set ms12 fade and pan parameter
+ * input parameters
+ *     struct dolby_ms12_desc *ms12: ms12 pointer
+ *     int fade_byte
+ *     int gain_byte_center
+ *     int gain_byte_front
+ *     int gain_byte_surround
+ *     int pan_byte
+ */
+void set_ms12_fade_pan
+    (struct dolby_ms12_desc *ms12
+    , int fade_byte
+    , int gain_byte_center
+    , int gain_byte_front
+    , int gain_byte_surround
+    , int pan_byte
+    );
 
 /*
  *@brief dolby ms12 system process

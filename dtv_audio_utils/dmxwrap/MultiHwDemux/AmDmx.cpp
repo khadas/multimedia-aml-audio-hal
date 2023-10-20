@@ -159,7 +159,7 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_handlePESpacket(AM_DMX_Device *dev, AM_DMX_
    #define AUDIO_STARTLEN 4
    int ulen=PATLOADSIZE-AUDIO_STARTLEN;
    int found=AM_FALSE;
-   int pos=0;
+   int pos=0, try_count = 0;
    findbuf[0]=0xff;
    findbuf[1]=0xff;
    findbuf[2]=0xff;
@@ -184,11 +184,15 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_handlePESpacket(AM_DMX_Device *dev, AM_DMX_
           memmove(findbuf,&findbuf[pos],AUDIO_STARTLEN);
       }
       usleep (1000);
-    }while(AM_FALSE==found && dev->enable_thread && !filter->to_be_stopped);
+    }while(AM_FALSE==found && dev->enable_thread && !filter->to_be_stopped && try_count++ < 5);
 
     if (filter->to_be_stopped)
     {
         return AM_DMX_ERR_TIMEOUT;
+    }
+    if (!found) {
+        ALOGI("%s, not find PacketStartCodePrefix", __func__);
+        return AM_FAILURE;
     }
 
     static unsigned char PESbuffer[PESBUFFERLEN]={0};
@@ -229,9 +233,8 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_handlePESpacket(AM_DMX_Device *dev, AM_DMX_
         {
         usleep (20000);
         }
-      } while (dev->enable_thread && !filter->to_be_stopped && read_len < needreadlen);
+      } while (dev->enable_thread && !filter->to_be_stopped && read_len < needreadlen && try_count++ < 10);
     }
-
     //dmx_audio_dump_audio_bitstreams("/data/pesraw.bin",PESbuffer,PES_packet_length+PES_START_LEN);
     int PES_header_len=0;
     {
@@ -283,8 +286,9 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
         ret = dev->drv->dvb_poll(dev, &mask, DMX_POLL_TIMEOUT);
         if (ret == AM_SUCCESS)
         {
-            if (AM_DMX_FILTER_MASK_ISEMPTY(&mask))
+            if (AM_DMX_FILTER_MASK_ISEMPTY(&mask)) {
                 continue;
+            }
 
 #if defined(DMX_WAIT_CB) || defined(DMX_SYNC)
             pthread_mutex_lock(&dev->lock);
@@ -297,10 +301,12 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
                 AM_DMX_Filter *filter = &(dev->filters[id]);
                 AM_DMX_DataCb cb;
                 void *data;
-                if (!AM_DMX_FILTER_MASK_ISSET(&mask, id))
+                if (!AM_DMX_FILTER_MASK_ISSET(&mask, id)) {
                     continue;
-                if (!filter->enable || !filter->used)
+                }
+                if (!filter->enable || !filter->used) {
                     continue;
+                }
                 sec_len = BUF_SIZE;
 
 #ifndef DMX_WAIT_CB
@@ -372,7 +378,6 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
                 {
                     sec = sec_buf;
                 }
-
                 if (cb && sec_len)
                 {
                     /*if (id && sec)

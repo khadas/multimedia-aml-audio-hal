@@ -415,6 +415,7 @@ typedef enum {
     AUDIO_OUTPUT_FLAG_MMAP_NOIRQ       = 0x4000,
     AUDIO_OUTPUT_FLAG_VOIP_RX          = 0x8000,
     AUDIO_OUTPUT_FLAG_INCALL_MUSIC     = 0x10000,
+    AUDIO_OUTPUT_FLAG_AD_STREAM        = 0x20000,
 } audio_output_flags_t;
 
 typedef enum {

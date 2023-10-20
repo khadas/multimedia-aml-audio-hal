@@ -25,6 +25,8 @@
 #include "audio_dtv_utils.h"
 #include "aml_audio_hal_avsync.h"
 #include "aml_dtvsync.h"
+#include "aml_audio_heaacparser.h"
+
 #ifdef BUILD_LINUX
 #include "compiler.h"
 #endif
@@ -278,10 +280,12 @@ struct aml_audio_patch {
     pthread_t audio_input_threadID;
     pthread_t audio_cmd_process_threadID;
     pthread_t audio_output_threadID;
+    pthread_t audio_ad_output_threadID;
     pthread_t audio_signal_detect_threadID;
     pthread_t audio_parse_threadID;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
+    pthread_cond_t ad_cond;
     void *in_buf;
     size_t in_buf_size;
     size_t numDecodedSamples;
@@ -295,6 +299,7 @@ struct aml_audio_patch {
     int cmd_process_thread_exit;
     int input_thread_exit;
     int output_thread_exit;
+    int ad_output_thread_exit;
     int signal_detect_thread_exit;
     void *audio_parse_para;
     audio_devices_t input_src;
@@ -358,6 +363,7 @@ struct aml_audio_patch {
     unsigned int dtv_decoder_ready;
     unsigned int input_thread_created;
     unsigned int output_thread_created;
+    unsigned int ad_output_thread_created;
     unsigned int decoder_offset ;
     unsigned int outlen_after_last_validpts;
     unsigned long last_valid_pts;
@@ -386,6 +392,7 @@ struct aml_audio_patch {
     unsigned int anchor_apts;
     unsigned int show_first_frame;
     pthread_mutex_t dtv_output_mutex;
+    pthread_mutex_t dtv_ad_output_mutex;
     pthread_mutex_t dtv_input_mutex;
     pthread_cond_t  dtv_cmd_process_cond;
     pthread_mutex_t dtv_cmd_process_mutex;
@@ -425,8 +432,11 @@ struct aml_audio_patch {
     int uio_fd;
     struct cmd_node *dtv_cmd_list;
     void *dtv_package_list;
+    void *dtv_ad_package_list;
     struct package *cur_package;
+    struct package *cur_ad_package;
     struct aml_stream_out * dtv_aml_out;
+    struct aml_stream_out * dtv_ad_aml_out;
     int sync_offset;
     int read_size;
     struct timespec start_ts;

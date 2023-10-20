@@ -113,6 +113,7 @@ add_library(audio_hal SHARED
 	aml_parser/aml_audio_ac4parser.c
 	aml_parser/aml_audio_bitsparser.c
 	aml_parser/aml_audio_matparser.c
+	aml_parser/aml_audio_heaacparser.c
 	aml_resampler/aml_audio_resample_manager.c
 	aml_resampler/aml_audio_resampler.c
 	aml_resampler/aml_resample_wrap.cpp

@@ -1105,10 +1105,15 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
         }
         if (pstPatch->cur_package)
         {
-            dprintf(fd, "[AML_HAL] data:%p,size %d,ad_data %p,ad_size %d,next %p,pts %lld,ad_pts %lld\n",
+            dprintf(fd, "[AML_HAL] main data:%p,size %d,next %p,pts %lldn",
                     pstPatch->cur_package->data,pstPatch->cur_package->size,
-                    pstPatch->cur_package->ad_data,pstPatch->cur_package->ad_size,
-                    pstPatch->cur_package->next,pstPatch->cur_package->pts,pstPatch->cur_package->ad_pts);
+                    pstPatch->cur_package->next,pstPatch->cur_package->pts);
+        }
+        if (pstPatch->cur_ad_package)
+        {
+            dprintf(fd, "[AML_HAL] ad data:%p,size %d,next %p,pts %lld\n",
+                    pstPatch->cur_ad_package->data,pstPatch->cur_ad_package->size,
+                    pstPatch->cur_ad_package->next,pstPatch->cur_ad_package->pts);
         }
         dprintf(fd, "[AML_HAL] demux_handle:%p,demux_info %p\n",
                 pstPatch->demux_handle,pstPatch->demux_info);

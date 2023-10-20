@@ -50,10 +50,6 @@ int dtv_package_list_flush(package_list *list)
             aml_audio_free(dtv_pacakge->data);
             dtv_pacakge->data = NULL;
         }
-        if (dtv_pacakge->ad_data) {
-            aml_audio_free(dtv_pacakge->ad_data);
-            dtv_pacakge->ad_data = NULL;
-        }
         aml_audio_free(dtv_pacakge);
         dtv_pacakge = NULL;
         list->pack_num--;
@@ -109,6 +105,23 @@ struct package * dtv_package_get(package_list *list)
     }
     pthread_mutex_unlock(&list->tslock);
     return p;
+}
+
+bool dtv_package_is_full(package_list *list)
+{
+    bool ret = false;
+    pthread_mutex_lock(&list->tslock);
+    ret = list->pack_num == INPUT_PACKAGE_MAXCOUNT;
+    pthread_mutex_unlock(&list->tslock);
+    return ret;
+}
+bool dtv_package_is_empty(package_list *list)
+{
+    bool ret = false;
+    pthread_mutex_lock(&list->tslock);
+    ret = list->pack_num == 0;
+    pthread_mutex_unlock(&list->tslock);
+    return ret;
 }
 
 void init_cmd_list(struct cmd_node *dtv_cmd_list)
@@ -199,14 +212,16 @@ AD_PACK_STATUS_T check_ad_package_status(int64_t main_pts, int64_t ad_pts, aml_d
     int timems_diff = llabs(main_pts - ad_pts) / 90;
 
     if (timems_diff > AD_PACK_STATUS_UNNORMAL_THRESHOLD_MS) {
-        ALOGI("timems_diff %d it is impossible so drop ad data ", timems_diff);
+        ALOGI("main_pts %lld ad_pts %lld timems_diff %d it is impossible so drop ad data ", main_pts, ad_pts, timems_diff);
         return AD_PACK_STATUS_DROP;
     }
     AD_PACK_STATUS_T ad_status = demux_info->ad_package_status;
     int drop_threshold_ms,drop_start_threshold_ms,hold_start_threshold_ms,hold_threshold_ms;
     bool is_dolby_format = (demux_info->main_fmt == ACODEC_FMT_AC3 ||
                             demux_info->main_fmt == ACODEC_FMT_EAC3||
-                            demux_info->main_fmt == ACODEC_FMT_AC4);
+                            demux_info->main_fmt == ACODEC_FMT_AC4 ||
+                            demux_info->main_fmt == ACODEC_FMT_AAC_LATM ||
+                            demux_info->main_fmt == ACODEC_FMT_AAC);
 
     if (is_dolby_format) {
        drop_threshold_ms = AD_PACK_STATUS_DROP_THRESHOLD_MS;
@@ -225,18 +240,18 @@ AD_PACK_STATUS_T check_ad_package_status(int64_t main_pts, int64_t ad_pts, aml_d
             if (main_pts >= ad_pts) {
                 timems_diff = (main_pts - ad_pts) / 90;
                 if ( timems_diff > drop_threshold_ms) {
-                    ALOGI("main and ad timems_diff %d ms  need drop ", timems_diff);
+                    ALOGI("%d main and ad timems_diff %d ms  need drop ", __LINE__, timems_diff);
                     ad_status = AD_PACK_STATUS_DROP;
                 } else if (timems_diff < hold_start_threshold_ms) {
                     if (is_dolby_format) {
-                        ALOGI("main and ad timems_diff %d ms  need hold ", timems_diff);
+                        ALOGI("%d main and ad timems_diff %d ms  need hold ", __LINE__, timems_diff);
                         ad_status = AD_PACK_STATUS_HOLD;
                     }
                 }
             } else {
                 timems_diff = (ad_pts - main_pts) / 90;
                 if (timems_diff > hold_threshold_ms) {
-                    ALOGI("ad ahead of main timems_diff %d ", timems_diff);
+                    ALOGI("%d ad ahead of main timems_diff %d ", __LINE__, timems_diff);
                     ad_status = AD_PACK_STATUS_HOLD;
                 }
             }
@@ -246,7 +261,7 @@ AD_PACK_STATUS_T check_ad_package_status(int64_t main_pts, int64_t ad_pts, aml_d
             if (main_pts > ad_pts) {
                 timems_diff = (main_pts - ad_pts) / 90;
                 if (timems_diff > drop_start_threshold_ms) {
-                    ALOGI("main and ad timems_diff %d ms  need drop ", timems_diff);
+                    ALOGI("%d main and ad timems_diff %d ms  need drop ", __LINE__, timems_diff);
                     ad_status = AD_PACK_STATUS_DROP;
                 } else {
                     ad_status = AD_PACK_STATUS_NORMAL;
@@ -267,7 +282,7 @@ AD_PACK_STATUS_T check_ad_package_status(int64_t main_pts, int64_t ad_pts, aml_d
             if (main_pts < ad_pts) {
                 timems_diff = (ad_pts - main_pts) / 90;
                 if (timems_diff >= 0) {
-                    ALOGI("ad ahead of main timems_diff %d ", timems_diff);
+                    ALOGI("%d ad ahead of main timems_diff %d ", __LINE__, timems_diff);
                 }
                 ad_status = AD_PACK_STATUS_HOLD;
             } else {
@@ -278,6 +293,7 @@ AD_PACK_STATUS_T check_ad_package_status(int64_t main_pts, int64_t ad_pts, aml_d
                 } else if (timems_diff >= hold_threshold_ms) {
                     if (is_dolby_format) {
                         ad_status = AD_PACK_STATUS_DROP;
+                        ALOGI("%d timems_diff %d, drop!", __LINE__, timems_diff);
                     } else {
                         ad_status = AD_PACK_STATUS_NORMAL;
                     }

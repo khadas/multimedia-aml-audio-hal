@@ -93,7 +93,7 @@ AM_Dmx_Audio_ErrorCode_t Init_Dmx_AD_Audio(void *demux_handle, int fmt, int pid,
         ALOGI("demux not open !!!");
         return AM_AUDIO_Dmx_ERROR;
     }
-    ALOGI("%s fmt %d pid %d ",__FUNCTION__, fmt, pid);
+    ALOGI("%s fmt %d pid %d pesmode %d",__FUNCTION__, fmt, pid, pesmode);
     demux_wrapper->AmDemuxWrapperOpenAD(pid, fmt, pesmode);
     return AM_AUDIO_Dmx_SUCCESS;
 }
