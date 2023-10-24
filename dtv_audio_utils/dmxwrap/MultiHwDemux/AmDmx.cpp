@@ -164,6 +164,7 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_handlePESpacket(AM_DMX_Device *dev, AM_DMX_
    findbuf[1]=0xff;
    findbuf[2]=0xff;
    findbuf[3]=0xff;
+   *eslen = 0;
    do {
       memset(findbuf+AUDIO_STARTLEN,0,ulen);
       ret  = dev->drv->dvb_read(dev, filter, findbuf+AUDIO_STARTLEN, &ulen);
@@ -209,10 +210,8 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_handlePESpacket(AM_DMX_Device *dev, AM_DMX_
     //ALOGI("PES_START  %x \n",PESbuffer[ii]);
     }
 
-    pPES_HEADER_tag ppeh=(pPES_HEADER_tag)&PESbuffer[0];
-    char dd[6] = {0};
-    sprintf(dd,"0x%x%x", ppeh->PES_packet_length[0], ppeh->PES_packet_length[1]);
-    int PES_packet_length= strtol(dd, NULL, 16);
+    pPES_HEADER_tag ppeh = (pPES_HEADER_tag)&PESbuffer[0];
+    unsigned int PES_packet_length = ((ppeh->PES_packet_length[0] << 8) | ppeh->PES_packet_length[1]);
 
     int needreadlen= PES_packet_length -(hassize-PES_START_LEN);
     {
@@ -374,7 +373,7 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
                     sec = sec_buf;
                 }
 
-                if (cb)
+                if (cb && sec_len)
                 {
                     /*if (id && sec)
                     ALOGI("filter %d data callback len fd:%ld len:%d, %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
