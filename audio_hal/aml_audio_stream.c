@@ -19,6 +19,10 @@
 #include <cutils/log.h>
 #include <tinyalsa/asoundlib.h>
 #include <cutils/properties.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 
 #include "aml_alsa_mixer.h"
 #include "aml_audio_stream.h"
@@ -52,6 +56,18 @@ static audio_format_t ms12_max_support_output_format() {
 #else
     return AUDIO_FORMAT_E_AC3;
 #endif
+}
+
+int get_file_size(char *name)
+{
+    struct stat statbuf;
+    int ret;
+
+    ret = stat(name, &statbuf);
+    if (ret != 0)
+        return -1;
+
+    return statbuf.st_size;
 }
 
 static pthread_mutex_t g_volume_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -904,19 +920,35 @@ static const char *write_func_to_str(enum stream_write_func func)
 void aml_stream_out_dump(struct aml_stream_out *aml_out, int fd)
 {
     if (aml_out) {
-        dprintf(fd, "    usecase: %s\n", usecase2Str(aml_out->usecase));
-        dprintf(fd, "    out device: %#x\n", aml_out->out_device);
-        dprintf(fd, "    tv source stream: %d\n", aml_out->tv_src_stream);
-        dprintf(fd, "    format: %#x\n", aml_out->hal_internal_format);
-        dprintf(fd, "    paused: %d\n", aml_out->pause_status);
-        dprintf(fd, "    status: %d\n", aml_out->status);
-        dprintf(fd, "    standby: %d\n", aml_out->standby);
-        dprintf(fd, "    vol: %f, org vol:%f\n", aml_out->volume_l, aml_out->volume_l_org);
-        dprintf(fd, "    write function: %s\n", write_func_to_str(aml_out->write_func));
+        dprintf(fd, "\t\t-usecase: %s\n", usecase2Str(aml_out->usecase));
+        dprintf(fd, "\t\t-out device: %#x\n", aml_out->out_device);
+        dprintf(fd, "\t\t-standby: %s\n", aml_out->standby?"true":"false");
+        if (aml_out->is_normal_pcm) {
+            dprintf(fd, "\t\t-normal pcm: %s\n",
+                write_func_to_str(aml_out->write_func));
+        }
+
+        uint64_t frames;
+        struct timespec timestamp;
+        aml_out->stream.get_presentation_position((const struct audio_stream_out *)aml_out, &frames, &timestamp);
+        dprintf(fd, "\t\t-presentaion_position:%llu    | sec:%ld  nsec:%ld\n", frames, timestamp.tv_sec, timestamp.tv_nsec);
     }
 }
 
-void aml_audio_port_config_dump(struct audio_port_config *port_config, int fd)
+void aml_adev_stream_out_dump(struct aml_audio_device *aml_dev, int fd) {
+    dprintf(fd, "\n-------------[AML_HAL] StreamOut --------------------------------\n");
+    dprintf(fd, "[AML_HAL]    usecase_masks: %#x\n", aml_dev->usecase_masks);
+    dprintf(fd, "[AML_HAL]    stream outs:\n");
+    for (int i = 0; i < STREAM_USECASE_MAX ; i++) {
+        struct aml_stream_out *aml_out = aml_dev->active_outputs[i];
+        if (aml_out) {
+            dprintf(fd, "\tout: %d, pointer: %p\n", i, aml_out);
+            aml_stream_out_dump(aml_out, fd);
+        }
+    }
+}
+
+static aml_audio_port_config_dump(struct audio_port_config *port_config, int fd)
 {
     if (port_config == NULL)
         return;
@@ -935,7 +967,7 @@ void aml_audio_port_config_dump(struct audio_port_config *port_config, int fd)
     }
 }
 
-void aml_audio_patch_dump(struct audio_patch *patch, int fd)
+static aml_audio_patch_dump(struct audio_patch *patch, int fd)
 {
     int i = 0;
 
@@ -951,14 +983,14 @@ void aml_audio_patch_dump(struct audio_patch *patch, int fd)
     }
 }
 
-void aml_audio_patches_dump(struct aml_audio_device* aml_dev, int fd)
+static aml_audio_patches_dump(struct aml_audio_device* aml_dev, int fd)
 {
     struct audio_patch_set *patch_set = NULL;
     struct audio_patch *patch = NULL;
     struct listnode *node = NULL;
     int i = 0;
 
-    dprintf(fd, "\nAML Audio Patches:\n");
+    dprintf(fd, "\n-------------[AML_HAL] Registered Audio Patches------------------\n");
     list_for_each(node, &aml_dev->patch_list) {
         dprintf(fd, "  patch %d:", i);
         patch_set = node_to_item (node, struct audio_patch_set, list);
@@ -974,7 +1006,7 @@ int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd)
     struct aml_stream_in *in = aml_dev->active_input;
     struct aml_audio_patch *patch = aml_dev->audio_patch;
 
-    dprintf(fd, "-------------[AML_HAL] audio Latency--------------------------\n");
+    dprintf(fd, "\n-------------[AML_HAL] audio patch Latency-----------------------\n");
 
     if (patch) {
         aml_dev_sample_audio_path_latency(aml_dev, NULL);
@@ -996,14 +1028,14 @@ int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd)
     return 0;
 }
 
-void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
+static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
 {
     struct aml_audio_patch *pstPatch = aml_dev->audio_patch;
     if (NULL == pstPatch) {
-        dprintf(fd, "-------------[AML_HAL] audio patch [not create]-----------\n");
+        dprintf(fd, "\n-------------[AML_HAL] audio device patch [not create]-----------\n");
         return;
     }
-    dprintf(fd, "-------------[AML_HAL] audio patch [%p]---------------\n", pstPatch);
+    dprintf(fd, "\n-------------[AML_HAL] audio device patch [%p]---------------\n", pstPatch);
     if (pstPatch->aml_ringbuffer.size != 0) {
         uint32_t u32FreeBuffer = get_buffer_write_space(&pstPatch->aml_ringbuffer);
         dprintf(fd, "[AML_HAL]      RingBuf   size: %10d Byte|  UnusedBuf:%10d Byte(%d%%)\n",
@@ -1131,8 +1163,86 @@ void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
         }
     }
     dprintf(fd, "-------------[AML_HAL] End DTV patch [%p]---------------\n", pstPatch);
+}
 
+void aml_adev_audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
+{
+    //android registered audio patch info dump
+    aml_audio_patches_dump(aml_dev, fd);
+    //aml audio device patch detail dump
+    audio_patch_dump(aml_dev, fd);
+}
 
+void aml_decoder_info_dump(struct aml_audio_device *adev, int fd)
+{
+    dprintf(fd, "\n-------------[AML_HAL] licence decoder --------------------------\n");
+    dprintf(fd, "[AML_HAL]    dolby_lib: %d\n", adev->dolby_lib_type);
+    dprintf(fd, "[AML_HAL]    MS12 library size:\n");
+    dprintf(fd, "             \t-V2 Encrypted: %d\n", get_file_size("/usr/lib/libdolbyms12.so"));
+    dprintf(fd, "             \t-V2 Decrypted: %d\n", get_file_size("/tmp/ds/0x4d_0x5331_0x32.so"));
+    dprintf(fd, "             \t-V1 Encrypted: %d\n", get_file_size("/oem/lib/libdolbyms12.so"));
+    dprintf(fd, "             \t-V1 Decrypted: %d\n", get_file_size("/odm/lib/libdolbyms12.so"));
+    dprintf(fd, "[AML_HAL]    DDP library size:\n");
+    dprintf(fd, "             \t-lib32: %d\n", get_file_size("/usr/lib/libHwAudio_dcvdec.so"));
+    dprintf(fd, "             \t-lib64: %d\n", get_file_size("/odm/lib64/libHwAudio_dcvdec.so"));
+    dprintf(fd, "[AML_HAL]    DTS library size:\n");
+    dprintf(fd, "             \t-lib32: %d\n", get_file_size("/odm/lib/libHwAudio_dtshd.so"));
+    dprintf(fd, "             \t-lib64: %d\n", get_file_size("/odm/lib64/libHwAudio_dtshd.so"));
+}
+
+void aml_alsa_device_status_dump(struct aml_audio_device* aml_dev, int fd) {
+    dprintf(fd, "\n-------------[AML_HAL]  ALSA devices status ---------------\n");
+    bool stream_using = false;
+    /* StreamOut using alsa devices list */
+    for (int i = 0; i < ALSA_DEVICE_CNT; i++) {
+        pthread_mutex_lock(&aml_dev->lock);
+        pthread_mutex_lock(&aml_dev->alsa_pcm_lock);
+        struct pcm *pcm_1 = aml_dev->pcm_handle[i];
+        void *alsa_handle = aml_dev->alsa_handle[i];
+        if (!pcm_1 && !alsa_handle) {
+            pthread_mutex_unlock(&aml_dev->alsa_pcm_lock);
+            pthread_mutex_unlock(&aml_dev->lock);
+            continue;
+        }
+
+        if (!stream_using) {
+            dprintf(fd, "  [AML_HAL] StreamOut using PCM list:\n");
+            stream_using = true;
+        }
+
+        if (pcm_1) {
+            aml_alsa_pcm_info_dump(pcm_1, fd);
+        }
+
+        if (alsa_handle) {
+            struct pcm* pcm_2 = (struct pcm*) get_internal_pcm(alsa_handle);
+            aml_alsa_pcm_info_dump(pcm_2, fd);
+        }
+        pthread_mutex_unlock(&aml_dev->alsa_pcm_lock);
+        pthread_mutex_unlock(&aml_dev->lock);
+    }
+    if (!stream_using) {
+        dprintf(fd, "  [AML_HAL] StreamOut using PCM list: None!\n");
+    }
+
+    /* Mixer outport using alsa devices list */
+    mixer_using_alsa_device_dump(fd, aml_dev);
+
+    /* StreamIn using alsa devices list */
+    pthread_mutex_lock(&aml_dev->lock);
+    stream_using = false;
+    if (aml_dev->active_input) {
+        struct pcm *pcm = aml_dev->active_input->pcm;
+        if (pcm) {
+            stream_using = true;
+            dprintf(fd, "  [AML_HAL] StreamIn using PCM list:\n");
+            aml_alsa_pcm_info_dump(pcm, fd);
+        }
+    }
+    if (!stream_using) {
+       dprintf(fd, "  [AML_HAL] StreamIn using PCM list: None!\n");
+    }
+    pthread_mutex_unlock(&aml_dev->lock);
 }
 
 bool is_use_spdifb(struct aml_stream_out *out) {

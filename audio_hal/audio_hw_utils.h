@@ -182,5 +182,6 @@ static inline void endian16_convert(void *buf, int size)
     }
 }
 
+void aml_alsa_pcm_info_dump(struct pcm* pcm, int fd);
 
 #endif

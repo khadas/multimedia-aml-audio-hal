@@ -479,13 +479,12 @@ hdmiin_audio_packet_t get_hdmiin_audio_packet(struct aml_mixer_handle *mixer_han
 /* dumpsys media.audio_flinger interfaces */
 const char *audio_port_role_to_str(audio_port_role_t role);
 const char *audio_port_type_to_str(audio_port_type_t type);
-void aml_stream_out_dump(struct aml_stream_out *aml_out, int fd);
-void aml_audio_port_config_dump(struct audio_port_config *port_config, int fd);
-void aml_audio_patch_dump(struct audio_patch *patch, int fd);
-void aml_audio_patches_dump(struct aml_audio_device* aml_dev, int fd);
+void aml_adev_stream_out_dump(struct aml_audio_device *aml_dev, int fd);
+void aml_decoder_info_dump(struct aml_audio_device *adev, int fd);
 int aml_dev_dump_latency(struct aml_audio_device *aml_dev, int fd);
-void audio_patch_dump(struct aml_audio_device* aml_dev, int fd);
+void aml_adev_audio_patch_dump(struct aml_audio_device* aml_dev, int fd);
 void audio_hal_info_dump(struct aml_audio_device* aml_dev, int fd);
+void aml_alsa_device_status_dump(struct aml_audio_device* aml_dev, int fd);
 bool is_use_spdifb(struct aml_stream_out *out);
 bool is_dolby_ms12_support_compression_format(audio_format_t format);
 bool is_direct_stream_and_pcm_format(struct aml_stream_out *out);

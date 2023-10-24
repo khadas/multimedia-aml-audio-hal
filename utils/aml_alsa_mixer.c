@@ -331,4 +331,118 @@ int aml_mixer_ctrl_set_str(struct aml_mixer_handle *mixer_handle, int mixer_id, 
     return 0;
 }
 
+static void print_enum(struct mixer_ctl *ctl, int fd)
+{
+    unsigned int num_enums;
+    unsigned int i;
+    unsigned int value;
+    const char *string;
 
+    num_enums = mixer_ctl_get_num_enums(ctl);
+    value = mixer_ctl_get_value(ctl, 0);
+
+    for (i = 0; i < num_enums; i++) {
+        string = mixer_ctl_get_enum_string(ctl, i);
+        dprintf(fd, "%s%s, ", value == i ? "> " : "", string);
+    }
+}
+
+static void print_control_values(struct mixer_ctl *control, int fd)
+{
+    enum mixer_ctl_type type;
+    unsigned int num_values;
+    unsigned int i;
+    int min, max;
+    int ret;
+    char *buf = NULL;
+    unsigned int tlv_header_size = 0;
+
+    type = mixer_ctl_get_type(control);
+    num_values = mixer_ctl_get_num_values(control);
+    if ((type == MIXER_CTL_TYPE_BYTE) && (num_values > 0)) {
+        if (mixer_ctl_is_access_tlv_rw(control) != 0) {
+            tlv_header_size = TLV_HEADER_SIZE;
+        }
+        buf = calloc(1, num_values + tlv_header_size);
+        if (buf == NULL) {
+            ALOGE("Failed to alloc mem for bytes %u", num_values);
+            return;
+        }
+        ret = mixer_ctl_get_array(control, buf, num_values + tlv_header_size);
+        if (ret < 0) {
+            ALOGE("Failed to mixer_ctl_get_array");
+            free(buf);
+            return;
+        }
+    }
+
+    for (i = 0; i < num_values; i++) {
+        switch (type)
+        {
+        case MIXER_CTL_TYPE_INT:
+            dprintf(fd,"%d", mixer_ctl_get_value(control, i));
+            break;
+        case MIXER_CTL_TYPE_BOOL:
+            dprintf(fd,"%s", mixer_ctl_get_value(control, i) ? "On" : "Off");
+            break;
+        case MIXER_CTL_TYPE_ENUM:
+            print_enum(control, fd);
+            break;
+        case MIXER_CTL_TYPE_BYTE:
+            dprintf(fd,"%02hhx", buf[i]);
+            break;
+        default:
+            dprintf(fd,"unknown");
+            break;
+        };
+        if ((i + 1) < num_values) {
+           dprintf(fd, ", ");
+        }
+    }
+
+    if (type == MIXER_CTL_TYPE_INT) {
+        min = mixer_ctl_get_range_min(control);
+        max = mixer_ctl_get_range_max(control);
+        dprintf(fd, " (range %d->%d)", min, max);
+    }
+
+    free(buf);
+}
+
+
+void aml_alsa_mixer_status_dump(struct aml_mixer_handle *mixer_handle, int fd)
+{
+    dprintf(fd, "\n-------------[AML_HAL] ALSA mxier ctrl ------------------------\n");
+
+    struct mixer_ctl *ctl;
+    const char *name, *type;
+    unsigned int num_ctls, num_values;
+    unsigned int i;
+    //struct aml_mixer_handle *aml_mixer = &adev->alsa_mixer;
+    struct aml_mixer_handle *aml_mixer = mixer_handle;
+
+    if (!aml_mixer->pMixer) {
+        ALOGW("%s() Warning! mixer = NULL!, return!", __func__);
+        return;
+    }
+
+    num_ctls = mixer_get_num_ctls(aml_mixer->pMixer);
+
+    dprintf(fd,"Number of controls: %u\n", num_ctls);
+
+    dprintf(fd,"ctl\ttype\tnum\t%-40svalue\n", "name");
+
+    for (i = 0; i < num_ctls; i++) {
+        ctl = mixer_get_ctl(aml_mixer->pMixer, i);  //ask one mixer_ctrl
+
+        name = mixer_ctl_get_name(ctl);
+        type = mixer_ctl_get_type_string(ctl);
+        num_values = mixer_ctl_get_num_values(ctl);
+        dprintf(fd, "%u\t%s\t%u\t%-40s", i, type, num_values, name);
+
+        pthread_mutex_lock(&aml_mixer->lock);
+        print_control_values(ctl, fd);
+        pthread_mutex_unlock(&aml_mixer->lock);
+        dprintf(fd, "\n");
+    }
+}

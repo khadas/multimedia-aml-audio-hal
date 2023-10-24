@@ -267,6 +267,14 @@ unsigned int pcm_get_buffer_size(struct pcm *pcm)
     return pcm->buffer_size;
 }
 
+int pcm_get_config(struct pcm *pcm, struct pcm_config *config) {
+    if (pcm == NULL) {
+        return -1;
+    }
+    *config = pcm->config;
+    return 0;
+}
+
 const char* pcm_get_error(struct pcm *pcm)
 {
     return pcm->error;

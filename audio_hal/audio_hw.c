@@ -5668,6 +5668,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+
 #ifdef BUILD_LINUX
     ret = str_parms_get_str(parms, "setenv", value, sizeof(value));
     if (ret >= 0) {
@@ -10861,7 +10862,7 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     aml_dev->debug_flag = aml_audio_get_debug_flag();
     dprintf(fd, "AUDIO_HAL_GIT_VERSION %s\n",libVersion_audio_hal);
 
-    dprintf(fd, "\n----------------------------[AML_HAL] primary audio hal[dev:%p]----------------------------\n", aml_dev);
+    dprintf(fd, "\n-------------[AML_HAL] primary audio hal[dev:%p]------------------\n", aml_dev);
     while (retry > 0 && pthread_mutex_trylock(&aml_dev->lock) != 0) {
         usleep(kSleepTimeMS * 1000);
         retry--;
@@ -10893,28 +10894,18 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     if (audio_ease && fabs(audio_ease->current_volume) <= 1e-6) {
         dprintf(fd, "[AML_HAL] ease out muted. start:%f target:%f\n", audio_ease->start_volume, audio_ease->target_volume);
     }
-    dprintf(fd, "[AML_HAL]      dolby_lib: %d\n", aml_dev->dolby_lib_type);
     dprintf(fd, "[AML_HAL]      master volume: %10f, mute: %d\n", aml_dev->master_volume, aml_dev->master_mute);
-    dprintf(fd, "\n[AML_HAL]      usecase_masks: %#x\n", aml_dev->usecase_masks);
-    dprintf(fd, "\nAML stream outs:\n");
+    aml_decoder_info_dump(aml_dev, fd);
+    aml_adev_stream_out_dump(aml_dev, fd);
 
-    for (i = 0; i < STREAM_USECASE_MAX ; i++) {
-        aml_out = aml_dev->active_outputs[i];
-        if (aml_out) {
-            dprintf(fd, "  out: %d, pointer: %p\n", i, aml_out);
-            aml_stream_out_dump(aml_out, fd);
-        }
-    }
 #ifdef AML_MALLOC_DEBUG
-    aml_audio_debug_malloc_showinfo(MEMINFO_SHOW_PRINT);
+        aml_audio_debug_malloc_showinfo(MEMINFO_SHOW_PRINT);
 #endif
-    if (aml_dev->useSubMix) {
-        subMixingDump(fd, aml_dev);
-    }
 
-    aml_audio_patches_dump(aml_dev, fd);
-    audio_patch_dump(aml_dev, fd);
+    aml_adev_audio_patch_dump(aml_dev, fd);
     audio_hal_info_dump(aml_dev, fd);
+    aml_alsa_device_status_dump(aml_dev, fd);
+    aml_alsa_mixer_status_dump(&aml_dev->alsa_mixer, fd);
 
 //#ifdef ENABLE_BT_A2DP
 #ifndef BUILD_LINUX
@@ -10935,7 +10926,7 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     close(fd);
     unlink("/tmp/haldump");
 #endif
-
+    dprintf(fd, "\n-------------[AML_HAL] primary audio hal End---------------------\n");
     return string;
 }
 

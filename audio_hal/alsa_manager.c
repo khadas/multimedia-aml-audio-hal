@@ -1095,6 +1095,13 @@ int aml_alsa_output_getinfo(void *handle, alsa_info_type_t type, alsa_output_inf
     return -1;
 }
 
+void *get_internal_pcm(void *handle) {
+    if (!handle) {
+        return NULL;
+    }
+    return ((alsa_handle_t *)handle)->pcm;
+}
+
 int aml_alsa_output_pause_new(void *handle) {
     int ret = -1;
     alsa_handle_t * alsa_handle = (alsa_handle_t *)handle;

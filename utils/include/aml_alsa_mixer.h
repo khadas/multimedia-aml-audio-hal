@@ -328,6 +328,7 @@ int aml_mixer_get_spdifin_type(int mixer_id);
 int aml_mixer_ctrl_set_array(struct aml_mixer_handle *mixer_handle, int mixer_id, void *array, int count);
 int aml_mixer_ctrl_set_int(struct aml_mixer_handle *mixer_handle, int mixer_id, int value);
 int aml_mixer_ctrl_set_str(struct aml_mixer_handle *mixer_handle, int mixer_id, char *value);
+void aml_alsa_mixer_status_dump(struct aml_mixer_handle *mixer_handle, int fd);
 
 #ifdef __cplusplus
 }
