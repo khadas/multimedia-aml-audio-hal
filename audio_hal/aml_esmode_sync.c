@@ -578,7 +578,8 @@ sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_
 
     if (!(MEDIA_SYNC_ESMODE(aml_out)))
     {
-        return;
+        ALOGE("aml_out->hwsync:%p, aml_out->hw_sync_mode:%d, aml_out->avsync_type:%d error!", aml_out->hwsync, aml_out->hw_sync_mode, aml_out->avsync_type);
+        return ESSYNC_AUDIO_OUTPUT;
     }
 
     pthread_mutex_lock(&aml_out->hwsync->lock);
@@ -676,7 +677,8 @@ sync_process_res  aml_hwmediasync_nonms12_process(struct audio_stream_out *strea
 
     if (!(MEDIA_SYNC_ESMODE(aml_out)))
     {
-        return;
+        ALOGE("aml_out->hwsync:%p, aml_out->hw_sync_mode:%d, aml_out->avsync_type:%d error!", aml_out->hwsync, aml_out->hw_sync_mode, aml_out->avsync_type);
+        return ESSYNC_AUDIO_OUTPUT;
     }
 
     if (aml_out->hwsync->es_mediasync.duration == 0 ||

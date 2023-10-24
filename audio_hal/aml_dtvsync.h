@@ -26,8 +26,9 @@
 //#define SYSTIME_CORRECTION_THRESHOLD        (90000*10/100)
 
 typedef enum {
-    DTVSYNC_AUDIO_DROP = 0,
-    DTVSYNC_AUDIO_OUTPUT,
+    DTVSYNC_AUDIO_DROP   = 0,
+    DTVSYNC_AUDIO_OUTPUT = 1,
+    DTVSYNC_AUDIO_EXIT   = 2,
 } dtvsync_process_res;
 
 void* aml_dtvsync_create();

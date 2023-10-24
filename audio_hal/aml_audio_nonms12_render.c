@@ -435,8 +435,14 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
                         }
                         dtvsync_process_res process_result = DTVSYNC_AUDIO_OUTPUT;
                         process_result = aml_dtvsync_nonms12_process(stream, duration, &speed_enabled);
-                        if (process_result == DTVSYNC_AUDIO_DROP)
+                        if (DTVSYNC_AUDIO_EXIT == process_result)
+                        {
+                            break;
+                        }
+                        else if (DTVSYNC_AUDIO_DROP == process_result)
+                        {
                             continue;
+                        }
                     }
                     else if (MEDIA_SYNC_ESMODE(aml_out))
                     {

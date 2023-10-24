@@ -542,9 +542,9 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                 int wait_count = 0;
                 while ((0 != patch->output_thread_created) || (0 != patch->input_thread_created))
                 {
-                    aml_audio_sleep(20000); //20ms
+                    aml_audio_sleep(10000); //10ms
                     wait_count++;
-                    if (50 < wait_count)
+                    if (100 < wait_count)
                     {
                         ALOGI("[%s:%d], 1s timeout break!!!", __func__, __LINE__);
                         break;
@@ -3883,6 +3883,7 @@ static int release_dtv_output_stream_thread(struct aml_audio_patch *patch)
     ALOGI("++%s   ---- %d\n", __FUNCTION__, patch->output_thread_created);
     if (patch->output_thread_created == 1) {
         patch->output_thread_exit = 1;
+        pthread_cond_signal(&patch->cond);
         pthread_join(patch->audio_output_threadID, NULL);
         pthread_mutex_destroy(&patch->dtv_output_mutex);
         patch->output_thread_created = 0;
@@ -4181,8 +4182,6 @@ int release_dtv_patch(struct aml_audio_device *aml_dev)
 {
     int ret = 0;
     aml_dtv_audio_instances_t *dtv_instances = (aml_dtv_audio_instances_t *)aml_dev->aml_dtv_audio_instances;
-    dtv_do_ease_out(aml_dev);
-
     pthread_mutex_lock(&aml_dev->patch_lock);
     if (aml_dev->patch_src == SRC_DTV && dtv_instances->dvb_path_count > 0) {
         dtv_instances->dvb_path_count--;
