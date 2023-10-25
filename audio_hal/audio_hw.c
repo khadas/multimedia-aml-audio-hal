@@ -7589,7 +7589,7 @@ ssize_t hw_write (struct audio_stream_out *stream
         ALOGI("%s() stream(%p) pcm handle %p format input %#x output %#x 61937 frame %d",
               __func__, stream, aml_out->pcm, aml_out->hal_internal_format, output_format, is_iec61937_format(stream));
 
-        if (eDolbyMS12Lib == adev->dolby_lib_type) {
+        if (eDolbyMS12Lib == adev->dolby_lib_type && adev->debug_flag) {
             //ms12 internal buffer avail(main/associate/system)
             if (adev->ms12.dolby_ms12_enable == true) {
                 ALOGI("%s MS12 buffer avail main %d associate %d system %d\n",
