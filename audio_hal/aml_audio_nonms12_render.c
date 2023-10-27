@@ -334,6 +334,8 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
 
             // write pcm data
             if (dec_pcm_data->data_len > 0) {
+                if (aml_dec->format == AUDIO_FORMAT_PCM_32_BIT)
+                    aml_out->config.format = PCM_FORMAT_S16_LE;
                 // aml_audio_dump_audio_bitstreams("/data/dec_data.raw", dec_pcm_data->buf, dec_pcm_data->data_len);
                 out_frames = dec_pcm_data->data_len /( 2 * dec_pcm_data->data_ch);
                 aml_dec->out_frame_pts = dec_pcm_data->pts;

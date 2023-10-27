@@ -530,6 +530,19 @@ static aml_dec_return_type_t u8pcm_process(aml_dec_t * aml_dec, const char*buffe
     return AML_DEC_RETURN_TYPE_OK;
 }
 
+static void pcm32bit_to_16bit (void *in_buf, void *out_buf, int bytes, int audio_format)
+{
+    if (audio_format == AUDIO_FORMAT_PCM_32_BIT) {
+        int32_t *input32 = (int32_t *)in_buf;
+        int16_t *output16 = (int16_t *)out_buf;
+        int i = 0;
+        for (i = 0; i < bytes / sizeof(int32_t); i++) {
+            output16[i] = (int16_t)((input32[i] >> 16) & 0xffff);
+        }
+    }
+    return;
+}
+
 static int pcm_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
 {
     struct pcm_dec_t *pcm_dec = NULL;
@@ -591,8 +604,13 @@ static int pcm_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer
 
 
         if (pcm_config->channel == 2) {
-            /*now we only support bypass PCM data*/
-            memcpy(dec_pcm_data->buf, buffer, bytes);
+            if (pcm_config->pcm_format == AUDIO_FORMAT_PCM_32_BIT) {
+                pcm32bit_to_16bit(buffer, dec_pcm_data->buf, bytes, pcm_config->pcm_format);
+                downmix_size = downmix_size / 2;
+            } else {
+                /*now we only support bypass PCM data*/
+                memcpy(dec_pcm_data->buf, buffer, bytes);
+            }
         } else if (pcm_config->channel == 4) {
             downmix_4ch_to_2ch(buffer, dec_pcm_data->buf, bytes, pcm_config->pcm_format);
         } else if (pcm_config->channel == 6) {

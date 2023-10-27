@@ -151,6 +151,7 @@ static inline bool is_digital_raw_format(audio_format_t format)
     case AUDIO_FORMAT_VORBIS:
     case AUDIO_FORMAT_FLAC:
     case AUDIO_FORMAT_PCM_LPCM_BLURAY:
+    case AUDIO_FORMAT_PCM_32_BIT:
         return true;
     default:
         return false;
