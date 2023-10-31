@@ -4358,6 +4358,7 @@ static void set_device_connect_state(struct aml_audio_device *adev, struct str_p
         if (audio_is_output_device(device)) {
             if ((device & AUDIO_DEVICE_OUT_HDMI_ARC) || (device & AUDIO_DEVICE_OUT_HDMI)) {
                 adev->bHDMIConnected = 0;
+                adev->is_hdmi_arc_interact_done = false;
                 adev->bHDMIConnected_update = 1;
                 memset(adev->last_arc_hdmi_array, 0, EDID_ARRAY_MAX_LEN);
                 adev->hdmi_descs.pcm_fmt.max_channels = 2;
@@ -6102,7 +6103,6 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         return strdup(temp_buf);
     }
     else if (strstr (keys, "get_arc_capability")) {
-        ALOGI("capability: %s", get_arc_capability(adev));
         return strdup(get_arc_capability(adev));
     }
     return strdup("");
@@ -11035,6 +11035,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->hw_device.get_audio_port = adev_get_audio_port;
     adev->hw_device.dump = adev_dump;
     adev->hdmi_format = AUTO;
+    adev->is_hdmi_arc_interact_done = false;
 
     card = alsa_device_get_card_index();
     if ((card < 0) || (card > 7)) {

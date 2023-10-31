@@ -675,6 +675,8 @@ struct aml_audio_device {
     /* -End- */
 
     bool user_setting_scaletempo;
+
+    bool is_hdmi_arc_interact_done;
 };
 
 struct meta_data {
