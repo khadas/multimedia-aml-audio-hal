@@ -196,7 +196,7 @@ re_write:
 
     int size = dolby_ms12_get_main_buffer_avail(NULL);
     dolby_ms12_get_pcm_output_size(&all_pcm_len2, &all_zero_len);
-    if (patch && patch->skip_amadec_flag)
+    if (patch)
         patch->decoder_offset += remain_size + write_bytes - size;
 
 exit:

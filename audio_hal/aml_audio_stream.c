@@ -1127,7 +1127,7 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
                     tm->ad_package_status,tm->mEsData,tm->mADEsData,tm->dtv_package,tm->ad_fade,tm->ad_pan);
         }
         dprintf(fd, "-------------[AML_HAL] DTV patch outstream [%p]---------------\n", pstPatch);
-        if (pstPatch->skip_amadec_flag &&  pstPatch->dtv_aml_out)
+        if (pstPatch->dtv_aml_out)
         {
             struct aml_stream_out * dtv_aml_out = pstPatch->dtv_aml_out;
             aml_dec_t *aml_dec= dtv_aml_out->aml_dec;

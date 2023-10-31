@@ -39,7 +39,7 @@ add_definitions(-DUSE_DEFAULT_STDLIB  -DUSE_VORBIS_DECODER)
 target_include_directories(vorbis-ahal PRIVATE
     ${PROJECT_SOURCE_DIR}/audio_codec/libvorbis
     ${PROJECT_SOURCE_DIR}/audio_codec/libvorbis/Tremolo
-    ${PROJECT_SOURCE_DIR}/amadec)
+	${PROJECT_SOURCE_DIR}/aml_adecs)
 
 #target_link_libraries(vorbis-ahal
 #    libutils libz libbinder libdl libcutils libc liblog)

@@ -30,10 +30,6 @@ TARGET_OBJS= utils/tsp_utils.o \
     avutils/amsysfsutils.o \
     avutils/amconfigutils.o
 
-ifeq ($(rm_amadec),n)
-TARGET_OBJS+= audio_data_read/audio_dtv_ad.o
-endif
-
 TARGET=libdvbaudioutils.so
 
 INSTALL_DIR=${LIB_DIR}
@@ -46,7 +42,7 @@ SRC?=$(TOPDIR)
 CFLAGS+=-O2 -fPIC -g
 CFLAGS+=-I$(SRC)/dmxwrap -I$(SRC)/include -I$(SRC)/utils -I$(SRC)/../utils/include -I$(SRC)/../include \
 	-I$(SRC)/dmxwrap/HwDemux -I$(SRC)/dmxwrap/MultiHwDemux -I$(SRC)/audio_read_api \
-	-I$(SRC)/sync -I$(SRC)/../amadec/include  -I$(SRC)/../amadec -I$(SRC)/avutils
+	-I$(SRC)/sync -I$(SRC)/avutils
 CFLAGS+=-I$(SRC)/../include/basic_utils
 
 %.o:%.c $(DEPS)

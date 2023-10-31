@@ -5,8 +5,6 @@ project(aml_audio_hal
 
 include(GNUInstallDirs)
 execute_process(COMMAND sh version_config.sh WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-#add_subdirectory("audio_codec/libfaad")
-#add_subdirectory("audio_codec/libmad")
 add_subdirectory("audio_codec/libvorbis")
 add_subdirectory("audio_codec/libdts")
 add_subdirectory("audio_codec/libdcv")
@@ -45,7 +43,6 @@ option(USE_DIAG_LOG "Support diagnostic logging for RDK" OFF)
 option(USE_MEDIA_INFO "Support media info API reporting" OFF)
 option(USE_MS12_V26 "Use MS12 v2.6" OFF)
 option(USE_MSYNC "Compile with MSYNC option" ON)
-option(USE_AMADEC "Use amadec" OFF)
 
 if(USE_MS12_V26)
 add_subdirectory("libms12_v26")
@@ -62,21 +59,11 @@ endif()
 if(USE_DTV)
     list(APPEND DTV_FILES audio_hal/audio_hw_dtv.c)
     list(APPEND DTV_FILES audio_hal/audio_dtv_utils.c)
-    if(USE_AMADEC)
-        list(APPEND DTV_FILES dtv_audio_utils/audio_data_read/audio_dtv_ad.c)
-        list(APPEND DTV_LIBS -L./amadec -laudamadec)
-        list(APPEND DTV_LIBS -lam_adp -lasound)
-    endif()
     list(APPEND DVB_AUDIO_INC ./dtv_audio_utils/sync)
     list(APPEND DVB_AUDIO_INC ./dtv_audio_utils/dmxwrap/MultiHwDemux)
-    list(APPEND DVB_AUDIO_INC ./amadec/include)
     list(APPEND DVB_AUDIO_LIBS -L./dtv_audio_utils -ldvbaudioutils)
 
     add_definitions(-DUSE_DTV)
-endif()
-
-if(USE_AMADEC)
-    add_definitions(-DUSE_AMADEC)
 endif()
 
 if(USE_APP_MIXING)
@@ -253,8 +240,7 @@ target_include_directories(audio_hal PRIVATE
 	./utils/cJSON
 	./amlogic_AQ_tools
 	./dtv_audio_utils/audio_read_api
-	./audio_hal
-	./amadec)
+	./audio_hal)
 
 target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations -funwind-tables -fasynchronous-unwind-tables -fPIC)
 

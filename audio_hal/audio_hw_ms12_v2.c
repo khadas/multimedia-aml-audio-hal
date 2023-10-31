@@ -2162,7 +2162,7 @@ int dolby_ms12_bypass_process(struct audio_stream_out *stream, void *buffer, siz
         return mat_bypass_process(stream, buffer, bytes);
     }
     struct aml_audio_patch *patch = adev->audio_patch;
-    bool do_sync_flag = (adev->patch_src == SRC_DTV) && patch && patch->skip_amadec_flag;
+    bool do_sync_flag = adev->patch_src  == SRC_DTV && patch;
     spdif_config_t spdif_config = { 0 };
     /*for patch mode, the hal_rate is not correct, we should parse it*/
     if (adev->audio_patching && is_dolby) {
@@ -2987,7 +2987,7 @@ Aml_MS12_SyncPolicy_t ms12_dtv_sync_callback(void *priv_data, unsigned long long
     audio_format_t audio_format = ms12_get_audio_hal_format(aml_out->hal_internal_format);
     int delay_frame = 0;
     int delay_pts_diff = 0;
-    bool do_sync_flag = (adev->patch_src == SRC_DTV) && patch && patch->skip_amadec_flag;
+    bool do_sync_flag = (adev->patch_src == SRC_DTV) && patch;
     decoded_frame = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, audio_format, MAIN_INPUT_STREAM);
     int debug_enable = get_debug_value(AML_DEBUG_AUDIOHAL_HW_SYNC);
 
@@ -3307,7 +3307,7 @@ int dolby_ms12_main_open(struct audio_stream_out *stream) {
     if (patch) {
         demux_info = (aml_demux_audiopara_t *)patch->demux_info;
     }
-    bool do_sync_flag = (adev->patch_src == SRC_DTV) && patch && patch->skip_amadec_flag;
+    bool do_sync_flag = (adev->patch_src == SRC_DTV) && patch;
 #endif
 
     audio_format_t hal_internal_format = ms12_get_audio_hal_format(aml_out->hal_internal_format);

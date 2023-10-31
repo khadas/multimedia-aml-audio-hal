@@ -55,7 +55,7 @@
 #include "audio_hw_profile.h"
 #include "audio_hw_utils.h"
 #ifdef USE_DTV
-#include "dtv_patch_out.h"
+//#include "dtv_patch_out.h"
 #endif
 #include "aml_audio_resampler.h"
 #include "dolby_lib_api.h"
@@ -1195,9 +1195,6 @@ void process_pts_sync(unsigned int pcm_lancty, struct aml_audio_patch *patch,
 
 
     get_sysfs_uint(DTV_DECODER_CHECKIN_FIRSTAPTS_PATH, &checkin_firstapts);
-#if defined(USE_AMADEC) && defined(USE_DTV)
-    pts = lookpts = dtv_patch_get_pts();
-#endif
     if (pts == patch->last_valid_pts) {
         ALOGI("dtv_patch_get_pts pts  -> %lx", pts);
     }

@@ -427,7 +427,6 @@ struct aml_audio_patch {
     struct cmd_node *dtv_cmd_list;
     void *dtv_package_list;
     struct package *cur_package;
-    bool skip_amadec_flag;
     struct aml_stream_out * dtv_aml_out;
     int sync_offset;
     int read_size;

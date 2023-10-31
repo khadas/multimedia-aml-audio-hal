@@ -7150,14 +7150,6 @@ ssize_t hw_write (struct audio_stream_out *stream
             __func__, buffer, bytes, output_format, aml_out, aml_out->hw_sync_mode);
     }
 
-#if 0  //if old version,will enable it for debug.
-    if (patch && !patch->skip_amadec_flag) {
-        if (is_dtv && need_hw_mix(adev->usecase_masks)) {
-        if (adev->audio_patch->avsync_callback && aml_out->dtvsync_enable)
-            adev->audio_patch->avsync_callback(adev->audio_patch,aml_out);
-        }
-    }
-#endif
     pthread_mutex_lock(&adev->alsa_pcm_lock);
     aml_out->alsa_output_format = output_format;
     if (aml_out->status != STREAM_HW_WRITING) {
