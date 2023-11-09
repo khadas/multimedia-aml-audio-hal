@@ -756,7 +756,7 @@ int aml_audio_get_ms12_presentation_position(const struct audio_stream_out *stre
     int frame_latency = 0, timems_latency = 0;
     bool b_raw_in = false;
     bool b_raw_out = false;
-    uint64_t frames_written_hw = out->last_frames_postion;
+    uint64_t frames_written_hw = out->last_frames_position;
     device_type_t platform_type = STB;
     bool is_earc = (ATTEND_TYPE_EARC == aml_audio_earctx_get_type(adev));
 
@@ -779,7 +779,7 @@ int aml_audio_get_ms12_presentation_position(const struct audio_stream_out *stre
 
     if (adev->continuous_audio_mode) {
         if (direct_continous((struct audio_stream_out *)stream)) {
-            frames_written_hw = adev->ms12.last_frames_postion;
+            frames_written_hw = adev->ms12.last_frames_position;
             *timestamp = adev->ms12.timestamp;
         }
 

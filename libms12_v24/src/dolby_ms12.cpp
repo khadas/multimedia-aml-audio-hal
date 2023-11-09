@@ -97,6 +97,16 @@ extern "C" void * dolby_ms12_init(int configNum, char **configParams)
     }
 }
 
+extern "C" char * dolby_ms12_get_version(void)
+{
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbMS12GetVersion();
+    } else {
+        return NULL;
+    }
+}
+
 extern "C" void dolby_ms12_release(void *dolbyMS12_pointer)
 {
     android::DolbyMS12* dolby_ms12_instance = getInstance();
@@ -105,6 +115,65 @@ extern "C" void dolby_ms12_release(void *dolbyMS12_pointer)
     }
 }
 
+extern "C" int dolby_ms12_init_all_params(void *dolbyMS12_pointer, int configNum, char **configParams)
+{
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12InitAllParams(dolbyMS12_pointer, configNum, configParams);
+    } else {
+        return -1;
+    }
+}
+
+extern "C" int dolby_ms12_main_decoder_open(void *dolbyMS12_pointer, int configNum, char **configParams)
+{
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMs12DecoderOpen(dolbyMS12_pointer, configNum, configParams);
+    } else {
+        return -1;
+    }
+}
+
+extern "C" int dolby_ms12_main_decoder_close(void *dolbyMS12_pointer)
+{
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMs12DecoderClose(dolbyMS12_pointer);
+    } else {
+        return -1;
+    }
+}
+
+extern "C" int dolby_ms12_main_decoder_process(void *dolbyMS12_pointer)
+{
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMs12DecoderProcess(dolbyMS12_pointer);
+    } else {
+        return -1;
+    }
+}
+
+extern "C" int dolby_ms12_encoder_open(void *dolbyMS12_pointer, int configNum, char **configParams)
+{
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMs12EncoderOpen(dolbyMS12_pointer, configNum, configParams);
+    } else {
+        return -1;
+    }
+}
+
+extern "C" int dolby_ms12_encoder_close(void *dolbyMS12_pointer)
+{
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMs12EncoderClose(dolbyMS12_pointer);
+    } else {
+        return -1;
+    }
+}
 
 extern "C" int dolby_ms12_input_main(
     void *dolbyMS12_pointer
@@ -227,6 +296,17 @@ extern "C" int dolby_ms12_output(void *dolbyMS12_pointer
 }
 #endif
 
+extern "C" int dolby_ms12_register_ms12sync_callback(void *dolby_mS12_pointer, void *callback, void *priv_data)
+{
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12RegisterSyncCallback(dolby_mS12_pointer, (android::ms12sync_callback)callback, priv_data);
+    } else {
+        return -1;
+    }
+}
+
+
 extern "C" int dolby_ms12_update_runtime_params(void *dolbyMS12_pointer, int configNum, char **configParams)
 {
     android::DolbyMS12* dolby_ms12_instance = getInstance();
@@ -343,7 +423,7 @@ extern "C" void dolby_ms12_get_pcm_output_size(unsigned long long *all_output_si
     }
 }
 
-extern "C" void dolby_ms12_get_bitsteam_output_size(unsigned long long *all_output_size, unsigned long long *ms12_generate_zero_size)
+extern "C" void dolby_ms12_get_bitstream_output_size(unsigned long long *all_output_size, unsigned long long *ms12_generate_zero_size)
 {
     ALOGV("%s()\n", __FUNCTION__);
     android::DolbyMS12* dolby_ms12_instance = getInstance();
@@ -406,6 +486,25 @@ extern "C" int dolby_ms12_set_mat_stream_profile(int stream_profile)
     return -1;
 }
 
+extern "C" int dolby_ms12_enable_atmos_drop(int atmos_drop)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12SetAtmosDrop(atmos_drop);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_info_dump(int fd)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        dolby_ms12_instance->DumpDolbyMS12Info(fd);
+    }
+    return -1;
+}
 
 extern "C" int dolby_ms12_get_input_atmos_info()
 {
@@ -416,6 +515,38 @@ extern "C" int dolby_ms12_get_input_atmos_info()
     } else {
         return -1;
     }
+}
+
+extern "C" int dolby_ms12_get_mat_dec_latency()
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetMATDecLatency();
+    } else {
+        return -1;
+    }
+}
+
+
+extern "C" int dolby_ms12_enable_mixer_max_size(int enable)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12EnableMixerMaxSize(enable);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_set_dolby_compression_format(int compression_format)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12SetCompressionFormat(compression_format);
+    }
+    return -1;
 }
 
 extern "C" int dolby_ms12_set_scheduler_state(int sch_state)
@@ -438,6 +569,18 @@ extern "C" unsigned long long dolby_ms12_get_decoder_nframes_pcm_output(void *ms
         return -1;
     }
 }
+
+extern "C" unsigned long long dolby_ms12_get_continuous_nframes_pcm_output(void *ms12_pointer, int index)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetContinuousNFramesPcmOutput(ms12_pointer, index);
+    } else {
+        return -1;
+    }
+}
+
 
 extern "C" void dolby_ms12_set_debug_level(int level)
 {
@@ -497,7 +640,7 @@ extern "C" int dolby_ms12_hwsync_checkin_pts_internal(int offset, int apts)
     ALOGV("%s()\n", __FUNCTION__);
     android::DolbyMS12* dolby_ms12_instance = getInstance();
     if (dolby_ms12_instance) {
-        return dolby_ms12_instance->DolbyMS12HWSyncChecinPTS(offset, apts);
+        return dolby_ms12_instance->DolbyMS12HWSyncCheckinPTS(offset, apts);
     } else {
         return -1;
     }
@@ -534,16 +677,6 @@ extern "C" int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duratio
     }
 }
 
-extern "C" int dolby_ms12_enable_mixer_max_size(int enable)
-{
-    ALOGV("%s()\n", __FUNCTION__);
-    android::DolbyMS12* dolby_ms12_instance = getInstance();
-    if (dolby_ms12_instance) {
-        return dolby_ms12_instance->DolbyMS12EnableMixerMaxSize(enable);
-    }
-    return -1;
-}
-
 extern "C" int dolby_ms12_get_main_audio_info(int *sample_rate, int *acmod, int *b_lfe)
 {
     ALOGV("%s()\n", __FUNCTION__);
@@ -553,6 +686,140 @@ extern "C" int dolby_ms12_get_main_audio_info(int *sample_rate, int *acmod, int 
     } else {
         return -1;
     }
+}
+
+extern "C" int dolby_ms12_get_latency_for_stereo_out(int *latency)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetLatencyForStereoOut(latency);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_get_latency_for_multichannel_out(int *latency)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetLatencyForMultiChannelOut(latency);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_get_latency_for_dap_speaker_out(int *latency)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetLatencyForDAPSpeakerOut(latency);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_get_latency_for_dap_headphone_out(int *latency)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetLatencyForDAPHeadphoneOut(latency);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_get_latency_for_ddp_out(int *latency)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetLatencyForDDPOut(latency);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_get_latency_for_dd_out(int *latency)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetLatencyForDDOut(latency);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_get_latency_for_mat_out(int *latency)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12GetLatencyForMATOut(latency);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_mat_encoder_init(int b_lfract_precision
+        , int b_chmod_locking
+        , unsigned int *p_matenc_maxoutbufsize
+        , int b_iec_header
+        , int dbg_enable
+        , void **mat_enc_handle
+        )
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12MATEncoderInit(b_lfract_precision, b_chmod_locking, p_matenc_maxoutbufsize, b_iec_header, dbg_enable, mat_enc_handle);
+    }
+    return -1;
+}
+
+extern "C" void dolby_ms12_mat_encoder_cleanup(void *mat_enc_handle)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        dolby_ms12_instance->DolbyMS12MatEncoderCleanup(mat_enc_handle);
+    }
+}
+
+extern "C" int dolby_ms12_mat_encoder_process(void *mat_enc_handle
+    , const unsigned char *in_buf
+    , int n_bytes_in_buf
+    , const unsigned char *out_buf
+    , int *n_bytes_out_buf
+    , int out_buf_max_size
+    , int *nbytes_consumed
+    )
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12MATEncoderProcess(mat_enc_handle, in_buf, n_bytes_in_buf, out_buf, n_bytes_out_buf, out_buf_max_size, nbytes_consumed);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_mat_encoder_config(void *mat_enc_handle
+    , int config_type
+    , int *config)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12MATEncoderConfig(mat_enc_handle, (mat_enc_config_type_t)config_type, (mat_enc_config_t *)config);
+    }
+    return -1;
+}
+
+extern "C" int dolby_ms12_set_alsa_delay_frame(int delay_frame)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12* dolby_ms12_instance = getInstance();
+    if (dolby_ms12_instance) {
+        return dolby_ms12_instance->DolbyMS12SetAlsaDelayFrame(delay_frame);
+    }
+    return -1;
 }
 
 extern "C" int dolby_ms12_get_ac4_active_presentation(int *presentation_group_index)

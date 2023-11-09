@@ -125,7 +125,7 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio
             // may be blocked by msync_cond for initial playback timing control
             // the first checkin pts should be consumed by aml_audio_hwsync_audio_process for av_sync_audio_start
             //aml_audio_hwsync_audio_process(aml_out->hwsync, 0, NULL);
-            aml_audio_hwsync_audio_process(aml_out->hwsync, 0, 0, NULL);
+            aml_audio_hwsync_audio_process(aml_out->hwsync, 0, abuffer->pts, NULL);
             // when dropping is needed at av_sync_audio_start
             // reset payload_offset since the data will not be
             // sent to MS12 pipeline. The consumed bytes number

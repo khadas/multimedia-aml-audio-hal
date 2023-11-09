@@ -749,7 +749,7 @@ struct aml_stream_out {
     int codec_type;
     uint64_t frame_write_sum;
     uint64_t frame_skip_sum;
-    uint64_t last_frames_postion;
+    uint64_t last_frames_position;
     uint64_t spdif_enc_init_frame_write_sum;
     int skip_frame;
     int32_t *tmp_buffer_8ch;
@@ -815,6 +815,7 @@ struct aml_stream_out {
     bool need_first_sync;
     uint64_t last_pts;
     uint64_t last_payload_offset;
+    uint64_t last_dec_out_frame;
     struct audio_config out_cfg;
     int debug_stream;
     uint64_t us_used_last_write;
@@ -913,6 +914,7 @@ struct aml_stream_out {
     uint64_t llp_underrun_wp;
     bool enable_scaletempo;
     struct scale_tempo * scaletempo;
+    bool b_install_sync_callback;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);
@@ -1160,6 +1162,10 @@ audio_format_t get_non_ms12_output_format(audio_format_t src_format, struct aml_
 int start_input_stream(struct aml_stream_in *in);
 
 int do_input_standby (struct aml_stream_in *in);
+
+int adev_ms12_prepare(struct audio_hw_device *dev);
+
+void adev_ms12_cleanup(struct audio_hw_device *dev);
 
 /* 'bytes' are the number of bytes written to audio FIFO, for which 'timestamp' is valid.
  * 'available' is the number of frames available to read (for input) or yet to be played

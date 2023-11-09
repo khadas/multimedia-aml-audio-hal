@@ -588,9 +588,8 @@ static inline uint32_t abs32(int32_t a)
 @p_adjust_ms: a/v adjust ms.if return a minus,means
  audio slow,need skip,need slow.return a plus value,means audio quick,need insert zero.
 */
-int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int frame_len, int *p_adjust_ms)
+int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, uint64_t apts, int *p_adjust_ms)
 {
-    uint32_t apts = 0;
     int ret = 0;
     //*p_adjust_ms = 0;
     uint32_t pcr = 0;
@@ -632,8 +631,6 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         }
     }
 
-    ret = aml_audio_hwsync_lookup_apts(p_hwsync, offset, &apts);
-
     if ((ret == 0) &&
         (adev->gap_offset != 0) &&
         !adev->gap_ignore_pts &&
@@ -661,9 +658,9 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
         if (adev && (eDolbyMS12Lib == adev->dolby_lib_type)) {
             /*the offset is the end of frame, so we need consider the frame len*/
             if (AVSYNC_TYPE_MSYNC == p_hwsync->aout->avsync_type) {
-                latency_frames = aml_audio_get_msync_ms12_tunnel_latency(stream) + frame_len;
+                latency_frames = aml_audio_get_msync_ms12_tunnel_latency(stream);
             } else {
-                latency_frames = aml_audio_get_ms12_tunnel_latency(stream) + frame_len;
+                latency_frames = aml_audio_get_ms12_tunnel_latency(stream);
             }
 #ifndef NO_AUDIO_CAP
             if (adev->cap_buffer) {
@@ -688,7 +685,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, int 
     }
     if (p_hwsync->use_mediasync) {
     } else {
-        if (p_hwsync->first_apts_flag == false && offset > 0 && (apts >= latency_pts) && AVSYNC_TYPE_TSYNC == p_hwsync->aout->avsync_type) {
+        if (p_hwsync->first_apts_flag == false && (apts >= latency_pts) && AVSYNC_TYPE_TSYNC == p_hwsync->aout->avsync_type) {
             ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);
             ALOGI("%s aml_audio_hwsync_set_first_pts = 0x%x (%d ms)", __FUNCTION__, apts - latency_pts, (apts - latency_pts)/90);
             aml_audio_hwsync_set_first_pts(p_hwsync, apts - latency_pts);

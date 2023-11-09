@@ -28,6 +28,9 @@
 
 #define DOLBY_SAMPLE_SIZE 4//2ch x 2bytes(16bits) = 4 bytes
 
+/*
+ *@brief define enum for MS12 Scheduler state
+ */
 typedef enum MS12_SCHEDULER_STATE {
     MS12_SCHEDULER_NONE = -1,
     MS12_SCHEDULER_RUNNING =  0,
@@ -49,7 +52,7 @@ typedef enum MS12_RESUME_STATE {
 enum {
     BITSTREAM_OUTPUT_A,
     BITSTREAM_OUTPUT_B,
-    BITSTREAM_OUTPUT_C,/*multi channel pcm*/
+    BITSTREAM_OUTPUT_C,  /*multi channel pcm*/
     BITSTREAM_OUTPUT_CNT
 };
 
@@ -77,11 +80,6 @@ struct dolby_ms12_desc {
     int dolby_ms12_init_argc;
     char **dolby_ms12_init_argv;
     void *dolby_ms12_ptr;
-#ifdef REPLACE_OUTPUT_BUFFER_WITH_CALLBACK
-
-#else
-    char *dolby_ms12_out_data;
-#endif
     int dolby_ms12_out_max_size;
     /*
     there are some risk when aux write thread and direct thread
@@ -101,7 +99,7 @@ struct dolby_ms12_desc {
     bool is_continuous_paused;
     int device;//alsa_device_t
     struct timespec timestamp;
-    uint64_t last_frames_postion;
+    uint64_t last_frames_position;
     uint64_t last_ms12_pcm_out_position;
     bool     ms12_position_update;
     /*
@@ -119,7 +117,7 @@ struct dolby_ms12_desc {
     // the input signal atmos info
     int is_dolby_atmos;
     int input_total_ms;
-    int bitsteam_cnt;
+    int bitstream_cnt;
     void * system_virtual_buf_handle;
     ring_buffer_t spdif_ring_buffer;
     unsigned char *lpcm_temp_buffer;
@@ -153,6 +151,7 @@ struct dolby_ms12_desc {
     bool dual_decoder_support;
     uint64_t main_input_start_offset_ns;
     uint64_t main_input_ns;
+    uint64_t main_input_bytes_offset;
     uint64_t main_output_ns;
     uint32_t main_input_rate;  /*it is used to calculate the buffer duration*/
     uint32_t main_buffer_min_level;
@@ -200,13 +199,22 @@ struct dolby_ms12_desc {
     uint32_t ms12_timer_id;
     bool sys_data_write2alsa_status;
     struct aml_pts_handle *p_pts_list;
+    void * scaletempo;
+    void * info_spdif_dec_handle;
+    void * info_ac3_parser_handle;
+    int mat_stream_profile;
+    bool enable_mixer_max_size;
+    bool b_encoder_reset;
+    pthread_mutex_t main_apts_update_lock;
+    bool main_input_insert_zero;
+    bool aaudio_low_latency;
 };
 
 /*
  *@brief this function is get the ms12 suitable output format
  *       1.input format
  *       2.EDID pcm/dd/dd+
- *       3.system settting
+ *       3.system setting
  * TODO, get the suitable format
  */
 audio_format_t get_dolby_ms12_suitable_output_format(void);
@@ -254,5 +262,16 @@ int aml_ms12_lib_preload(char *dolby_ms12_path);
 
 int aml_ms12_lib_release();
 
+int aml_ms12_main_decoder_open(struct dolby_ms12_desc *ms12_desc
+                    , audio_format_t config_format
+                    , audio_channel_mask_t config_channel_mask
+                    , int config_sample_rate);
+
+
+int aml_ms12_main_decoder_close(struct dolby_ms12_desc *ms12_desc);
+
+int aml_ms12_main_decoder_process(struct dolby_ms12_desc *ms12_desc);
+
+int aml_ms12_main_encoder_reconfig(struct dolby_ms12_desc *ms12_desc, int output_config);
 
 #endif //end of __AML_AUDIO_MS12_H__

@@ -52,6 +52,15 @@ void * dolby_ms12_init(int argc, char **argv);
 //release dolby ms12
 void dolby_ms12_release(void *dolby_mS12_pointer);
 
+int dolby_ms12_init_all_params(void *dolbyMS12_pointer, int configNum, char **configParams);
+int dolby_ms12_main_decoder_open(void *dolbyMS12_pointer, int configNum, char **configParams);
+int dolby_ms12_main_decoder_close(void *dolbyMS12_pointer);
+int dolby_ms12_main_decoder_process(void *dolbyMS12_pointer);
+int dolby_ms12_encoder_open(void *dolbyMS12_pointer, int configNum, char **configParams);
+int dolby_ms12_encoder_close(void *dolbyMS12_pointer);
+
+
+
 /*@@
     @brief Input main[dolby/he-aac/pcm]
     @if single input as pcm, use this api
@@ -142,6 +151,15 @@ int dolby_ms12_output(void *dolby_mS12_pointer
 #endif
 
 /*@@
+    @brief register the sync callback
+    @void *dolby_mS12_pointer //dolby ms12 handle
+    @void *callback //sync callback handle
+    @void *priv_data //priv data
+*/
+int dolby_ms12_register_ms12sync_callback(void *dolby_mS12_pointer, void *callback, void *priv_data);
+
+
+/*@@
     @brief get all the runtime config params, as the style of "int argc, char **argv"
 
     @void *dolby_mS12_pointer //dolby ms12 handle
@@ -203,7 +221,7 @@ void dolby_ms12_get_pcm_output_size(unsigned long long *all_output_size, unsigne
     @*all_output_size, all the data from ms12
     @*ms12_generate_zero_size, all the ms12 generate zero size
 */
-void dolby_ms12_get_bitsteam_output_size(unsigned long long *all_output_size, unsigned long long *ms12_generate_zero_size);
+void dolby_ms12_get_bitstream_output_size(unsigned long long *all_output_size, unsigned long long *ms12_generate_zero_size);
 
 /*@@
     @brief get main buffer avail
@@ -224,11 +242,20 @@ void dolby_ms12_set_main_dummy(int type, int dummy);
 
 int dolby_ms12_get_gain(int idx);
 
+/*@@
+    @brief dump ms12 info
+*/
+int dolby_ms12_info_dump(int fd);
 
 /*@@
     @brief get dolby atmos info
 */
 int dolby_ms12_get_input_atmos_info();
+
+/*@@
+    @brief get dolby mat dec latency
+*/
+int dolby_ms12_get_mat_dec_latency();
 
 
 /*@@
@@ -242,9 +269,37 @@ int dolby_ms12_set_main_volume(float volume);
 int dolby_ms12_set_mat_stream_profile(int stream_profile);
 
 /*@@
+    @brief enable the atmos drop
+*/
+int dolby_ms12_enable_atmos_drop(int atmos_drop);
+
+/*@@
+    @brief set game mode
+*/
+int dolby_ms12_set_game_mode(int game_mode);
+
+/*@@
+    @brief enable the mixer max frame size
+*/
+int dolby_ms12_enable_mixer_max_size(int enable);
+
+/*@@
+    @brief set the mixer compression format
+*/
+int dolby_ms12_set_dolby_compression_format(int compression_format);
+
+
+/*@@
+    @brief set the scheduler state
+*/
+int dolby_ms12_set_scheduler_state(int sch_state);
+
+/*@@
     @brief get PCM's nframes which outputed by decoder
 */
 unsigned long long dolby_ms12_get_decoder_nframes_pcm_output(void *ms12_pointer, int format, int is_main);
+
+unsigned long long dolby_ms12_get_continuous_nframes_pcm_output(void *ms12_pointer, int index);
 
 
 /*@@
@@ -260,7 +315,6 @@ unsigned long long dolby_ms12_get_consumed_sys_audio();
 /*@@
     @brief get the total delay(which means frame nums)
 */
-
 int dolby_ms12_get_total_nframes_delay(void *ms12_pointer);
 
 int dolby_ms12_hwsync_init_internal(void);
@@ -270,12 +324,39 @@ int dolby_ms12_hwsync_release_internal(void);
 int dolby_ms12_hwsync_checkin_pts_internal(int offset, int apts);
 
 /*@@
-*  @brief get main input underrun status
+    @brief get the total delay for stereo out
 */
-int dolby_ms12_get_main_underrun();
+int dolby_ms12_get_latency_for_stereo_out(int *latency);
+
 /*@@
-*  @brief set the MS12 sync control
+    @brief get the total delay for multichannel out
 */
+int dolby_ms12_get_latency_for_multichannel_out(int *latency);
+
+/*@@
+    @brief get the total delay for dap speaker out
+*/
+int dolby_ms12_get_latency_for_dap_speaker_out(int *latency);
+
+/*@@
+    @brief get the total delay for dap headphone out
+*/
+int dolby_ms12_get_latency_for_dap_headphone_out(int *latency);
+
+/*@@
+    @brief get the total delay for ddp out
+*/
+int dolby_ms12_get_latency_for_ddp_out(int *latency);
+
+/*@@
+    @brief get the total delay for dd out
+*/
+int dolby_ms12_get_latency_for_dd_out(int *latency);
+
+/*@@
+    @brief get the total delay for mat out
+*/
+int dolby_ms12_get_latency_for_mat_out(int *latency);
 int dolby_ms12_set_sync(int sync);
 
 /*@@
@@ -284,24 +365,61 @@ int dolby_ms12_set_sync(int sync);
 int dolby_ms12_set_pts_gap(unsigned long long offset, int gap_duration);
 
 /*@@
-    @brief register scaletempo callback
-*/
-int dolby_ms12_register_scaletempo_callback(void *callback, void *priv_data);
-
-/*@@
-    @brief enable the mixer max frame size
-*/
-int dolby_ms12_enable_mixer_max_size(int enable);
-
-/*@@
     @brief get main audio info
 */
 int dolby_ms12_get_main_audio_info(int *sample_rate, int *acmod, int *b_lfe);
+
+/**
+ * @brief MAT Encoder init
+ */
+int dolby_ms12_mat_encoder_init
+    (int b_lfract_precision                     /**< [in] 0: disable lfract precision. 1: enable lfract precision */
+    , int b_chmod_locking                       /**< [in] 0: disable chmod locking. 1: enable  chmod locking */
+    , unsigned int *p_matenc_maxoutbufsize      /**< [out] Pointer of MAT encoder mat outbuf size */
+    , int b_iec_header                          /**< [in] 0: output raw mat format. 1: output IEC61937 format */
+    , int dbg_enable                            /**< [in] 0: disable debug. 1: enable debug */
+    , void **mat_enc_handle                     /**< [out] Pointer of MAT encoder handle */
+    );
+
+
+
+/**
+ * @brief MAT Encoder cleanup
+ */
+void dolby_ms12_mat_encoder_cleanup
+    (void *mat_enc_handle                       /**< [in] Pointer of MAT encoder handle */
+    );
+
+/**
+ * @brief MAT Encoder decode process
+ */
+int dolby_ms12_mat_encoder_process
+    (void *mat_enc_handle               /**< [in] Pointer of MAT encoder handle */
+    , const unsigned char *in_buf       /**< [in] Pointer of mlp data buffer */
+    , int n_bytes_in_buf                /**< [in] Size in bytes of in_buf */
+    , const unsigned char *out_buf      /**< [out] Pointer of mat data buffer output by MAT encoder */
+    , int *n_bytes_out_buf              /**< [out] Size in bytes of mat data buffer output by MAT encoder */
+    , int out_buf_max_size              /**< [in] Max size in bytes of in_buf buffer */
+    , int *nbytes_consumed              /**< [out] Size in bytes of consumed in_buf data */
+    );
+
+
+
+/**
+ * @brief This function set parameter for MAT Encoder.
+ */
+int dolby_ms12_mat_encoder_config
+    (void *mat_enc_handle   /**< [in] Pointer of MAT encoder handle */
+    , int config_type       /**< [in] mat encoder config type */
+    , int *config           /**< [in] mat encoder config value */
+    );
 
 //brief This function get the active presentation group indext
 int dolby_ms12_get_ac4_active_presentation(int *presentation_group_index);
 //whether the given presentation group index is present in a bitstream
 int dolby_ms12_ac4dec_check_the_pgi_is_present(int presentation_group_index);
+
+int dolby_ms12_set_alsa_delay_frame(int delay_frame);
 
 int dolby_ms12_register_scaletempo_callback(void *callback, void *priv_data);
 

@@ -465,10 +465,6 @@ bool signal_status_check(audio_devices_t in_device, int *mute_time,
 int set_resample_source(struct aml_mixer_handle *mixer_handle, enum ResampleSource source);
 int set_spdifin_pao(struct aml_mixer_handle *mixer_handle,int enable);
 
-/*
- *@brief clean the tmp_buffer_8ch&audioeffect_tmp_buffer and release audio stream
- */
-void  release_audio_stream(struct audio_stream_out *stream);
 /*@brief check the AV audio stability by HW register */
 bool is_av_in_stable_hw(struct audio_stream_in *stream);
 bool is_dual_output_stream(struct audio_stream_out *stream);
@@ -505,7 +501,7 @@ int input_stream_channels_adjust(struct audio_stream_in *stream, void* buffer, s
 int update_sink_format_after_hotplug(struct aml_audio_device *adev);
 
 int stream_check_reconfig_param(struct audio_stream_out *stream);
-
+char * get_arc_capability(struct aml_audio_device *adev);
 /*
 *@brief check tv signal need to mute or not
 * return false if signal need to mute

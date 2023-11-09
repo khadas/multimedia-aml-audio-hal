@@ -286,11 +286,11 @@ public:
     virtual void setInputMixerGainValuesForUIInput(MixGain *mixergain)
     {
         if (mixergain) {
-            memcpy(&mUIMixGain, mixergain, sizeof(MixGain));
-            if (mUIMixGain.target < -12288) {
-                mUIMixGain.target = -12288;
+            memcpy(&mOTTMixGain, mixergain, sizeof(MixGain));
+            if (mOTTMixGain.target < -12288) {
+                mOTTMixGain.target = -12288;
             }
-            ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mUIMixGain.target, mUIMixGain.duration, mUIMixGain.shape);
+            ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mOTTMixGain.target, mOTTMixGain.duration, mOTTMixGain.shape);
         }
     }
     virtual void setSystemSoundMixerGainValuesForPrimaryInput(MixGain *mixergain)
@@ -427,7 +427,7 @@ public:
     }
 
     //DAP SWITCHES (content specific)
-    virtual void setDAPMIStreering(DAPMISteering *dapMiSteeringParameters)
+    virtual void setDAPMISteering(DAPMISteering *dapMiSteeringParameters)
     {
         if (dapMiSteeringParameters) {
             memcpy(&ContentDAPMISteering, dapMiSteeringParameters, sizeof(ContentDAPMISteering));
@@ -448,7 +448,7 @@ public:
     virtual void setDAPDialogueEnhancer(DAPDialogueEnhancer *dapDialogueEnhancerParameters)
     {
         if (dapDialogueEnhancerParameters) {
-            memcpy(&ContenDAPDialogueEnhancer, dapDialogueEnhancerParameters, sizeof(ContenDAPDialogueEnhancer));
+            memcpy(&ContentDAPDialogueEnhancer, dapDialogueEnhancerParameters, sizeof(ContentDAPDialogueEnhancer));
         }
     }
 
@@ -471,11 +471,11 @@ public:
     virtual void setInputMixerGainValuesForOTTSoundsInput(MixGain *mixergain)
     {
         if (mixergain) {
-            memcpy(&mUIMixGain, mixergain, sizeof(MixGain));
-            if (mUIMixGain.target < -12288) {
-                mUIMixGain.target = -12288;
+            memcpy(&mOTTMixGain, mixergain, sizeof(MixGain));
+            if (mOTTMixGain.target < -12288) {
+                mOTTMixGain.target = -12288;
              }
-             ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mUIMixGain.target, mUIMixGain.duration, mUIMixGain.shape);
+            ALOGI("%s() set target %d duration %d shape %d", __FUNCTION__, mOTTMixGain.target, mOTTMixGain.duration, mOTTMixGain.shape);
         }
     }
 
@@ -557,6 +557,12 @@ public:
         return mIsLegacyDDPOut;
     }
 
+    virtual void setHDMIOutoutType(int HdmiOutputType)
+    {
+        mHdmiOutputType = HdmiOutputType;
+        ALOGI("%s() mHdmiOutputType %d\n", __FUNCTION__, mHdmiOutputType);
+    }
+
     virtual void setInputCMDMask(const char *input_cmd);
 
     virtual int getInputCMDMask(void)
@@ -568,17 +574,24 @@ public:
     {
         int curMask = getInputCMDMask();
         int ddp_dual_input = MS12_INPUT_MASK_MAIN_DDP|MS12_INPUT_MASK_ASSOCIATE;
+        int heaac_dual_input = MS12_INPUT_MASK_MAIN_HEAAC|MS12_INPUT_MASK_ASSOCIATE;
 
         bool is_ac4_single = ((curMask & MS12_INPUT_MASK_MAIN_AC4) == MS12_INPUT_MASK_MAIN_AC4);
         bool is_ddp_dual_input = ((curMask & ddp_dual_input) == ddp_dual_input);
+        bool is_heaac_dual_input = ((curMask & heaac_dual_input) == heaac_dual_input);
+        ALOGI("%s() curMask %#x heaac_dual_input %#x is_heaac_dual_input %d\n", __FUNCTION__, curMask, heaac_dual_input, is_heaac_dual_input);
 
-        if (is_ac4_single || is_ddp_dual_input)
+        if (is_ac4_single || is_ddp_dual_input || is_heaac_dual_input)
             return true;
         else
             return false;
     }
     virtual void setEnforceTimeslice(bool is_enforce) {
         mEnforceTimeslice = is_enforce;
+    }
+
+    virtual void setTVTuningFlag(bool tv_tuning_flag) {
+        mTVTuningFlag = tv_tuning_flag;
     }
 
     //*End||Add the APT to set the params*//
@@ -646,7 +659,7 @@ private:
         .duration = 0,
         .shape = 0,
     };//Input mixer gain values for 2nd Main program input
-    MixGain mUIMixGain = {
+    MixGain mOTTMixGain = {
         .target = 0,
         .duration = 0,
         .shape = 0,
@@ -735,7 +748,7 @@ private:
         .ieq_band_center = {32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000},
         .ieq_band_target = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     };
-    DAPDialogueEnhancer ContenDAPDialogueEnhancer = {
+    DAPDialogueEnhancer ContentDAPDialogueEnhancer = {
         .de_enable = 0,
         .de_amount = 0,
     };
@@ -755,6 +768,16 @@ private:
     bool mIsLegacyDDPOut;
     int mDolbyInputCMDMask;
     bool mEnforceTimeslice;
+    bool mTVTuningFlag;
+    bool mFullDAPDisable;
+    /*
+       DD/DD+ output is used for
+       0 = Full HDMI (default)
+       1 = HDMI ARC
+       2 = HDMI E-ARC
+    */
+    int mHdmiOutputType;
+
 }; //class DolbyMS12ConfigParams
 
 

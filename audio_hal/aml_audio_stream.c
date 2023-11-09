@@ -40,6 +40,7 @@
 #ifdef USE_MEDIAINFO
 #include "aml_media_info.h"
 #endif
+#include "audio_hw_ms12_common.h"
 
 #if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
 #include "audio_hw_ms12_v2.h"
@@ -568,18 +569,6 @@ bool is_hdmi_in_stable_sw (struct audio_stream_in *stream)
     return true;
 }
 
-
-void  release_audio_stream(struct audio_stream_out *stream)
-{
-    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
-    if (aml_out->is_tv_platform == 1) {
-        aml_audio_free(aml_out->tmp_buffer_8ch);
-        aml_out->tmp_buffer_8ch = NULL;
-        aml_audio_free(aml_out->audioeffect_tmp_buffer);
-        aml_out->audioeffect_tmp_buffer = NULL;
-    }
-    aml_audio_free(stream);
-}
 bool is_atv_in_stable_hw (struct audio_stream_in *stream)
 {
     struct aml_stream_in *in = (struct aml_stream_in *) stream;
@@ -1731,6 +1720,9 @@ int update_sink_format_after_hotplug(struct aml_audio_device *adev)
         else {
             ALOGD("%s() active stream %p ms12_out %p\n", __FUNCTION__, stream, adev->ms12_out);
         }
+    }
+    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+        audiohal_send_msg_2_ms12(&adev->ms12, MS12_MESG_TYPE_RESET_MS12_ENCODER);
     }
 
     return 0;

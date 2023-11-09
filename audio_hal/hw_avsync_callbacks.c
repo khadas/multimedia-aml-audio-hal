@@ -138,7 +138,7 @@ int on_meta_data_cbk(void *cookie,
             latency = (int32_t)out_get_outport_latency((struct audio_stream_out *)out) * 90;
             latency += tunning_latency * 90;
             ALOGD("%s(), set tsync start pts %d, latency %d, last position %" PRId64 "",
-                __func__, pts32, latency, out->last_frames_postion);
+                __func__, pts32, latency, out->last_frames_position);
             if (latency < 0) {
                 pts32 += abs(latency);
             } else {
@@ -209,7 +209,7 @@ int on_meta_data_cbk(void *cookie,
         latency = (int32_t)out_get_outport_latency((struct audio_stream_out *)out) * 90;
         latency += tunning_latency * 90;
         ALOGD("%s(), set tsync start pts %d, latency %d, last position %" PRId64 "",
-            __func__, pts32, latency, out->last_frames_postion);
+            __func__, pts32, latency, out->last_frames_position);
         if (latency < 0) {
             pts32 += abs(latency);
         } else {

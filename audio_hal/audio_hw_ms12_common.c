@@ -68,8 +68,10 @@ const char *mesg_type_2_string[MS12_MESG_TYPE_MAX] = {
     "MS12_MESG_TYPE_PAUSE",
     "MS12_MESG_TYPE_RESUME",
     "MS12_MESG_TYPE_SET_MAIN_DUMMY",
-    "MS12_MESG_TYPE_UPDATE_RUNTIIME_PARAMS",
+    "MS12_MESG_TYPE_UPDATE_RUNTIME_PARAMS",
+    "MS12_MESG_TYPE_RESET_MS12_ENCODER",
     "MS12_MESG_TYPE_EXIT_THREAD",
+    "MS12_MESG_TYPE_SCHEDULER_STATE",
 };
 
 /*
@@ -164,15 +166,15 @@ int dolby_ms12_main_resume(struct audio_stream_out *stream)
 ******************************************************************************/
 bool ms12_msg_list_is_empty(struct dolby_ms12_desc *ms12)
 {
-    bool is_emtpy = true;
+    bool is_empty = true;
     if (0 != ms12->ms12_mesg_threadID) {
         pthread_mutex_lock(&ms12->mutex);
         if (!list_empty(&ms12->mesg_list)) {
-            is_emtpy = false;
+            is_empty = false;
         }
         pthread_mutex_unlock(&ms12->mutex);
     }
-    return is_emtpy;
+    return is_empty;
 }
 
 /*****************************************************************************
@@ -237,8 +239,8 @@ static void *ms12_message_threadloop(void *data)
     CPU_ZERO(&cpuSet);
     CPU_SET(2, &cpuSet);
     CPU_SET(3, &cpuSet);
-    int sastat = sched_setaffinity(0, sizeof(cpu_set_t), &cpuSet);
-    if (sastat) {
+    int set_affinity = sched_setaffinity(0, sizeof(cpu_set_t), &cpuSet);
+    if (set_affinity) {
         ALOGW("%s(), failed to set cpu affinity", __func__);
     }
 
@@ -264,7 +266,9 @@ Repop_Mesg:
             ALOGE("%s wrong message type =%d", __func__, mesg_p->mesg_type);
             mesg_p->mesg_type = MS12_MESG_TYPE_NONE;
         }
-        ALOGD("%s(), msg type: %s", __func__, mesg_type_2_string[mesg_p->mesg_type]);
+        if (mesg_p->mesg_type < MS12_MESG_TYPE_MAX) {
+            ALOGD("%s(), msg type: %s", __func__, mesg_type_2_string[mesg_p->mesg_type]);
+        }
         pthread_mutex_unlock(&ms12->mutex);
 
         while ((NULL == ms12->ms12_main_stream_out && true != ms12->CommThread_ExitFlag ) || (false == ms12->dolby_ms12_init_flags)) {
@@ -284,10 +288,17 @@ Repop_Mesg:
                 break;
             case MS12_MESG_TYPE_SET_MAIN_DUMMY:
                 break;
-            case MS12_MESG_TYPE_UPDATE_RUNTIIME_PARAMS:
+            case MS12_MESG_TYPE_UPDATE_RUNTIME_PARAMS:
+                break;
+            case MS12_MESG_TYPE_RESET_MS12_ENCODER:
+                dolby_ms12_encoder_reconfig(ms12);
                 break;
             case MS12_MESG_TYPE_EXIT_THREAD:
                 ALOGD("%s mesg exit thread.", __func__);
+                break;
+            case MS12_MESG_TYPE_SCHEDULER_STATE:
+                //aml_set_ms12_scheduler_state(&ms12->ms12_main_stream_out->stream);
+                //ALOGD("%s scheduler state.", __func__);
                 break;
             default:
                 ALOGD("%s  msg type not support.", __func__);
@@ -327,11 +338,11 @@ int ms12_mesg_thread_create(struct dolby_ms12_desc *ms12)
     list_init(&ms12->mesg_list);
     ms12->CommThread_ExitFlag = false;
     if ((ret = pthread_mutex_init (&ms12->mutex, NULL)) != 0) {
-        ALOGE("%s  pthread_mutex_init fail, errono:%s", __func__, strerror(errno));
+        ALOGE("%s  pthread_mutex_init fail, errno:%s", __func__, strerror(errno));
     } else if((ret = pthread_cond_init(&ms12->cond, NULL)) != 0) {
-        ALOGE("%s  pthread_cond_init fail, errono:%s", __func__, strerror(errno));
+        ALOGE("%s  pthread_cond_init fail, errno:%s", __func__, strerror(errno));
     } else if((ret = pthread_create(&(ms12->ms12_mesg_threadID), NULL, &ms12_message_threadloop, (void *)ms12)) != 0) {
-        ALOGE("%s  pthread_create fail, errono:%s", __func__, strerror(errno));
+        ALOGE("%s  pthread_create fail, errno:%s", __func__, strerror(errno));
     } else {
         ALOGD("%s ms12 thread init & create successful, ms12_mesg_threadID:%#lx ret:%d", __func__, ms12->ms12_mesg_threadID, ret);
     }
@@ -354,8 +365,9 @@ int ms12_mesg_thread_destroy(struct dolby_ms12_desc *ms12)
         if (!list_empty(&ms12->mesg_list)) {
             struct ms12_mesg_desc *mesg_p = NULL;
             struct listnode *item = NULL;
+            struct listnode *temp = NULL;
 
-            list_for_each(item, &ms12->mesg_list){
+            list_for_each_safe(item, temp, &ms12->mesg_list){
                 item = list_head(&ms12->mesg_list);
                 mesg_p = (struct ms12_mesg_desc *)item;
 
@@ -377,6 +389,39 @@ int ms12_mesg_thread_destroy(struct dolby_ms12_desc *ms12)
     }
 
     return ret;
+}
+
+/*****************************************************************************
+*   Function Name:  aml_send_ms12_scheduler_state_2_ms12
+*   Description:    send scheduler state to ms12 after timer expiration.
+*   Parameters:     void
+*   Return value:   0: success, -1: error
+******************************************************************************/
+int aml_send_ms12_scheduler_state_2_ms12(void)
+{
+    struct aml_audio_device *adev = aml_adev_get_handle();
+    struct dolby_ms12_desc *ms12 = &(adev->ms12);
+    int sch_state = MS12_SCHEDULER_NONE;
+    pthread_mutex_lock(&ms12->lock);
+    sch_state = ms12->ms12_scheduler_state;
+    if (sch_state <= MS12_SCHEDULER_NONE ||  sch_state >= MS12_SCHEDULER_MAX) {
+           ALOGE("%s  sch_state:%d is an invalid scheduler state.", __func__, sch_state);
+           pthread_mutex_unlock(&ms12->lock);
+           return -1;
+    } else {
+        dolby_ms12_set_scheduler_state(ms12->ms12_scheduler_state);
+        ALOGD("%s adev:%p, sch_state:%d(%s) ", __func__, adev, sch_state, scheduler_state_2_string[sch_state]);
+    }
+    pthread_mutex_unlock(&ms12->lock);
+
+    return 0;
+}
+
+void ms12_timer_callback_handler(union sigval sigv)
+{
+    ALOGD("func:%s sigv:%d ~~~~~~~~~~", __func__, sigv.sival_int);
+    aml_send_ms12_scheduler_state_2_ms12();
+    return ;
 }
 
 void set_ms12_full_dap_disable(struct dolby_ms12_desc *ms12, int full_dap_disable)
@@ -458,6 +503,20 @@ int aml_audiohal_sch_state_2_ms12(struct dolby_ms12_desc *ms12, int sch_state)
     return 0;
 }
 
+void set_ms12_mc_enable(struct dolby_ms12_desc *ms12, int mc_enable)
+{
+    char parm[64] = "";
+    if (!ms12) {
+        ALOGE("set_ms12_mc_enable ms12 is null");
+        return ;
+    }
+    if (!(ms12->output_config & MS12_OUTPUT_MASK_MC)) {
+        return;
+    }
+    sprintf(parm, "%s %d", "-mc", mc_enable);
+    if ((strlen(parm)) > 0 )
+        aml_ms12_update_runtime_params(ms12, parm);
+}
 void set_ms12_ac4_1st_preferred_language_code(struct dolby_ms12_desc *ms12, char *lang_iso639_code)
 {
     char parm[64] = "";
@@ -480,4 +539,91 @@ void set_ms12_ac4_prefer_presentation_selection_by_associated_type_over_language
     sprintf(parm, "%s %d", "-pat", prefer_selection_type);
     if ((strlen(parm)) > 0 && ms12)
         aml_ms12_update_runtime_params(ms12, parm);
+}
+
+void set_ms12_ac4_short_prog_identifier(struct dolby_ms12_desc *ms12, int short_program_identifier)
+{
+    char parm[64] = "";
+    sprintf(parm, "%s %d", "-ac4_short_prog_id", short_program_identifier);
+    if ((strlen(parm)) > 0 && ms12)
+        aml_ms12_update_runtime_params(ms12, parm);
+}
+
+void set_ms12_ext_pcm_acmod_lfe(struct dolby_ms12_desc *ms12, audio_channel_mask_t channel_mask)
+{
+    char param[64];
+    int acmod = 0;
+    int lfe = 0;
+
+    acmod = dolby_ms12_get_channel_config(channel_mask);
+    lfe = dolby_ms12_get_lfe_config(channel_mask);
+    if (acmod < 0 || lfe < 0) {
+        ALOGE("%s invalid channel_mask 0x%x, acmod %d, lfe %d", __func__, channel_mask, acmod, lfe);
+        return;
+    }
+
+    memset(param, 0, sizeof(param));
+    sprintf(param, "%s %d", "-chp", acmod);
+    if ((strlen(param)) > 0 && ms12) {
+        aml_ms12_update_runtime_params(ms12, param);
+    }
+
+    memset(param, 0, sizeof(param));
+    sprintf(param, "%s %d", "-lp", lfe);
+    if ((strlen(param)) > 0 && ms12) {
+        aml_ms12_update_runtime_params(ms12, param);
+    }
+}
+
+void set_ms12_sys_pcm_acmod_lfe(struct dolby_ms12_desc *ms12, audio_channel_mask_t channel_mask)
+{
+    char param[64];
+    int acmod = 0;
+    int lfe = 0;
+
+    acmod = dolby_ms12_get_channel_config(channel_mask);
+    lfe = dolby_ms12_get_lfe_config(channel_mask);
+    if (acmod < 0 || lfe < 0) {
+        ALOGE("%s invalid channel_mask 0x%x, acmod %d, lfe %d", __func__, channel_mask, acmod, lfe);
+        return;
+    }
+
+    memset(param, 0, sizeof(param));
+    sprintf(param, "%s %d", "-chs", acmod);
+    if ((strlen(param)) > 0 && ms12) {
+        aml_ms12_update_runtime_params(ms12, param);
+    }
+
+    memset(param, 0, sizeof(param));
+    sprintf(param, "%s %d", "-ls", lfe);
+    if ((strlen(param)) > 0 && ms12) {
+        aml_ms12_update_runtime_params(ms12, param);
+    }
+}
+
+
+void set_ms12_app_pcm_acmod_lfe(struct dolby_ms12_desc *ms12, audio_channel_mask_t channel_mask)
+{
+    char param[64];
+    int acmod = 0;
+    int lfe = 0;
+
+    acmod = dolby_ms12_get_channel_config(channel_mask);
+    lfe = dolby_ms12_get_lfe_config(channel_mask);
+    if (acmod < 0 || lfe < 0) {
+        ALOGE("%s invalid channel_mask 0x%x, acmod %d, lfe %d", __func__, channel_mask, acmod, lfe);
+        return;
+    }
+
+    memset(param, 0, sizeof(param));
+    sprintf(param, "%s %d", "-chas", acmod);
+    if ((strlen(param)) > 0 && ms12) {
+        aml_ms12_update_runtime_params(ms12, param);
+    }
+
+    memset(param, 0, sizeof(param));
+    sprintf(param, "%s %d", "-las", lfe);
+    if ((strlen(param)) > 0 && ms12) {
+        aml_ms12_update_runtime_params(ms12, param);
+    }
 }
