@@ -47,6 +47,7 @@
 #include "aml_malloc_debug.h"
 #include "audio_hdmi_util.h"
 #include "aml_audio_speed_manager.h"
+#include "aml_audio_aec.h"
 
 #ifdef ADD_AUDIO_DELAY_INTERFACE
 #include "aml_audio_delay.h"
@@ -97,6 +98,8 @@ static unsigned int DEFAULT_OUT_SAMPLING_RATE = 48000;
 #define MM_FULL_POWER_SAMPLING_RATE 48000
 /* sampling rate when using VX port for narrow band */
 #define VX_NB_SAMPLING_RATE 8000
+/* sampling rate when using AEC for capture */
+#define AEC_CAP_SAMPLING_RATE 16000
 
 #define AUDIO_PARAMETER_STREAM_EQ "audioeffect_eq"
 #define AUDIO_PARAMETER_STREAM_SRS "audioeffect_srs_param"
@@ -275,7 +278,7 @@ enum IN_PORT {
     INPORT_DTV                  = 9,
     INPORT_ATV                  = 10,
     INPORT_MEDIA                = 11,
-    INPORT_MAX                  = 12,
+    INPORT_MAX                  = 13,
 };
 
 struct audio_patch_set {
@@ -617,6 +620,7 @@ struct aml_audio_device {
     uint64_t  sys_audio_frame_written;
     void* hw_mediasync;
     struct aec_t *aec;
+    struct aec_context *aml_aec;
     bool bt_wbs;
     int security_mem_level;
     int dolby_ms12_dap_init_mode;

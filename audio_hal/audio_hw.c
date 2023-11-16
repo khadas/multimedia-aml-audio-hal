@@ -194,6 +194,7 @@
 #define IEC61937_PACKET_SIZE_OF_EAC3                    (0x6000)
 
 #define MAX_INPUT_STREAM_CNT                            (3)
+#define AML_AEC_MIC_CHANNEL_NUM                         (2)
 
 #define NETFLIX_DDP_BUFSIZE                             (768)
 
@@ -234,6 +235,18 @@ static const struct pcm_config pcm_config_in = {
     .period_count = CAPTURE_PERIOD_COUNT,
     .format = PCM_FORMAT_S16_LE,
 };
+
+static const struct pcm_config pcm_config_aec = {
+    .channels = 4,
+    .rate = AEC_CAP_SAMPLING_RATE,
+    .period_size = DEFAULT_CAPTURE_PERIOD_SIZE,
+    .period_count = CAPTURE_PERIOD_COUNT,
+    .format = PCM_FORMAT_S16_LE,
+    .start_threshold = 0,
+    .stop_threshold = 0,
+    .avail_min = 0,
+};
+
 
 static const struct pcm_config pcm_config_bt = {
     .channels = 1,
@@ -771,7 +784,7 @@ static int check_input_parameters(uint32_t sample_rate, audio_format_t format, i
         return -EINVAL;
     }
 
-    if (channel_count < 1 || channel_count > 2) {
+    if (channel_count < 1 || channel_count > 4 || channel_count == 3) {
         ALOGE("%s: unsupported channel count (%d) passed  Min / Max (1 / 2)", __func__, channel_count);
         return -EINVAL;
     }
@@ -2530,6 +2543,8 @@ static unsigned int select_port_by_device(struct aml_stream_in *in)
         else
             inport = PORT_I2S;
     }
+    if (in_device & AUDIO_DEVICE_IN_ECHO_REFERENCE)
+        inport = PORT_ECHO_REFERENCE;
 
 #ifdef ENABLE_AEC_HAL
     /* AEC using inner loopback port */
@@ -3088,8 +3103,10 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
     size_t cur_in_bytes, cur_in_frames;
     int in_mute = 0, parental_mute = 0;
     bool stable = true;
+    size_t size_aec = 0;
+    void *buffer_aec = NULL;
 
-    ALOGV("%s(): stream: %d, bytes %zu", __func__, in->source, bytes);
+    AM_LOGV("%s(): stream: %d, bytes %zu", __func__, in->source, bytes);
 
 #ifdef ENABLE_AEC_APP
     /* Special handling for Echo Reference: simply get the reference from FIFO.
@@ -3166,11 +3183,11 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
         cur_in_bytes = in_frames * 2 * 2;
         // 2 ch 16 bit TODO: add more fmt
         if (!in->tmp_buffer_8ch || in->tmp_buffer_8ch_size < 4 * cur_in_bytes) {
-            ALOGI("%s: realloc tmp_buffer_8ch size from %zu to %zu",
+            AM_LOGI("%s: realloc tmp_buffer_8ch size from %zu to %zu",
                 __func__, in->tmp_buffer_8ch_size, 4 * cur_in_bytes);
             in->tmp_buffer_8ch = aml_audio_realloc(in->tmp_buffer_8ch, 4 * cur_in_bytes);
             if (!in->tmp_buffer_8ch) {
-                ALOGE("%s malloc failed\n", __func__);
+                AM_LOGE("%s malloc failed\n", __func__);
             }
             in->tmp_buffer_8ch_size = 4 * cur_in_bytes;
         }
@@ -3194,7 +3211,7 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
 
         if (!stable) {
             if (in->mute_log_cntr == 0)
-                ALOGI("%s: audio is unstable, mute channel", __func__);
+                AM_LOGI("%s: audio is unstable, mute channel", __func__);
             if (in->mute_log_cntr++ >= 100)
                 in->mute_log_cntr = 0;
             clock_gettime(CLOCK_MONOTONIC, &in->mute_start_ts);
@@ -3203,7 +3220,7 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
         if (in->mute_flag) {
             in_mute = Stop_watch(in->mute_start_ts, in->mute_mdelay);
             if (!in_mute) {
-                ALOGI("%s: unmute audio since audio signal is stable", __func__);
+                AM_LOGI("%s: unmute audio since audio signal is stable", __func__);
                 /* The data of ALSA has not been read for a long time in the muted state,
                  * resulting in the accumulation of data. So, cache of capture needs to be cleared.
                  */
@@ -3237,7 +3254,23 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
             if (in->resampler) {
                 ret = read_frames(in, buffer, in_frames);
             } else {
-                ret = aml_alsa_input_read(stream, buffer, bytes);
+                if (in->device & AUDIO_DEVICE_IN_ECHO_REFERENCE) {
+                    size_aec = bytes * 2;  /* 2ch mic + 2ch loopback */
+                    buffer_aec = (char *)aml_audio_malloc(size_aec);
+                    if (buffer_aec == NULL) {
+                        ret = -ENOMEM;
+                        goto exit;
+                    }
+                    memset(buffer_aec, 0, size_aec);
+
+                    ret = aml_alsa_input_read(stream, buffer_aec, size_aec);
+                    aml_audio_dump_audio_bitstreams("/data/dump_pre.raw", buffer_aec, size_aec);
+                    aec_process(adev->aml_aec, buffer_aec, buffer);
+                    aml_audio_dump_audio_bitstreams("/data/dump_post.raw", buffer, bytes);
+                    aml_audio_free(buffer_aec);
+                } else {
+                    ret = aml_alsa_input_read(stream, buffer_aec, size_aec);
+                }
             }
             if (ret < 0)
                 goto exit;
@@ -3277,7 +3310,7 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t byte
 
 exit:
     if (ret < 0) {
-        ALOGE("%s: read failed - sleeping for buffer duration", __func__);
+        AM_LOGE("%s: read failed - sleeping for buffer duration", __func__);
         usleep(bytes * 1000000 / audio_stream_in_frame_size(stream) /
                 in_get_sample_rate(&stream->common));
     }
@@ -3289,7 +3322,7 @@ exit:
         fwrite((char*)buffer, 1, bytes, fp_in);
         fclose(fp_in);
     } else {
-        ALOGE("AEC debug: Could not open file aec_in.pcm!");
+        AM_LOGE("AEC debug: Could not open file aec_in.pcm!");
     }
     FILE* fp_mic_ts = fopen("/data/local/traces/aec_in_timestamps.txt", "a+");
     if (fp_mic_ts) {
@@ -6258,6 +6291,9 @@ static int choose_stream_pcm_config(struct aml_stream_in *in)
                 (in->device & AUDIO_DEVICE_IN_HDMI_ARC))) {
             memcpy(&in->config, &pcm_config_in, sizeof(pcm_config_in));
         }
+        if (in->device & AUDIO_DEVICE_IN_ECHO_REFERENCE) {
+            memcpy(&in->config, &pcm_config_aec, sizeof(pcm_config_aec));
+        }
     }
 
     if (in->config.channels != 8)
@@ -6328,7 +6364,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
     int ret = 0;
     enum IN_PORT inport = INPORT_HDMIIN;
 
-    ALOGD("%s: enter: devices(%#x) channel_mask(%#x) rate(%d) format(%#x) source(%d)", __func__,
+    AM_LOGD("%s: enter: devices(%#x) channel_mask(%#x) rate(%d) format(%#x) source(%d)", __func__,
         devices, config->channel_mask, config->sample_rate, config->format, source);
 
     if ((ret = check_input_parameters(config->sample_rate, config->format, channel_count, devices)) != 0) {
@@ -6340,27 +6376,39 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         } else {
            return -EINVAL;
         }
+
     } else {
         //check successfully, continue excute.
     }
+
+    in = (struct aml_stream_in *)aml_audio_calloc(1, sizeof(struct aml_stream_in));
+    if (!in) {
+        AM_LOGE("  calloc fail, return!!!");
+        return -ENOMEM;
+    }
+    in->device = devices & ~AUDIO_DEVICE_BIT_IN;
 
     if (channel_count == 1)
         // in fact, this value should be AUDIO_CHANNEL_OUT_BACK_LEFT(16u) according to VTS codes,
         // but the macroname can be confusing, so I'd like to set this value to
         // AUDIO_CHANNEL_IN_FRONT(16u) instead of AUDIO_CHANNEL_OUT_BACK_LEFT.
         config->channel_mask = AUDIO_CHANNEL_IN_FRONT;
-    else
+    else if (channel_count == 2) {
         config->channel_mask = AUDIO_CHANNEL_IN_STEREO;
+        if (in->device & AUDIO_DEVICE_IN_ECHO_REFERENCE) {
+            config->channel_mask = AUDIO_CHANNEL_IN_2POINT0POINT2;
+        }
+    }
+    if (in->device  & AUDIO_DEVICE_IN_ECHO_REFERENCE) {
+        if (access(AML_AEC_LIB_PATH, R_OK) != 0) {
+            AM_LOGE("libAudioSignalProcess.so not found.");
+            goto err;
+        }
+    }
 
     android_dev_convert_to_hal_dev(devices, (int *)&inport);
     //adev->active_inport = inport;
     //adev->src_gain[inport] = 1.0;
-
-    in = (struct aml_stream_in *)aml_audio_calloc(1, sizeof(struct aml_stream_in));
-    if (!in) {
-        ALOGE("  calloc fail, return!!!");
-        return -ENOMEM;
-    }
 
 #if defined(ENABLE_HBG_PATCH)
 //[SEI-Tiger-2019/02/28] Optimize HBG RCU{
@@ -6435,7 +6483,6 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         in->stream.common.remove_audio_effect = in_remove_audio_effect;
     }
 
-    in->device = devices & ~AUDIO_DEVICE_BIT_IN;
     in->dev = adev;
     in->standby = 1;
 
@@ -6451,7 +6498,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
     } else if (in->device & AUDIO_DEVICE_IN_WIRED_HEADSET) {
         //bluetooth rc voice
         // usecase for bluetooth rc audio hal
-        ALOGI("%s: use RC audio HAL", __func__);
+        AM_LOGI("%s: use RC audio HAL", __func__);
         ret = rc_open_input_stream(&in, config);
         if (ret != 0) {
             ALOGE("  rc_open_input_stream fail, goto err!!!");
@@ -6460,8 +6507,11 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         config->sample_rate = in->config.rate;
         config->channel_mask = AUDIO_CHANNEL_IN_MONO;
     #endif
-    } else
+    } else if (in->device & AUDIO_DEVICE_IN_ECHO_REFERENCE) {
+        memcpy(&in->config, &pcm_config_aec, sizeof(pcm_config_aec));
+    } else {
         memcpy(&in->config, &pcm_config_in, sizeof(pcm_config_in));
+    }
     in->config.channels = channel_count;
     in->source = source;
     if (source == AUDIO_SOURCE_ECHO_REFERENCE) {
@@ -6523,6 +6573,9 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
     }
 #endif
 
+    if (in->device & AUDIO_DEVICE_IN_ECHO_REFERENCE) {
+        adev->aml_aec = aec_create(AML_AEC_MIC_CHANNEL_NUM, pcm_config_aec);
+    }
     *stream_in = &in->stream;
 
 #if ENABLE_NANO_NEW_PATH
@@ -6611,6 +6664,10 @@ static void adev_close_input_stream(struct audio_hw_device *dev,
         destroy_aec_mic_config(adev->aec);
     }
 #endif
+
+    if (in->device & AUDIO_DEVICE_IN_ECHO_REFERENCE) {
+        aec_destroy(adev->aml_aec);
+    }
 
     aml_audio_free(stream);
     ALOGD("%s: exit", __func__);
