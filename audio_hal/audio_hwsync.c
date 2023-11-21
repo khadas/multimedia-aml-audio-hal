@@ -604,8 +604,8 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, uint
     struct aml_stream_out  *out = p_hwsync->aout;
     struct timespec ts;
     int pcr_pts_gap = 0;
-    int alsa_pcm_delay_frames = 0;
-    int alsa_bitstream_delay_frames = 0;
+    //int alsa_pcm_delay_frames = 0;
+    //int alsa_bitstream_delay_frames = 0;
     int ms12_pipeline_delay_frames = 0;
     ALOGV("%s,================", __func__);
     if (p_adjust_ms) *p_adjust_ms = 0;
@@ -659,6 +659,7 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, uint
             /*the offset is the end of frame, so we need consider the frame len*/
             if (AVSYNC_TYPE_MSYNC == p_hwsync->aout->avsync_type) {
                 latency_frames = aml_audio_get_msync_ms12_tunnel_latency(stream);
+                ms12_pipeline_delay_frames = dolby_ms12_main_pipeline_latency_frames(stream);
             } else {
                 latency_frames = aml_audio_get_ms12_tunnel_latency(stream);
             }
@@ -667,9 +668,8 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, uint
                 latency_frames += adev->cap_delay * 48;
             }
 #endif
-            alsa_pcm_delay_frames = out_get_ms12_latency_frames(stream, false);
-            alsa_bitstream_delay_frames = out_get_ms12_bitstream_latency_ms(stream) * 48;
-            ms12_pipeline_delay_frames = dolby_ms12_main_pipeline_latency_frames(stream);
+            //alsa_pcm_delay_frames = out_get_ms12_latency_frames(stream, false);
+            //alsa_bitstream_delay_frames = out_get_ms12_bitstream_latency_ms(stream) * 48;
         } else {
             latency_frames = (int32_t)out_get_latency_frames(stream);
         }
@@ -679,11 +679,14 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, uint
         latency_pts = latency_frames * 90/ 48;
     }
 
-    if (ret) {
-        ALOGE("%s lookup failed", __func__);
-        return 0;
-    }
     if (p_hwsync->use_mediasync) {
+        if (MEDIA_SYNC_ESMODE(out)) {
+            if (pts_log)
+                ALOGI("[%s:%d], apts=0x%llx, latency_pts=%x", __func__, __LINE__, apts, latency_pts);
+            out->hwsync->es_mediasync.out_start_apts = apts;
+            out->hwsync->es_mediasync.cur_outapts = apts - latency_pts;
+            aml_hwsynces_ms12_get_policy(out);
+        }
     } else {
         if (p_hwsync->first_apts_flag == false && (apts >= latency_pts) && AVSYNC_TYPE_TSYNC == p_hwsync->aout->avsync_type) {
             ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);

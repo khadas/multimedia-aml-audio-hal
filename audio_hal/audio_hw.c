@@ -1816,6 +1816,7 @@ exit:
     if (aml_out->msync_session) {
         av_sync_pause(aml_out->msync_session, true);
     }
+
     pthread_mutex_unlock(&aml_out->lock);
     pthread_mutex_unlock(&aml_dev->lock);
 
@@ -3681,6 +3682,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->ddp_frame_size = aml_audio_get_ddp_frame_size();
     out->resample_handle = NULL;
     out->set_init_avsync_policy = false;
+    out->last_lookup_pts = 0;
+    out->same_pts_frames = 0;
     *stream_out = &out->stream;
     ALOGD("%s: exit", __func__);
 
@@ -7562,6 +7565,7 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
     int sink_format = AUDIO_FORMAT_PCM_16_BIT;
     adev->dcvlib_bypass_enable = 0;
     adev->dtslib_bypass_enable = 0;
+    AM_LOGI_IF(adev->debug_flag, "+<IN> [%s:%d] ", __func__, __LINE__);
 
     /*get sink format*/
     get_sink_format (stream);
@@ -7684,7 +7688,8 @@ void config_output(struct audio_stream_out *stream, bool reset_decoder)
             aml_out->device = PORT_SPDIF;
         }
     }
-    ALOGI("[%s:%d] out stream alsa port device:%d", __func__, __LINE__, aml_out->device);
+
+    AM_LOGI_IF(adev->debug_flag, "-<OUT> [%s:%d] out stream alsa port device:%d", __func__, __LINE__, aml_out->device);
     return ;
 }
 
@@ -8785,13 +8790,13 @@ ssize_t out_write_new(struct audio_stream_out *stream,
     }
 #endif
 
-    if (adev->continuous_audio_mode && aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) {
+    /*if (adev->continuous_audio_mode && aml_out->avsync_type == AVSYNC_TYPE_MEDIASYNC) {
         bool set_ms12_non_continuous = true;
         ALOGI("mediasync esmode we need disable continuous mode\n");
         get_dolby_ms12_cleanup(&adev->ms12, set_ms12_non_continuous);
         adev->ms12_out = NULL;
         adev->doing_reinit_ms12 = true;
-    }
+    }*/
 
     aml_audio_trace_int("out_write_new", bytes);
     /**

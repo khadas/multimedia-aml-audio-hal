@@ -541,10 +541,8 @@ int aml_audio_get_ms12_tunnel_latency(struct audio_stream_out *stream)
     struct aml_stream_out *out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = out->dev;
     int32_t latency_frames = 0;
-    int32_t alsa_delay = 0;
-    int32_t tunning_delay = 0;
-    int32_t ms12_pipeline_delay = 0;
-    int32_t atmos_tunning_delay = 0;
+    int32_t tuning_delay = 0;
+    int32_t atmos_tuning_delay = 0;
     int32_t bypass_delay = 0;
     int32_t video_delay = 0;
     bool is_output_ddp_atmos = aml_audio_output_ddp_atmos(stream);
@@ -562,9 +560,8 @@ int aml_audio_get_ms12_tunnel_latency(struct audio_stream_out *stream)
     }
 
    /*we need get the correct ms12 out pcm */
-    alsa_delay = (int32_t)out_get_ms12_latency_frames(stream, false);
     //ALOGI("latency_frames =%d", latency_frames);
-    tunning_delay = get_ms12_tunnel_latency_offset(adev->active_outport,
+    tuning_delay = get_ms12_tunnel_latency_offset(adev->active_outport,
                                                       out->hal_internal_format,
                                                       adev->ms12.optical_format,
                                                       adev->is_netflix,
@@ -577,10 +574,8 @@ int aml_audio_get_ms12_tunnel_latency(struct audio_stream_out *stream)
          * In DV AV sync, the ATMOS(DDP_JOC) item, it will add atmos_tunning_delay into the latency_frames.
          * If other case choose an diff value, here seperate by is_netflix.
          */
-        atmos_tunning_delay = get_ms12_atmos_latency_offset(true, adev->is_netflix) * 48;
+        atmos_tuning_delay = get_ms12_atmos_latency_offset(true, adev->is_netflix) * 48;
     }
-    /*ms12 pipe line has some delay, we need consider it*/
-    ms12_pipeline_delay = dolby_ms12_main_pipeline_latency_frames(stream);
 
     if (adev->ms12.is_bypass_ms12) {
         bypass_delay = get_ms12_bypass_latency_offset(true) * 48;
@@ -590,10 +585,10 @@ int aml_audio_get_ms12_tunnel_latency(struct audio_stream_out *stream)
         video_delay = get_ms12_tunnel_video_delay() * 48;
     }
 
-    latency_frames = alsa_delay + tunning_delay + atmos_tunning_delay + ms12_pipeline_delay + bypass_delay + video_delay;
+    latency_frames = tuning_delay + atmos_tuning_delay + bypass_delay + video_delay;
 
-    ALOGV("latency frames =%d alsa delay=%d ms tunning delay=%d ms ms12 pipe =%d ms atmos =%d ms video delay %d ms",
-        latency_frames, alsa_delay / 48, tunning_delay / 48, ms12_pipeline_delay / 48, atmos_tunning_delay / 48, video_delay / 48);
+    ALOGV("latency frames =%d tuning delay=%d ms atmos =%d ms video delay %d ms",
+        latency_frames, tuning_delay / 48, atmos_tuning_delay / 48, video_delay / 48);
     return latency_frames;
 }
 

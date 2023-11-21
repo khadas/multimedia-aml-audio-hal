@@ -814,8 +814,10 @@ struct aml_stream_out {
     bool first_pts_set;
     bool need_first_sync;
     uint64_t last_pts;
+    uint64_t last_lookup_pts;
     uint64_t last_payload_offset;
     uint64_t last_dec_out_frame;
+    uint64_t same_pts_frames;
     struct audio_config out_cfg;
     int debug_stream;
     uint64_t us_used_last_write;

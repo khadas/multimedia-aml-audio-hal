@@ -535,6 +535,7 @@ void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
     struct mediasync_audio_policy m_audiopolicy;
+    int debug_flag = aml_audio_property_get_int("audio.media.sync.util.debug", debug_flag);
     memset(&m_audiopolicy, 0, sizeof(m_audiopolicy));
 
     if (!(MEDIA_SYNC_ESMODE(aml_out)))
@@ -546,23 +547,13 @@ void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
     audio_hwsync_mediasync_t *p_esmediasync = &(aml_out->hwsync->es_mediasync);
     //p_esmediasync->out_start_apts = aml_out->hwsync->es_mediasync.in_apts;
     pthread_mutex_unlock(&aml_out->hwsync->lock);
-    do {
-        mediasync_wrap_AudioProcess(p_esmediasync->mediasync, p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
-        if (adev->debug_flag > 0) {
-            ALOGI("[%s:%d], es m_audiopolicy=%d=%s, param1=%u, param2=%u, org_pts=0x%llx, cur_pts=0x%llx", __func__, __LINE__,
+    mediasync_wrap_AudioProcess(p_esmediasync->mediasync, p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
+    if (debug_flag || m_audiopolicy.audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT) {
+        ALOGI("[%s:%d], es m_audiopolicy=%d=%s, param1=%u, param2=%u, org_pts=0x%llx, cur_pts=0x%llx", __func__, __LINE__,
                 m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
                 m_audiopolicy.param1, m_audiopolicy.param2,
                 p_esmediasync->out_start_apts, p_esmediasync->cur_outapts);
-        }
-
-        if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
-            if (m_audiopolicy.param1 == -1) {
-                usleep(15000);
-            } else {
-                usleep(m_audiopolicy.param1);
-            }
-        }
-    } while (aml_out->hwsync && aml_out->hw_sync_mode && (aml_out->pause_status == false) && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
+    }
     p_esmediasync->apolicy.audiopolicy= (audio_policy)m_audiopolicy.audiopolicy;
     p_esmediasync->apolicy.param1 = m_audiopolicy.param1;
     p_esmediasync->apolicy.param2 = m_audiopolicy.param2;
