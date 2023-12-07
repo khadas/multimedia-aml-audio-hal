@@ -2842,8 +2842,8 @@ Aml_MS12_SyncPolicy_t ms12_sync_callback(void *priv_data, unsigned long long u64
     struct timespec ms12_main_ts;
     uint64_t ms12_main_position = 0;
     uint64_t main_current_frame = 0;
-
-    if (!aml_out->hw_sync_mode) {
+    AM_LOGI_IF(adev->debug_flag,"%s <in>", __func__);
+    if (!aml_out->hw_sync_mode || true == aml_out->will_pause) {
         return audio_sync_policy;
     }
 
@@ -2897,8 +2897,7 @@ Aml_MS12_SyncPolicy_t ms12_sync_callback(void *priv_data, unsigned long long u64
     if (decoded_frame > u64DecOutFrame) {
             delay_frame = decoded_frame - u64DecOutFrame;
     }
-    //delay_pts_diff = (delay_frame + stDelay.u32DelayFrame) * 90 / 48;
-    delay_pts_diff = delay_frame * 90 / 48;
+    delay_pts_diff = (delay_frame + stDelay.u32DelayFrame) * 90 / 48;
     if (ret == 0) {
         if (apts > delay_pts_diff) {
             new_apts = apts - delay_pts_diff;
@@ -3002,6 +3001,7 @@ Aml_MS12_SyncPolicy_t ms12_sync_callback(void *priv_data, unsigned long long u64
     aml_out->last_dec_out_frame = u64DecOutFrame;
     aml_out->last_pts = new_apts;
     aml_out->last_lookup_pts = apts;
+    AM_LOGI_IF(adev->debug_flag,"%s <out>", __func__);
 
     return audio_sync_policy;
 }

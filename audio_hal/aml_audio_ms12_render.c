@@ -318,7 +318,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
                         int64_t out_apts;
                         out_apts = aml_dec->out_frame_pts;
                         if (aml_audio_mediasync_util_checkin_apts(mediasync_util, mediasync_util->payload_offset, out_apts) < 0) {
-                            ALOGE("[%s:%d] checkin apts(%llx) data_size(%zu) fail",
+                            AM_LOGI_IF(adev->debug_flag, "[%s:%d] checkin apts(%llx) data_size(%zu) fail",
                                 __FUNCTION__, __LINE__, out_apts, mediasync_util->payload_offset);
                         }
                         mediasync_util->payload_offset += dec_pcm_data->data_len;

@@ -1427,6 +1427,14 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         goto exit;
     }
 
+    ret = str_parms_get_str (parms, "will_pause", value, sizeof (value));
+    if (ret >= 0) {
+        int will_pause = atoi(value);
+        out->will_pause = will_pause ? true : false;
+        ALOGI("stream(%p) will pause: %d", out, out->will_pause);
+        goto exit;
+    }
+
 exit:
     str_parms_destroy (parms);
 
@@ -1754,6 +1762,7 @@ static int out_pause_new (struct audio_stream_out *stream)
           __func__, stream, aml_out->pause_status, aml_dev->dolby_lib_type, aml_dev->continuous_audio_mode, aml_out->hw_sync_mode, aml_dev->ms12.dolby_ms12_enable, aml_dev->ms12.is_continuous_paused);
 
     aml_audio_trace_int("out_pause_new", 1);
+
     pthread_mutex_lock (&aml_dev->lock);
     pthread_mutex_lock (&aml_out->lock);
 
@@ -1817,6 +1826,11 @@ exit:
         av_sync_pause(aml_out->msync_session, true);
     }
 
+    if ((aml_out->hw_sync_mode) && aml_out->tsync_status != TSYNC_STATUS_PAUSED) {
+        aml_hwsync_set_tsync_pause(aml_out->hwsync);
+        aml_out->tsync_status = TSYNC_STATUS_PAUSED;
+    }
+
     pthread_mutex_unlock(&aml_out->lock);
     pthread_mutex_unlock(&aml_dev->lock);
 
@@ -1824,7 +1838,7 @@ exit:
         ALOGD("%s(), stream(%p) already in standy, return INVALID_STATE", __func__, stream);
         ret = INVALID_STATE;
     }
-
+    aml_out->will_pause = false;
     aml_audio_trace_int("out_pause_new", 0);
     ALOGI("%s(), stream(%p) exit", __func__, stream);
     return ret;
@@ -1880,9 +1894,7 @@ static int out_resume_new (struct audio_stream_out *stream)
     aml_out->pause_status = false;
     if (aml_out->hw_sync_mode && !aml_dev->ms12.need_resume) {
         if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type || AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
-            if ((eDolbyMS12Lib != aml_dev->dolby_lib_type) || (1 != aml_dev->continuous_audio_mode)) {
-                aml_hwsync_set_tsync_resume(aml_out->hwsync);
-            }
+            aml_hwsync_set_tsync_resume(aml_out->hwsync);
         }
         aml_out->tsync_status = TSYNC_STATUS_RUNNING;
     }
@@ -3545,6 +3557,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->position_update = 0;
     out->inputPortID = AML_MIXER_INPUT_PORT_BUTT;
     out->msync_action = AV_SYNC_AA_RENDER;
+    out->will_pause = false;
 
 
 //#ifdef ENABLE_MMAP

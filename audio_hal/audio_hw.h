@@ -917,6 +917,7 @@ struct aml_stream_out {
     bool enable_scaletempo;
     struct scale_tempo * scaletempo;
     bool b_install_sync_callback;
+    bool will_pause;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);
