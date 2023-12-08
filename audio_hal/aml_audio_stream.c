@@ -51,6 +51,9 @@
 #define DTS_FMT_UPDATE_THRESHOLD    (1)
 #define AED_DEFAULT_VOLUME          (831)
 
+#define DOLBY_DCV_LIB_PATH_A        "/usr/lib/libHwAudio_dcvdec.so"
+#define DCV_BYPASS_LIB_SIZE         (10000)
+
 static audio_format_t ms12_max_support_output_format() {
 #if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
     return AUDIO_FORMAT_MAT;
@@ -511,6 +514,11 @@ void get_sink_format(struct audio_stream_out *stream)
         adev->optical_format = AUDIO_FORMAT_AC3;
     }
 #endif
+
+    if (eDolbyDcvLib == adev->dolby_lib_type && get_file_size(DOLBY_DCV_LIB_PATH_A) <= DCV_BYPASS_LIB_SIZE
+        && is_dolby_format(source_format)) {
+        adev->optical_format = source_format;
+    }
 
     ALOGI("%s sink_format %#x max channel =%d optical_format %#x, dual_output %d\n",
            __FUNCTION__, adev->sink_format, adev->sink_max_channels, adev->optical_format, aml_out->dual_output_flag);
