@@ -939,7 +939,7 @@ int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, uint6
              */
             pts_tab[i].pts = apts;
             if (debug_enable) {
-                ALOGI("%s checkin done,offset %zu,apts 0x%llx", __func__, offset, apts);
+                ALOGI("%s:%d checkin done,offset %zu,apts 0x%llx", __func__, __LINE__, offset, apts);
             }
             ret = 0;
             break;
@@ -948,7 +948,7 @@ int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, uint6
             pts_tab[i].offset = offset;
             pts_tab[i].valid = 1;
             if (debug_enable) {
-                ALOGI("%s checkin done,offset %zu,apts 0x%llx", __func__, offset, apts);
+                ALOGI("%s checkin done,offset %zu,apts 0x%llx", __func__, __LINE__, offset, apts);
             }
             ret = 0;
             break;

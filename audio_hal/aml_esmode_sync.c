@@ -547,13 +547,37 @@ void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
     audio_hwsync_mediasync_t *p_esmediasync = &(aml_out->hwsync->es_mediasync);
     //p_esmediasync->out_start_apts = aml_out->hwsync->es_mediasync.in_apts;
     pthread_mutex_unlock(&aml_out->hwsync->lock);
-    mediasync_wrap_AudioProcess(p_esmediasync->mediasync, p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
-    if (debug_flag || m_audiopolicy.audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT) {
-        ALOGI("[%s:%d], es m_audiopolicy=%d=%s, param1=%u, param2=%u, org_pts=0x%llx, cur_pts=0x%llx", __func__, __LINE__,
+
+    do {
+        if (true == aml_out->will_pause || true == aml_out->pause_status) {
+            return;
+        }
+
+        int ret = mediasync_wrap_AudioProcess(p_esmediasync->mediasync, p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
+        if (!ret) {
+            AM_LOGE("aml_dtvsync_audioprocess fail.");
+            return;
+        }
+
+        if (debug_flag || m_audiopolicy.audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT) {
+            ALOGI("ts m_audiopolicy=%d=%s, param1=%u, param2=%u, org_pts=0x%llx, cur_pts=0x%llx",
                 m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
                 m_audiopolicy.param1, m_audiopolicy.param2,
                 p_esmediasync->out_start_apts, p_esmediasync->cur_outapts);
-    }
+        }
+
+        if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
+            if (m_audiopolicy.param1 == -1) {
+                usleep(15000);
+            } else if (1000000 < m_audiopolicy.param1) {
+                AM_LOGE("Invalid hold parameter, m_audiopolicy.param1:%d, change sleep to 1s now!", m_audiopolicy.param1);
+                usleep(1000000);
+            } else {
+                usleep(m_audiopolicy.param1);
+            }
+        }
+    } while (aml_out->hwsync && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
+
     p_esmediasync->apolicy.audiopolicy= (audio_policy)m_audiopolicy.audiopolicy;
     p_esmediasync->apolicy.param1 = m_audiopolicy.param1;
     p_esmediasync->apolicy.param2 = m_audiopolicy.param2;
