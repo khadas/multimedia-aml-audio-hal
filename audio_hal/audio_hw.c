@@ -3801,17 +3801,6 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         pthread_mutex_lock(&adev->ms12.lock);
         /*after ms12 lock, dolby_ms12_enable may be cleared with clean up function*/
         if (adev->ms12.dolby_ms12_enable) {
-            if (adev->ms12_main1_dolby_dummy == false
-            && (!audio_is_linear_pcm(out->hal_internal_format) && is_dolby_ms12_support_compression_format(out->hal_internal_format))) {
-                dolby_ms12_set_main_dummy(0, true);
-                adev->ms12_main1_dolby_dummy = true;
-                ALOGI("%s set main dd+ dummy", __func__);
-            } else if (adev->ms12_ott_enable == true
-               && (audio_is_linear_pcm(out->hal_internal_format) || !is_dolby_ms12_support_compression_format(out->hal_internal_format))) {
-                dolby_ms12_set_main_dummy(1, true);
-                adev->ms12_ott_enable = false;
-                ALOGI("%s set ott dummy", __func__);
-            }
             adev->ms12.need_resume = 0;
             adev->ms12.need_resync = 0;
             if (adev->ms12_out)
@@ -7269,8 +7258,7 @@ ssize_t hw_write (struct audio_stream_out *stream
                     char *raw_buf = NULL;
                     char *temp_buf = NULL;
                     /*atmos lock or input is ddp atmos*/
-                    if (adev->atoms_lock_flag ||
-                        (adev->ms12.is_dolby_atmos && adev->ms12_main1_dolby_dummy == false)) {
+                    if (adev->atoms_lock_flag || adev->ms12.is_dolby_atmos) {
                         bAtmos = 1;
                     }
                     raw_buf = aml_audio_get_muteframe(output_format, &raw_size, bAtmos);
@@ -7730,8 +7718,8 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
            || patch->input_src == AUDIO_DEVICE_IN_TV_TUNER));
 
     if (adev->debug_flag) {
-        ALOGI("[%s:%d] out:%p bytes:%zu,format:%#x,ms12_ott:%d,conti:%d,hw_sync:%d", __func__, __LINE__,
-              aml_out, abuffer->size, aml_out->hal_internal_format,adev->ms12_ott_enable,adev->continuous_audio_mode,aml_out->hw_sync_mode);
+        ALOGI("[%s:%d] out:%p bytes:%zu,format:%#x,conti:%d,hw_sync:%d", __func__, __LINE__,
+              aml_out, abuffer->size, aml_out->hal_internal_format,adev->continuous_audio_mode,aml_out->hw_sync_mode);
         ALOGI("[%s:%d] hal_format:%#x, out_usecase:%s, dev_usecase_masks:%#x", __func__, __LINE__,
             aml_out->hal_format, usecase2Str(aml_out->usecase), adev->usecase_masks);
     }
@@ -8100,13 +8088,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
         /*
         continuous mode,available dolby format coming,need set main dolby dummy to false
         */
-        if (continuous_mode(adev) && adev->ms12_main1_dolby_dummy == true
-            && (!audio_is_linear_pcm(aml_out->hal_internal_format) && is_dolby_ms12_support_compression_format(aml_out->hal_internal_format))) {
-            pthread_mutex_lock(&adev->lock);
-            dolby_ms12_set_main_dummy(0, false);
-            adev->ms12_main1_dolby_dummy = false;
-
-            pthread_mutex_unlock(&adev->lock);
+        if (!aml_out->is_ms12_main_decoder) {
             pthread_mutex_lock(&adev->trans_lock);
             ms12_out->hal_internal_format = aml_out->hal_internal_format;
             ms12_out->avsync_type = aml_out->avsync_type;
@@ -8115,23 +8097,6 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
             ms12_out->hal_ch = aml_out->hal_ch;
             ms12_out->hal_rate = aml_out->hal_rate;
             pthread_mutex_unlock(&adev->trans_lock);
-            ALOGI("%s set dolby main1 dummy false", __func__);
-        } else if (continuous_mode(adev) && adev->ms12_ott_enable == false
-                   && (audio_is_linear_pcm(aml_out->hal_internal_format) || !is_dolby_ms12_support_compression_format(aml_out->hal_internal_format))) {
-            pthread_mutex_lock(&adev->lock);
-            dolby_ms12_set_main_dummy(1, false);
-            adev->ms12_ott_enable = true;
-
-            pthread_mutex_unlock(&adev->lock);
-            pthread_mutex_lock(&adev->trans_lock);
-            ms12_out->hal_internal_format = aml_out->hal_internal_format;
-            ms12_out->avsync_type = aml_out->avsync_type;
-            ms12_out->hw_sync_mode = aml_out->hw_sync_mode;
-            ms12_out->hwsync = aml_out->hwsync;
-            ms12_out->hal_ch = aml_out->hal_ch;
-            ms12_out->hal_rate = aml_out->hal_rate;
-            pthread_mutex_unlock(&adev->trans_lock);
-            ALOGI("%s set dolby ott enable", __func__);
         }
     }
 
@@ -10696,20 +10661,9 @@ int adev_ms12_prepare(struct audio_hw_device *dev) {
 
     get_sink_format(&aml_out->stream);
 
-    adev->ms12_main1_dolby_dummy = main1_dummy;
-    adev->ms12_ott_enable = ott_input;
-
-    dolby_ms12_set_ott_sound_input_enable(true);
-    dolby_ms12_set_dolby_main1_as_dummy_file(true);
-
     adev->continuous_audio_mode = true;
     adev->ms12.is_continuous_paused = false;
     ret = get_the_dolby_ms12_prepared(aml_out, aformat, AUDIO_CHANNEL_OUT_STEREO, 48000);
-
-    if (continuous_mode(adev) && adev->ms12.dolby_ms12_enable) {
-        dolby_ms12_set_main_dummy(0, main1_dummy);
-        dolby_ms12_set_main_dummy(1, !ott_input);
-    }
 
     /*the stream will be used in ms12, don't close it*/
     //adev_close_output_stream_new(dev, stream_out);
@@ -11182,8 +11136,6 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     for (i = 0; i < INPORT_MAX; i++) {
         adev->src_gain[i] = 1.0f;
     }
-    adev->ms12_main1_dolby_dummy = true;
-    adev->ms12_ott_enable = false;
     adev->continuous_audio_mode_default = 0;
     adev->need_remove_conti_mode = false;
 #ifdef BUILD_LINUX

@@ -551,8 +551,6 @@ struct aml_audio_device {
     bool is_has_video;
     struct aml_stream_out *ms12_out;
     int spdif_fmt_hw;
-    bool ms12_ott_enable;
-    bool ms12_main1_dolby_dummy;
     /*amlogic soft ware noise gate fot analog TV source*/
     void* aml_ng_handle;
     int aml_ng_enable;
