@@ -355,7 +355,7 @@ static int get_ms12_tunnel_latency_offset(enum OUT_PORT port
     bool is_tunnel = true;
 
     if (is_netflix) {
-        input_latency_ms  = get_ms12_netflix_tunnel_input_latency(input_format);
+        //input_latency_ms  = get_ms12_netflix_tunnel_input_latency(input_format);
         output_latency_ms = get_ms12_netflix_output_latency(output_format);
         if ((output_format == AUDIO_FORMAT_E_AC3) || (output_format == AUDIO_FORMAT_AC3)) {
             output_latency_ms += AVSYNC_MS12_NETFLIX_DDP_OUT_TUNNEL_TUNNING;

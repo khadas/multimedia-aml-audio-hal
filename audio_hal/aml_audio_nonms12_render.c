@@ -478,7 +478,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
                     }
                 }
                 //for next loop
-                ainput.pts = dec_pcm_data->pts + out_frames * 1000 * 90 /dec_pcm_data->data_sr;
+                //ainput.pts = dec_pcm_data->pts + out_frames * 1000 * 90 /dec_pcm_data->data_sr;
                 aml_dec->out_frame_pts = ainput.pts;
                 if (adev->patch_src == SRC_HDMIIN ||
                             adev->patch_src == SRC_SPDIFIN ||

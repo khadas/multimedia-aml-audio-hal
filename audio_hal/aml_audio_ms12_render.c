@@ -329,7 +329,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
                                     dec_pcm_data->data_sr, dec_pcm_data->data_ch, mediasync_util->payload_offset);
                     }
                     //for next loop
-                    ainput.pts = dec_pcm_data->pts + out_frames * 1000 * 90 /dec_pcm_data->data_sr;
+                    //ainput.pts = dec_pcm_data->pts + out_frames * 1000 * 90 /dec_pcm_data->data_sr;
                     aml_dec->out_frame_pts = ainput.pts;
                     pcm_abuffer.size = dec_pcm_data->data_len;
                     pcm_abuffer.buffer = dec_data;
