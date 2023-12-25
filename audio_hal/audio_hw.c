@@ -5667,6 +5667,22 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             goto exit;
         }
     }
+    ret = str_parms_get_str(parms, "dmx_mode", value, sizeof(value));
+    if (ret >= 0) {
+        char *parm = strstr(kvpairs, "=");
+        pthread_mutex_lock(&adev->lock);
+        if (parm) {
+            if (strstr(parm+1, "-dmx")) {
+                adev->downmix_type = atoi(parm+5);//refer to enum: AM_DownMixMode_t
+                AM_LOGD("%s, downmix_type %d", parm+5, adev->downmix_type);
+                if (eDolbyMS12Lib == adev->dolby_lib_type) {
+                    aml_ms12_update_runtime_params(&(adev->ms12), parm+1);
+                }
+            }
+        }
+        pthread_mutex_unlock(&adev->lock);
+        goto exit;
+    }
 
     ret = str_parms_get_str(parms, "drc_mode", value, sizeof(value));
     if (ret >= 0) {
