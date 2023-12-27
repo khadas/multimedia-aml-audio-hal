@@ -265,6 +265,7 @@ int aml_ms12_main_decoder_open(struct dolby_ms12_desc *ms12_desc
 }
 
 int aml_ms12_main_decoder_close(struct dolby_ms12_desc *ms12_desc) {
+    ALOGI("+%s() enter", __FUNCTION__);
     dolby_ms12_main_decoder_close(ms12_desc->dolby_ms12_ptr);
     return 0;
 }

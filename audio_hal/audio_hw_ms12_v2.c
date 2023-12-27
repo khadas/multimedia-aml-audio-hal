@@ -1847,25 +1847,26 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12, bool set_non_continuous
     int is_quit = 1;
     int i = 0;
     struct aml_audio_device *adev = NULL;
-    ALOGI("+%s()", __FUNCTION__);
+    AM_LOGI("enter");
     if (!ms12) {
+        AM_LOGI("exit");
         return -EINVAL;
     }
     adev = ms12_to_adev(ms12);
+    adev->ms12_to_be_cleanup = true;
     pthread_mutex_lock(&ms12->lock);
     pthread_mutex_lock(&ms12->main_lock);
 
     if (!ms12->dolby_ms12_init_flags) {
-        ALOGI("ms12 is not init, don't need cleanup");
+        AM_LOGI("ms12 is not init, don't need cleanup");
         if (set_non_continuous) {
             adev->continuous_audio_mode = 0;
-            ALOGI("%s set ms12 to non continuous mode", __func__);
+            AM_LOGI("set ms12 to non continuous mode");
         }
         goto exit;
     }
 
     adev->doing_cleanup_ms12 = true;
-    ms12->dolby_ms12_init_flags = false;
 
     ALOGI("++%s(), locked", __FUNCTION__);
     ALOGI("%s() dolby_ms12_set_quit_flag %d", __FUNCTION__, is_quit);
@@ -1898,6 +1899,7 @@ int get_dolby_ms12_cleanup(struct dolby_ms12_desc *ms12, bool set_non_continuous
     ms12->main_input_rate = DDP_OUTPUT_SAMPLE_RATE;
     ms12->main_buffer_min_level = 0xFFFFFFFF;
     ms12->main_buffer_max_level = 0;
+    ms12->dolby_ms12_init_flags = false;
 
     audio_virtual_buf_close(&ms12->system_virtual_buf_handle);
     aml_ac3_parser_close(ms12->ac3_parser_handle);
@@ -1945,7 +1947,8 @@ exit:
     ALOGI("--%s(), locked", __FUNCTION__);
     pthread_mutex_unlock(&ms12->main_lock);
     pthread_mutex_unlock(&ms12->lock);
-    ALOGI("-%s()", __FUNCTION__);
+    adev->ms12_to_be_cleanup = false;
+    AM_LOGI("exit");
     return 0;
 }
 
@@ -3039,7 +3042,8 @@ Aml_MS12_SyncPolicy_t ms12_dtv_sync_callback(void *priv_data, unsigned long long
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     struct aml_audio_patch *patch = adev->audio_patch;
-    aml_dtvsync_t *aml_dtvsync = NULL;
+    //aml_dtvsync_t *aml_dtvsync = NULL;
+    audio_hwsync_mediasync_t *aml_dtvsync = NULL;
     struct dtvsync_audio_policy *async_policy = NULL;
     uint64_t apts = 0;
     uint64_t new_apts = 0;
@@ -3060,7 +3064,7 @@ Aml_MS12_SyncPolicy_t ms12_dtv_sync_callback(void *priv_data, unsigned long long
             return audio_sync_policy;
         }
 
-        aml_dtvsync = patch->dtvsync;
+        aml_dtvsync = &(aml_out->hwsync->es_mediasync);//patch->dtvsync;
         consume_payload = dolby_ms12_get_main_bytes_consumed(stream_out);
 
         if (aml_out->hal_rate != 48000 && aml_out->hal_rate !=0) {
@@ -3078,7 +3082,9 @@ Aml_MS12_SyncPolicy_t ms12_dtv_sync_callback(void *priv_data, unsigned long long
         }
         if (aml_dtvsync) {
             async_policy = &(aml_dtvsync->apolicy);
-            ret = aml_audio_hwsync_lookup_apts(aml_out->hwsync, consume_payload, &apts);
+            audio_mediasync_util_t * mediasync_util = aml_audio_get_mediasync_util_handle();
+            ret = aml_audio_mediasync_util_lookup_apts(mediasync_util, consume_payload, &apts);
+            //ret = aml_audio_hwsync_lookup_apts(aml_out->hwsync, consume_payload, &apts);
             if (ret == 0) {
                 if (apts > delay_pts_diff) {
                     new_apts = apts - delay_pts_diff;
@@ -3124,7 +3130,8 @@ Aml_MS12_SyncPolicy_t ms12_dtv_sync_callback(void *priv_data, unsigned long long
                 ms12_do_dtv_sync(stream_out);
 
                 if (async_policy->audiopolicy != DTVSYNC_AUDIO_NORMAL_OUTPUT)
-                    ALOGI("cur policy:%d, prm1:%d, prm2:%d\n", async_policy->audiopolicy,
+                    ALOGI("cur policy:%d(%s), prm1:%d, prm2:%d\n", async_policy->audiopolicy,
+                        mediasyncAudiopolicyType2Str(async_policy->audiopolicy),
                         async_policy->param1, async_policy->param2);
 
                 if (async_policy->audiopolicy == DTVSYNC_AUDIO_DROP_PCM) {
@@ -3472,6 +3479,7 @@ int dolby_ms12_main_open(struct audio_stream_out *stream) {
     aml_ms12_main_decoder_open(ms12, hal_internal_format, aml_out->hal_channel_mask, sample_rate);
 
 #ifdef USE_DTV
+#if 0 //This code will make DTV silent, so it will be temporarily removed.
     if ((adev->patch_src == SRC_DTV) && patch) {
         if (ms12->scaletempo == NULL) {
             hal_scaletempo_init((struct scale_tempo **)&ms12->scaletempo);
@@ -3484,6 +3492,7 @@ int dolby_ms12_main_open(struct audio_stream_out *stream) {
         }
 
     }
+#endif
 #endif
     /* In Netflix test case, the volume should add into the list. */
     /* In DTV case, at start, will set the 0.0 to mute, after about 100~200ms, the volume will set to normal value.*/

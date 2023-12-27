@@ -689,6 +689,7 @@ void aml_dtvsync_ms12_get_policy(struct audio_stream_out *stream)
 
     if (!(MEDIA_SYNC_TSMODE(aml_out)))
     {
+        AM_LOGE("aml_out->hwsync:%p, aml_out->dtvsync_enable:%p, error!", aml_out->hwsync, aml_out->dtvsync_enable);
         return;
     }
 
@@ -703,11 +704,12 @@ void aml_dtvsync_ms12_get_policy(struct audio_stream_out *stream)
             return;
         }
 
-        if (adev->debug_flag > 0) {
-            ALOGI("[%s:%d], ts m_audiopolicy=%d=%s, param1=%u, param2=%u, org_pts=0x%llx, cur_pts=0x%llx", __func__, __LINE__,
+        if (adev->debug_flag > 0 || m_audiopolicy.audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT) {
+            ALOGI("[%s:%d], ts m_audiopolicy=%d=%s, param1=%u, param2=%u, org_pts=0x%llx(%lldms), cur_pts=0x%llx(%lldms)", __func__, __LINE__,
                 m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
                 m_audiopolicy.param1, m_audiopolicy.param2,
-                p_esmediasync->out_start_apts, p_esmediasync->cur_outapts);
+                p_esmediasync->out_start_apts, p_esmediasync->out_start_apts/90,
+                p_esmediasync->cur_outapts, p_esmediasync->cur_outapts/90);
         }
 
         if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
@@ -721,9 +723,10 @@ void aml_dtvsync_ms12_get_policy(struct audio_stream_out *stream)
             }
         }
 
-        if (adev->audio_patch
-            && ((adev->audio_patch->input_thread_exit == 1) || (adev->audio_patch->output_thread_exit == 1))) {
-            ALOGI("input exit, break now.");
+        if ((adev->audio_patch
+            && ((adev->audio_patch->input_thread_exit == 1) || (adev->audio_patch->output_thread_exit == 1)))
+            || adev->ms12_to_be_cleanup) {
+            AM_LOGI("input exit, break now.");
             break;
         }
     } while (aml_out->hwsync && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
