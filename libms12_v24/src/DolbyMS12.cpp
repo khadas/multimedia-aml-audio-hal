@@ -71,7 +71,6 @@ void (*FuncDolbyMS12SetQuitFlag)(int);
 void (*FuncDolbyMS12FlushInputBuffer)(void);
 void (*FuncDolbyMS12FlushMainInputBuffer)(void);
 void (*FuncDolbyMS12FlushAppInputBuffer)(void);
-void (*FuncDolbyMS12SetMainDummy)(int, int);
 unsigned long long (*FuncDolbyMS12GetNBytesConsumed)(void *, int, int);
 unsigned long long (*FuncDolbyMS12GetNFramesPCMOutput)(void *, int, int);
 unsigned long long (*FuncDolbyMS12GetContinuousNFramesPCMOutput)(void *, int);
@@ -269,11 +268,6 @@ int DolbyMS12::GetLibHandle(char *dolby_ms12_path)
     FuncDolbyMS12FlushAppInputBuffer = (void (*)(void))  dlsym(mDolbyMS12LibHandle, "ms12_flush_app_input_buffer");
     if (!FuncDolbyMS12FlushAppInputBuffer) {
         ALOGE("%s, dlsym FuncDolbyMS12FlushAppInputBuffer fail\n", __FUNCTION__);
-        goto ERROR;
-    }
-    FuncDolbyMS12SetMainDummy = (void (*)(int, int))  dlsym(mDolbyMS12LibHandle, "ms12_set_main_dummy");
-    if (!FuncDolbyMS12SetMainDummy) {
-        ALOGE("%s, dlsym ms12_set_main_dummy fail\n", __FUNCTION__);
         goto ERROR;
     }
 
@@ -478,7 +472,6 @@ void DolbyMS12::ReleaseLibHandle(void)
     FuncDolbyMS12GetMainBufferAvail = NULL;
     FuncDolbyMS12GetAssociateBufferAvail = NULL;
     FuncDolbyMS12GetSystemBufferAvail = NULL;
-    FuncDolbyMS12SetMainDummy = NULL;
     FuncDolbyMS12Config = NULL;
     FuncDumpDolbyMS12Info = NULL;
     FuncDolbyMS12GetAudioInfo = NULL;
@@ -908,20 +901,6 @@ void DolbyMS12::DolbyMS12FlushAppInputBuffer(void)
     }
 
     (*FuncDolbyMS12FlushAppInputBuffer)();
-    ALOGV("-%s() ret %d", __FUNCTION__, ret);
-    return ;
-}
-
-void DolbyMS12::DolbyMS12SetMainDummy(int type, int dummy)
-{
-    int ret = 0;
-    ALOGV("+%s()", __FUNCTION__);
-    if (!FuncDolbyMS12SetMainDummy) {
-        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
-        return ;
-    }
-
-    (*FuncDolbyMS12SetMainDummy)(type, dummy);
     ALOGV("-%s() ret %d", __FUNCTION__, ret);
     return ;
 }
