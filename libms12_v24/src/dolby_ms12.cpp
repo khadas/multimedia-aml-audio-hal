@@ -377,16 +377,6 @@ extern "C" void dolby_ms12_flush_app_input_buffer(void)
     }
 }
 
-extern "C" void dolby_ms12_set_main_dummy(int type, int dummy)
-{
-    ALOGI("%s() %d, %d\n", __FUNCTION__, type, dummy);
-    android::DolbyMS12* dolby_ms12_instance = getInstance();
-    if (dolby_ms12_instance) {
-        dolby_ms12_instance->DolbyMS12SetMainDummy(type, dummy);
-    }
-}
-
-
 extern "C" unsigned long long dolby_ms12_get_decoder_n_bytes_consumed(void *ms12_pointer, int format, int is_main)
 {
     ALOGV("%s()\n", __FUNCTION__);

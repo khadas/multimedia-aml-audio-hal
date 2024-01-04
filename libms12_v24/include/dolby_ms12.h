@@ -238,8 +238,6 @@ int dolby_ms12_get_associate_buffer_avail(void);
 */
 int dolby_ms12_get_system_buffer_avail(int * max_size);
 
-void dolby_ms12_set_main_dummy(int type, int dummy);
-
 int dolby_ms12_get_gain(int idx);
 
 /*@@

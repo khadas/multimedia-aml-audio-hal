@@ -161,8 +161,6 @@ public:
 
     virtual void    DolbyMS12FlushAppInputBuffer(void);
 
-    virtual void    DolbyMS12SetMainDummy(int type, int dummy);
-
     virtual unsigned long long DolbyMS12GetDecoderNBytesConsumed(void *ms12_pointer, int format, int is_main);
 
     virtual void    DolbyMS12GetPCMOutputSize(unsigned long long *all_output_size, unsigned long long *ms12_generate_zero_size);
