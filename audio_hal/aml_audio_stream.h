@@ -434,6 +434,7 @@ struct aml_audio_patch {
     int mdelay;
     bool start_mute;
     size_t total_data_size;
+    bool digital_input_fmt_change;
 };
 
 stream_usecase_t convert_usecase_mask_to_stream_usecase(usecase_mask_t mask);
