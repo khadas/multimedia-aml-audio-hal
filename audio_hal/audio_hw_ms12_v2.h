@@ -327,10 +327,6 @@ int mat_bitstream_output(void *buffer, void *priv_data, size_t size);
  *@brief set ms12 dap postgain
  */
 void set_ms12_dap_postgain(struct dolby_ms12_desc *ms12, int postgain);
-/*
- *  *@brief set dolby ms12 sync
- *   */
-void set_dolby_ms12_runtime_sync(struct dolby_ms12_desc *ms12, int sync);
 void set_ms12_ac4_presentation_group_index(struct dolby_ms12_desc *ms12, int index);
 /*
  *@brief set ms12 main audio mute or non mute

@@ -480,14 +480,6 @@ void set_ms12_ad_vol(struct dolby_ms12_desc *ms12, int ad_vol)
         aml_ms12_update_runtime_params(ms12, parm);
 }
 
-void set_dolby_ms12_runtime_sync(struct dolby_ms12_desc *ms12, int sync)
-{
-    (void)ms12;
-
-    dolby_ms12_set_sync(sync);
-}
-
-
 void set_dolby_ms12_runtime_system_mixing_enable(struct dolby_ms12_desc *ms12, int system_mixing_enable)
 {
     char parm[12] = "";

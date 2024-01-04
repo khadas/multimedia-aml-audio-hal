@@ -355,7 +355,6 @@ int dolby_ms12_get_latency_for_dd_out(int *latency);
     @brief get the total delay for mat out
 */
 int dolby_ms12_get_latency_for_mat_out(int *latency);
-int dolby_ms12_set_sync(int sync);
 
 /*@@
     @brief add pts gap record

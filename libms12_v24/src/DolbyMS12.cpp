@@ -95,9 +95,6 @@ int (*FuncDolbyMS12HWSyncInit)(void);
 int (*FuncDolbyMS12HWSyncRelease)(void);
 int (*FuncDolbyMS12HWSyncCheckinPTS)(int offset, int apts);
 
-int (*FuncDolbyMS12GetMainUnderrun)();
-void (*FuncDolbyMS12SetSync)(int);
-
 int (*FuncDolbyMS12SetPtsGap)(unsigned long long offset, int pts_duration);
 char * (*FunDolbMS12GetVersion)(void);
 
@@ -374,17 +371,6 @@ int DolbyMS12::GetLibHandle(char *dolby_ms12_path)
         ALOGW("%s, dlsym FuncDolbyMS12HWSyncCheckinPTS fail,ignore it as version difference\n", __FUNCTION__);
     }
 
-    FuncDolbyMS12GetMainUnderrun = (int (*)()) dlsym(mDolbyMS12LibHandle, "get_main_underrun");
-    if (!FuncDolbyMS12GetMainUnderrun) {
-        ALOGW("%s, dlsym FuncDolbyMS12GetMainUnderrun failed\n", __FUNCTION__);
-    }
-
-    FuncDolbyMS12SetSync = (void (*)(int)) dlsym(mDolbyMS12LibHandle, "ms12_set_sync");
-    if (!FuncDolbyMS12SetSync) {
-        ALOGW("%s, dlsym FuncDolbyMS12SetSync failed\n", __FUNCTION__);
-    }
-
-
     FuncDolbyMS12SetPtsGap= (int (*)(unsigned long long, int)) dlsym(mDolbyMS12LibHandle, "ms12_set_pts_gap");
     if (!FuncDolbyMS12SetPtsGap) {
         ALOGW("%s, dlsym FuncDolbyMS12SetPtsGap fail\n", __FUNCTION__);
@@ -481,8 +467,6 @@ void DolbyMS12::ReleaseLibHandle(void)
     FuncDolbyMS12SetDebugLevel = NULL;
     FuncDolbyMS12GetNBytesConsumedSysSound = NULL;
     FuncDolbyMS12GetTotalNFramesDelay = NULL;
-    FuncDolbyMS12GetMainUnderrun = NULL;
-    FuncDolbyMS12SetSync = NULL;
     FuncDolbyMS12SetPtsGap = NULL;
 
     /* MAT Encoder API Begin */
@@ -1268,32 +1252,6 @@ int DolbyMS12::DolbyMS12GetLatencyForMultiChannelOut(int *latency)
     ALOGV("-%s() ret %d", __FUNCTION__, ret);
     return ret;
 }
-
-int DolbyMS12::DolbyMS12GetMainUnderrun()
-{
-    int ret = 0;
-    ALOGV("+%s()", __FUNCTION__);
-    if (!FuncDolbyMS12GetMainUnderrun) {
-        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
-        return ret;
-    }
-
-    ret = (*FuncDolbyMS12GetMainUnderrun)();
-    ALOGV("-%s() ret %d", __FUNCTION__, ret);
-    return ret;
-}
-
-void DolbyMS12::DolbyMS12SetSync(int sync)
-{
-    ALOGV("+%s()", __FUNCTION__);
-    if (!FuncDolbyMS12SetSync) {
-        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
-        return;
-    }
-
-    (*FuncDolbyMS12SetSync)(sync);
-}
-
 
 int DolbyMS12::DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration)
 {

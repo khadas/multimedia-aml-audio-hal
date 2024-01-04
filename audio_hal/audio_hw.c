@@ -6559,9 +6559,6 @@ int do_output_standby_l(struct audio_stream *stream)
                         adev->ms12.need_resync       = 0;
                         adev->need_remove_conti_mode = false;
                     }
-                    if (AVSYNC_TYPE_MSYNC == aml_out->avsync_type) {
-                        set_dolby_ms12_runtime_sync(&(adev->ms12), 0);
-                    }
                 }
             }
         }

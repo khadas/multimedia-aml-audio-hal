@@ -703,9 +703,6 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, uint
             if (out->msync_action == AV_SYNC_AA_RENDER) {
                 clock_gettime(CLOCK_MONOTONIC_RAW, &out->msync_rendered_ts);
                 out->msync_rendered_pts = apts - latency_pts;
-                // force ME12 to insert mode at start
-                set_dolby_ms12_runtime_sync(&(adev->ms12), 1);
-                        //set_dolby_ms12_runtime_pause(&(adev->ms12), 1);
                 ALOGI("START MSYNC action switched to AA_INSERT First");
                 out->msync_action = AV_SYNC_AA_INSERT;
                 p_hwsync->msync_first_insert_flag = true;
@@ -853,16 +850,10 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, uint
                      * and MS12 "-sync <positive>" for insert
                      */
                     if (policy.action == AV_SYNC_AA_INSERT) {
-                        set_dolby_ms12_runtime_sync(&(adev->ms12), 1);
-                        //set_dolby_ms12_runtime_pause(&(adev->ms12), 1);
                         ALOGI("MSYNC action switched to AA_INSERT.");
                     } else if (policy.action == AV_SYNC_AA_DROP) {
-                        set_dolby_ms12_runtime_sync(&(adev->ms12), -1);
-                        //set_dolby_ms12_runtime_pause(&(adev->ms12), 0);
                         ALOGI("MSYNC action switched to AA_DROP.");
                     } else {
-                        set_dolby_ms12_runtime_sync(&(adev->ms12), 0);
-                        //set_dolby_ms12_runtime_pause(&(adev->ms12), 0);
                         ALOGI("MSYNC action switched to AA_RENDER.");
                     }
                     out->msync_action = policy.action;

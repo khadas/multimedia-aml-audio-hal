@@ -234,9 +234,6 @@ public:
         , mat_enc_config_t *config
         );
 
-    virtual void    DolbyMS12SetSync(int sync);
-    virtual int     DolbyMS12GetMainUnderrun();
-
     virtual int     DolbyMS12SetPtsGap(unsigned long long offset, int pts_duration);
     virtual char *  DolbMS12GetVersion(void);
 
