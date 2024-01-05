@@ -96,29 +96,13 @@ int release_dtv_patch_l(struct aml_audio_device *dev);
 //int dtv_patch_add_cmd(int cmd);
 int dtv_in_read(struct audio_stream_in *stream, void* buffer, size_t bytes);
 void dtv_in_write(struct audio_stream_out *stream, const void* buffer, size_t bytes);
-void save_latest_dtv_aformat(int afmt);
 int audio_set_spdif_clock(struct aml_stream_out *stream,int type);
-int dtv_get_syncmode(void);
 
-void clean_dtv_patch_pts(struct aml_audio_patch *patch);
-int audio_decoder_status(unsigned int *perror_count);
 extern size_t aml_alsa_output_write(struct audio_stream_out *stream, void *buffer, size_t bytes);
 
-extern int get_tsync_pcr_debug(void);
-extern int get_video_delay(void);
-extern void set_video_delay(int delay_ms);
-extern void dtv_do_process_pcm(int avail, struct aml_audio_patch *patch,
-                            struct audio_stream_out *stream_out);
-extern void dtv_do_insert_zero_pcm(struct aml_audio_patch *patch,
-                            struct audio_stream_out *stream_out);
-extern void dtv_do_drop_pcm(int avail, struct aml_audio_patch *patch);
 extern void dtv_adjust_output_clock(struct aml_audio_patch * patch, int direct, int step, bool is_dual);
-extern void dtv_avsync_process(struct aml_audio_patch* patch, struct aml_stream_out* stream_out);
 
-extern void decoder_set_pcrsrc(unsigned int pcrsrc);
-int get_audio_checkin_underrun(void);
 int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val);
-bool is_dtv_patch_alive(struct aml_audio_device *aml_dev);
 int dtv_patch_get_latency(struct aml_audio_device *aml_dev);
 bool dtv_is_secure(void *dtv_instances);
 

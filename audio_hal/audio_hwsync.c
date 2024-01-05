@@ -91,192 +91,6 @@ void* aml_hwsync_mediasync_create()
     return NULL;
 }
 
-void aml_hwsync_set_tsync_init(audio_hwsync_t *p_hwsync)
-{
-    ALOGI("%s", __func__);
-    return aml_hwsync_wrap_set_tsync_init(p_hwsync);
-}
-
-void aml_hwsync_set_tsync_pause(audio_hwsync_t *p_hwsync)
-{
-    ALOGI("%s", __func__);
-    return aml_hwsync_wrap_set_tsync_pause(p_hwsync);
-}
-
-void aml_hwsync_set_tsync_resume(audio_hwsync_t *p_hwsync)
-{
-    ALOGI("%s", __func__);
-    return aml_hwsync_wrap_set_tsync_resume(p_hwsync);
-}
-
-void aml_hwsync_set_tsync_stop(audio_hwsync_t *p_hwsync)
-{
-    ALOGI("%s", __func__);
-    return aml_hwsync_wrap_set_tsync_stop(p_hwsync);
-}
-
-int aml_hwsync_set_tsync_start_pts(audio_hwsync_t *p_hwsync, uint32_t pts)
-{
-    ALOGI("%s", __func__);
-    return aml_hwsync_wrap_set_tsync_start_pts(p_hwsync, pts);
-}
-
-int aml_hwsync_set_tsync_start_pts64(audio_hwsync_t *p_hwsync, uint64_t pts)
-{
-    ALOGV("%s", __func__);
-    return aml_hwsync_wrap_set_tsync_start_pts64(p_hwsync, pts);
-}
-
-int aml_hwsync_get_tsync_pts(audio_hwsync_t *p_hwsync, uint32_t *pts)
-{
-    ALOGV("%s", __func__);
-    return aml_hwsync_wrap_get_tsync_pts(p_hwsync, pts);
-}
-
-int aml_hwsync_get_tsync_apts(audio_hwsync_t *p_hwsync, uint32_t *pts)
-{
-    ALOGV("%s", __func__);
-    return aml_hwsync_wrap_get_tsync_apts(p_hwsync, pts);
-}
-
-int aml_hwsync_get_tsync_vpts(audio_hwsync_t *p_hwsync, uint32_t *pts)
-{
-    ALOGV("%s", __func__);
-    return aml_hwsync_wrap_get_tsync_vpts(p_hwsync, pts);
-}
-
-int aml_hwsync_get_tsync_firstvpts(audio_hwsync_t *p_hwsync, uint32_t *pts)
-{
-    ALOGV("%s", __func__);
-    return aml_hwsync_wrap_get_tsync_firstvpts(p_hwsync, pts);
-}
-
-int aml_hwsync_get_tsync_video_started(audio_hwsync_t *p_hwsync, uint32_t *video_started)
-{
-    ALOGV("%s", __func__);
-    return aml_hwsync_wrap_get_tsync_video_started(p_hwsync, video_started);
-}
-
-int aml_hwsync_reset_tsync_pcrscr(audio_hwsync_t *p_hwsync, uint32_t pts)
-{
-    ALOGV("%s", __func__);
-    return aml_hwsync_wrap_reset_tsync_pcrscr(p_hwsync, pts);
-}
-
-void aml_hwsync_wait_video_start(audio_hwsync_t *p_hwsync)
-{
-    int waitcount = 0;
-    int ret = -1;
-
-    if (!p_hwsync->use_mediasync) {
-        return;
-    }
-
-    waitcount = aml_audio_property_get_int("vender.media.audio.hal.waitvpts.count", 100);
-    aml_hwsync_wrap_wait_video_start(p_hwsync, waitcount);
-    return;
-}
-
-void aml_hwsync_wait_video_drop(audio_hwsync_t *p_hwsync, uint32_t cur_pts)
-{
-    int waitcount = 0;
-    int ret = -1;
-
-    if (!p_hwsync->use_mediasync) {
-        return;
-    }
-
-    waitcount = aml_audio_property_get_int("vender.media.audio.hal.waitvpts.count", 100);
-    aml_hwsync_wrap_wait_video_drop(p_hwsync, cur_pts, waitcount);
-    return;
-}
-
-int aml_hwsync_open_tsync(void)
-{
-    ALOGI("%s", __func__);
-    return open(TSYNC_PCRSCR, O_RDONLY);
-}
-
-void aml_hwsync_close_tsync(int fd)
-{
-    ALOGI("%s", __func__);
-    if (fd >= 0) {
-        ALOGE("%s(), fd = %d", __func__, fd);
-        close(fd);
-    }
-}
-
-int aml_hwsync_get_tsync_pts_by_handle(int fd, uint32_t *pts)
-{
-    ALOGI("%s", __func__);
-    char valstr[64];
-    uint32_t val = 0;
-    int ret = 0;
-
-    if (!pts) {
-        ALOGE("%s(), NULL pointer", __func__);
-        return -EINVAL;
-    }
-
-    if (fd >= 0) {
-        memset(valstr, 0, 64);
-        lseek(fd, 0, SEEK_SET);
-        ret = read(fd, valstr, 64 - 1);
-        if (ret < 0) {
-            ALOGE("%s(), fail to read", __func__);
-        }
-        valstr[strlen(valstr)] = '\0';
-    } else {
-        ALOGE("invalid fd\n");
-        return -EINVAL;
-    }
-
-    if (sscanf(valstr, "0x%x", &val) < 1) {
-        ALOGE("unable to get pts from: fd(%d), str(%s)", fd, valstr);
-        return -EINVAL;
-    }
-    *pts = val;
-    return 0;
-}
-
-static int aml_audio_hwsync_get_pcr(audio_hwsync_t *p_hwsync, uint32_t *value)
-{
-    int fd = -1;
-    char valstr[64];
-    uint32_t val = 0;
-    off_t offset;
-    int ret = 0;
-    if (!p_hwsync) {
-        ALOGE("invalid pointer %s", __func__);
-        return -1;
-    }
-    if (p_hwsync->tsync_fd < 0) {
-        fd = open(TSYNC_PCRSCR, O_RDONLY);
-        p_hwsync->tsync_fd = fd;
-        ALOGI("%s open tsync fd %d", __func__, fd);
-    } else {
-        fd = p_hwsync->tsync_fd;
-    }
-    if (fd >= 0) {
-        memset(valstr, 0, 64);
-        offset = lseek(fd, 0, SEEK_SET);
-        ret = read(fd, valstr, 64 - 1);
-        if (ret < 0) {
-            ALOGE("%s(), fail to read", __func__);
-        }
-        valstr[strlen(valstr)] = '\0';
-    } else {
-        ALOGE("%s unable to open file %s\n", __func__, TSYNC_PCRSCR);
-        return -1;
-    }
-    if (sscanf(valstr, "0x%x", &val) < 1) {
-        ALOGE("%s unable to get pcr from: %s,fd %d,offset %ld", __func__, valstr, fd, offset);
-        return -1;
-    }
-    *value = val;
-    return 0;
-}
-
 void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out)
 {
     ALOGI("%s p_hwsync %p out %p\n", __func__, p_hwsync, out);
@@ -525,25 +339,6 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
     pts32 = (uint32_t)pts;
     p_hwsync->first_apts = pts;
 
-    if (AVSYNC_TYPE_MSYNC != p_hwsync->aout->avsync_type) {
-        p_hwsync->first_apts_flag = true;
-
-        if (!p_hwsync->use_mediasync) {
-            while (delay_count < 10) {
-                vframe_ready_cnt = get_sysfs_int("/sys/class/video/vframe_ready_cnt");
-                ALOGV("/sys/class/video/vframe_ready_cnt is %d", vframe_ready_cnt);
-                if (vframe_ready_cnt < 2) {
-                    usleep(10000);
-                    delay_count++;
-                    continue;
-                }
-                break;
-            }
-        }
-        if (aml_hwsync_set_tsync_start_pts(p_hwsync, pts32) < 0)
-            return -EINVAL;
-    }
-
     if (p_hwsync->aout->msync_session) {
         ALOGI("%s apts:%d", __func__, pts32);
         int r = av_sync_audio_start(p_hwsync->aout->msync_session, pts32, 0,
@@ -572,7 +367,6 @@ int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts)
         }
     }
 
-    p_hwsync->aout->tsync_status = TSYNC_STATUS_RUNNING;
     return 0;
 }
 
@@ -716,48 +510,6 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, uint
 
             if (p_hwsync->eos && (eDolbyMS12Lib == adev->dolby_lib_type) && continuous_mode(adev)) {
                 return 0;
-            }
-
-            if (AVSYNC_TYPE_TSYNC == p_hwsync->aout->avsync_type) {
-                ret = aml_audio_hwsync_get_pcr(p_hwsync, &pcr);
-
-                if (ret == 0) {
-                    gap = get_pts_gap(pcr, apts);
-                    gap_ms = gap / 90;
-                    if (debug_enable) {
-                        ALOGI("%s pcr 0x%x,apts 0x%x,gap 0x%x,gap duration %d ms", __func__, pcr, apts, gap, gap_ms);
-                    }
-                    /*resume from pause status, we can sync it exactly*/
-                    if (adev->ms12.need_resync) {
-                        adev->ms12.need_resync = 0;
-                        if (apts > pcr) {
-                            *p_adjust_ms = gap_ms;
-                            ALOGE("%s resync p_adjust_ms %d\n", __func__, *p_adjust_ms);
-                        }
-                    }
-                    if (gap > APTS_DISCONTINUE_THRESHOLD_MIN && gap < APTS_DISCONTINUE_THRESHOLD_MAX) {
-                        if (apts > pcr) {
-                            /*during video stop, pcr has been reset by video
-                            we need ignore such pcr value*/
-                            if (pcr != 0) {
-                                *p_adjust_ms = gap_ms;
-                                ALOGE("%s *p_adjust_ms %d\n", __func__, *p_adjust_ms);
-                            } else {
-                                ALOGE("pcr has been reset\n");
-                            }
-                        } else {
-                            ALOGI("tsync -> reset pcrscr 0x%x -> 0x%x, %s big,diff %"PRIx64" ms",
-                                pcr, apts, apts > pcr ? "apts" : "pcr", get_pts_gap(apts, pcr) / 90);
-                            int ret_val = aml_hwsync_reset_tsync_pcrscr(p_hwsync, apts);
-                            if (ret_val == -1) {
-                                ALOGE("unable to open file %s,err: %s", TSYNC_APTS, strerror(errno));
-                            }
-                        }
-                    } else if (gap > APTS_DISCONTINUE_THRESHOLD_MAX) {
-                        ALOGE("%s apts exceed the adjust range,need check apts 0x%x,pcr 0x%x",
-                            __func__, apts, pcr);
-                    }
-                }
             }
 
             if (out->msync_session &&  AVSYNC_TYPE_MSYNC == p_hwsync->aout->avsync_type) {

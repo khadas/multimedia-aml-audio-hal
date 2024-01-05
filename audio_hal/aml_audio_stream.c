@@ -1086,10 +1086,6 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
                 pstPatch->dtv_symple_rate,pstPatch->dtv_pcm_channel,
                 pstPatch->dtv_replay_flag,pstPatch->dtv_output_clock,
                 pstPatch->dtv_default_i2s_clock,pstPatch->dtv_default_spdif_clock);
-        dprintf(fd, "[AML_HAL] dtv_audio_mode:%d,dtv_apts_lookup:%d,dtv_audio_tune:%d,avsync_callback:%p,dtv_output_mutex:%p,dtv_input_mutex:%p\n",
-                pstPatch->dtv_audio_mode,pstPatch->dtv_apts_lookup,
-                pstPatch->dtv_audio_tune,pstPatch->avsync_callback,
-                &(pstPatch->dtv_output_mutex),&(pstPatch->dtv_input_mutex));
         dprintf(fd, "[AML_HAL] dtv_cmd_process_cond:%p,dtv_cmd_process_mutex:%p,dtv_log_retry_cnt:%d,dtvsync:%p,dtv_cmd_list:%p,dtv_package_list %p\n",
                 &(pstPatch->dtv_cmd_process_cond),&(pstPatch->dtv_cmd_process_mutex),
                 pstPatch->dtv_log_retry_cnt,pstPatch->dtvsync,

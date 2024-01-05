@@ -385,7 +385,6 @@ struct aml_audio_patch {
     unsigned int cur_outapts;
     unsigned int anchor_apts;
     unsigned int show_first_frame;
-    dtv_avsync_process_cb avsync_callback;
     pthread_mutex_t dtv_output_mutex;
     pthread_mutex_t dtv_input_mutex;
     pthread_cond_t  dtv_cmd_process_cond;

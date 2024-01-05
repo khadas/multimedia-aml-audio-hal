@@ -143,7 +143,7 @@ int dolby_ms12_main_resume(struct audio_stream_out *stream)
     //ms12_runtime_update_ret = aml_ms12_update_runtime_params(ms12);
     ms12_runtime_update_ret = set_dolby_ms12_runtime_pause(ms12, false);
     if ((aml_out->hw_sync_mode) && (aml_out->tsync_status == TSYNC_STATUS_PAUSED) && (1 == adev->continuous_audio_mode)) {
-        aml_hwsync_set_tsync_resume(aml_out->hwsync);
+        mediasync_wrap_setPause(aml_out->hwsync->es_mediasync.mediasync, false);
         aml_out->tsync_status = TSYNC_STATUS_RUNNING;
     }
     ms12->is_continuous_paused = false;

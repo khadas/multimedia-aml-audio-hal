@@ -222,9 +222,6 @@ int remove_all_inport_messages(input_port *port)
     list_for_each_safe(node, n, &port->msg_list) {
         p_msg = node_to_item(node, port_message, list);
         AM_LOGI("msg what %s", port_msg_to_str(p_msg->msg_what));
-        //won't do tsync pause, because this port doesn't HWSYNC
-        //if (p_msg->msg_what == MSG_PAUSE)
-        //    aml_hwsync_wrap_set_tsync_pause(NULL);
         list_remove(&p_msg->list);
         aml_audio_free(p_msg);
     }
@@ -256,23 +253,6 @@ int remove_outport_message(output_port *port, port_message *p_msg)
     pthread_mutex_unlock(&port->msg_lock);
     aml_audio_free(p_msg);
 
-    return 0;
-}
-
-int remove_all_outport_messages(output_port *port)
-{
-    port_message *p_msg = NULL;
-    struct listnode *node = NULL, *n = NULL;
-    pthread_mutex_lock(&port->msg_lock);
-    list_for_each_safe(node, n, &port->msg_list) {
-        p_msg = node_to_item(node, port_message, list);
-        AM_LOGI("msg what %s", port_msg_to_str(p_msg->msg_what));
-        if (p_msg->msg_what == MSG_PAUSE)
-            aml_hwsync_set_tsync_pause(NULL);
-        list_remove(&p_msg->list);
-        aml_audio_free(p_msg);
-    }
-    pthread_mutex_unlock(&port->msg_lock);
     return 0;
 }
 

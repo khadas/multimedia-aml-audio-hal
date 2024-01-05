@@ -833,16 +833,6 @@ int aml_audio_start_trigger(void *stream)
     char tempbuf[128];
     ALOGI("reset alsa to set the audio start\n");
     pcm_stop(aml_out->pcm);
-    sprintf(tempbuf, "AUDIO_START:0x%x", adev->first_apts);
-    ALOGI("audio start set tsync -> %s", tempbuf);
-
-    aml_hwsync_set_tsync_init(aml_out->hwsync);
-
-
-    if (aml_hwsync_set_tsync_start_pts(aml_out->hwsync, adev->first_apts) == -1) {
-        ALOGE("set AUDIO_START failed \n");
-        return -1;
-    }
     return 0;
 }
 

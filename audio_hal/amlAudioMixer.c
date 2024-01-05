@@ -685,7 +685,7 @@ static void process_port_msg(input_port *in_port)
             audio_hwsync_t *hwsync = (out != NULL) ? (out->hwsync) : NULL;
             AM_LOGI("[%s:%d] hwsync:%p tsync pause", __func__, __LINE__, hwsync);
             if (hwsync != NULL) {
-                aml_hwsync_wrap_set_tsync_pause(hwsync);
+                mediasync_wrap_setPause(hwsync->es_mediasync.mediasync, true);
             }
             set_inport_state(in_port, PAUSING);
             break;
@@ -786,7 +786,7 @@ static int mixer_inports_read(struct amlAudioMixer *audio_mixer)
                     struct aml_stream_out *out = (struct aml_stream_out *)in_port->notify_cbk_data;
                     audio_hwsync_t *hwsync = (out != NULL) ? (out->hwsync) : NULL;
                     AM_LOGI("output port:%s fade out, pausing->pausing_1, tsync pause audio", mixerInputType2Str(type));
-                    aml_hwsync_wrap_set_tsync_pause(hwsync);
+                    mediasync_wrap_setPause(hwsync->es_mediasync.mediasync, true);
                     audio_fade_func(in_port->data, ret, 0);
                     set_inport_state(in_port, PAUSED);
                     /* Mute the last data to prevent gap. */

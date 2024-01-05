@@ -252,7 +252,6 @@ extern void dtv_audio_gap_monitor(struct aml_audio_patch *patch);
 extern void decoder_set_latency(unsigned int latency);
 extern unsigned int decoder_get_latency(void);
 extern int get_audio_discontinue(void);
-extern int dtv_get_tsync_mode(void);
 extern int get_dtv_pcr_sync_mode(void);
 extern unsigned long decoder_apts_lookup(unsigned int offset);
 

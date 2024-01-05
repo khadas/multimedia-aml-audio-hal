@@ -372,51 +372,7 @@ bool mediasync_wrap_getPause(void* handle, bool *pause) {
      }
      return false;
 }
-bool mediasync_wrap_setStartingTimeMedia(void* handle, int64_t startingTimeMediaUs) {
-     if (handle != NULL)  {
-         mediasync_result ret = gMediaSync_setStartingTimeMedia(handle, startingTimeMediaUs);
-         if (ret == AM_MEDIASYNC_OK) {
-            return true;
-         } else {
-            ALOGE("[%s] no ok\n", __func__);
-         }
-     }
-     return false;
-}
-bool mediasync_wrap_clearAnchor(void* handle) {
-     if (handle != NULL)  {
-         mediasync_result ret = gMediaSync_clearAnchor(handle);
-         if (ret == AM_MEDIASYNC_OK) {
-            return true;
-         } else {
-            ALOGE("[%s] no ok\n", __func__);
-         }
-     } else {
-        ALOGE("[%s] no handle\n", __func__);
-     }
-     return false;
-}
-bool mediasync_wrap_updateAnchor(void* handle, int64_t anchorTimeMediaUs,
-                                int64_t anchorTimeRealUs,
-                                int64_t maxTimeMediaUs) {
-     if (handle != NULL)  {
-         bool ispause = false;
-         mediasync_result ret = gMediaSync_getPause(handle, &ispause);
-         if ((ret == AM_MEDIASYNC_OK) && ispause) {
-            gMediaSync_setPause(handle, false);
-         }
 
-         ret = gMediaSync_updateAnchor(handle, anchorTimeMediaUs, anchorTimeRealUs, maxTimeMediaUs);
-         if (ret == AM_MEDIASYNC_OK) {
-            return true;
-         } else {
-            ALOGE("[%s] no ok\n", __func__);
-         }
-     } else {
-        ALOGE("[%s] no handle\n", __func__);
-     }
-     return false;
-}
 bool mediasync_wrap_setPlaybackRate(void* handle, float rate) {
      if (handle != NULL)  {
          mediasync_result ret = gMediaSync_setPlaybackRate(handle, rate);
@@ -458,45 +414,6 @@ bool mediasync_wrap_getMediaTime(void* handle, int64_t realUs,
      }
      return false;
 }
-bool mediasync_wrap_getRealTimeFor(void* handle, int64_t targetMediaUs, int64_t *outRealUs) {
-     if (handle != NULL)  {
-         mediasync_result ret = gMediaSync_getRealTimeFor(handle, targetMediaUs, outRealUs);
-         if (ret == AM_MEDIASYNC_OK) {
-            return true;
-         } else {
-            ALOGE("[%s] no ok\n", __func__);
-         }
-     } else {
-        ALOGE("[%s] no handle\n", __func__);
-     }
-     return false;
-}
-bool mediasync_wrap_getRealTimeForNextVsync(void* handle, int64_t *outRealUs) {
-     if (handle != NULL)  {
-         mediasync_result ret = gMediaSync_getRealTimeForNextVsync(handle, outRealUs);
-         if (ret == AM_MEDIASYNC_OK) {
-            return true;
-         } else {
-            ALOGE("[%s] no ok\n", __func__);
-         }
-     } else {
-        ALOGE("[%s] no handle\n", __func__);
-     }
-     return false;
-}
-bool mediasync_wrap_getTrackMediaTime(void* handle, int64_t *outMeidaUs) {
-     if (handle != NULL)  {
-         mediasync_result ret = gMediaSync_getTrackMediaTime(handle, outMeidaUs);
-         if (ret == AM_MEDIASYNC_OK) {
-            return true;
-         } else {
-            ALOGE("[%s] no ok\n", __func__);
-         }
-     } else {
-        ALOGE("[%s] no handle\n", __func__);
-     }
-     return false;
-}
 
 bool mediasync_wrap_setParameter(void* handle, mediasync_parameter type, void* arg) {
      if (handle != NULL)  {
@@ -520,21 +437,6 @@ bool mediasync_wrap_getParameter(void* handle, mediasync_parameter type, void* a
          } else {
             ALOGE("[%s] no ok\n", __func__);
          }
-     }
-     return false;
-}
-
-bool mediasync_wrap_setUpdateTimeThreshold(void* handle, int64_t value) {
-    if (handle != NULL) {
-        mediasync_result ret = gMediaSync_setUpdateTimeThreshold(handle, value);
-        if (ret == AM_MEDIASYNC_OK) {
-            ALOGD("[%s] set threshold ok\n", __func__);
-            return true;
-        } else {
-            ALOGE("[%s] no ok, errno:%s\n", __func__, strerror(errno));
-        }
-     } else {
-        ALOGE("[%s] no handle\n", __func__);
      }
      return false;
 }
@@ -563,22 +465,6 @@ bool mediasync_wrap_AudioProcess(void* handle, int64_t apts, int64_t cur_apts, m
             ALOGE("[%s] no ok\n", __func__);
         }
     }
-    return false;
-}
-
-bool mediasync_wrap_getUpdateTimeThreshold(void* handle, int64_t *value) {
-    if (handle != NULL) {
-        mediasync_result ret = gMediaSync_getUpdateTimeThreshold(handle, value);
-        if (ret == AM_MEDIASYNC_OK) {
-            ALOGV("[%s] get threshold ok, value:%lld\n", __func__, *value);
-            return true;
-        } else {
-            ALOGE("[%s] no ok, errno:%s\n", __func__, strerror(errno));
-        }
-     } else {
-        ALOGE("[%s] no handle\n", __func__);
-     }
-
     return false;
 }
 

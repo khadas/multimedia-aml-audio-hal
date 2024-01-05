@@ -801,21 +801,3 @@ bool aml_dtvsync_reset(aml_dtvsync_t *p_dtvsync)
     return ret;
 }
 
-void aml_dtvsync_release(aml_dtvsync_t *p_dtvsync)
-{
-
-    if (p_dtvsync) {
-        pthread_mutex_lock(&p_dtvsync->ms_lock);
-        ALOGI("mediasync_new:%p, mediasync:%p", p_dtvsync->mediasync_new, p_dtvsync->mediasync);
-        void *tmp = NULL;
-        if (p_dtvsync->mediasync_new)
-            tmp = p_dtvsync->mediasync_new;
-        mediasync_wrap_destroy(p_dtvsync->mediasync_new);
-        p_dtvsync->mediasync_new = NULL;
-        if (p_dtvsync->mediasync && p_dtvsync->mediasync != tmp)
-            mediasync_wrap_destroy(p_dtvsync->mediasync);
-        p_dtvsync->mediasync = NULL;
-        pthread_mutex_unlock(&p_dtvsync->ms_lock);
-    }
-    return;
-}

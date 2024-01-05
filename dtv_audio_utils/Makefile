@@ -24,7 +24,6 @@ TARGET_OBJS= utils/tsp_utils.o \
     dmxwrap/MultiHwDemux/AmDmx.o \
     audio_data_read/dmx_audio_es.o \
     audio_data_read/uio_audio_read.o \
-    sync/audio_dtv_sync.o \
     avutils/amthreadpool.o \
     avutils/itemlist.o \
     avutils/amsysfsutils.o \
@@ -42,7 +41,7 @@ SRC?=$(TOPDIR)
 CFLAGS+=-O2 -fPIC -g
 CFLAGS+=-I$(SRC)/dmxwrap -I$(SRC)/include -I$(SRC)/utils -I$(SRC)/../utils/include -I$(SRC)/../include \
 	-I$(SRC)/dmxwrap/HwDemux -I$(SRC)/dmxwrap/MultiHwDemux -I$(SRC)/audio_read_api \
-	-I$(SRC)/sync -I$(SRC)/avutils
+	-I$(SRC)/avutils
 CFLAGS+=-I$(SRC)/../include/basic_utils
 
 %.o:%.c $(DEPS)
@@ -61,9 +60,7 @@ install:
 	-install -m 555 ${TARGET} $(INSTALL_DIR)
 	-install -m 555 $(TARGET) $(TARGET_DIR)/usr/lib
 	install -d  $(HEADERS_DIR)/audio_read_api
-	install -d  $(HEADERS_DIR)/sync
 	cp -rf $(SRC)/audio_read_api/*.h  $(HEADERS_DIR)/
-	cp -rf $(SRC)/sync/*.h  $(HEADERS_DIR)/
 force:
 
 clean:

@@ -334,19 +334,12 @@ new_hw_avsync_header_extractor(
     header_extractor->consume_meta_data = consume_meta_data;
     header_extractor->consume_output_data = consume_output_data;
     header_extractor->cbk_cookie = cookie;
-    //header_extractor->tsync_fd = aml_hwsync_open_tsync();
-    //ALOGV("header_extractor->tsync_fd = %d", header_extractor->tsync_fd);
-    //if (header_extractor->tsync_fd < 0)
-    //    ALOGE("%s(), fail to open tsync", __func__);
     return header_extractor;
 }
 
 void delete_hw_avsync_header_extractor(struct hw_avsync_header_extractor *header_extractor)
 {
     if (header_extractor) {
-        //ALOGV("header_extractor->tsync_fd = %d", header_extractor->tsync_fd);
-        //aml_hwsync_close_tsync(header_extractor->tsync_fd);
-        //header_extractor->tsync_fd = -1;
         aml_audio_free(header_extractor);
         header_extractor = NULL;
     }

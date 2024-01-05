@@ -1331,12 +1331,7 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         }
 
         if (hw_sync_id == 12345678) {
-            out->avsync_type = AVSYNC_TYPE_TSYNC;
-            out->hwsync->hwsync_id = hw_sync_id;
-            sync_enable = 1;
-            out->hwsync->use_mediasync = false;
-            aml_hwsync_set_tsync_init(out->hwsync);
-            ALOGI("[%s:%d]:The current sync type: tSync", __FUNCTION__, __LINE__);
+            ALOGE("[%s:%d]:tsync not support anymore!", __FUNCTION__, __LINE__);
         } else {
             if (out->avsync_type == AVSYNC_TYPE_MEDIASYNC) {
                 hwsync_mediasync_outset(adev,out,&sync_enable,hw_sync_id);
@@ -1676,10 +1671,10 @@ exit1:
 exit:
     if (out->hw_sync_mode) {
         ALOGI("%s set AUDIO_PAUSE when tunnel mode\n",__func__);
-    if (AVSYNC_TYPE_TSYNC == out->avsync_type || AVSYNC_TYPE_MEDIASYNC == out->avsync_type) {
-        aml_hwsync_set_tsync_pause(out->hwsync);
-    }
-    out->tsync_status = TSYNC_STATUS_PAUSED;
+        if (AVSYNC_TYPE_MEDIASYNC == out->avsync_type) {
+            mediasync_wrap_setPause(out->hwsync->es_mediasync.mediasync, true);
+        }
+        out->tsync_status = TSYNC_STATUS_PAUSED;
     }
     pthread_mutex_unlock (&adev->lock);
     pthread_mutex_unlock (&out->lock);
@@ -1731,8 +1726,8 @@ static int out_resume (struct audio_stream_out *stream)
         ALOGI ("init hal mixer when hwsync resume\n");
         adev->hwsync_output = out;
         aml_hal_mixer_init(&adev->hal_mixer);
-        if (AVSYNC_TYPE_TSYNC == out->avsync_type || AVSYNC_TYPE_MEDIASYNC == out->avsync_type) {
-            aml_hwsync_set_tsync_resume(out->hwsync);
+        if (AVSYNC_TYPE_MEDIASYNC == out->avsync_type) {
+            mediasync_wrap_setPause(out->hwsync->es_mediasync.mediasync, false);
         }
         out->tsync_status = TSYNC_STATUS_RUNNING;
     }
@@ -1777,9 +1772,9 @@ static int out_pause_new (struct audio_stream_out *stream)
         goto exit;
     }
 
-    if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type || AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
-        if ((eDolbyMS12Lib != aml_dev->dolby_lib_type) || (1 != aml_dev->continuous_audio_mode)) {
-            aml_hwsync_set_tsync_pause(aml_out->hwsync);
+    if (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
+        if (eDolbyMS12Lib != aml_dev->dolby_lib_type) {
+            mediasync_wrap_setPause(aml_out->hwsync->es_mediasync.mediasync, true);
         }
     }
 
@@ -1827,7 +1822,7 @@ exit:
     }
 
     if ((aml_out->hw_sync_mode) && aml_out->tsync_status != TSYNC_STATUS_PAUSED) {
-        aml_hwsync_set_tsync_pause(aml_out->hwsync);
+        mediasync_wrap_setPause(aml_out->hwsync->es_mediasync.mediasync, true);
         aml_out->tsync_status = TSYNC_STATUS_PAUSED;
     }
 
@@ -1893,8 +1888,8 @@ static int out_resume_new (struct audio_stream_out *stream)
     }
     aml_out->pause_status = false;
     if (aml_out->hw_sync_mode && !aml_dev->ms12.need_resume) {
-        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type || AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
-            aml_hwsync_set_tsync_resume(aml_out->hwsync);
+        if (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
+            mediasync_wrap_setPause(aml_out->hwsync->es_mediasync.mediasync, false);
         }
         aml_out->tsync_status = TSYNC_STATUS_RUNNING;
     }
@@ -6575,15 +6570,8 @@ int do_output_standby_l(struct audio_stream *stream)
 
     if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_STOP) {
         ALOGI("%s set AUDIO_PAUSE\n",__func__);
-        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
-            aml_hwsync_set_tsync_pause(aml_out->hwsync);
-        }
         aml_out->tsync_status = TSYNC_STATUS_PAUSED;
-
         ALOGI("%s set AUDIO_STOP\n",__func__);
-        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
-            aml_hwsync_set_tsync_stop(aml_out->hwsync);
-        }
         aml_out->tsync_status = TSYNC_STATUS_STOP;
     }
 
@@ -7891,7 +7879,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
                 audiohal_send_msg_2_ms12(ms12, MS12_MESG_TYPE_RESUME);
                 pthread_mutex_unlock(&ms12->lock);
                 if (aml_out->hw_sync_mode) {
-                    aml_hwsync_set_tsync_resume(aml_out->hwsync);
+                    mediasync_wrap_setPause(aml_out->hwsync->es_mediasync.mediasync, false);
                     aml_out->tsync_status = TSYNC_STATUS_RUNNING;
                     adev->ms12.need_resync = 1;
                 }
@@ -7899,7 +7887,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
             } else if (aml_out->tsync_status == TSYNC_STATUS_STOP && aml_out->hw_sync_mode) {
                 pthread_mutex_lock(&ms12->lock);
                 audiohal_send_msg_2_ms12(ms12, MS12_MESG_TYPE_RESUME);
-                aml_hwsync_set_tsync_resume(aml_out->hwsync);
+                mediasync_wrap_setPause(aml_out->hwsync->es_mediasync.mediasync, false);
                 aml_out->tsync_status = TSYNC_STATUS_RUNNING;
                 adev->ms12.need_resync = 1;
                 ALOGI("resume ms12 and the timer");
@@ -8944,15 +8932,11 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
      */
     if (aml_out->hw_sync_mode && aml_out->tsync_status != TSYNC_STATUS_STOP && !has_hwsync_stream_running(stream)) {
         ALOGI("%s set AUDIO_PAUSE when close stream\n",__func__);
-        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type || AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
-            aml_hwsync_set_tsync_pause(aml_out->hwsync);
+        if (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
+            mediasync_wrap_setPause(aml_out->hwsync->es_mediasync.mediasync, true);
         }
         aml_out->tsync_status = TSYNC_STATUS_PAUSED;
-
         ALOGI("%s set AUDIO_STOP when close stream\n",__func__);
-        if (AVSYNC_TYPE_TSYNC == aml_out->avsync_type) {
-            aml_hwsync_set_tsync_stop(aml_out->hwsync);
-        }
         aml_out->tsync_status = TSYNC_STATUS_STOP;
     }
 
@@ -10714,7 +10698,6 @@ static int adev_close(hw_device_t *device)
     if (adev->sm) {
         deleteHalSubMixing(adev->sm);
     }
-    aml_hwsync_close_tsync(adev->tsync_fd);
     pthread_mutex_destroy(&adev->dtv_patch_lock);
     pthread_mutex_destroy(&adev->patch_lock);
     pthread_mutex_destroy(&adev->dtv_lock);
@@ -11257,10 +11240,6 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 
     if (adev->useSubMix) {
         ret = initHalSubMixing(&adev->sm, MIXER_LPCM, adev, adev->is_TV);
-        adev->tsync_fd = aml_hwsync_open_tsync();
-        if (adev->tsync_fd < 0) {
-            ALOGE("%s() open tsync failed", __func__);
-        }
         adev->raw_to_pcm_flag = false;
     }
 

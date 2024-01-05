@@ -412,27 +412,7 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
     if (!adev->first_apts_flag) {
         goto write;
     }
-
-    // video not comming. skip audio
-    aml_hwsync_get_tsync_firstvpts(aml_out->hwsync, &first_vpts);
-    if (first_vpts == 0) {
-        ALOGI("[audio-startup] video not comming - skip this packet. size:%zu\n", bytes);
-        aml_out->dropped_size += bytes;
-        //memset(audio_data, 0, bytes);
-        return bytes;
-    }
-
-    // av both comming. check need add zero or skip
-    //get_sysfs_uint(TSYNC_FIRSTAPTS, (unsigned int *)&(first_apts));
-    first_apts = adev->first_apts;
-    aml_hwsync_get_tsync_vpts(aml_out->hwsync, &cur_vpts);
-    aml_hwsync_get_tsync_pts(aml_out->hwsync, &cur_pcr);
-    if (cur_vpts <= first_vpts) {
-        cur_vpts = first_vpts;
-    }
-
-
-
+#if 0
     cur_apts = (unsigned int)((int64_t)first_apts + (int64_t)(((int64_t)aml_out->dropped_size * 90) / (48 * frame_size)));
     av_diff = (int)((int64_t)cur_apts - (int64_t)cur_vpts);
     ALOGI("[audio-startup] av both comming.fa:0x%x fv:0x%x ca:0x%x cv:0x%x cp:0x%x d:%d fs:%zu diff:%d ms\n",
@@ -448,17 +428,6 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
         goto write;
     }
 
-#if 0
-    // avsync inside 100ms, start
-    if (abs(av_diff) < 100 * 90) {
-        adev->first_apts = cur_apts;
-        aml_audio_start_trigger(stream);
-        adev->first_apts_flag = false;
-        ALOGI("[audio-startup] case-1: ca:0x%x cv:0x%x dr:%d\n",
-              cur_apts, cur_vpts, aml_out->dropped_size);
-        goto write;
-    }
-#endif
     // drop case
     if (av_diff < 0) {
         need_drop_inject = abs(av_diff) / 90 * 48 * frame_size;
@@ -509,7 +478,7 @@ size_t aml_alsa_output_write(struct audio_stream_out *stream,
     adev->first_apts_flag = false;
     ALOGI("[audio-startup] case-4: ca:0x%x cv:0x%x dropped:%d add zero:%d\n",
           cur_apts, cur_vpts, aml_out->dropped_size, need_drop_inject);
-
+#endif
 write:
 
     if (aml_audio_property_get_bool(ALSA_DUMP_PROPERTY, false)) {
