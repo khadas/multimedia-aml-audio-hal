@@ -11,7 +11,7 @@
  *
  */
 
-#define LOG_TAG "audio_format_parse"
+#define LOG_TAG "audio_hw_format_parse"
 //#define LOG_NDEBUG 0
 
 #include <pthread.h>

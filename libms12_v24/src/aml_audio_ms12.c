@@ -9,7 +9,7 @@
  */
 
 
-#define LOG_TAG "libms12"
+#define LOG_TAG "audio_hw_decoder_ms12v2"
 // #define LOG_NDEBUG 0
 
 #include <cutils/log.h>

@@ -8,7 +8,7 @@
  *
  */
 
-#define LOG_TAG "ringbuffer"
+#define LOG_TAG "audio_hw_utils_ringbuf"
 
 #ifdef __cplusplus
 extern "C" {

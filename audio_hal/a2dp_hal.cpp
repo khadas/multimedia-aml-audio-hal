@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG  "a2dp_hal"
+#define LOG_TAG  "audio_hw_hal_a2dp"
 
 #include <system/audio.h>
 #include <cutils/log.h>

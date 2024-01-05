@@ -8,7 +8,7 @@
  *
  */
 
-#define LOG_TAG "audio_post_process"
+#define LOG_TAG "audio_hw_hal_postprocess"
 //#define LOG_NDEBUG 0
 
 #include <dlfcn.h>

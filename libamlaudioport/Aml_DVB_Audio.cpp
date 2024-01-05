@@ -1,4 +1,4 @@
-#define LOG_TAG "Aml_DVB_Audio"
+#define LOG_TAG "audio_hw_audioport_dvb"
 #include <cutils/log.h>
 #include <unistd.h>
 #include <cutils/str_parms.h>

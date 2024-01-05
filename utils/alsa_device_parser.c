@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#define LOG_TAG "AudioALSADeviceParser"
+#define LOG_TAG "audio_hw_utils_alsaparser"
 
 #include <stdint.h>
 #include <dirent.h>

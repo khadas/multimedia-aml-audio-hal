@@ -29,7 +29,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define LOG_TAG "audio_hw_primary"
+#define LOG_TAG "audio_hw_hal_scaletempo"
 #include <cutils/log.h>
 #include <time.h>
 

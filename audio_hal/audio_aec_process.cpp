@@ -20,7 +20,7 @@
 #include "audio_aec_process.h"
 
 #undef  LOG_TAG
-#define LOG_TAG  "audio_hw_primary"
+#define LOG_TAG  "audio_hw_process_effect_aecc"
 
 static audio_ears::GoogleAec *pGoogleAec;
 static audio_ears::GoogleAec::AudioBufferInfo *p_spk_buf_info;

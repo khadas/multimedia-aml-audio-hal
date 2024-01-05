@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#define LOG_TAG "audio_hw_utils_ini"
 
 #define _CRT_SECURE_NO_WARNINGS
 //#pragma warning (disable: 4127)

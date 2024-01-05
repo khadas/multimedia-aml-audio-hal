@@ -15,7 +15,7 @@
  */
 
 
-#define LOG_TAG "audio_hw_hdmi"
+#define LOG_TAG "audio_hw_input_hdmi"
 //#define LOG_NDEBUG 0
 
 /*

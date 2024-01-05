@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AmlAudioOutPort"
+#define LOG_TAG "audio_hw_audioport_out"
 #include <AmlAudioOutPort.h>
 #include <cutils/log.h>
 

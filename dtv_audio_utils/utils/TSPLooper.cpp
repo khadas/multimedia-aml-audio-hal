@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "TSPLooper"
+#define LOG_TAG "audio_hw_dtvutils_utils"
 
 #include "tsp_platform.h"
 

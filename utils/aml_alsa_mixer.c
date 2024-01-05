@@ -33,7 +33,7 @@
 #include "alsa_device_parser.h"
 
 #undef  LOG_TAG
-#define LOG_TAG "audio_alsa_mixer"
+#define LOG_TAG "audio_hw_utils_alsamixer"
 
 static struct aml_mixer_list gAmlMixerList[] = {
     /* for i2s out status */

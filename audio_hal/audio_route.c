@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 #ifdef BUILD_LINUX
-#define LOG_TAG "audio_route"
+#define LOG_TAG "audio_hw_hal_route"
 /*#define LOG_NDEBUG 0*/
 
 #include <errno.h>

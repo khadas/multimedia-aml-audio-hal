@@ -18,7 +18,7 @@
  * Author:  Shoufu Zhao <shoufu.zhao@amlogic.com>
  */
 
-#define LOG_TAG "IniParser"
+#define LOG_TAG "audio_hw_utils_ini"
 #define LOG_NDEBUG 0
 
 #include <stdio.h>
