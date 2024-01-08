@@ -407,7 +407,6 @@ struct aml_audio_device {
     struct audio_route *ar;
     struct echo_reference_itfe *echo_reference;
     bool low_power;
-    struct aml_stream_out *hwsync_output;
     struct aml_hal_mixer hal_mixer;
     struct pcm *pcm;
     struct aml_bt_output bt_output;
@@ -756,7 +755,8 @@ struct aml_stream_out {
     int is_tv_platform;
     void *audioeffect_tmp_buffer;
     bool pause_status;
-    bool hw_sync_mode;
+    bool need_sync;
+    bool with_header;
     int  tsync_status;
     float volume_l_org;
     float volume_r_org;
@@ -875,7 +875,6 @@ struct aml_stream_out {
     audio_data_handle_state_t audio_data_handle_state;
     uint16_t easing_time;
     float output_speed;
-    int dtvsync_enable;
     uint64_t write_time;
     uint64_t pause_time;
     int write_count;

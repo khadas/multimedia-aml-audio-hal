@@ -142,7 +142,8 @@ int dolby_ms12_main_resume(struct audio_stream_out *stream)
     dolby_ms12_set_pause_flag(false);
     //ms12_runtime_update_ret = aml_ms12_update_runtime_params(ms12);
     ms12_runtime_update_ret = set_dolby_ms12_runtime_pause(ms12, false);
-    if ((aml_out->hw_sync_mode) && (aml_out->tsync_status == TSYNC_STATUS_PAUSED) && (1 == adev->continuous_audio_mode)) {
+    if ((aml_out->need_sync) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)
+        && (aml_out->tsync_status == TSYNC_STATUS_PAUSED) && (1 == adev->continuous_audio_mode)) {
         mediasync_wrap_setPause(aml_out->hwsync->es_mediasync.mediasync, false);
         aml_out->tsync_status = TSYNC_STATUS_RUNNING;
     }

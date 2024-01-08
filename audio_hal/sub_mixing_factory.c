@@ -275,7 +275,7 @@ static int consume_output_data(void *cookie, const void* buffer, size_t bytes)
     set_mixer_inport_volume(audio_mixer, out->inputPortID, out->volume_l);
     out->last_volume_l = out->volume_l;
     out->last_volume_r = out->volume_r;
-    if (out->hw_sync_mode && out->resample_outbuf != NULL) {
+    if (out->need_sync && out->resample_outbuf != NULL) {
         int out_frame = bytes >> 2;
         out_frame = resample_process (&out->aml_resample, out_frame,
                 (int16_t *) buffer, (int16_t *) out->resample_outbuf);
@@ -367,26 +367,6 @@ static ssize_t out_write_hwsync_lpcm(struct audio_stream_out *stream, const void
     struct timespec ts;
     memset(&ts, 0, sizeof(struct timespec));
 
-    // when connect bt, bt stream maybe open before hdmi stream close,
-    // bt stream mediasync is set to adev->hw_mediasync, and it would be
-    // release in hdmi stream close, so bt stream mediasync is invalid
-    if (out->hwsync->use_mediasync == true && adev->hw_mediasync == NULL) {
-        #if 0
-        adev->hw_mediasync = aml_hwsync_mediasync_create();
-        out->hwsync->use_mediasync = true;
-        out->hwsync->mediasync = adev->hw_mediasync;
-        ret = aml_hwsync_wrap_set_id(out->hwsync, out->hwsync->hwsync_id);
-        if (!ret) {
-            ALOGD("%s: aml_hwsync_wrap_set_id fail: ret=%d, id=%d", __func__, ret, out->hwsync->hwsync_id);
-            ret = aml_hwsync_wrap_get_id(out->hwsync->mediasync, &out->hwsync->hwsync_id);
-            if (ret && ret != -1) {
-                adev->hw_sync_id = out->hwsync->hwsync_id;
-                ret = aml_hwsync_wrap_set_id(out->hwsync, out->hwsync->hwsync_id);
-            }
-        }
-        #endif
-        aml_audio_hwsync_init(out->hwsync, out);
-    }
     if (out->standby) {
         AM_LOGI("start hwsync lpcm stream: %p", out);
         aml_audio_set_cpu23_affinity();
@@ -725,7 +705,7 @@ static int out_get_presentation_position_port(
         }
         *timestamp = adjusted_timestamp;
     } else if (!adev->audio_patching) {
-        if (out->hw_sync_mode || out->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
+        if (out->need_sync || out->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
             if (!out->frame_write_sum_updated || out->pause_status || out->standby) {
                 *frames = frames_written_hw;
                 *timestamp = out->timestamp;
@@ -874,7 +854,7 @@ static int deleteSubMixingInputPcm(struct aml_stream_out *out)
     struct meta_data_list *mdata_list;
     struct listnode *item;
 
-    if (out->hw_sync_mode) {
+    if (out->need_sync) {
         pthread_mutex_lock(&out->mdata_lock);
         while (!list_empty(&out->mdata_list)) {
             item = list_head(&out->mdata_list);
@@ -1113,8 +1093,8 @@ ssize_t mixer_main_buffer_write_sm (struct audio_stream_out *stream, struct audi
 
 
     if (adev->debug_flag) {
-        AM_LOGD("stream:%p, out_device:%#x, bytes:%zu, format:%#x, hw_sync_mode:%d",
-            stream, aml_out->out_device, bytes, aml_out->hal_internal_format, aml_out->hw_sync_mode);
+        AM_LOGD("stream:%p, out_device:%#x, bytes:%zu, format:%#x, need_sync:%d",
+            stream, aml_out->out_device, bytes, aml_out->hal_internal_format, aml_out->need_sync);
     }
 
     if (popcount(adev->usecase_masks & SUBMIX_USECASE_MASK) > 1) {
@@ -1123,7 +1103,7 @@ ssize_t mixer_main_buffer_write_sm (struct audio_stream_out *stream, struct audi
     }
 
     /* handle HWSYNC audio data*/
-    if (aml_out->hw_sync_mode) {
+    if (aml_out->need_sync) {
         write_bytes = out_write_hwsync_lpcm(stream, buffer, bytes);
     } else {
         write_bytes = out_write_direct_pcm(stream, buffer, bytes);
@@ -1682,7 +1662,7 @@ static int out_flush_subMixingPCM(struct audio_stream_out *stream)
         struct listnode *item;
 
         //mixer_flush_inport(audio_mixer, out->port_index);
-        if (aml_out->hw_sync_mode) {
+        if (aml_out->need_sync) {
             pthread_mutex_lock(&aml_out->mdata_lock);
             while (!list_empty(&aml_out->mdata_list)) {
                 item = list_head(&aml_out->mdata_list);

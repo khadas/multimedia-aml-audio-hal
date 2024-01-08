@@ -1437,7 +1437,7 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
 
     ret = adev_open_output_stream_new(patch->dev, 0,
                                       patch->output_src,        // devices_t
-                                      AUDIO_OUTPUT_FLAG_DIRECT, // flags
+                                      AUDIO_OUTPUT_FLAG_DIRECT | AUDIO_OUTPUT_FLAG_HW_AV_SYNC, // flags
                                       &stream_config, &stream_out, "AML_DTV_SOURCE");
     if (ret < 0) {
         ALOGE("live open output stream fail, ret = %d", ret);
@@ -1449,10 +1449,16 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
 
     if (aml_out->hwsync)
     {
+        aml_out->avsync_type = AVSYNC_TYPE_MEDIASYNC;
         pthread_mutex_lock(&aml_out->hwsync->lock);
         aml_out->hwsync->es_mediasync.mediasync    = patch->dtvsync->mediasync;
         aml_out->hwsync->es_mediasync.mediasync_id = patch->dtvsync->mediasync_id;
         pthread_mutex_unlock(&aml_out->hwsync->lock);
+    }
+    else
+    {
+        AM_LOGE("aml_out->hwsync NULL error!");
+        goto exit_open;
     }
 
     ALOGI("++%s live create a output stream success now!!!\n ", __FUNCTION__);
@@ -1472,7 +1478,7 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
 
     prctl(PR_SET_NAME, (unsigned long)"dtv_output_data");
     aml_out->output_speed = 1.0f;
-    aml_out->dtvsync_enable = aml_audio_property_get_bool(DTV_SYNCENABLE, true);
+    //aml_out->dtvsync_enable = aml_audio_property_get_bool(DTV_SYNCENABLE, true);
     while (!patch->output_thread_exit) {
 
         if (patch->dtv_decoder_state == AUDIO_DTV_PATCH_DECODER_STATE_PAUSE) {

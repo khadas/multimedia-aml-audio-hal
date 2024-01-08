@@ -146,16 +146,11 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
 
     /* handle HWSYNC audio data*/
     /* to do: move this to before hw_write*/
-    if (aml_out->hw_sync_mode && aml_out->hwsync) {
+    if (aml_out->need_sync && aml_out->hwsync && (aml_out->avsync_type == AVSYNC_TYPE_MSYNC)) {
         uint64_t  cur_pts = abuffer->pts;
         int outsize = abuffer->size;
         audio_hwsync_t *hw_sync = aml_out->hwsync;
         uint32_t apts32 = 0;
-
-        if (aml_out->avsync_type == AVSYNC_TYPE_TSYNC)
-        {
-            cur_pts = cur_pts & 0xffffffff;
-        }
 
         if (cur_pts != 0xffffffff && outsize > 0) {
 

@@ -2234,7 +2234,7 @@ int dolby_ms12_bypass_process(struct audio_stream_out *stream, void *buffer, siz
             aml_audio_spdifout_mute(bitstream_out->spdifout_handle, 0);
         }
 
-        if (do_sync_flag && aml_out->dtvsync_enable) {
+        if (do_sync_flag && aml_out->need_sync) {
             aml_dtvsync_t *aml_dtvsync = patch->dtvsync;
             struct dtvsync_audio_policy *async_policy = NULL;
              if (aml_dtvsync != NULL) {
@@ -2838,7 +2838,7 @@ Aml_MS12_SyncPolicy_t ms12_sync_callback(void *priv_data, unsigned long long u64
     uint64_t ms12_main_position = 0;
     uint64_t main_current_frame = 0;
     AM_LOGI_IF(adev->debug_flag,"%s <in>", __func__);
-    if (!aml_out->hw_sync_mode || true == aml_out->will_pause || true == aml_out->pause_status) {
+    if (!aml_out->need_sync || true == aml_out->will_pause || true == aml_out->pause_status) {
         return audio_sync_policy;
     }
 
@@ -3009,7 +3009,7 @@ void ms12_do_dtv_sync(struct audio_stream_out *stream)
     bool do_sync_flag =  true;//(patch->dtvsync->sync_type == DTVSYNC_MEDIASYNC);
 
     if (do_sync_flag) {
-        if (aml_out->dtvsync_enable) {
+        if (aml_out->need_sync) {
             aml_dtvsync = patch->dtvsync;
             if (aml_out->alsa_status_changed) {
                 aml_dtvsync_setParameter(aml_dtvsync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
@@ -3047,6 +3047,8 @@ Aml_MS12_SyncPolicy_t ms12_dtv_sync_callback(void *priv_data, unsigned long long
     bool do_sync_flag = (adev->patch_src == SRC_DTV) && patch;
     decoded_frame = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, audio_format, MAIN_INPUT_STREAM);
     int debug_enable = get_debug_value(AML_DEBUG_AUDIOHAL_HW_SYNC);
+
+    AM_LOGI_IF(adev->debug_flag,"%s <in>", __func__);
 
     if (do_sync_flag) {
         if (patch->output_thread_exit) {
@@ -3159,6 +3161,7 @@ Aml_MS12_SyncPolicy_t ms12_dtv_sync_callback(void *priv_data, unsigned long long
         audio_sync_policy.s32TagFrame = 0;
         audio_sync_policy.s32CurFrame = 0;
     }
+    AM_LOGI_IF(adev->debug_flag,"%s <out>", __func__);
     return audio_sync_policy;
 }
 
@@ -3458,12 +3461,15 @@ int dolby_ms12_main_open(struct audio_stream_out *stream) {
     if (do_sync_flag) {
         dolby_ms12_register_ms12sync_callback(ms12->dolby_ms12_ptr, ms12_dtv_sync_callback, (void *)stream);
         aml_out->b_install_sync_callback = true;
-        ALOGI("%s set dtv sync callback %p", __func__, stream);
+        ALOGI("%s set ms12_dtv_sync_callback %p", __func__, stream);
     } else
 #endif
-    if (aml_out->hw_sync_mode) {
-        dolby_ms12_register_ms12sync_callback(ms12->dolby_ms12_ptr, ms12_sync_callback, (void *)stream);
-        aml_out->b_install_sync_callback = true;
+    {
+        if ((aml_out->need_sync) && (aml_out->with_header)) {
+            dolby_ms12_register_ms12sync_callback(ms12->dolby_ms12_ptr, ms12_sync_callback, (void *)stream);
+            aml_out->b_install_sync_callback = true;
+            ALOGI("%s set ms12_sync_callback %p", __func__, stream);
+        }
     }
 
     aml_ms12_main_decoder_open(ms12, hal_internal_format, aml_out->hal_channel_mask, sample_rate);
@@ -3845,7 +3851,7 @@ uint64_t dolby_ms12_get_main_pcm_generated(struct audio_stream_out *stream) {
     audio_format_t audio_format = AUDIO_FORMAT_DEFAULT;
     int latency_frames = 0;
 
-    if (aml_out->hw_sync_mode && aml_out->hwsync && aml_out->hwsync->aout)
+    if (aml_out->hwsync && aml_out->hwsync->aout)
         audio_format = aml_out->hwsync->aout->hal_internal_format;
     else {
         audio_format = aml_out->hal_internal_format;

@@ -59,7 +59,6 @@ struct hw_avsync_header_extractor {
     size_t sync_frame_written;
     bool is_reading_avsync_header;
     uint64_t payload_offset;
-    //int tsync_fd;
 };
 
 void hwsync_header_set_frame_size(struct hw_avsync_header *header, uint32_t fream_size);

@@ -697,7 +697,7 @@ static void process_port_msg(input_port *in_port)
             struct aml_stream_out *out = (struct aml_stream_out *)in_port->notify_cbk_data;
             audio_hwsync_t *hwsync = (out != NULL) ? (out->hwsync) : NULL;
             //AM_LOGI("[%s:%d] hwsync:%p tsync resume", hwsync);
-            if ((hwsync != NULL) && (hwsync->use_mediasync)) {
+            if ((hwsync != NULL) && (AVSYNC_TYPE_MEDIASYNC == out->avsync_type)) {
                 hwsync->hwsync_need_resume = true;
             }
             set_inport_state(in_port, RESUMING);
@@ -1576,7 +1576,7 @@ bool has_hwsync_stream_running(struct audio_stream_out *stream)
         if (NULL != in_port && in_port->enInPortType == AML_MIXER_INPUT_PORT_PCM_DIRECT
             && in_port->notify_cbk_data) {
             struct aml_stream_out *out = (struct aml_stream_out *)in_port->notify_cbk_data;
-            if ((out != aml_out) && out->hw_sync_mode && !out->standby)
+            if ((out != aml_out) && out->need_sync && !out->standby)
                 return true;
         }
     }

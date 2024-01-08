@@ -112,22 +112,10 @@ void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out
     p_hwsync->last_lookup_apts = 0xffffffff;
     p_hwsync->last_ms12_latency_frames = 0;
 
-    if (!p_hwsync->use_mediasync && (p_hwsync->es_mediasync.mediasync == NULL)) {
-        p_hwsync->hwsync_id = -1;
-    }
-
     memset(p_hwsync->pts_tab, 0, sizeof(apts_tab_t)*HWSYNC_APTS_NUM);
     pthread_mutex_init(&p_hwsync->lock, NULL);
     p_hwsync->payload_offset = 0;
     p_hwsync->aout = out;
-
-/*
-    if (p_hwsync->tsync_fd < 0) {
-        fd = open(TSYNC_PCRSCR, O_RDONLY);
-        p_hwsync->tsync_fd = fd;
-        ALOGI("%s open tsync fd %d", __func__, fd);
-    }
-*/
 
     out->msync_start = false;
 
@@ -473,14 +461,12 @@ int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, uint
         latency_pts = latency_frames * 90/ 48;
     }
 
-    if (p_hwsync->use_mediasync) {
-        if (MEDIA_SYNC_ESMODE(out)) {
+    if (MEDIA_SYNC_ESMODE(out)) {
             if (pts_log)
                 ALOGI("[%s:%d], apts=0x%llx, latency_pts=%x", __func__, __LINE__, apts, latency_pts);
             out->hwsync->es_mediasync.out_start_apts = apts;
             out->hwsync->es_mediasync.cur_outapts = apts - latency_pts;
             aml_hwsynces_ms12_get_policy(out);
-        }
     } else {
         if (p_hwsync->first_apts_flag == false && (apts >= latency_pts) && AVSYNC_TYPE_TSYNC == p_hwsync->aout->avsync_type) {
             ALOGI("%s apts = 0x%x (%d ms) latency=0x%x (%d ms)", __FUNCTION__, apts, apts / 90, latency_pts, latency_pts/90);

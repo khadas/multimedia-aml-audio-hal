@@ -102,7 +102,7 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio
     remain_size = dolby_ms12_get_main_buffer_avail(NULL);
     dolby_ms12_get_pcm_output_size(&all_pcm_len1, &all_zero_len);
 
-    if (aml_out->hw_sync_mode && aml_out->hwsync) {
+    if (aml_out->need_sync && aml_out->hwsync) {
 
         // missing code with aml_audio_hwsync_checkin_apts, need to add for netflix tunnel mode. zzz
         if (abuffer->pts != HWSYNC_PTS_NA) {

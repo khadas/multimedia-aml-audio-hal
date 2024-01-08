@@ -54,12 +54,17 @@
 #define HWSYNC_PTS_NA  (UINT64_MAX-1)
 
 #define MEDIA_SYNC_ESMODE(aml_out)                               \
-     ((aml_out) && (aml_out)->hwsync && (aml_out)->hw_sync_mode \
+     ((aml_out) && (aml_out)->hwsync && (aml_out)->need_sync \
      && (AVSYNC_TYPE_MEDIASYNC == (aml_out)->avsync_type)        \
-     && (aml_out)->hwsync->use_mediasync)
+     && (aml_out)->with_header)
+
+//#define MEDIA_SYNC_TSMODE(aml_out)                               \
+//     ((aml_out) && (aml_out)->hwsync && (aml_out)->dtvsync_enable)
 
 #define MEDIA_SYNC_TSMODE(aml_out)                               \
-     ((aml_out) && (aml_out)->hwsync && (aml_out)->dtvsync_enable)
+     ((aml_out) && (aml_out)->hwsync && (aml_out)->need_sync \
+     && (AVSYNC_TYPE_MEDIASYNC == (aml_out)->avsync_type)        \
+     && (false == (aml_out)->with_header))
 
 enum hwsync_status {
     CONTINUATION,  // good sync condition
@@ -127,11 +132,8 @@ typedef struct  audio_hwsync {
     pthread_mutex_t lock;
     size_t payload_offset;
     struct aml_stream_out  *aout;
-    int tsync_fd;
     int version_num;
-    bool use_mediasync;
     audio_hwsync_mediasync_t es_mediasync;
-    int hwsync_id;
     uint64_t last_output_pts;
     struct timespec  last_timestamp;
     bool wait_video_done;

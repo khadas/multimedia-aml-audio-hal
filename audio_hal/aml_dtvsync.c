@@ -627,7 +627,7 @@ dtvsync_process_res  aml_dtvsync_nonms12_process(struct audio_stream_out *stream
 
     if (!(MEDIA_SYNC_TSMODE(aml_out)))
     {
-        ALOGE("aml_out->hwsync:%p, aml_out->dtvsync_enable:%p, error!", aml_out->hwsync, aml_out->dtvsync_enable);
+        ALOGE("aml_out->hwsync:%p, error!", aml_out->hwsync);
         return DTVSYNC_AUDIO_OUTPUT;
     }
 
@@ -689,7 +689,7 @@ void aml_dtvsync_ms12_get_policy(struct audio_stream_out *stream)
 
     if (!(MEDIA_SYNC_TSMODE(aml_out)))
     {
-        AM_LOGE("aml_out->hwsync:%p, aml_out->dtvsync_enable:%p, error!", aml_out->hwsync, aml_out->dtvsync_enable);
+        AM_LOGE("aml_out->hwsync:%p, error!", aml_out->hwsync);
         return;
     }
 
@@ -746,7 +746,7 @@ dtvsync_process_res aml_dtvsync_ms12_process_policy(void *priv_data, aml_ms12_de
 
     if (!(MEDIA_SYNC_TSMODE(aml_out)))
     {
-        ALOGE("aml_out->hwsync:%p, aml_out->dtvsync_enable:%p, error!", aml_out->hwsync, aml_out->dtvsync_enable);
+        ALOGE("aml_out->hwsync:%p, error!", aml_out->hwsync);
         return DTVSYNC_AUDIO_OUTPUT;
     }
 
