@@ -25,12 +25,6 @@
 #include "dmx_audio_es.h"
 //#define SYSTIME_CORRECTION_THRESHOLD        (90000*10/100)
 
-typedef enum {
-    DTVSYNC_AUDIO_DROP   = 0,
-    DTVSYNC_AUDIO_OUTPUT = 1,
-    DTVSYNC_AUDIO_EXIT   = 2,
-} dtvsync_process_res;
-
 void* aml_dtvsync_create();
 
 bool aml_dtvsync_allocinstance(aml_dtvsync_t *p_dtvsync, int32_t* id);
@@ -60,12 +54,6 @@ bool aml_dtvsync_ms12_insert_pcm(void *priv_data, int time_ms, enum MS12_PCM_TYP
 bool aml_dtvsync_ms12_insertraw(void *priv_data, int time_ms, audio_format_t output_format);
 
 bool aml_dtvsync_adjustclock(struct audio_stream_out *stream, struct mediasync_audio_policy *p_policy);
-
-dtvsync_process_res aml_dtvsync_nonms12_process(struct audio_stream_out *stream, int duration, bool *speed_enabled);
-
-void aml_dtvsync_ms12_get_policy(struct audio_stream_out *stream);
-
-dtvsync_process_res aml_dtvsync_ms12_process_policy(void *priv_data, aml_ms12_dec_info_t *ms12_info);
 
 bool aml_dtvsync_setPause(aml_dtvsync_t *p_dtvsync, bool pause);
 

@@ -1,5 +1,6 @@
 #ifndef _AUDIO_DVB_ES_H_
 #define _AUDIO_DVB_ES_H_
+
 #define VALID_PID(_pid_) ((_pid_)>0 && (_pid_)<0x1fff)
 #define VALID_AD_FMT(fmt)  ((fmt == ACODEC_FMT_EAC3) || (fmt == ACODEC_FMT_AC3) || \
     (fmt == ACODEC_FMT_MPEG) || (fmt == ACODEC_FMT_MPEG1) || \
@@ -59,16 +60,11 @@ typedef enum {
     DTVSYNC_AUDIO_ADJUST_CLOCK,
 } dtvsync_policy;
 
-
 struct dtvsync_audio_policy {
-    dtvsync_policy last_audiopolicy;
     dtvsync_policy audiopolicy;
     int32_t  param1;
     int32_t  param2;
 };
-
-#define DTVSYNC_INIT_PTS     (-10000)
-#define DTVSYNC_APTS_THRESHOLD  (-5000)
 
 typedef struct  aml_dtvsync {
     void* mediasync;

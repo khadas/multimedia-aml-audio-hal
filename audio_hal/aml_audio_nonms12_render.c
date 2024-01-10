@@ -209,10 +209,8 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
         dec_data_info_t * raw_in_data  = &aml_dec->raw_in_data;
         left_bytes = abuffer->size;
 
-        if ((MEDIA_SYNC_TSMODE(aml_out)) || (MEDIA_SYNC_ESMODE(aml_out))) {
-            aml_dec->in_frame_pts = (NULL_INT64 == ainput.pts) ? aml_dec->out_frame_pts : ainput.pts;
-            ainput.pts = aml_dec->in_frame_pts;
-        }
+        aml_dec->in_frame_pts = (NULL_INT64 == ainput.pts) ? aml_dec->out_frame_pts : ainput.pts;
+        ainput.pts = aml_dec->in_frame_pts;
 
         do {
             ALOGV("%s() in raw len=%d", __func__, left_bytes);
@@ -308,65 +306,55 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
                     ALOGI("[%s:%d] aml_decoder_stream_info %d %d", __func__, __LINE__, adev->dec_stream_info.dec_info.stream_ch, adev->dec_stream_info.dec_info.stream_sr);
                 }
 
-                if ((MEDIA_SYNC_TSMODE(aml_out)) || (MEDIA_SYNC_ESMODE(aml_out)))
+                if ((true == aml_out->need_sync) && (NULL != aml_out->hwsync) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type))
                 {
+                    audio_hwsync_t *phwsync = aml_out->hwsync;
+
                     if (dec_pcm_data->data_ch != 0)
                     {
                         duration = (pcm_len * 1000) / (2 * dec_pcm_data->data_ch * aml_out->config.rate);
                     }
 
                     alsa_latency = 90 *(out_get_latency_frames(stream) * 1000) / aml_out->config.rate;
+
                     int tuning_delay = 0;
-                    if (MEDIA_SYNC_TSMODE(aml_out))
-                    {
-                        tuning_delay = dtv_avsync_get_apts_latency(stream);
+                    if (NULL != phwsync->get_tuning_latency) {
+                        tuning_delay = phwsync->get_tuning_latency(stream);
                     }
-                    aml_out->hwsync->es_mediasync.cur_outapts = aml_dec->out_frame_pts - decoder_latency - alsa_latency - tuning_delay;
+
+                    phwsync->es_mediasync.cur_outapts = aml_dec->out_frame_pts - decoder_latency - alsa_latency - tuning_delay;
 
                     AM_LOGI_IF(adev->debug_flag, "sr:%d, ch:%d, format:0x%x, alsa_latency:%d(ms), duration:%d, in_apts:%lld(%llx), "
                         "out_pts:%lld, out_frames:%d, cur_outapts:%lld",
                         dec_pcm_data->data_sr, dec_pcm_data->data_ch, dec_pcm_data->data_format, alsa_latency/90, duration,
-                        aml_dec->in_frame_pts, aml_dec->in_frame_pts, aml_dec->out_frame_pts, out_frames, aml_out->hwsync->es_mediasync.cur_outapts);
+                        aml_dec->in_frame_pts, aml_dec->in_frame_pts, aml_dec->out_frame_pts, out_frames, phwsync->es_mediasync.cur_outapts);
 
-                    if (MEDIA_SYNC_TSMODE(aml_out))
-                    {
-                        //sync process here
-                        if (aml_out->alsa_status_changed) {
-                            ALOGI("[%s:%d]aml_out->alsa_running_status %d", __FUNCTION__, __LINE__, aml_out->alsa_running_status);
-                            mediasync_wrap_setParameter(aml_out->hwsync->es_mediasync.mediasync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
-                            aml_out->alsa_status_changed = false;
-                        }
-                        dtvsync_process_res process_result = DTVSYNC_AUDIO_OUTPUT;
-                        process_result = aml_dtvsync_nonms12_process(stream, duration, &speed_enabled);
-                        if (DTVSYNC_AUDIO_EXIT == process_result)
-                        {
-                            break;
-                        }
-                        else if (DTVSYNC_AUDIO_DROP == process_result)
-                        {
-                            continue;
-                        }
+                    if (adev->useSubMix) {
+                        struct subMixing *sm = adev->sm;
+                        struct amlAudioMixer *audio_mixer = sm->mixerData;
+                        ringbuf_latency = mixer_get_inport_latency_frames(audio_mixer, aml_out->inputPortID) / 48 * 90;
+                        phwsync->es_mediasync.cur_outapts -= ringbuf_latency;
                     }
-                    else if (MEDIA_SYNC_ESMODE(aml_out))
+
+                    //sync process here
+                    if (aml_out->alsa_status_changed) {
+                        ALOGI("[%s:%d]aml_out->alsa_running_status %d", __FUNCTION__, __LINE__, aml_out->alsa_running_status);
+                        mediasync_wrap_setParameter(phwsync->es_mediasync.mediasync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
+                        aml_out->alsa_status_changed = false;
+                    }
+                    sync_process_res process_result = ESSYNC_AUDIO_OUTPUT;
+                    process_result = aml_hwmediasync_nonms12_process(stream, duration, &speed_enabled);
+                    if (ESSYNC_AUDIO_EXIT == process_result)
                     {
-                        if (adev->useSubMix) {
-                            struct subMixing *sm = adev->sm;
-                            struct amlAudioMixer *audio_mixer = sm->mixerData;
-                            ringbuf_latency = mixer_get_inport_latency_frames(audio_mixer, aml_out->inputPortID) / 48 * 90;
-                            aml_out->hwsync->es_mediasync.cur_outapts -= ringbuf_latency;
-                        }
-                        //sync process here
-                        sync_process_res process_result = ESSYNC_AUDIO_OUTPUT;
-                        process_result = aml_hwmediasync_nonms12_process(stream, duration, &speed_enabled);
-                        if (process_result == ESSYNC_AUDIO_DROP)
-                            continue;
+                        break;
+                    }
+                    else if (ESSYNC_AUDIO_DROP == process_result)
+                    {
+                        continue;
                     }
 
                     // pcm case, asink do speed before audio_hal.
-                    if ((fabs(aml_out->output_speed - 1.0f) > 1e-6)
-                        && ((MEDIA_SYNC_ESMODE(aml_out)) && !audio_is_linear_pcm(aml_out->hal_internal_format))
-                            || (MEDIA_SYNC_TSMODE(aml_out)))
-                    {
+                    if (fabs(aml_out->output_speed - 1.0f) > 1e-6) {
                         ret = aml_audio_speed_process_wrapper(&aml_out->speed_handle, dec_data,
                                                 pcm_len, aml_out->output_speed,
                                                 OUTPUT_ALSA_SAMPLERATE, dec_pcm_data->data_ch);

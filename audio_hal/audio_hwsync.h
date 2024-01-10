@@ -53,19 +53,6 @@
 #define HWSYNC_PTS_EOS UINT64_MAX
 #define HWSYNC_PTS_NA  (UINT64_MAX-1)
 
-#define MEDIA_SYNC_ESMODE(aml_out)                               \
-     ((aml_out) && (aml_out)->hwsync && (aml_out)->need_sync \
-     && (AVSYNC_TYPE_MEDIASYNC == (aml_out)->avsync_type)        \
-     && (aml_out)->with_header)
-
-//#define MEDIA_SYNC_TSMODE(aml_out)                               \
-//     ((aml_out) && (aml_out)->hwsync && (aml_out)->dtvsync_enable)
-
-#define MEDIA_SYNC_TSMODE(aml_out)                               \
-     ((aml_out) && (aml_out)->hwsync && (aml_out)->need_sync \
-     && (AVSYNC_TYPE_MEDIASYNC == (aml_out)->avsync_type)        \
-     && (false == (aml_out)->with_header))
-
 enum hwsync_status {
     CONTINUATION,  // good sync condition
     ADJUSTMENT,    // can be adjusted by discarding or padding data
@@ -86,16 +73,10 @@ typedef struct apts_tab {
 } apts_tab_t;
 
 typedef enum {
-    ESSYNC_AUDIO_DROP = 0,
-    ESSYNC_AUDIO_OUTPUT,
+    ESSYNC_AUDIO_DROP   = 0,
+    ESSYNC_AUDIO_OUTPUT = 1,
+    ESSYNC_AUDIO_EXIT   = 2,
 } sync_process_res;
-
-struct mediasync_a_policy {
-    audio_policy last_audiopolicy;
-    audio_policy audiopolicy;
-    int32_t  param1;
-    int32_t  param2;
-};
 
 typedef struct audio_hwsync_mediasync {
     void* mediasync;
@@ -104,42 +85,47 @@ typedef struct audio_hwsync_mediasync {
     int64_t out_start_apts;
     int64_t out_end_apts;
     int duration;
-    struct mediasync_a_policy apolicy;
+    struct mediasync_audio_policy apolicy;
     size_t total_data_size;
     int64_t in_apts;
 }audio_hwsync_mediasync_t;//for AudioProcess mode
 
 typedef struct  audio_hwsync {
+/* header */
     uint8_t hw_sync_header[HW_AVSYNC_MAX_HEADER_SIZE];
     size_t hw_sync_header_cnt;
     int hw_sync_state;
     uint32_t hw_sync_body_cnt;
     uint32_t hw_sync_frame_size;
-    int      bvariable_frame_size;
+    int      bvariable_frame_size;   //toD
     uint8_t hw_sync_body_buf[HWSYNC_MAX_BODY_SIZE];
-    uint8_t body_align[64];
-    uint8_t body_align_cnt;
+    uint8_t body_align_cnt;    //toD
+    int version_num;
+
+/* msync */
     bool first_apts_flag;//flag to indicate set first apts
     bool msync_first_insert_flag;
     uint64_t first_apts;
     uint64_t last_apts_from_header;
     uint64_t last_apts_from_header_raw;
-    uint64_t last_lookup_apts;
     int last_ms12_latency_frames;
-    int video_valid_time;
+    bool eos;
 
+/* common */
+    uint64_t last_lookup_apts;
+    uint64_t last_dec_out_frame;
+    uint64_t same_apts_frames;
+    uint64_t last_output_apts;
     apts_tab_t pts_tab[HWSYNC_APTS_NUM];
     pthread_mutex_t lock;
     size_t payload_offset;
-    struct aml_stream_out  *aout;
-    int version_num;
+    struct aml_stream_out *aout;
+    int (*get_tuning_latency)(struct audio_stream_out *stream);
+
+/* mediasync */
     audio_hwsync_mediasync_t es_mediasync;
-    uint64_t last_output_pts;
-    struct timespec  last_timestamp;
-    bool wait_video_done;
-    bool eos;
-    bool hwsync_need_resume;
 } audio_hwsync_t;
+
 static inline bool hwsync_header_valid(uint8_t *header)
 {
     return (header[0] == 0x55) &&

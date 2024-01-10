@@ -152,7 +152,6 @@
 #include <audio_effects/effect_aec.h>
 #include <audio_utils/clock.h>
 #include "audio_hal_version.h"
-#include "audio_media_sync_util.h"
 
 #include "hal_scaletempo.h"
 
@@ -1063,6 +1062,7 @@ static void hwsync_mediasync_outset(struct aml_audio_device *adev, struct aml_st
     out->output_speed = 1.0f;
     *sync_enable = ret_set_id ? 1 : 0;
     out->with_header = true;
+    out->hwsync->get_tuning_latency = aml_audio_get_ms12_tunnel_latency;
     AM_LOGI("The current sync type: MediaSync %d,%d,%x, hw_mediasync:%p, out->with_header:%d", *sync_enable, hw_sync_id, out->hal_format, adev->hw_mediasync, out->with_header);
     return;
 }
@@ -1342,7 +1342,6 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         }
 
         out->hwsync->first_apts_flag = false;
-        out->hwsync->video_valid_time = 0;
         out->hwsync->msync_first_insert_flag = false;
         ALOGI("(%p)set hw_sync_id=%d, %s need_sync", out, hw_sync_id, sync_enable ? "enable" : "disable");
 
@@ -3616,8 +3615,6 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
             return -ENOMEM;
         }
         aml_audio_hwsync_init(out->hwsync, out);
-        audio_mediasync_util_t* media_sync_util = aml_audio_mediasync_util_init();
-        ALOGI("[%s:%d], aml_audio_mediasync_util_init, media_sync_util=%p", __func__, __LINE__, media_sync_util);
     }
 
     /*if tunnel mode pcm is not 48Khz, resample to 48K*/
@@ -3664,8 +3661,6 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->ddp_frame_size = aml_audio_get_ddp_frame_size();
     out->resample_handle = NULL;
     out->set_init_avsync_policy = false;
-    out->last_lookup_pts = 0;
-    out->same_pts_frames = 0;
     *stream_out = &out->stream;
     ALOGD("%s: exit", __func__);
 
@@ -7834,7 +7829,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
         if (!is_bypass_dolbyms12(stream) && (need_reset_decoder == true)) {
             ALOGI("%s aml_audio_hwsync_reset_apts ", __func__);
             aml_audio_hwsync_reset_apts(aml_out->hwsync);
-            aml_audio_mediasync_util_init();
+            //aml_audio_mediasync_util_init();
         }
     }
 #if 0
@@ -8642,15 +8637,6 @@ hwsync_rewrite:
             cur_pts = aml_out->hwsync->es_mediasync.in_apts;
             pthread_mutex_unlock(&aml_out->hwsync->lock);
         }
-        audio_mediasync_util_t *media_sync_util = aml_audio_get_mediasync_util_handle();
-        if ((is_dolby_ms12_support_compression_format(aml_out->hal_internal_format)) && (eDolbyMS12Lib == adev->dolby_lib_type))
-        {
-            if (0 > aml_audio_mediasync_util_checkin_apts(media_sync_util, media_sync_util->payload_offset, cur_pts))
-            {
-                ALOGE("[%s:%d], checkin apts(%llx) data_size(%zu) payload_offset(%zu)fail", __func__, __LINE__, cur_pts, bytes, media_sync_util->payload_offset);
-            }
-            media_sync_util->payload_offset += write_bytes;
-        }
     }
 
     if (aml_out->write && write_bytes > 0) {
@@ -8848,7 +8834,6 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
         aml_out->debug_stream = 1;
     }
 
-    audio_mediasync_util_t* media_sync_util = aml_audio_mediasync_util_init();
     ALOGD("-%s: out %p: io handle:%d, usecase:%s card:%d alsa devices:%d", __func__,
         aml_out, handle, usecase2Str(aml_out->usecase), aml_out->card, aml_out->device);
 

@@ -36,7 +36,6 @@
 #include "aml_audio_ms12_sync.h"
 #include "aml_esmode_sync.h"
 #include "aml_audio_hal_avsync.h"
-#include "audio_media_sync_util.h"
 
 #define MS12_MAIN_WRITE_LOOP_THRESHOLD                  (2000)
 #define AUDIO_IEC61937_FRAME_SIZE 4
@@ -95,8 +94,8 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio
     unsigned long long all_zero_len = 0;
     audio_format_t output_format = get_output_format (stream);
     if (adev->debug_flag) {
-        ALOGD("%s:%d hal_format:%#x, output_format:0x%x, sink_format:0x%x",
-            __func__, __LINE__, aml_out->hal_format, output_format, adev->sink_format);
+        ALOGD("%s:%d hal_format:%#x, output_format:0x%x, sink_format:0x%x, apts:0x%llx, size:%z",
+            __func__, __LINE__, aml_out->hal_format, output_format, adev->sink_format, abuffer->pts, abuffer->size);
     }
 
     remain_size = dolby_ms12_get_main_buffer_avail(NULL);
@@ -107,16 +106,8 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio
         // missing code with aml_audio_hwsync_checkin_apts, need to add for netflix tunnel mode. zzz
         if (abuffer->pts != HWSYNC_PTS_NA) {
             aml_audio_hwsync_checkin_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, abuffer->pts);
+            aml_out->hwsync->payload_offset += abuffer->size;
         }
-#ifndef BUILD_LINUX
-        // dolby_ms12_hwsync_checkin_pts checkin PTS info to MS12's global PTS sync table, which
-        // is only used by UDC decoder to detect PTS gap for NTS. On Linux, audio gap for timestamp
-        // is sent from upper layer directly and the gap detection is not needed.
-        if (continuous_mode(adev) && !audio_is_linear_pcm(aml_out->hal_internal_format) && adev->is_netflix) {
-            dolby_ms12_hwsync_checkin_pts(aml_out->hwsync->payload_offset, abuffer->pts);
-        }
-#endif
-        aml_out->hwsync->payload_offset += abuffer->size;
         //change
         // when msync is used, the original first apts->audio start logic from legacy amaster tsync
         // implementation in hw_write() is moved to this place when main input samples are injected
@@ -148,11 +139,6 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio
         if (audio_hal_data_processing (stream, write_buf, write_bytes, &output_buffer, &output_buffer_bytes, output_format) == 0)
             hw_write (stream, output_buffer, output_buffer_bytes, output_format);
     } else {
-        /*not continuous mode, we use sink gain control the volume*/
-        if (!continuous_mode(adev)) {
-            /*when it is non continuous mode, we bypass data here*/
-            dolby_ms12_bypass_process(stream, write_buf, write_bytes);
-        }
         /*begin to write, clear the total write*/
         total_write = 0;
 re_write:
@@ -225,13 +211,11 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
 
     if (bypass_aml_dec) {
         ret = aml_audio_ms12_process_wrapper(stream, abuffer);
-        if (MEDIA_SYNC_TSMODE(aml_out)) {
-            if (aml_out->alsa_status_changed) {
-                ALOGI("[%s:%d] aml_out->alsa_running_status %d", __FUNCTION__, __LINE__, aml_out->alsa_running_status);
-                //aml_dtvsync_setParameter(patch->dtvsync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
-                mediasync_wrap_setParameter(aml_out->hwsync->es_mediasync.mediasync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
-                aml_out->alsa_status_changed = false;
-            }
+        if ((aml_out->alsa_status_changed) && (AVSYNC_TYPE_MEDIASYNC == (aml_out)->avsync_type)) {
+            ALOGI("[%s:%d] aml_out->alsa_running_status %d", __FUNCTION__, __LINE__, aml_out->alsa_running_status);
+            //aml_dtvsync_setParameter(patch->dtvsync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
+            mediasync_wrap_setParameter(aml_out->hwsync->es_mediasync.mediasync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
+            aml_out->alsa_status_changed = false;
         }
     } else {
         if (aml_out->aml_dec == NULL) {
@@ -239,17 +223,13 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
         }
         aml_dec_t *aml_dec = aml_out->aml_dec;
         aml_dec_info_t dec_info;
-        audio_mediasync_util_t * mediasync_util = aml_audio_get_mediasync_util_handle();
         struct audio_buffer ainput;
         ainput.buffer = abuffer->buffer;
         ainput.size = abuffer->size;
         ainput.pts = abuffer->pts;
 
-        if ((MEDIA_SYNC_TSMODE(aml_out)) || (MEDIA_SYNC_ESMODE(aml_out)))
-        {
-            aml_dec->in_frame_pts = (NULL_INT64 == ainput.pts) ? aml_dec->out_frame_pts : ainput.pts;
-            ainput.pts = aml_dec->in_frame_pts;
-        }
+        aml_dec->in_frame_pts = (NULL_INT64 == ainput.pts) ? aml_dec->out_frame_pts : ainput.pts;
+        ainput.pts = aml_dec->in_frame_pts;
 
         if (aml_dec) {
             dec_data_info_t * dec_pcm_data = &aml_dec->dec_pcm_data;
@@ -312,28 +292,12 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
                              dec_pcm_data->data_len = aml_out->resample_handle->resample_size;
                          }
                     }
-
-                    if ((MEDIA_SYNC_TSMODE(aml_out)) || (MEDIA_SYNC_ESMODE(aml_out)))
-                    {
-                        int64_t out_apts;
-                        out_apts = aml_dec->out_frame_pts;
-                        if (aml_audio_mediasync_util_checkin_apts(mediasync_util, mediasync_util->payload_offset, out_apts) < 0) {
-                            AM_LOGI_IF(adev->debug_flag, "[%s:%d] checkin apts(%llx) data_size(%zu) fail",
-                                __FUNCTION__, __LINE__, out_apts, mediasync_util->payload_offset);
-                        }
-                        mediasync_util->payload_offset += dec_pcm_data->data_len;
-
-                        if (mediasync_util->media_sync_debug)
-                             ALOGI("out_frames %d, out_apts %llx, in_frame_pts %llx, out_frame_pts %llx, data_sr %d, data_ch %d, frame_offset %zu",
-                                    out_frames, out_apts, aml_dec->in_frame_pts, aml_dec->out_frame_pts,
-                                    dec_pcm_data->data_sr, dec_pcm_data->data_ch, mediasync_util->payload_offset);
-                    }
                     //for next loop
                     //ainput.pts = dec_pcm_data->pts + out_frames * 1000 * 90 /dec_pcm_data->data_sr;
                     aml_dec->out_frame_pts = ainput.pts;
                     pcm_abuffer.size = dec_pcm_data->data_len;
                     pcm_abuffer.buffer = dec_data;
-                    pcm_abuffer.pts = aml_dec->out_frame_pts;
+                    pcm_abuffer.pts = dec_pcm_data->pts;
                     pcm_abuffer.format = AUDIO_FORMAT_PCM_16_BIT;
                     ret = aml_audio_ms12_process_wrapper(stream, &pcm_abuffer);
                 }

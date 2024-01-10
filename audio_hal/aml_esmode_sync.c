@@ -39,7 +39,6 @@
 #include "alsa_config_parameters.h"
 #include "audio_hwsync.h"
 #include "aml_esmode_sync.h"
-#include "audio_media_sync_util.h"
 
 #define DD_MUTE_FRAME_SIZE 1536
 #define EAC3_IEC61937_FRAME_SIZE 24576
@@ -319,173 +318,7 @@ int aml_hwmediasync_nonms12_process_insert(struct audio_stream_out *stream,struc
     return 0;
 }
 
-int aml_hwsynces_ms12_process_insert(void *priv_data, int insert_time_ms,
-                                    aml_ms12_dec_info_t *ms12_info)
-{
-    struct aml_stream_out *aml_out = (struct aml_stream_out *)priv_data;
-    struct aml_audio_device *adev = aml_out->dev;
-    struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    struct bitstream_out_desc *bitstream_out;
-    unsigned char buffer[EAC3_IEC61937_FRAME_SIZE];
-    audio_format_t output_format = (ms12_info) ? ms12_info->data_type : AUDIO_FORMAT_PCM_16_BIT;
-    int t1 = 0;
-    int i = 0;
-    int insert_ms = 0;
-    int size = 0;
-    bool is_mat = false;
-    size_t out_buf_size = SYNC_BUF_SIZE;
-    static char out_buf[SYNC_BUF_SIZE];
-
-    for (i = 0; i < BITSTREAM_OUTPUT_CNT; i++) {
-        bitstream_out = &ms12->bitstream_out[i];
-        if ((bitstream_out->audio_format == AUDIO_FORMAT_AC3) ||
-            (bitstream_out->audio_format == AUDIO_FORMAT_E_AC3)) {
-            t1 = insert_time_ms / 32;
-            break;
-        } else if (bitstream_out->audio_format == AUDIO_FORMAT_MAT) {
-            t1 = insert_time_ms / 20;
-            is_mat = true;
-        }
-    }
-
-    if (is_mat)
-        insert_ms = 20;
-    else
-        insert_ms = 32;
-
-    ALOGI("inset_time_ms=%d, insert_ms=%d, t1=%d, is_mat=%d\n",
-            insert_time_ms, insert_ms, t1, is_mat);
-
-    memset(out_buf, 0, out_buf_size);
-
-    do {
-
-        if (audio_is_linear_pcm(output_format)) {
-
-            if (ms12_info->pcm_type == DAP_LPCM) {
-                dap_pcm_output(out_buf, priv_data, 192*insert_ms, ms12_info);
-            } else {
-                stereo_pcm_output(out_buf, priv_data, 192*insert_ms, ms12_info);
-            }
-        } else {
-            if (is_mat) {
-                size = sizeof(hwms12_muted_mat_raw);
-                memcpy(buffer, hwms12_muted_mat_raw, size);
-                mat_bitstream_output(buffer, priv_data, size);
-            } else {
-                for (i = 0; i < BITSTREAM_OUTPUT_CNT; i++) {
-
-                    bitstream_out = &ms12->bitstream_out[i];
-
-                    if (bitstream_out->spdifout_handle != NULL) {
-                        if (bitstream_out->audio_format == AUDIO_FORMAT_E_AC3) {
-                            size = sizeof(hwm_mute_ddp_frame);
-                            memcpy(buffer,  hwm_mute_ddp_frame, size);
-                            bitstream_output(buffer, priv_data, size);
-                        } else if (bitstream_out->audio_format == AUDIO_FORMAT_AC3) {
-                            size = sizeof(hwm_mute_dd_frame);
-                            memcpy(buffer,  hwm_mute_dd_frame, size);
-                            spdif_bitstream_output(buffer, priv_data, size);
-                        }
-                    }
-                }
-            }
-        }
-        insert_time_ms -= insert_ms;
-    } while(insert_time_ms > 0);
-
-    return 0;
-}
-
-sync_process_res aml_hwsynces_ms12_process_policy1(void *priv_data, aml_ms12_dec_info_t *ms12_info, struct aml_stream_out *aml_out_write)
-{
-    struct aml_stream_out *aml_out = (struct aml_stream_out *)priv_data;//ms12out
-    struct audio_stream_out *stream_out = (struct audio_stream_out *)aml_out;
-    struct aml_audio_device *adev = aml_out->dev;
-    struct mediasync_audio_policy *async_policy = NULL;
-    struct renderpts_item *frame_item = NULL;
-    struct listnode *item = NULL;
-
-    pthread_mutex_lock(&adev->ms12.p_pts_list->list_lock);
-    if (!list_empty(&adev->ms12.p_pts_list->frame_list)) {
-        item = list_head(&adev->ms12.p_pts_list->frame_list);
-        frame_item = node_to_item(item, struct renderpts_item, list);
-        list_remove(item);
-    }
-    pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
-
-    if (NULL != frame_item)
-    {
-        async_policy = &(aml_out_write->hwsync->es_mediasync.apolicy);
-        do {
-            mediasync_wrap_AudioProcess(aml_out_write->hwsync->es_mediasync.mediasync, frame_item->out_start_apts, frame_item->cur_outapts, MEDIASYNC_UNIT_PTS, async_policy);
-            if (adev->debug_flag > 0)
-                ALOGI("ms12_process_policy_14=%d=%s, param1=%u, param2=%u, ori=0x%llx,curout=0x%llx \n",
-                    async_policy->audiopolicy, mediasyncAudiopolicyType2Str(async_policy->audiopolicy),
-                    async_policy->param1, async_policy->param2,
-                    frame_item->out_start_apts, frame_item->cur_outapts);
-            if (async_policy->audiopolicy == MEDIASYNC_AUDIO_HOLD) {
-                if (async_policy->param1 > 15000 || async_policy->param1 < 1) {
-                    async_policy->param1 = 15000;
-                }
-                usleep(async_policy->param1);
-            }
-        } while (aml_out_write->hwsync && (aml_out_write->pause_status == false) && async_policy->audiopolicy == MEDIASYNC_AUDIO_HOLD);
-
-        aml_audio_free(frame_item);
-        if (async_policy->audiopolicy == MEDIASYNC_AUDIO_DROP_PCM) {
-
-            return ESSYNC_AUDIO_DROP;
-
-        } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_INSERT) {
-
-            aml_hwsynces_ms12_process_insert(priv_data, async_policy->param1/1000, ms12_info);
-
-        } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_ADJUST_CLOCK) {
-
-
-        } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_RESAMPLE) {
-
-
-        } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_MUTE) {
-
-            adev->underrun_mute_flag = true;
-
-        } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_NORMAL_OUTPUT) {
-            adev->underrun_mute_flag = false;
-        }
-        async_policy->audiopolicy = MEDIASYNC_AUDIO_UNKNOWN;
-    }
-    return ESSYNC_AUDIO_OUTPUT;
-}
-
-
-void aml_hwsynces_ms12_get_policy_continue(struct audio_stream_out *stream)
-{
-    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
-    struct aml_audio_device *adev = aml_out->dev;
-    struct mediasync_audio_policy m_audiopolicy;
-    memset(&m_audiopolicy, 0, sizeof(m_audiopolicy));
-    pthread_mutex_lock(&aml_out->hwsync->lock);
-    audio_hwsync_mediasync_t *p_esmediasync = &(aml_out->hwsync->es_mediasync);
-    pthread_mutex_unlock(&aml_out->hwsync->lock);
-    mediasync_wrap_AudioProcess(p_esmediasync->mediasync, p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
-    if (adev->debug_flag > 0) {
-        static int64_t beforepts = 0;
-        static int64_t beforepts1 = 0;
-        ALOGI("%s, do ms12_1 get es m_audiopolicy=%d=%s, param1=%u, param2=%u, cur_pts=0x%llx,cur_outpts=0x%llx,diff_cur_pts=%lld,diff_cur_outpts=%lld \n", __func__,
-            m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
-            m_audiopolicy.param1, m_audiopolicy.param2,
-            p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, p_esmediasync->out_start_apts - beforepts1, p_esmediasync->cur_outapts - beforepts);
-       beforepts = p_esmediasync->cur_outapts;
-       beforepts1 = p_esmediasync->out_start_apts;
-    }
-    p_esmediasync->apolicy.audiopolicy= (audio_policy)m_audiopolicy.audiopolicy;
-    p_esmediasync->apolicy.param1 = m_audiopolicy.param1;
-    p_esmediasync->apolicy.param2 = m_audiopolicy.param2;
-}
-
-void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
+void aml_mediasync_ms12_get_policy(struct audio_stream_out *stream)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
@@ -493,14 +326,8 @@ void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
     int debug_flag = aml_audio_property_get_int("audio.media.sync.util.debug", debug_flag);
     memset(&m_audiopolicy, 0, sizeof(m_audiopolicy));
 
-    if (!(MEDIA_SYNC_ESMODE(aml_out)))
-    {
-        return;
-    }
-
     pthread_mutex_lock(&aml_out->hwsync->lock);
     audio_hwsync_mediasync_t *p_esmediasync = &(aml_out->hwsync->es_mediasync);
-    //p_esmediasync->out_start_apts = aml_out->hwsync->es_mediasync.in_apts;
     pthread_mutex_unlock(&aml_out->hwsync->lock);
 
     do {
@@ -510,12 +337,12 @@ void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
 
         int ret = mediasync_wrap_AudioProcess(p_esmediasync->mediasync, p_esmediasync->out_start_apts, p_esmediasync->cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
         if (!ret) {
-            AM_LOGE("aml_dtvsync_audioprocess fail.");
+            AM_LOGE("mediasync_wrap_AudioProcess fail.");
             return;
         }
 
         if (debug_flag || m_audiopolicy.audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT) {
-            ALOGI("ts m_audiopolicy=%d=%s, param1=%u, param2=%u, org_pts=0x%llx, cur_pts=0x%llx",
+            ALOGI("m_audiopolicy=%d=%s, param1=%u, param2=%u, org_pts=0x%llx, cur_pts=0x%llx",
                 m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
                 m_audiopolicy.param1, m_audiopolicy.param2,
                 p_esmediasync->out_start_apts, p_esmediasync->cur_outapts);
@@ -531,77 +358,17 @@ void aml_hwsynces_ms12_get_policy(struct audio_stream_out *stream)
                 usleep(m_audiopolicy.param1);
             }
         }
+
+        if ((true == aml_out->fast_quit) || adev->ms12_to_be_cleanup) {
+            AM_LOGI("fast_quit, break now.");
+            break;
+        }
     } while (aml_out->hwsync && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
 
     p_esmediasync->apolicy.audiopolicy= (audio_policy)m_audiopolicy.audiopolicy;
     p_esmediasync->apolicy.param1 = m_audiopolicy.param1;
     p_esmediasync->apolicy.param2 = m_audiopolicy.param2;
     return;
-}
-
-sync_process_res aml_hwsynces_ms12_process_policy(void *priv_data, aml_ms12_dec_info_t *ms12_info)
-{
-    struct aml_stream_out *aml_out = (struct aml_stream_out *)priv_data;//ms12out
-    struct audio_stream_out *stream_out = (struct audio_stream_out *)aml_out;
-    struct aml_audio_device *adev = aml_out->dev;
-    struct mediasync_a_policy *async_policy = NULL;
-
-    if (!(MEDIA_SYNC_ESMODE(aml_out)))
-    {
-        ALOGE("aml_out->hwsync:%p, aml_out->need_sync:%d, aml_out->avsync_type:%d error!", aml_out->hwsync, aml_out->need_sync, aml_out->avsync_type);
-        return ESSYNC_AUDIO_OUTPUT;
-    }
-
-    pthread_mutex_lock(&aml_out->hwsync->lock);
-    async_policy = &(aml_out->hwsync->es_mediasync.apolicy);
-    pthread_mutex_unlock(&aml_out->hwsync->lock);
-
-    if (adev->debug_flag)
-        ALOGI("[%s:%d] es cur_policy:%d, prm1:%d, prm2:%d", __func__, __LINE__, async_policy->audiopolicy, async_policy->param1, async_policy->param2);
-
-    if (async_policy->audiopolicy == MEDIASYNC_AUDIO_DROP_PCM) {
-        return ESSYNC_AUDIO_DROP;
-    } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_INSERT) {
-        aml_hwsynces_ms12_process_insert(priv_data, async_policy->param1/1000, ms12_info);
-    } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_ADJUST_CLOCK) {
-    } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_RESAMPLE) {
-    } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_MUTE) {
-        adev->underrun_mute_flag = true;
-    } else if (async_policy->audiopolicy == MEDIASYNC_AUDIO_NORMAL_OUTPUT) {
-        adev->underrun_mute_flag = false;
-    }
-
-    if (async_policy) {
-        async_policy->audiopolicy = DTVSYNC_AUDIO_UNKNOWN;
-    }
-
-    return ESSYNC_AUDIO_OUTPUT;
-}
-
-int aml_audio_get_cur_ms12_latencyes(struct audio_stream_out *stream) {
-
-    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
-    struct aml_audio_device *adev = aml_out->dev;
-    struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    //struct aml_audio_patch *patch = adev->audio_patch;
-    //aml_demux_audiopara_t *demux_info = (aml_demux_audiopara_t *)patch->demux_info;
-    int ms12_latencyms = 0;
-
-    uint64_t inputnode_consumed = dolby_ms12_get_main_bytes_consumed(stream);
-    uint64_t frames_generated = dolby_ms12_get_main_pcm_generated(stream);
-    if (is_dolby_ms12_support_compression_format(aml_out->hal_internal_format)) {
-        //if (demux_info->dual_decoder_support)
-        //    ms12_latencyms = (frames_generated - ms12->master_pcm_frames) / 48;
-        //else
-            ms12_latencyms = (ms12->ms12_main_input_size - inputnode_consumed) / aml_out->ddp_frame_size * 32 + (frames_generated - ms12->master_pcm_frames) / 48;
-    } else {
-        ms12_latencyms = ((ms12->ms12_main_input_size - inputnode_consumed ) / 4 + frames_generated - ms12->master_pcm_frames) / 48;
-    }
-    if (adev->debug_flag)
-        ALOGI("ms12_latencyms %d  ms12_main_input_size %lld inputnode_consumed %lld frames_generated %lld master_pcm_frames %lld,audio format %d\n",
-        ms12_latencyms, ms12->ms12_main_input_size, inputnode_consumed,frames_generated, ms12->master_pcm_frames,aml_out->hal_internal_format);
-    return ms12_latencyms;
-
 }
 
 int aml_hwsynces_process_resample(struct audio_stream_out *stream,
@@ -641,15 +408,9 @@ sync_process_res  aml_hwmediasync_nonms12_process(struct audio_stream_out *strea
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
     aml_dec_t *aml_dec = aml_out->aml_dec;
-    float speed = 0.0f;
+    sync_process_res ret = ESSYNC_AUDIO_OUTPUT;
     struct mediasync_audio_policy m_audiopolicy;
     memset(&m_audiopolicy, 0, sizeof(m_audiopolicy));
-
-    if (!(MEDIA_SYNC_ESMODE(aml_out)))
-    {
-        ALOGE("aml_out->hwsync:%p, aml_out->need_sync:%d, aml_out->avsync_type:%d error!", aml_out->hwsync, aml_out->need_sync, aml_out->avsync_type);
-        return ESSYNC_AUDIO_OUTPUT;
-    }
 
     if (aml_out->hwsync->es_mediasync.duration == 0 ||
         (duration > 0 && duration < aml_out->hwsync->es_mediasync.duration)) {
@@ -663,12 +424,12 @@ sync_process_res  aml_hwmediasync_nonms12_process(struct audio_stream_out *strea
             if (aml_out->tsync_status == TSYNC_STATUS_STOP) {
                 break;
             }
-            mediasync_wrap_AudioProcess(aml_out->hwsync->es_mediasync.mediasync, aml_dec->out_frame_pts, aml_out->hwsync->es_mediasync.cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
-            if (adev->debug_flag > 0 || MEDIASYNC_AUDIO_NORMAL_OUTPUT != m_audiopolicy.audiopolicy)
-                ALOGI("es m_audiopolicy=%d=%s, param1=%u, param2=%u, out_pts=0x%llx,cur=0x%llx \n",
-                    m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
-                    m_audiopolicy.param1, m_audiopolicy.param2,
-                    aml_dec->out_frame_pts, aml_out->hwsync->es_mediasync.cur_outapts);
+            mediasync_wrap_AudioProcess(aml_out->hwsync->es_mediasync.mediasync, aml_dec->out_frame_pts,
+                                        aml_out->hwsync->es_mediasync.cur_outapts, MEDIASYNC_UNIT_PTS, &m_audiopolicy);
+            AM_LOGI_IF((adev->debug_flag > 2), "m_audiopolicy=%d=%s, param1=%u, param2=%u, out_pts=0x%llx, cur=0x%llx",
+                        m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
+                        m_audiopolicy.param1, m_audiopolicy.param2,
+                        aml_dec->out_frame_pts, aml_out->hwsync->es_mediasync.cur_outapts);
 
             if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
                 if (m_audiopolicy.param1 == -1) {
@@ -679,26 +440,52 @@ sync_process_res  aml_hwmediasync_nonms12_process(struct audio_stream_out *strea
             }
         }
 
+        if (MEDIASYNC_AUDIO_HOLD == m_audiopolicy.audiopolicy) {
+            if (-1 == m_audiopolicy.param1) {
+                usleep(15000);
+            } else if (1000000 < m_audiopolicy.param1) {
+                AM_LOGE("Invalid hold parameter, m_audiopolicy.param1:%d, change sleep to 1s now!", m_audiopolicy.param1);
+                usleep(1000000);
+            } else {
+                usleep(m_audiopolicy.param1);
+            }
+        }
+
+        if ((true == aml_out->fast_quit) || adev->ms12_to_be_cleanup) {
+            AM_LOGI("fast_quit, break now.");
+            ret = ESSYNC_AUDIO_EXIT;
+            break;
+        }
+
     } while (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
 
-    if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_DROP_PCM) {
-        aml_out->hwsync->es_mediasync.cur_outapts = aml_dec->out_frame_pts;
-        return ESSYNC_AUDIO_DROP;
-    } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_INSERT) {
-
-        aml_hwmediasync_nonms12_process_insert(stream,  &m_audiopolicy);
-
-    } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_ADJUST_CLOCK) {
-
-    } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_RESAMPLE) {
-
-        aml_hwsynces_process_resample(stream, &m_audiopolicy, speed_enabled);
-    } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_MUTE) {
-        adev->underrun_mute_flag = true;
-    } else if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_NORMAL_OUTPUT) {
-        adev->underrun_mute_flag = false;
+    switch (m_audiopolicy.audiopolicy)
+    {
+        case MEDIASYNC_AUDIO_DROP_PCM:
+            aml_out->hwsync->es_mediasync.cur_outapts = aml_dec->out_frame_pts;
+            ret = ESSYNC_AUDIO_DROP;
+            break;
+        case MEDIASYNC_AUDIO_INSERT:
+            aml_hwmediasync_nonms12_process_insert(stream, &m_audiopolicy);
+            break;
+        case DTVSYNC_AUDIO_ADJUST_CLOCK:
+            //aml_dtvsync_ms12_adjust_clock(stream_out, async_policy->param1);
+            adev->underrun_mute_flag = false;
+            break;
+        case MEDIASYNC_AUDIO_RESAMPLE:
+            //aml_hwsynces_process_resample(stream, &m_audiopolicy, speed_enabled);
+            break;
+        case MEDIASYNC_AUDIO_MUTE:
+            adev->underrun_mute_flag = true;
+            break;
+        case MEDIASYNC_AUDIO_NORMAL_OUTPUT:
+            adev->underrun_mute_flag = false;
+            break;
+        default :
+            AM_LOGE("unknown policy:%d error!", m_audiopolicy.audiopolicy);
+            break;
     }
 
-    return ESSYNC_AUDIO_OUTPUT;
+    return ret;
 }
 

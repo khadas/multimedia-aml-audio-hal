@@ -813,10 +813,7 @@ struct aml_stream_out {
     bool first_pts_set;
     bool need_first_sync;
     uint64_t last_pts;
-    uint64_t last_lookup_pts;
     uint64_t last_payload_offset;
-    uint64_t last_dec_out_frame;
-    uint64_t same_pts_frames;
     struct audio_config out_cfg;
     int debug_stream;
     uint64_t us_used_last_write;
@@ -916,6 +913,7 @@ struct aml_stream_out {
     struct scale_tempo * scaletempo;
     bool b_install_sync_callback;
     bool will_pause;
+    int fast_quit;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);

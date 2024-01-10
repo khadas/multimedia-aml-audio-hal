@@ -128,7 +128,6 @@ add_library(audio_hal SHARED
 	audio_hal/aml_audio_delay.c
 	#audio_hal/a2dp_hal.cpp
 	audio_hal/aml_audio_ease.c
-	audio_hal/audio_media_sync_util.c
 	audio_hal/amlAudioMixer.c
 	audio_hal/aml_audio_ms12_bypass.c
 	audio_hal/aml_audio_stream.c

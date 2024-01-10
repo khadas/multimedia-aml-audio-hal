@@ -71,7 +71,6 @@
 #include "aml_ddp_dec_api.h"
 #include "aml_dts_dec_api.h"
 #include "audio_dtv_utils.h"
-#include "audio_media_sync_util.h"
 #include "audio_hw_ms12_common.h"
 
 #define DTV_SKIPAMADEC "vendor.dtv.audio.skipamadec"
@@ -1251,8 +1250,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                             audio_queue_info.isworkingchannel = false;
                         audio_queue_info.tunit = MEDIASYNC_UNIT_PTS;
                         aml_dtvsync_queue_audio_frame(Dtvsync, &audio_queue_info);
-                        audio_mediasync_util_t* media_sync_util = aml_audio_get_mediasync_util_handle();
-                        if (media_sync_util->media_sync_debug)
+                        if (aml_dev->debug_flag > 0)
                              ALOGI("queue pts:%llx, size:%d, dur:%d isneedupdate %d\n",
                                  dtv_package->pts, dtv_package->size, Dtvsync->duration,audio_queue_info.isneedupdate);
                         if (path_index != dtv_audio_instances->demux_index_working) {
@@ -1453,6 +1451,7 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
         pthread_mutex_lock(&aml_out->hwsync->lock);
         aml_out->hwsync->es_mediasync.mediasync    = patch->dtvsync->mediasync;
         aml_out->hwsync->es_mediasync.mediasync_id = patch->dtvsync->mediasync_id;
+        aml_out->hwsync->get_tuning_latency        = dtv_avsync_get_apts_latency;
         pthread_mutex_unlock(&aml_out->hwsync->lock);
     }
     else
@@ -1848,6 +1847,11 @@ static void *audio_dtv_patch_process_threadloop_v2(void *data)
                 ALOGI("[audiohal_kpi]++%s live now  stop  the audio decoder now \n",
                       __FUNCTION__);
                 dtv_do_ease_out(aml_dev);
+                struct audio_stream_out *stream_out = (struct audio_stream_out *)patch->dtv_aml_out;
+                struct aml_stream_out *aml_out = (struct aml_stream_out *)stream_out;
+                aml_out->fast_quit = true;
+                AM_LOGI("aml_out:%p, set fast_quit:%d", aml_out, aml_out->fast_quit);
+
                 //non-pip case ,Make sure you get the first new data
                 //Always hold a current package in input_stream thread,so need release it.
                 if (!IsPipRun(dtv_audio_instances) && aml_dev->is_multi_demux) {

@@ -698,7 +698,7 @@ static void process_port_msg(input_port *in_port)
             audio_hwsync_t *hwsync = (out != NULL) ? (out->hwsync) : NULL;
             //AM_LOGI("[%s:%d] hwsync:%p tsync resume", hwsync);
             if ((hwsync != NULL) && (AVSYNC_TYPE_MEDIASYNC == out->avsync_type)) {
-                hwsync->hwsync_need_resume = true;
+                //hwsync->hwsync_need_resume = true;
             }
             set_inport_state(in_port, RESUMING);
             break;
@@ -742,8 +742,8 @@ static int mixer_inports_read(struct amlAudioMixer *audio_mixer)
                 audio_hwsync_t *hwsync = (out != NULL) ? (out->hwsync) : NULL;
                 fade_in = 1;
                 AM_LOGI("input port:%s tsync resume", mixerInputType2Str(type));
-                if (hwsync)
-                    hwsync->hwsync_need_resume = true;
+                //if (hwsync)
+                    //hwsync->hwsync_need_resume = true;
                 set_inport_state(in_port, ACTIVE);
             } else if (state == STOPPED || state == PAUSED || state == FLUSHED) {
                 AM_LOGV("input port:%s stopped, paused or flushed", mixerInputType2Str(type));

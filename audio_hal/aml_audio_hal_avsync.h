@@ -257,6 +257,7 @@ extern unsigned long decoder_apts_lookup(unsigned int offset);
 
 void dtv_adjust_i2s_output_clock(struct aml_audio_patch* patch, int direct, int step);
 void dtv_adjust_spdif_output_clock(struct aml_audio_patch* patch, int direct, int step, bool spdifb);
+int dtv_avsync_get_apts_latency(struct audio_stream_out *stream);
 
 
 
