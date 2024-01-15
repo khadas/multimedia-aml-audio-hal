@@ -23,6 +23,13 @@
 #ifdef BUILD_LINUX
 #include <pthread.h>
 #endif
+
+#ifdef USE_MSYNC
+#include <aml_avsync.h>
+#include <aml_avsync_log.h>
+#else
+#include "aml_avsync_stub.h"
+#endif
 #include "audio_mediasync_wrap.h"
 #define SYSTIME_CORRECTION_THRESHOLD        (90000*10/100)
 #define NSEC_PER_SECOND 1000000000ULL
@@ -59,13 +66,6 @@ enum hwsync_status {
     RESYNC,        // pts need resync
 };
 
-enum tsync_status {
-    TSYNC_STATUS_INIT,
-    TSYNC_STATUS_RUNNING,
-    TSYNC_STATUS_PAUSED,
-    TSYNC_STATUS_STOP
-};
-
 typedef struct apts_tab {
     int  valid;
     size_t offset;
@@ -78,17 +78,39 @@ typedef enum {
     ESSYNC_AUDIO_EXIT   = 2,
 } sync_process_res;
 
-typedef struct audio_hwsync_mediasync {
-    void* mediasync;
+typedef struct audio_mediasync {
+    void* handle;
     int mediasync_id;
     int64_t cur_outapts;
     int64_t out_start_apts;
-    int64_t out_end_apts;
-    int duration;
     struct mediasync_audio_policy apolicy;
-    size_t total_data_size;
     int64_t in_apts;
-}audio_hwsync_mediasync_t;//for AudioProcess mode
+}audio_mediasync_t;//for AudioProcess mode
+
+typedef struct audio_msync {
+    void *msync_session;
+    pthread_mutex_t msync_mutex;
+    pthread_cond_t msync_cond;
+    bool msync_start;
+    avs_audio_action msync_action;
+    int msync_action_delta;
+    uint32_t msync_rendered_pts;
+    bool first_apts_flag;//flag to indicate set first apts
+    bool msync_first_insert_flag;
+    uint64_t first_apts;  //record and print
+}audio_msync_t;//for AudioProcess mode
+
+typedef struct audio_avsync {
+    audio_mediasync_t *mediasync_ctx;
+    audio_msync_t *msync_ctx;
+    uint64_t last_lookup_apts;
+    uint64_t last_dec_out_frame;
+    uint64_t last_output_apts;
+    apts_tab_t pts_tab[HWSYNC_APTS_NUM];
+    size_t payload_offset;
+    int (*get_tuning_latency)(struct audio_stream_out *stream);
+    pthread_mutex_t lock;
+}avsync_ctx_t;
 
 typedef struct  audio_hwsync {
 /* header */
@@ -101,29 +123,11 @@ typedef struct  audio_hwsync {
     uint8_t hw_sync_body_buf[HWSYNC_MAX_BODY_SIZE];
     uint8_t body_align_cnt;    //toD
     int version_num;
-
-/* msync */
-    bool first_apts_flag;//flag to indicate set first apts
-    bool msync_first_insert_flag;
-    uint64_t first_apts;
     uint64_t last_apts_from_header;
     uint64_t last_apts_from_header_raw;
-    int last_ms12_latency_frames;
     bool eos;
-
-/* common */
-    uint64_t last_lookup_apts;
-    uint64_t last_dec_out_frame;
-    uint64_t same_apts_frames;
-    uint64_t last_output_apts;
-    apts_tab_t pts_tab[HWSYNC_APTS_NUM];
     pthread_mutex_t lock;
-    size_t payload_offset;
-    struct aml_stream_out *aout;
-    int (*get_tuning_latency)(struct audio_stream_out *stream);
-
-/* mediasync */
-    audio_hwsync_mediasync_t es_mediasync;
+    struct aml_stream_out *aout;  //toD
 } audio_hwsync_t;
 
 static inline bool hwsync_header_valid(uint8_t *header)
@@ -176,28 +180,25 @@ static inline uint64_t get_pts_gap(uint64_t a, uint64_t b)
         return (b - a);
     }
 }
-void* aml_hwsync_mediasync_create();
-int aml_hwsync_get_tsync_vpts(audio_hwsync_t *p_hwsync, uint32_t *pts);
-int aml_hwsync_set_tsync_start_pts(audio_hwsync_t *p_hwsync, uint32_t pts);
-int aml_hwsync_set_tsync_start_pts64(audio_hwsync_t *p_hwsync, uint64_t pts);
-void aml_hwsync_set_tsync_stop(audio_hwsync_t *p_hwsync);
-int aml_hwsync_get_tsync_pts(audio_hwsync_t *p_hwsync, uint32_t *pts);
-int aml_hwsync_get_tsync_apts(audio_hwsync_t *p_hwsync, uint32_t *pts);
-void aml_hwsync_wait_video_start(audio_hwsync_t *p_hwsync);
-void aml_hwsync_wait_video_drop(audio_hwsync_t *p_hwsync, uint32_t cur_pts);
+
 void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out);
 int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
         const void *in_buffer, size_t in_bytes,
         uint64_t *cur_pts, int *outsize);
-int aml_audio_hwsync_set_first_pts(audio_hwsync_t *p_hwsync, uint64_t pts);
-void aml_audio_hwsync_reset_apts(audio_hwsync_t *p_hwsync);
-int aml_audio_hwsync_checkin_apts(audio_hwsync_t *p_hwsync, size_t offset, uint64_t apts);
-int aml_audio_hwsync_lookup_apts(audio_hwsync_t *p_hwsync, size_t offset, uint64_t *p_apts);
-int aml_audio_hwsync_audio_process(audio_hwsync_t *p_hwsync, size_t offset, uint64_t apts, int *p_adjust_ms);
-void aml_audio_hwsync_release(audio_hwsync_t *p_hwsync);
-bool aml_audio_hwsync_get_id(audio_hwsync_t *p_hwsync, int32_t* id);
-bool aml_audio_hwsync_set_id(audio_hwsync_t *p_hwsync, uint32_t id);
-void aml_audio_hwsync_msync_unblock_start(struct aml_stream_out *out);
+
+void* aml_hwsync_mediasync_create();
 
 
+void avsync_ctx_reset(avsync_ctx_t *avsync_ctx);
+avsync_ctx_t *avsync_ctx_init(void);
+audio_mediasync_t *mediasync_ctx_init(void);
+audio_msync_t *msync_ctx_init(void);
+
+void aml_audio_hwsync_reset_apts(avsync_ctx_t *avsync_ctx);
+int aml_audio_hwsync_checkin_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t apts);
+int aml_audio_hwsync_lookup_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t *p_apts);
+void aml_audio_hwsync_msync_unblock_start(audio_msync_t *msync_ctx);
+int msync_set_first_pts(audio_msync_t *msync_ctx, uint32_t pts);
+bool skip_check_when_gap(struct audio_stream_out *stream, size_t offset, uint64_t apts);
+int msync_get_policy(struct audio_stream_out *stream, uint64_t apts);
 #endif

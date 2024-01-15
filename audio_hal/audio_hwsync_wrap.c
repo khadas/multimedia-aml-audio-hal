@@ -41,31 +41,4 @@ void* aml_hwsync_wrap_mediasync_create (void) {
     return mediasync_wrap_create();
 }
 
-bool aml_hwsync_wrap_get_id(void *mediasync, int32_t* id)
-{
-    if(mediasync) {
-        return mediasync_wrap_allocInstance(mediasync, 0, 0, id);
-    }
-    return false;
-}
-
-bool aml_hwsync_wrap_set_id(audio_hwsync_t *p_hwsync, uint32_t id)
-{
-
-    if (p_hwsync->es_mediasync.mediasync) {
-        return mediasync_wrap_bindInstance(p_hwsync->es_mediasync.mediasync, id, MEDIA_AUDIO);
-    }
-    return false;
-}
-
-bool aml_hwsync_wrap_release(audio_hwsync_t *p_hwsync)
-{
-
-    if (p_hwsync->es_mediasync.mediasync) {
-        mediasync_wrap_destroy(p_hwsync->es_mediasync.mediasync);
-        return true;
-    }
-    return false;
-}
-
 

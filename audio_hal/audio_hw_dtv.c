@@ -266,15 +266,20 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
     struct aml_audio_device *adev = (struct aml_audio_device *) dev;
     struct aml_audio_patch *patch = adev->audio_patch;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    struct audio_stream_out *stream_out = (struct audio_stream_out *)patch->dtv_aml_out;
     int has_audio = 1;
     int audio_sync_mode = 0;
     float dtv_volume_switch = 1.0;
     aml_dtv_audio_instances_t *dtv_audio_instances =  (aml_dtv_audio_instances_t *)adev->aml_dtv_audio_instances;
     unsigned int path_id = val >> DVB_DEMUX_ID_BASE;
-    ALOGI("%s %p path_id %d cmd %d val %d\n",__FUNCTION__,patch,path_id, cmd,val & ((1 << DVB_DEMUX_ID_BASE) - 1));
+
+    if (NULL == patch) {
+        AM_LOGE("patch NULL error, need create patch first!!");
+        goto exit;
+    }
+
+    AM_LOGI("%p path_id %d cmd %d val %d\n", patch, path_id, cmd,val & ((1 << DVB_DEMUX_ID_BASE) - 1));
     if (path_id < 0  ||  path_id >= DVB_DEMUX_SUPPORT_MAX_NUM) {
-        ALOGI("path_id %d  is invalid ! ",path_id);
+        AM_LOGW("path_id %d is invalid !",path_id);
         goto exit;
     }
 
@@ -302,6 +307,7 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                 patch->dtv_volume = dtv_volume_switch;
                 ALOGI ("dtv set volume:%f", patch->dtv_volume);
                 if (patch->dtv_aml_out) {
+                    struct audio_stream_out *stream_out = (struct audio_stream_out *)patch->dtv_aml_out;
                     stream_out->set_volume(stream_out, patch->dtv_volume, patch->dtv_volume);
                 }
             } else {
@@ -1445,18 +1451,22 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
     aml_out = (struct aml_stream_out *)stream_out;
     patch->dtv_aml_out = aml_out;
 
-    if (aml_out->hwsync)
+    if (aml_out->avsync_ctx)
     {
+        aml_out->avsync_ctx->mediasync_ctx = mediasync_ctx_init();
+        if (NULL == aml_out->avsync_ctx->mediasync_ctx) {
+            goto exit_open;
+        }
         aml_out->avsync_type = AVSYNC_TYPE_MEDIASYNC;
-        pthread_mutex_lock(&aml_out->hwsync->lock);
-        aml_out->hwsync->es_mediasync.mediasync    = patch->dtvsync->mediasync;
-        aml_out->hwsync->es_mediasync.mediasync_id = patch->dtvsync->mediasync_id;
-        aml_out->hwsync->get_tuning_latency        = dtv_avsync_get_apts_latency;
-        pthread_mutex_unlock(&aml_out->hwsync->lock);
+        pthread_mutex_lock(&(aml_out->avsync_ctx->lock));
+        aml_out->avsync_ctx->mediasync_ctx->handle       = patch->dtvsync->mediasync;
+        aml_out->avsync_ctx->mediasync_ctx->mediasync_id = patch->dtvsync->mediasync_id;
+        aml_out->avsync_ctx->get_tuning_latency          = dtv_avsync_get_apts_latency;
+        pthread_mutex_unlock(&(aml_out->avsync_ctx->lock));
     }
     else
     {
-        AM_LOGE("aml_out->hwsync NULL error!");
+        AM_LOGE("aml_out->avsync_ctx NULL error!");
         goto exit_open;
     }
 
@@ -1518,11 +1528,10 @@ void *audio_dtv_patch_output_threadloop_v2(void *data)
             patch->dtv_first_apts_flag = 1;
         }
 
-        if (aml_out->hwsync)
-        {
-            pthread_mutex_lock(&aml_out->hwsync->lock);
-            aml_out->hwsync->es_mediasync.in_apts = patch->cur_package->pts;
-            pthread_mutex_unlock(&aml_out->hwsync->lock);
+        if ((aml_out->avsync_ctx) && (aml_out->avsync_ctx->mediasync_ctx)) {
+            pthread_mutex_lock(&(aml_out->avsync_ctx->lock));
+            aml_out->avsync_ctx->mediasync_ctx->in_apts = patch->cur_package->pts;
+            pthread_mutex_unlock(&(aml_out->avsync_ctx->lock));
         }
 
         aml_out->output_speed = aml_audio_get_output_speed(aml_out);
@@ -2160,7 +2169,6 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     patch->debug_para.debug_last_out_vpts = 0;
     patch->debug_para.debug_last_demux_pcr = 0;
     patch->debug_para.debug_time_interval = aml_audio_property_get_int(PROPERTY_DEBUG_TIME_INTERVAL, DEFULT_DEBUG_TIME_INTERVAL);
-    patch->total_data_size = 0;
 
     ALOGI("--%s", __FUNCTION__);
     return 0;

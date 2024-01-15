@@ -432,7 +432,6 @@ struct aml_audio_patch {
     struct timespec start_ts;
     int mdelay;
     bool start_mute;
-    size_t total_data_size;
     bool digital_input_fmt_change;
 };
 

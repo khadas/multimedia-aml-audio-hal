@@ -17,17 +17,10 @@
 
 #include "audio_hw.h"
 
-int aml_audio_get_ms12_tunnel_latency(struct audio_stream_out *stream);
 
-int aml_audio_get_msync_ms12_tunnel_latency(struct audio_stream_out *stream);
-
+int get_ms12_tuning_latency_pts(struct audio_stream_out *stream);
+int get_latency_pts(struct audio_stream_out *stream);
 int aml_audio_get_ms12_presentation_position(const struct audio_stream_out *stream, uint64_t *frames, struct timespec *timestamp);
-
 uint32_t aml_audio_out_get_ms12_latency_frames(struct audio_stream_out *stream);
-
 uint32_t out_get_ms12_latency_frames(struct audio_stream_out *stream, bool ignore_default);
-
-uint32_t out_get_ms12_bitstream_latency_ms(struct audio_stream_out *stream);
-
-int aml_audio_get_nonms12_tunnel_latency(struct audio_stream_out * stream);
 

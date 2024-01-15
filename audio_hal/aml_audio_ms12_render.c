@@ -72,7 +72,6 @@ int aml_audio_get_cur_ms12_latency(struct audio_stream_out *stream) {
 }
 
 int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio_buffer *abuffer)
-
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
@@ -101,33 +100,13 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio
     remain_size = dolby_ms12_get_main_buffer_avail(NULL);
     dolby_ms12_get_pcm_output_size(&all_pcm_len1, &all_zero_len);
 
-    if (aml_out->need_sync && aml_out->hwsync) {
-
+    if ((AVSYNC_TYPE_NULL != aml_out->avsync_type) && (NULL != aml_out->avsync_ctx)) {
         // missing code with aml_audio_hwsync_checkin_apts, need to add for netflix tunnel mode. zzz
         if (abuffer->pts != HWSYNC_PTS_NA) {
-            aml_audio_hwsync_checkin_apts(aml_out->hwsync, aml_out->hwsync->payload_offset, abuffer->pts);
-            aml_out->hwsync->payload_offset += abuffer->size;
-        }
-        //change
-        // when msync is used, the original first apts->audio start logic from legacy amaster tsync
-        // implementation in hw_write() is moved to this place when main input samples are injected
-        // because the sync policy return from msync side may need block when audio starts to play.
-        if (aml_out->hwsync->first_apts_flag == false && AVSYNC_TYPE_MSYNC == aml_out->avsync_type) {
-            // may be blocked by msync_cond for initial playback timing control
-            // the first checkin pts should be consumed by aml_audio_hwsync_audio_process for av_sync_audio_start
-            //aml_audio_hwsync_audio_process(aml_out->hwsync, 0, NULL);
-            aml_audio_hwsync_audio_process(aml_out->hwsync, 0, abuffer->pts, NULL);
-            // when dropping is needed at av_sync_audio_start
-            // reset payload_offset since the data will not be
-            // sent to MS12 pipeline. The consumed bytes number
-            // from MS12 should match PTS checkin record from
-            // payload_offset
-            if (aml_out->msync_action == AV_SYNC_AA_DROP) {
-                aml_out->hwsync->payload_offset = 0;
-                ALOGI("MSYNC start dropping @0x%llx, %d bytes", aml_out->hwsync->first_apts, abuffer->size);
-                goto exit;
-            }
-
+            aml_audio_hwsync_checkin_apts(aml_out->avsync_ctx, aml_out->avsync_ctx->payload_offset, abuffer->pts);
+            pthread_mutex_lock(&(aml_out->avsync_ctx->lock));
+            aml_out->avsync_ctx->payload_offset += abuffer->size;
+            pthread_mutex_unlock(&(aml_out->avsync_ctx->lock));
         }
     }
 
@@ -211,10 +190,10 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
 
     if (bypass_aml_dec) {
         ret = aml_audio_ms12_process_wrapper(stream, abuffer);
-        if ((aml_out->alsa_status_changed) && (AVSYNC_TYPE_MEDIASYNC == (aml_out)->avsync_type)) {
+        if ((aml_out->alsa_status_changed) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)) {
             ALOGI("[%s:%d] aml_out->alsa_running_status %d", __FUNCTION__, __LINE__, aml_out->alsa_running_status);
             //aml_dtvsync_setParameter(patch->dtvsync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
-            mediasync_wrap_setParameter(aml_out->hwsync->es_mediasync.mediasync, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
+            mediasync_wrap_setParameter(aml_out->avsync_ctx->mediasync_ctx->handle, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
             aml_out->alsa_status_changed = false;
         }
     } else {

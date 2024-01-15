@@ -757,7 +757,6 @@ struct aml_stream_out {
     bool pause_status;
     bool need_sync;
     bool with_header;
-    int  tsync_status;
     float volume_l_org;
     float volume_r_org;
     float volume_l;
@@ -875,16 +874,8 @@ struct aml_stream_out {
     uint64_t write_time;
     uint64_t pause_time;
     int write_count;
-    /* msync session */
-    void *msync_session;
-    pthread_mutex_t msync_mutex;
-    pthread_cond_t msync_cond;
-    bool msync_start;
-    avs_audio_action msync_action;
-    int msync_action_delta;
-    uint32_t msync_rendered_pts;
-    struct timespec msync_rendered_ts;
     int avsync_type;
+    avsync_ctx_t *avsync_ctx;
     bool is_dtscd;
     bool dts_check;
     bool alsa_running_status;
@@ -914,6 +905,7 @@ struct aml_stream_out {
     bool b_install_sync_callback;
     bool will_pause;
     int fast_quit;
+    bool eos;
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);
