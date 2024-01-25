@@ -263,7 +263,7 @@ bool aml_hwsynces_spdif_insertraw(struct audio_stream_out *stream,  void **spdif
 
 
 
-int aml_hwmediasync_nonms12_process_insert(struct audio_stream_out *stream,struct mediasync_audio_policy *p_policy)
+int mediasync_nonms12_process_insert(struct audio_stream_out *stream,struct mediasync_audio_policy *p_policy)
 {
     int insert_time_ms = 0;
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
@@ -363,7 +363,7 @@ int mediasync_get_policy(struct audio_stream_out *stream)
             AM_LOGI("fast_quit, break now.");
             break;
         }
-    } while (aml_out->hwsync && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
+    } while (aml_out->avsync_ctx && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
 
     p_mediasync->apolicy.audiopolicy= (audio_policy)m_audiopolicy.audiopolicy;
     p_mediasync->apolicy.param1 = m_audiopolicy.param1;
@@ -371,7 +371,7 @@ int mediasync_get_policy(struct audio_stream_out *stream)
     return;
 }
 
-int aml_hwsynces_process_resample(struct audio_stream_out *stream,
+int aml_process_resample(struct audio_stream_out *stream,
                                 struct mediasync_audio_policy *p_policy,
                                 bool *speed_enabled)
 {
@@ -429,7 +429,7 @@ sync_process_res mediasync_nonms12_process(struct audio_stream_out *stream)
             ret = ESSYNC_AUDIO_DROP;
             break;
         case MEDIASYNC_AUDIO_INSERT:
-            aml_hwmediasync_nonms12_process_insert(stream, &async_policy);
+            mediasync_nonms12_process_insert(stream, &async_policy);
             break;
         case DTVSYNC_AUDIO_ADJUST_CLOCK:
             //aml_dtvsync_ms12_adjust_clock(stream_out, async_policy->param1);

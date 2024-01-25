@@ -32,7 +32,6 @@
 #include "aml_ringbuffer.h"
 #include "audio_hw_utils.h"
 #include "audio_hwsync.h"
-#include "audio_hwsync_wrap.h"
 #include "aml_malloc_debug.h"
 //#include "karaoke_manager.h"
 #include "aml_dump_debug.h"

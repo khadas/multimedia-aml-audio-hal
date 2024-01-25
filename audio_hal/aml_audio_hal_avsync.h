@@ -17,36 +17,6 @@
 #ifndef _AML_AUDIO_HAL_AVSYNC_H_
 #define _AML_AUDIO_HAL_AVSYNC_H_
 
-#define TSYNC_PCRSCR "/sys/class/tsync/pts_pcrscr"
-#define TSYNC_EVENT "/sys/class/tsync/event"
-#define TSYNC_APTS "/sys/class/tsync/pts_audio"
-#define TSYNC_VPTS "/sys/class/tsync/pts_video"
-#define TSYNC_CHECKIN_APTS "/sys/class/tsync/last_checkin_apts"
-#define TSYNC_CHECKIN_VPTS "/sys/class/tsync/last_checkin_vpts"
-
-
-#define TSYNC_AUDIO_LEVEL "/sys/class/tsync_pcr/tsync_audio_level"
-
-#define TSYNC_LAST_CHECKIN_APTS "/sys/class/tsync/last_checkin_apts"
-
-#define TSYNC_PCR_DEBUG "/sys/class/tsync_pcr/tsync_pcr_debug"
-#define TSYNC_APTS_DIFF "/sys/class/tsync_pcr/tsync_pcr_apts_diff"
-#define TSYNC_VPTS_ADJ "/sys/class/tsync_pcr/tsync_vpts_adjust"
-#define TSYNC_PCR_MODE "/sys/class/tsync_pcr/tsync_pcr_mode"
-#define TSYNC_FIRST_VPTS  "/sys/class/tsync/firstvpts"
-#define TSYNC_DEMUX_PCR         "/sys/class/tsync/demux_pcr"
-#define TSYNC_LASTCHECKIN_APTS "/sys/class/tsync/last_checkin_apts"
-#define VIDEO_FIRST_FRAME_SHOW  "/sys/module/amvideo/parameters/first_frame_toggled"
-#define VIDEO_FIRST_FRAME_SHOW_2  "/sys/module/aml_media/parameters/first_frame_toggled"
-#define VIDEO_DISPLAY_FRAME_CNT "/sys/module/amvideo/parameters/display_frame_count"
-#define VIDEO_RECEIVE_FRAME_CNT "/sys/module/amvideo/parameters/receive_frame_count"
-#define VIDEO_SHOW_FIRST_FRAME "/sys/class/video/show_first_frame_nosync"
-
-
-#define DTV_DECODER_PTS_LOOKUP_PATH "/sys/class/tsync/apts_lookup"
-#define DTV_DECODER_CHECKIN_FIRSTAPTS_PATH "/sys/class/tsync/checkin_firstapts"
-#define DTV_DECODER_TSYNC_MODE      "/sys/class/tsync/mode"
-#define PROPERTY_LOCAL_ARC_LATENCY   "vendor.media.amnuplayer.audio.delayus"
 #define PROPERTY_LOCAL_PASSTHROUGH_LATENCY  "vendor.media.dtv.passthrough.latencyms"
 #define PROPERTY_PRESET_AC3_PASSTHROUGH_LATENCY  "vendor.media.dtv.passthrough.ac3prelatencyms"
 #define PROPERTY_AUDIO_ADJUST_PCR_MAX   "vendor.media.audio.adjust.pcr.max"
@@ -55,8 +25,6 @@
 #define PROPERTY_UNDERRUN_MAX_TIME      "vendor.media.audio.underruncheck.max.time"
 #define PROPERTY_AUDIO_TUNING_PCR_CLOCK_STEPS "vendor.media.audio.tuning.pcr.clocksteps"
 #define PROPERTY_AUDIO_TUNING_CLOCK_FACTOR  "vendor.media.audio.tuning.clock.factor"
-#define PROPERTY_AUDIO_DROP_THRESHOLD  "vendor.media.audio.drop.thresholdms"
-#define PROPERTY_AUDIO_LEAST_CACHE  "vendor.media.audio.leastcachems"
 #define PROPERTY_DEBUG_TIME_INTERVAL  "vendor.media.audio.debug.timeinterval"
 
 
@@ -248,11 +216,7 @@ struct audiohal_debug_para {
     struct timespec debug_system_time;
 };
 
-extern void dtv_audio_gap_monitor(struct aml_audio_patch *patch);
-extern void decoder_set_latency(unsigned int latency);
-extern unsigned int decoder_get_latency(void);
 extern int get_audio_discontinue(void);
-extern int get_dtv_pcr_sync_mode(void);
 extern unsigned long decoder_apts_lookup(unsigned int offset);
 
 void dtv_adjust_i2s_output_clock(struct aml_audio_patch* patch, int direct, int step);

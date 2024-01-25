@@ -142,105 +142,6 @@ static void dtv_check_audio_reset()
     aml_sysfs_set_str(AMSTREAM_AUDIO_PORT_RESET, "1");
 }
 
-void decoder_set_latency(unsigned int latency)
-{
-    char tempbuf[128];
-    memset(tempbuf, 0, 128);
-    sprintf(tempbuf, "%d", latency);
-    AM_LOGI("latency=%u\n", latency);
-    if (aml_sysfs_set_str(TSYNC_PCR_LANTCY, tempbuf) == -1) {
-        AM_LOGE("set pcr lantcy failed %s\n", tempbuf);
-    }
-    return;
-}
-
-unsigned int decoder_get_latency(void)
-{
-    unsigned int latency = 0;
-    int ret;
-    char buff[64];
-    memset(buff, 0, 64);
-    ret = aml_sysfs_get_str(TSYNC_PCR_LANTCY, buff, sizeof(buff));
-    if (ret > 0) {
-        ret = sscanf(buff, "%u\n", &latency);
-    }
-    //AM_LOGI("get lantcy %d", latency);
-    return (unsigned int)latency;
-}
-
-static int get_dtv_audio_mode(void)
-{
-    int ret, mode = 0;
-    char buff[64];
-    ret = aml_sysfs_get_str(TSYNC_AUDIO_MODE, buff, sizeof(buff));
-    if (ret > 0) {
-        ret = sscanf(buff, "%d", &mode);
-    }
-    return mode;
-}
-
-int get_dtv_pcr_sync_mode(void)
-{
-    int ret, mode = 0;
-    char buff[64];
-    ret = aml_sysfs_get_str(TSYNC_PCR_MODE, buff, sizeof(buff));
-    if (ret > 0) {
-        ret = sscanf(buff, "%d", &mode);
-    }
-    return mode;
-}
-
-void clean_dtv_patch_pts(struct aml_audio_patch *patch)
-{
-    if (patch) {
-        patch->last_apts = 0;
-        patch->last_pcrpts = 0;
-    }
-}
-
-int get_audio_checkin_underrun(void)
-{
-    char tempbuf[128];
-    int a_checkin_underrun = 0, ret = 0;
-    ret = aml_sysfs_get_str(TSYNC_AUDIO_UNDERRUN, tempbuf, sizeof(tempbuf));
-    if (ret > 0) {
-        ret = sscanf(tempbuf, "%d\n", &a_checkin_underrun);
-    } else
-        AM_LOGI("getting failed\n");
-    return a_checkin_underrun;
-}
-
-int get_audio_discontinue(void)
-{
-    char tempbuf[128];
-    int a_discontinue = 0, ret;
-    ret = aml_sysfs_get_str(TSYNC_AUDIO_LEVEL, tempbuf, sizeof(tempbuf));
-    if (ret > 0) {
-        ret = sscanf(tempbuf, "%d\n", &a_discontinue);
-    }
-    if (ret > 0 && a_discontinue > 0) {
-        a_discontinue = (a_discontinue & 0xff);
-    } else {
-        a_discontinue = 0;
-    }
-    return a_discontinue;
-}
-static int get_video_discontinue(void)
-{
-    char tempbuf[128];
-    int pcr_vdiscontinue = 0, ret;
-    ret = aml_sysfs_get_str(TSYNC_VIDEO_DISCONT, tempbuf, sizeof(tempbuf));
-    if (ret > 0) {
-        ret = sscanf(tempbuf, "%d\n", &pcr_vdiscontinue);
-    }
-    if (ret > 0 && pcr_vdiscontinue > 0) {
-        pcr_vdiscontinue = (pcr_vdiscontinue & 0xff);
-    } else {
-        pcr_vdiscontinue = 0;
-    }
-    return pcr_vdiscontinue;
-}
-
 void  clean_dtv_demux_info(aml_demux_audiopara_t *demux_info) {
     demux_info->demux_id = -1;
     demux_info->security_mem_level  = -1;
@@ -470,7 +371,7 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
 
                     {
                         pthread_mutex_lock(&dtvsync->ms_lock);
-                        dtvsync->mediasync_new = aml_dtvsync_create();
+                        dtvsync->mediasync_new = mediasync_wrap_create();
                         if (dtvsync->mediasync_new == NULL)
                             AM_LOGI("mediasync create failed");
                         else {
@@ -501,7 +402,7 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
 
                     {
                         pthread_mutex_lock(&dtvsync->ms_lock);
-                        dtvsync->mediasync_new = aml_dtvsync_create();
+                        dtvsync->mediasync_new = mediasync_wrap_create();
                         if (dtvsync->mediasync_new == NULL) {
                             AM_LOGI("mediasync create failed\n");
                         }
@@ -643,13 +544,6 @@ int dtv_patch_get_latency(struct aml_audio_device *aml_dev)
              patch->last_chenkin_apts = last_queue_es_apts;
         }
         latencyms = (patch->last_chenkin_apts - patch->dtvsync->cur_outapts) / 90;
-    } else {
-        uint32_t lastcheckinapts = 0;
-        get_sysfs_uint(TSYNC_LAST_CHECKIN_APTS, &lastcheckinapts);
-        AM_LOGI("lastcheckinapts %d patch->cur_outapts %d", lastcheckinapts, patch->cur_outapts);
-        patch->last_chenkin_apts = lastcheckinapts;
-        if (patch->last_chenkin_apts > patch->cur_outapts && patch->cur_outapts > 0)
-            latencyms = (patch->last_chenkin_apts - patch->cur_outapts) / 90;
     }
     return latencyms;
 }
@@ -1278,7 +1172,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                         else
                             audio_queue_info.isworkingchannel = false;
                         audio_queue_info.tunit = MEDIASYNC_UNIT_PTS;
-                        aml_dtvsync_queue_audio_frame(Dtvsync, &audio_queue_info);
+                        mediasync_wrap_queueAudioFrame(Dtvsync->mediasync, &audio_queue_info);
                         AM_LOGI_IF(aml_dev->debug_flag, "queue pts:%llx, size:%d, dur:%d isneedupdate %d\n",
                                  dtv_package->pts, dtv_package->size, Dtvsync->duration,audio_queue_info.isneedupdate);
                         if (path_index != dtv_audio_instances->demux_index_working) {
@@ -1599,8 +1493,8 @@ void *audio_dtv_patch_output_threadloop(void *data)
 
         if (patch->dtvsync) {
             if (aml_dev->bHDMIConnected_update || aml_dev->a2dp_updated) {
-                AM_LOGI("reset_dtvsync (mediasync:%p)", patch->dtvsync->mediasync);
-                aml_dtvsync_reset(patch->dtvsync);
+                ALOGI("reset_dtvsync (mediasync:%p)", patch->dtvsync->mediasync);
+                mediasync_wrap_reset(patch->dtvsync->mediasync);
             }
         }
 
@@ -1659,8 +1553,8 @@ exit_open:
     }
 
     if (patch->dtvsync) {
-        AM_LOGI("reset_dtvsync (mediasync:%p)", patch->dtvsync->mediasync);
-        aml_dtvsync_reset(patch->dtvsync);
+        ALOGI("mediasync_wrap_reset (mediasync:%p)", patch->dtvsync->mediasync);
+        mediasync_wrap_reset(patch->dtvsync->mediasync);
     }
     AM_LOGI("--");
     return ((void *)0);
@@ -1813,7 +1707,7 @@ static void *audio_dtv_patch_process_threadloop(void *data)
     int path_id  = 0;
     aml_dtvsync_t *dtvsync=NULL;
     struct mediasync_audio_format audio_format={0};
-    patch->sample_rate = stream_config.sample_rate = 48000;
+    stream_config.sample_rate = 48000;
     patch->chanmask = stream_config.channel_mask = AUDIO_CHANNEL_IN_STEREO;
     patch->aformat = stream_config.format = AUDIO_FORMAT_PCM_16_BIT;
 
@@ -1853,16 +1747,7 @@ static void *audio_dtv_patch_process_threadloop(void *data)
             }
 
             patch->dtv_decoder_state = AUDIO_DTV_PATCH_DECODER_STATE_START;
-            /* +[SE] [BUG][SWPL-21070][yinli.xia] added: turn channel mute audio*/
-            if (switch_flag) {
-                if (patch->dtv_has_video == 1)
-                    aml_dev->start_mute_flag = 1;
-            }
             aml_dev->underrun_mute_flag = 0;
-            if (show_first_nosync) {
-                sysfs_set_sysfs_str(VIDEO_SHOW_FIRST_FRAME, "1");
-                AM_LOGI("show_first_frame_nosync set 1\n");
-            }
         }
         break;
         case AUDIO_DTV_PATCH_DECODER_STATE_START:
@@ -1888,41 +1773,30 @@ static void *audio_dtv_patch_process_threadloop(void *data)
 
                 if (patch->dtv_aformat == ACODEC_FMT_AC3) {
                     patch->aformat = AUDIO_FORMAT_AC3;
-                    patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_EAC3) {
                     patch->aformat = AUDIO_FORMAT_E_AC3;
-
-                    patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_DTS) {
                     patch->aformat = AUDIO_FORMAT_DTS;
-                    patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_AAC ) {
                     if (eDolbyMS12Lib == aml_dev->dolby_lib_type_last)
                         patch->aformat = AUDIO_FORMAT_HE_AAC_V2;
                     else
                         patch->aformat = AUDIO_FORMAT_AAC;
-                    patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_AAC_LATM) {
                     if (eDolbyMS12Lib == aml_dev->dolby_lib_type_last)
                         patch->aformat = AUDIO_FORMAT_HE_AAC_V1;
                     else
                         patch->aformat = AUDIO_FORMAT_AAC_LATM;
-                    patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_MPEG ) {
                     patch->aformat = AUDIO_FORMAT_MP3;
-                    patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_MPEG1) {
                     patch->aformat = AUDIO_FORMAT_MP2;/* audio-base.h no define mpeg1 format */
-                    patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_MPEG2) {
                     patch->aformat = AUDIO_FORMAT_MP2;
-                    patch->decoder_offset = 0;
                 } else if (patch->dtv_aformat == ACODEC_FMT_AC4) {
                    patch->aformat = AUDIO_FORMAT_AC4;
-                   patch->decoder_offset = 0;
                 } else {
                     patch->aformat = AUDIO_FORMAT_PCM_16_BIT;
-                    patch->decoder_offset = 0;
                 }
 
                 AM_LOGI("patch->demux_handle %p patch->aformat %0x", patch->demux_handle, patch->aformat);
@@ -2003,7 +1877,7 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                     patch->demux_handle = dtv_audio_instances->demux_handle[path_id];
                     aml_dtvsync_t *dtvsync = &dtv_audio_instances->dtvsync[path_id];
                     if (dtvsync->mediasync) {
-                        aml_dtvsync_setPause(dtvsync, true);
+                        mediasync_wrap_setPause(dtvsync->mediasync, true);
                     }
                     //if (patch->demux_handle) {
                     //    Stop_Dmx_Main_Audio(patch->demux_handle);
@@ -2012,7 +1886,7 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                 }  else {
                     aml_dtvsync_t *dtvsync = &dtv_audio_instances->dtvsync[0];
                     if (dtvsync->mediasync) {
-                        aml_dtvsync_setPause(dtvsync, true);
+                        mediasync_wrap_setPause(dtvsync->mediasync, true);
                     }
                 }
                 patch->dtv_decoder_state = AUDIO_DTV_PATCH_DECODER_STATE_PAUSE;
@@ -2069,14 +1943,14 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                 if (aml_dev->is_multi_demux) {
                     aml_dtvsync_t *dtvsync = &dtv_audio_instances->dtvsync[path_id];
                     if (dtvsync->mediasync) {
-                        aml_dtvsync_setPause(dtvsync, false);
+                        mediasync_wrap_setPause(dtvsync->mediasync, false);
                     }
                    // Start_Dmx_Main_Audio(patch->demux_handle);
                    // Start_Dmx_AD_Audio(patch->demux_handle);
                 } else {
                     aml_dtvsync_t *dtvsync = &dtv_audio_instances->dtvsync[0];
                     if (dtvsync->mediasync) {
-                        aml_dtvsync_setPause(dtvsync, false);
+                        mediasync_wrap_setPause(dtvsync->mediasync, false);
                     }
                 }
                 patch->dtv_decoder_state = AUDIO_DTV_PATCH_DECODER_STATE_RUNING;

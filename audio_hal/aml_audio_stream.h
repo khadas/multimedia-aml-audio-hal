@@ -24,7 +24,6 @@
 #include "audio_hw_profile.h"
 #include "audio_dtv_utils.h"
 #include "aml_audio_hal_avsync.h"
-#include "aml_dtvsync.h"
 #include "aml_audio_heaacparser.h"
 
 #ifdef BUILD_LINUX
@@ -304,7 +303,6 @@ struct aml_audio_patch {
     void *audio_parse_para;
     audio_devices_t input_src;
     audio_format_t  aformat;
-    int  sample_rate;
     int input_sample_rate;
     audio_channel_mask_t chanmask;
     audio_channel_mask_t in_chanmask;
@@ -364,7 +362,6 @@ struct aml_audio_patch {
     unsigned int input_thread_created;
     unsigned int output_thread_created;
     unsigned int ad_output_thread_created;
-    unsigned int decoder_offset ;
     unsigned int outlen_after_last_validpts;
     unsigned long last_valid_pts;
     unsigned int first_apts_lookup_over; /*cache audio data before start-play flag*/

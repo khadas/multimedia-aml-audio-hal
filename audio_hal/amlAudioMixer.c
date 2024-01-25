@@ -37,7 +37,6 @@
 #include "audio_hw_utils.h"
 #include "hw_avsync.h"
 #include "audio_hwsync.h"
-#include "audio_hwsync_wrap.h"
 #include "audio_data_process.h"
 #include "audio_virtual_buf.h"
 

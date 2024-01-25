@@ -389,15 +389,17 @@ void dtv_adjust_output_clock(struct aml_audio_patch * patch, int direct, int ste
     struct aml_audio_device *aml_dev = (struct aml_audio_device *) adev;
     bool spdif_b = true;
     if (aml_audio_get_debug_flag())
-        ALOGI("dtv_adjust_output_clock not set,%" PRIx64 ",%x",patch->decoder_offset,patch->dtv_pcm_readed);
+        ALOGI("dtv_adjust_output_clock not set,%x", patch->dtv_pcm_readed);
     if (!aml_dev || step <= 0 || patch->dtv_audio_mode) {
         return;
     }
+#if 0
     if (patch->decoder_offset < 512 * 2 * 10 &&
         ((patch->aformat == AUDIO_FORMAT_AC3) ||
          (patch->aformat == AUDIO_FORMAT_E_AC3))) {
         return;
     }
+#endif
     if (patch->dtv_default_spdif_clock > DEFAULT_I2S_OUTPUT_CLOCK * 4 ||
         patch->dtv_default_spdif_clock == 0) {
         return;

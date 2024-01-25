@@ -20,28 +20,6 @@
 #include "dmx_audio_es.h"
 #include "aml_dec_api.h"
 
-#define TSYNC_PCRSCR "/sys/class/tsync/pts_pcrscr"
-#define TSYNC_EVENT "/sys/class/tsync/event"
-#define TSYNC_APTS "/sys/class/tsync/pts_audio"
-#define TSYNC_VPTS "/sys/class/tsync/pts_video"
-
-#define TSYNC_AUDIO_MODE "/sys/class/tsync_pcr/tsync_audio_mode"
-#define TSYNC_AUDIO_LEVEL "/sys/class/tsync_pcr/tsync_audio_level"
-#define TSYNC_AUDIO_UNDERRUN "/sys/class/tsync_pcr/tsync_audio_underrun"
-#define TSYNC_VIDEO_DISCONT "/sys/class/tsync_pcr/tsync_vdiscontinue"
-#define TSYNC_VIDEO_STARTED "/sys/class/tsync/videostarted"
-#define TSYNC_PCR_INITED    "/sys/class/tsync_pcr/tsync_pcr_inited_flag"
-
-#define TSYNC_LAST_DISCONTINUE_CHECKIN_APTS "/sys/class/tsync_pcr/tsync_last_discontinue_checkin_apts"
-#define TSYNC_LAST_CHECKIN_APTS "/sys/class/tsync/last_checkin_apts"
-#define TSYNC_LAST_CHECKIN_VPTS "/sys/class/tsync/last_checkin_vpts"
-
-#define TSYNC_APTS_DIFF "/sys/class/tsync_pcr/tsync_pcr_apts_diff"
-#define TSYNC_FIRSTCHECKIN_APTS "/sys/class/tsync/checkin_firstapts"
-#define TSYNC_FIRSTCHECKIN_VPTS "/sys/class/tsync/checkin_firstvpts"
-#define TSYNC_FIRST_VPTS  "/sys/class/tsync/firstvpts"
-#define TSYNC_DEMUX_PCR         "/sys/class/tsync/demux_pcr"
-#define TSYNC_PCR_LANTCY        "/sys/class/tsync/pts_latency"
 #define AMSTREAM_AUDIO_PORT_RESET   "/sys/class/amstream/reset_audio_port"
 #define PROPERTY_ENABLE_AUDIO_RESAMPLE "vendor.media.audio.resample"
 #define PROPERTY_AUDIO_DISCONTINUE_THRESHOLD "vendor.media.audio.discontinue_threshold"
@@ -64,7 +42,6 @@
 #define AUDIO_AC3_FRAME_SIZE 4
 #define AUDIO_TV_PCM_FRAME_SIZE 32
 #define AUDIO_DEFAULT_PCM_FRAME_SIZE 4
-#define AUDIO_IEC61937_FRAME_SIZE 4
 #define ADUIO_DOLBY_ADSUBFRAME_CHECKED_SIZE 2048
 
 #define AUDIO_RESAMPLE_MIN_THRESHOLD 50

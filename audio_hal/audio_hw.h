@@ -775,7 +775,7 @@ struct aml_stream_out {
     int raw_61937_frame_size;
     /* recorded for wraparound print info */
     unsigned last_dsp_frame;
-    audio_hwsync_t *hwsync;
+    audio_header_t *pheader;
     struct timespec timestamp;
     struct timespec lasttimestamp;
     stream_usecase_t usecase;
@@ -794,8 +794,6 @@ struct aml_stream_out {
     bool dual_output_flag;
     uint64_t input_bytes_size;
     uint64_t continuous_audio_offset;
-    bool hwsync_pcm_config;
-    bool hwsync_raw_config;
     bool direct_raw_config;
     bool is_device_differ_with_ms12;
     uint64_t total_write_size;
@@ -1147,7 +1145,7 @@ int dsp_process_output(struct aml_audio_device *adev, void *in_buffer,
                        size_t bytes);
 int release_patch_l(struct aml_audio_device *adev);
 enum hwsync_status check_hwsync_status (uint32_t apts_gap);
-void config_output(struct audio_stream_out *stream, bool reset_decoder);
+int config_output(struct audio_stream_out *stream, bool reset_decoder);
 int start_ease_in(struct aml_audio_device *adev);
 int start_ease_out(struct aml_audio_device *adev);
 int out_standby_direct (struct audio_stream *stream);

@@ -25,8 +25,6 @@
 #include "aml_audio_timer.h"
 //#include "karaoke_manager.h"
 
-#include "audio_hwsync_wrap.h"
-
 
 //#define DEBUG_TIME
 

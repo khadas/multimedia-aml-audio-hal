@@ -313,11 +313,6 @@ bool is_ms12_output_compatible(struct audio_stream_out *stream, audio_format_t n
 void dynamic_set_dolby_ms12_drc_parameters(struct dolby_ms12_desc *ms12, unsigned int mode_control);
 
 /*
- *@brief get ms12 pipeline latency
- */
-int dolby_ms12_main_pipeline_latency_frames(struct audio_stream_out *stream);
-
-/*
  *@brief get buffer latency about ms12
  */
 unsigned int get_ms12_buffer_latency(struct aml_stream_out *out);

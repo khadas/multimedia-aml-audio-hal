@@ -112,7 +112,7 @@ typedef struct audio_avsync {
     pthread_mutex_t lock;
 }avsync_ctx_t;
 
-typedef struct  audio_hwsync {
+typedef struct  audio_header {
 /* header */
     uint8_t hw_sync_header[HW_AVSYNC_MAX_HEADER_SIZE];
     size_t hw_sync_header_cnt;
@@ -127,8 +127,7 @@ typedef struct  audio_hwsync {
     uint64_t last_apts_from_header_raw;
     bool eos;
     pthread_mutex_t lock;
-    struct aml_stream_out *aout;  //toD
-} audio_hwsync_t;
+} audio_header_t;
 
 static inline bool hwsync_header_valid(uint8_t *header)
 {
@@ -181,23 +180,20 @@ static inline uint64_t get_pts_gap(uint64_t a, uint64_t b)
     }
 }
 
-void aml_audio_hwsync_init(audio_hwsync_t *p_hwsync, struct aml_stream_out  *out);
-int aml_audio_hwsync_find_frame(audio_hwsync_t *p_hwsync,
+audio_header_t *audio_header_info_init(void);
+void audio_header_info_reset(audio_header_t *p_header);
+int audio_header_find_frame(audio_header_t *p_header,
         const void *in_buffer, size_t in_bytes,
         uint64_t *cur_pts, int *outsize);
-
-void* aml_hwsync_mediasync_create();
-
 
 void avsync_ctx_reset(avsync_ctx_t *avsync_ctx);
 avsync_ctx_t *avsync_ctx_init(void);
 audio_mediasync_t *mediasync_ctx_init(void);
 audio_msync_t *msync_ctx_init(void);
-
-void aml_audio_hwsync_reset_apts(avsync_ctx_t *avsync_ctx);
-int aml_audio_hwsync_checkin_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t apts);
-int aml_audio_hwsync_lookup_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t *p_apts);
-void aml_audio_hwsync_msync_unblock_start(audio_msync_t *msync_ctx);
+void avsync_reset_apts_tbl(avsync_ctx_t *avsync_ctx);
+int avsync_checkin_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t apts);
+int avsync_lookup_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t *p_apts);
+void msync_unblock_start(audio_msync_t *msync_ctx);
 int msync_set_first_pts(audio_msync_t *msync_ctx, uint32_t pts);
 bool skip_check_when_gap(struct audio_stream_out *stream, size_t offset, uint64_t apts);
 int msync_get_policy(struct audio_stream_out *stream, uint64_t apts);

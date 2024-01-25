@@ -50,7 +50,6 @@
 #include "aml_malloc_debug.h"
 #include "aml_esmode_sync.h"
 #include "aml_dump_debug.h"
-#include "aml_dtvsync.h"
 #include "audio_hw_ms12_common.h"
 #include "hal_scaletempo.h"
 
@@ -2899,12 +2898,13 @@ Aml_MS12_SyncPolicy_t ms12_avsync_callback(void *priv_data, unsigned long long u
         avsync_ctx_t *avsync_ctx = aml_out->avsync_ctx;
         /*get decoded frame and its pts*/
         consume_payload = dolby_ms12_get_main_bytes_consumed(stream_out);
+
         /*main pcm is resampled out of ms12, so the payload size is changed*/
         if (audio_is_linear_pcm(aml_out->hal_internal_format) && aml_out->hal_rate != 48000) {
             consume_payload = consume_payload * aml_out->hal_rate / 48000;
         }
 
-        ret = aml_audio_hwsync_lookup_apts(aml_out->avsync_ctx, consume_payload, &apts);
+        ret = avsync_lookup_apts(aml_out->avsync_ctx, consume_payload, &apts);
         if (0 != ret) {
             break;
         }
@@ -2920,7 +2920,7 @@ Aml_MS12_SyncPolicy_t ms12_avsync_callback(void *priv_data, unsigned long long u
         }
 
         if (avsync_ctx->last_lookup_apts == apts) {
-            /* when last policy done, we need get new policy ,so calc the increase frame while same apts */
+            /* when last !normal output policy done, we need get new policy, so calc the increase frame no matter whether got the same apts */
             if (MS12_SYNC_AUDIO_DROP_PCM == syncpolicy_status.eSyncPolicy || MS12_SYNC_AUDIO_INSERT == syncpolicy_status.eSyncPolicy) {
                 same_pts_diff = (u64DecOutFrame - avsync_ctx->last_dec_out_frame) * 90 / 48;
                 delay_frame = 0;
@@ -2932,9 +2932,7 @@ Aml_MS12_SyncPolicy_t ms12_avsync_callback(void *priv_data, unsigned long long u
         }
 
         delay_pts_diff = (delay_frame + stDelay.u32DelayFrame) * 90 / 48;
-
         new_apts = apts + same_pts_diff - delay_pts_diff;
-
         AM_LOGI_IF(adev->debug_flag, "lookup_apts=0x%llx(%lld ms), new_apts=0x%llx(%lld ms), pts_diff=%x, DecOutFrame=%llu, "
                                      "decoded_frame=%lld, DelayFrame=%d(%d ms), last_output_apts:%llu",
                                     apts, apts / 90, new_apts, new_apts / 90, delay_pts_diff, u64DecOutFrame, decoded_frame,
@@ -2942,7 +2940,7 @@ Aml_MS12_SyncPolicy_t ms12_avsync_callback(void *priv_data, unsigned long long u
 
         /* check if need skip when got gap */
         if (true == skip_check_when_gap(stream_out, consume_payload, new_apts)) {
-            return audio_sync_policy;
+            break;
         }
 
         int32_t latency_pts = 0;
@@ -3176,7 +3174,6 @@ int dolby_ms12_main_open(struct audio_stream_out *stream) {
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     int ret = 0, associate_audio_mixing_enable = 0 , media_presentation_id = -1, mixing_level = 0,ad_vol = 100;
     struct aml_audio_patch *patch = adev->audio_patch;
-    uint32_t dtv_decoder_offset_base = 0;
     unsigned int sample_rate = aml_out->hal_rate;
 
 #ifdef USE_DTV
@@ -3231,7 +3228,6 @@ int dolby_ms12_main_open(struct audio_stream_out *stream) {
             ms12->dual_decoder_support = demux_info->dual_decoder_support;
             associate_audio_mixing_enable = demux_info->associate_audio_mixing_enable;
             media_presentation_id = demux_info->media_presentation_id;
-            dtv_decoder_offset_base = patch->decoder_offset;
        } else {
             ms12->dual_decoder_support = 0;
             associate_audio_mixing_enable = 0;
@@ -3637,11 +3633,7 @@ uint64_t dolby_ms12_get_main_pcm_generated(struct audio_stream_out *stream) {
     audio_format_t audio_format = AUDIO_FORMAT_DEFAULT;
     int latency_frames = 0;
 
-    if (aml_out->hwsync && aml_out->hwsync->aout)
-        audio_format = aml_out->hwsync->aout->hal_internal_format;
-    else {
-        audio_format = aml_out->hal_internal_format;
-    }
+    audio_format = aml_out->hal_internal_format;
     audio_format = ms12_get_audio_hal_format(audio_format);
     pcm_frame_generated = dolby_ms12_get_continuous_nframes_pcm_output(ms12->dolby_ms12_ptr, MAIN_INPUT_STREAM);
 
@@ -3754,42 +3746,6 @@ bool is_ms12_output_compatible(struct audio_stream_out *stream, audio_format_t n
     return is_compatible;
 
 }
-
-int dolby_ms12_main_pipeline_latency_frames(struct audio_stream_out *stream) {
-    int latency_frames = 0;
-    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
-    struct aml_audio_device *adev = aml_out->dev;
-    struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    /*udc/tunnel pcm decoded frames */
-    uint64_t decoded_frame = 0;
-    /*ms12 output total frames*/
-    uint64_t main_mixer_consume = 0;
-    audio_format_t audio_format = AUDIO_FORMAT_DEFAULT;
-    audio_format_t hal_internal_format = ms12_get_audio_hal_format(aml_out->hal_internal_format);
-    if (aml_out->hwsync && aml_out->hwsync->aout)
-        audio_format = aml_out->hwsync->aout->hal_internal_format;
-    else {
-        audio_format = hal_internal_format;
-    }
-
-    /*the decoded pcm frame - mixer consumed frame, it is the delay*/
-    decoded_frame = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, audio_format, MAIN_INPUT_STREAM);
-    /*pcm data is resampled before ms12*/
-    if (aml_out->hal_rate != 48000 && aml_out->hal_rate != 0 && hal_internal_format != AUDIO_FORMAT_PCM_16_BIT) {
-        decoded_frame = decoded_frame * 48000 / aml_out->hal_rate;
-    }
-    main_mixer_consume = dolby_ms12_get_continuous_nframes_pcm_output(ms12->dolby_ms12_ptr, MAIN_INPUT_STREAM);
-
-    if (decoded_frame >= main_mixer_consume) {
-        latency_frames += (decoded_frame - main_mixer_consume);
-    } else {
-        ALOGE("wrong ms12 pipe line delay decode =%" PRId64 " mixer =%" PRId64 "", decoded_frame, main_mixer_consume);
-    }
-
-    ALOGV("%s decoded_frame = %" PRId64 " main_mixer_consume = %" PRId64 " latency_frames=%d %d ms", __func__, decoded_frame, main_mixer_consume, latency_frames, latency_frames / 48);
-    return latency_frames;
-}
-
 
 void set_ms12_encoder_chmod_locking(struct dolby_ms12_desc *ms12, bool is_lock_on)
 {
