@@ -2852,17 +2852,6 @@ Aml_MS12_SyncPolicy_t ms12_avsync_callback(void *priv_data, unsigned long long u
             break;
         }
 
-        if (avsync_ctx->last_lookup_apts == apts) {
-            /* when last policy done, we need get new policy ,so calc the increase frame while same apts */
-            if (MS12_SYNC_AUDIO_DROP_PCM == syncpolicy_status.eSyncPolicy || MS12_SYNC_AUDIO_INSERT == syncpolicy_status.eSyncPolicy) {
-                same_pts_diff = (u64DecOutFrame - avsync_ctx->last_dec_out_frame) * 90 / 48;
-                AM_LOGI_IF(adev->debug_flag, "last policy:%d done need get new policy, same_pts_diff:%d", syncpolicy_status.eSyncPolicy, same_pts_diff);
-            }
-            else {
-                break;
-            }
-        }
-
         audio_format_t audio_format = ms12_get_audio_hal_format(aml_out->hal_internal_format);
         decoded_frame = dolby_ms12_get_decoder_nframes_pcm_output(ms12->dolby_ms12_ptr, audio_format, MAIN_INPUT_STREAM);
         if (aml_out->hal_rate != 48000 && aml_out->hal_rate != 0 && !audio_is_linear_pcm(aml_out->hal_internal_format)) {
@@ -2872,6 +2861,19 @@ Aml_MS12_SyncPolicy_t ms12_avsync_callback(void *priv_data, unsigned long long u
         if (decoded_frame > u64DecOutFrame) {
             delay_frame = decoded_frame - u64DecOutFrame;
         }
+
+        if (avsync_ctx->last_lookup_apts == apts) {
+            /* when last policy done, we need get new policy ,so calc the increase frame while same apts */
+            if (MS12_SYNC_AUDIO_DROP_PCM == syncpolicy_status.eSyncPolicy || MS12_SYNC_AUDIO_INSERT == syncpolicy_status.eSyncPolicy) {
+                same_pts_diff = (u64DecOutFrame - avsync_ctx->last_dec_out_frame) * 90 / 48;
+                delay_frame = 0;
+                AM_LOGI_IF(adev->debug_flag, "last policy:%d done need get new policy, same_pts_diff:%d", syncpolicy_status.eSyncPolicy, same_pts_diff);
+            }
+            else {
+                break;
+            }
+        }
+
         delay_pts_diff = (delay_frame + stDelay.u32DelayFrame) * 90 / 48;
 
         new_apts = apts + same_pts_diff - delay_pts_diff;
