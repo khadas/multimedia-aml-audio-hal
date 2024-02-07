@@ -115,7 +115,7 @@ int aml_audio_get_pcm_latency_offset(int format, bool is_netflix, stream_usecase
 int aml_audio_get_hwsync_latency_offset(bool b_raw);
 int aml_audio_get_ddp_frame_size();
 uint32_t out_get_outport_latency(const struct audio_stream_out *stream);
-uint32_t out_get_latency (const struct audio_stream_out *stream);
+uint32_t out_get_latency_ms (const struct audio_stream_out *stream);
 uint32_t out_get_latency_frames(const struct audio_stream_out *stream);
 int aml_audio_get_spdif_tuning_latency(void);
 int aml_audio_get_arc_tuning_latency(audio_format_t arc_afmt);

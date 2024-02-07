@@ -716,6 +716,26 @@ static int out_set_sample_rate(struct audio_stream *stream __unused, uint32_t ra
     return 0;
 }
 
+static uint32_t out_get_latency (const struct audio_stream_out *stream)
+{
+    const struct aml_stream_out *out = (const struct aml_stream_out *) stream;
+    const struct aml_audio_device *adev = out->dev;
+    int buffer_size = 0;
+    int ret = 0;
+    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+        if (out->is_normal_pcm) {
+           ret = dolby_ms12_get_system_buffer_avail(&buffer_size);
+           if (ret < 0) {
+               AM_LOGE("get available system buffer error!");
+           } else {
+               return ret;
+           }
+       }
+    }
+    ret = out_get_latency_frames (out) * audio_stream_out_frame_size(out);
+    return ret;
+}
+
 static size_t out_get_buffer_size (const struct audio_stream *stream)
 {
     struct aml_stream_out *out = (struct aml_stream_out *) stream;
@@ -728,6 +748,7 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
      */
     size_t size = out->config.period_size;
     size_t buffer_size = 0;
+    int ret = 0;
     switch (out->hal_internal_format) {
     case AUDIO_FORMAT_AC3:
         if (stream->get_format(stream) == AUDIO_FORMAT_IEC61937) {
@@ -833,6 +854,15 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
         }
 #endif
     default:
+        if (eDolbyMS12Lib == adev->dolby_lib_type) {
+            if (out->is_normal_pcm) {
+                ret = dolby_ms12_get_system_buffer_avail(&size);
+                if (ret < 0) {
+                    AM_LOGE("get available system buffer error!");
+                }
+            }
+           return size;
+        }
         if (adev->continuous_audio_mode && audio_is_linear_pcm(out->hal_internal_format)) {
             /*Tunnel sync HEADER is 20 bytes*/
             if (out->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
