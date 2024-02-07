@@ -127,7 +127,7 @@ typedef struct aml_dec {
     dec_data_info_t raw_in_data;
     char *ad_data;
     int ad_size;
-    int64_t in_frame_pts;
+    int64_t last_in_frame_pts;
     int64_t out_frame_pts;
     int status;
     int frame_cnt;

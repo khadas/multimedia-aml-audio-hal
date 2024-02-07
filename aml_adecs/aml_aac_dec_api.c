@@ -307,8 +307,6 @@ static void dump_faad_data(void *buffer, int size, char *file_name)
         }
     }
 }
-
-
 static int faad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
 {
     struct aac_dec_t *aac_dec = NULL;
@@ -334,60 +332,72 @@ static int faad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffe
     AM_LOGI_IF(aml_dec->debug_level, "remain_size %d bytes %d ad_decoder_supported %d ad_mixing_enable %d advol_level %d mixer_level %d",
         aac_dec->remain_size ,bytes, aac_dec->ad_decoder_supported, aac_dec->ad_mixing_enable, aac_dec->advol_level,aac_dec->mixer_level );
     if (bytes > 0) {
-        if (!aac_dec->remain_size)
+        if (true == abuffer->b_pts_valid)
+        {
+            AM_LOGI_IF(aml_dec->debug_level, "remain_data_pts_aline 0x%llx -> abuffer->pts 0x%llx ,abuffer->b_pts_valid:%d", aac_dec->remain_data_pts, abuffer->pts, abuffer->b_pts_valid);
             aac_dec->remain_data_pts = abuffer->pts;
+        }
         memcpy(aac_dec->remain_data + aac_dec->remain_size, buffer, bytes);
         aac_dec->remain_size += bytes;
     }
     dec_pcm_data->data_len = 0;
 
-    while (aac_dec->remain_size >  used_size) {
-      int pcm_len = AAC_MAX_LENGTH;
-      int decode_len = faad_op->decode(faad_op, (char *)(dec_pcm_data->buf + dec_pcm_data->data_len), &pcm_len, (char *)aac_dec->remain_data + used_size, aac_dec->remain_size  - used_size);
+    while (aac_dec->remain_size > used_size) {
+        int pcm_len = AAC_MAX_LENGTH;
+        int decode_len = faad_op->decode(faad_op, (char *)(dec_pcm_data->buf + dec_pcm_data->data_len), &pcm_len, (char *)aac_dec->remain_data + used_size, aac_dec->remain_size  - used_size);
 
-      if (decode_len > 0) {
-          used_size += decode_len;
-          dec_pcm_data->data_len += pcm_len;
-          if (dec_pcm_data->data_len > dec_pcm_data->buf_size) {
-              ALOGE("decode len %d  > buf_size %d ", dec_pcm_data->data_len, dec_pcm_data->buf_size);
-              break;
-          }
-          AM_LOGI_IF(aml_dec->debug_level, "decode_len %d in %d pcm_len %d used_size %d", decode_len,  aac_dec->remain_size , pcm_len, used_size);
-          faad_op->getinfo(faad_op,&pAudioInfo);
-          aac_dec->stream_info.stream_sr = pAudioInfo.samplerate;
-          aac_dec->stream_info.stream_ch = pAudioInfo.channels;
-          aac_dec->stream_info.stream_error_num = pAudioInfo.error_num;
-          aac_dec->stream_info.stream_drop_num = pAudioInfo.drop_num;
-          aac_dec->stream_info.stream_decode_num = pAudioInfo.decode_num;
-
-          if (dec_pcm_data->data_len) {
-              aac_dec->remain_size = aac_dec->remain_size - used_size;
-              dec_pcm_data->pts = aac_dec->remain_data_pts;
-              if (used_size >= mark_remain_size) {
-                  used_size_return = used_size - mark_remain_size;
-                  aac_dec->remain_size = 0;
-              } else {
-                   used_size_return = 0;
-                   aac_dec->remain_size = mark_remain_size - used_size;
-                   aac_dec->remain_data_pts = aac_dec->remain_data_pts + dec_pcm_data->data_len /( 2 * pAudioInfo.channels) * 1000 * 90 /pAudioInfo.samplerate;
-                   memmove(aac_dec->remain_data, aac_dec->remain_data + used_size, aac_dec->remain_size );
-              }
-              break;
-          }
-      } else {
-          if (aac_dec->remain_size  > used_size) {
-             aac_dec->remain_size = aac_dec->remain_size - used_size;
-             if (aac_dec->remain_size > AAC_REMAIN_BUFFER_SIZE) {
-                ALOGE("aac_dec->remain_size %d > %d  ,overflow", aac_dec->remain_size , AAC_REMAIN_BUFFER_SIZE );
-                aac_dec->remain_size = 0;
-            } else {
-                memmove(aac_dec->remain_data, aac_dec->remain_data + used_size, aac_dec->remain_size );
+        if (decode_len > 0) {
+            used_size += decode_len;
+            dec_pcm_data->data_len += pcm_len;
+            if (dec_pcm_data->data_len > dec_pcm_data->buf_size) {
+                ALOGE("decode len %d  > buf_size %d ", dec_pcm_data->data_len, dec_pcm_data->buf_size);
+                break;
             }
-          }
-          used_size_return = bytes;
-          AM_LOGI_IF(aml_dec->debug_level, "decode_len %d in %d pcm_len %d used_size %d aac_dec->remain_size %d", decode_len,  bytes, pcm_len, used_size, aac_dec->remain_size);
-          break;
-      }
+            AM_LOGI_IF(aml_dec->debug_level, "decode_len %d in %d pcm_len %d used_size %d", decode_len,  aac_dec->remain_size , pcm_len, used_size);
+            faad_op->getinfo(faad_op,&pAudioInfo);
+            aac_dec->stream_info.stream_sr = pAudioInfo.samplerate;
+            aac_dec->stream_info.stream_ch = pAudioInfo.channels;
+            aac_dec->stream_info.stream_error_num = pAudioInfo.error_num;
+            aac_dec->stream_info.stream_drop_num = pAudioInfo.drop_num;
+            aac_dec->stream_info.stream_decode_num = pAudioInfo.decode_num;
+
+            if (dec_pcm_data->data_len) {
+                aac_dec->remain_size = aac_dec->remain_size - used_size;
+                dec_pcm_data->pts = aac_dec->remain_data_pts;
+                if (used_size >= mark_remain_size) {
+                    used_size_return = bytes;
+                } else {
+                    used_size_return = 0;
+                    aac_dec->remain_size = mark_remain_size - used_size;
+                }
+
+                aac_dec->remain_data_pts = aac_dec->remain_data_pts + dec_pcm_data->data_len /( 2 * pAudioInfo.channels) * 1000 * 90 /pAudioInfo.samplerate;
+                memmove(aac_dec->remain_data, aac_dec->remain_data + used_size, aac_dec->remain_size);
+                break;
+            }
+        } else {
+            if (aac_dec->remain_size > used_size) {
+                if (0 == used_size) {
+                    used_size = bytes; //remove broken data
+                    AM_LOGE("remove broken data, aac_dec->remain_size %d, bytes:%d", aac_dec->remain_size , bytes);
+                }
+                aac_dec->remain_size = aac_dec->remain_size - used_size;
+                if (aac_dec->remain_size > AAC_REMAIN_BUFFER_SIZE) {
+                    AM_LOGE("aac_dec->remain_size %d > %d  ,overflow", aac_dec->remain_size , AAC_REMAIN_BUFFER_SIZE );
+                    aac_dec->remain_size = 0;
+                } else {
+                    memmove(aac_dec->remain_data, aac_dec->remain_data + used_size, aac_dec->remain_size );
+                }
+            }
+            else {
+                memset(aac_dec->remain_data, 0x0, aac_dec->remain_size);
+                aac_dec->remain_size = 0;
+                AM_LOGE("aac_dec->remain_size %d, used_size:%d", aac_dec->remain_size , used_size);
+            }
+            used_size_return = bytes;
+            AM_LOGI_IF(aml_dec->debug_level, "decode_len %d in %d pcm_len %d used_size %d aac_dec->remain_size %d", decode_len,  bytes, pcm_len, used_size, aac_dec->remain_size);
+            break;
+        }
     }
 
     aac_dec->total_raw_size += used_size_return;

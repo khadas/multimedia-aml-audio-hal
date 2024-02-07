@@ -7662,10 +7662,6 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
     void   *write_buf = (void *) abuffer->buffer;
     size_t  write_bytes = abuffer->size;
     int return_bytes = write_bytes;
-    bool digital_input_src = (patch && \
-           (patch->input_src == AUDIO_DEVICE_IN_HDMI
-           || patch->input_src == AUDIO_DEVICE_IN_SPDIF
-           || patch->input_src == AUDIO_DEVICE_IN_TV_TUNER));
 
     if (adev->debug_flag) {
         ALOGI("[%s:%d] out:%p bytes:%zu,format:%#x,conti:%d,with_header:%d", __func__, __LINE__,
@@ -7934,8 +7930,6 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
     }
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         return_bytes = aml_audio_ms12_render(stream, abuffer);
-    } else if (eDolbyDcvLib == adev->dolby_lib_type) {
-        return_bytes = aml_audio_nonms12_render(stream, abuffer);
     } else {
         return_bytes = aml_audio_nonms12_render(stream, abuffer);
     }
@@ -8938,16 +8932,6 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
             ALOGD("func:%s timer_id:%d  ret:%d",__func__, aml_out->timer_id, ret);
         }
 
-    }
-    /* when switch hdmi output to a2dp output, close hdmi stream maybe after open a2dp stream,
-     * and here set audio stop would cause audio stuck
-     */
-    if (aml_out->need_sync && !has_hwsync_stream_running(stream)) {
-        ALOGI("%s set AUDIO_PAUSE when close stream\n",__func__);
-        if (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
-            mediasync_wrap_setPause(aml_out->avsync_ctx->mediasync_ctx->handle, true);
-            ALOGI("%s set AUDIO_STOP when close stream\n",__func__);
-        }
     }
 
 #if 0

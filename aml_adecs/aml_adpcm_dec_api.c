@@ -394,7 +394,7 @@ static int adpcm_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuff
     ALOGV("[%s:%d] finish decode. decode_len %d, pcm_len %d", __func__, __LINE__, decode_len, pcm_len);
 
     if (decode_len > 0) {
-        dump_data(dec_pcm_data->buf, pcm_len, "/data/adpcm_decout.pcm");
+        dump_data(dec_pcm_data->buf, pcm_len, "/data/adpcm_out.pcm");
         used_size = decode_len ;
         dec_pcm_data->data_len += pcm_len;
         if (dec_pcm_data->data_len > dec_pcm_data->buf_size) {

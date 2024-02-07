@@ -118,13 +118,14 @@ int aml_decoder_init(aml_dec_t **ppaml_dec, audio_format_t format, aml_dec_confi
     aml_dec_handel->frame_cnt = 0;
     aml_dec_handel->format = format;
     aml_dec_handel->fragment_left_size = 0;
-    aml_dec_handel->in_frame_pts = 0;
     dec_config->advol_level = 100;
     dec_config->mixer_level = 0;
     dec_config->ad_fade = 0;
     dec_config->ad_pan = 0;
     aml_dec_handel->ad_data = NULL;
     aml_dec_handel->ad_size = 0;
+    aml_dec_handel->out_frame_pts = -1;
+    aml_dec_handel->last_in_frame_pts = -1;
     aml_dec_handel->debug_level = aml_audio_property_get_int("vendor.media.audio.hal.decoder", 0);
     return ret;
 

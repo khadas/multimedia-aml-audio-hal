@@ -149,38 +149,51 @@ int aml_audio_amldec_process(struct audio_stream_out *stream, struct audio_buffe
         }
     }
 
-    int dec_used_size = 0;
-    int used_size = 0;
-    int left_bytes = 0;
-    int out_frames = 0;
     aml_dec_t *aml_dec = aml_out->aml_dec;
-    aml_dec_info_t dec_info;
     struct audio_buffer ainput;
     ainput.buffer = abuffer->buffer;
-    ainput.size = abuffer->size;
-    ainput.pts = abuffer->pts;
+    ainput.size   = abuffer->size;
+    ainput.pts    = abuffer->pts;
+    ainput.b_pts_valid = true;
 
-    aml_dec->in_frame_pts = (NULL_INT64 == ainput.pts) ? aml_dec->out_frame_pts : ainput.pts;
-    ainput.pts = aml_dec->in_frame_pts;
+    /* check the input apts and set valid flag */
+    if ((NULL_INT64 == ainput.pts) || (ainput.pts == aml_dec->last_in_frame_pts)) {
+        AM_LOGI_IF(adev->debug_flag, "ainput.pts(0x%llx)->out_frame_pts(0x%llx)", ainput.pts, aml_dec->out_frame_pts);
 
+        /* if input apts invalid use the out_frame_pts instead */
+        ainput.pts            = aml_dec->out_frame_pts;
+        ainput.b_pts_valid    = false;
+    }
+    aml_dec->last_in_frame_pts = ainput.pts;
     dec_data_info_t * dec_pcm_data = &aml_dec->dec_pcm_data;
     dec_data_info_t * dec_raw_data = &aml_dec->dec_raw_data;
     dec_data_info_t * raw_in_data  = &aml_dec->raw_in_data;
-    left_bytes = abuffer->size;
-    struct audio_buffer pcm_abuffer = {0};
 
+    int used_size     = 0;
+    int out_frames    = 0;
+    int dec_used_size = 0;
+    int left_bytes    = ainput.size;
+    struct audio_buffer out_abuffer = {0};
+
+    AM_LOGI_IF(adev->debug_flag, "new_in_pts:0x%llx (%lld ms) size: %d", ainput.pts, ainput.pts/90, ainput.size);
     do {
-        ainput.buffer = abuffer->buffer + dec_used_size;
-        ainput.size = left_bytes;
+        ainput.buffer += dec_used_size;
+        ainput.size   = left_bytes;
 
         AM_LOGI_IF(adev->debug_flag, "in pts:0x%llx (%lld ms) size: %d", ainput.pts, ainput.pts/90, ainput.size);
         ret = aml_decoder_process(aml_dec, &ainput, &used_size);
         if (0 > ret) {
-            ALOGI("aml_decoder_process error!!");
+            AM_LOGW("aml_decoder_process error, ret:%d", ret);
             break;
         }
-        left_bytes -= used_size;
+        left_bytes    -= used_size;
         dec_used_size += used_size;
+
+        /* cleanup the pts valid flag to false for next round, the aml dec will accumulate the output apts by decode frame,
+           and when pts valid is true, the aml dec will aligned output apts with input pts add cached frames for the input pts may not continue */
+        ainput.b_pts_valid     = false;
+        aml_dec->out_frame_pts = ainput.pts;
+
         AM_LOGI_IF(adev->debug_flag, "out pts:0x%llx (%lld ms) pcm len =%d raw len=%d used_size %d total used size %d left_bytes =%d",
             dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len,dec_raw_data->data_len,
             used_size, dec_used_size, left_bytes);
@@ -201,8 +214,6 @@ int aml_audio_amldec_process(struct audio_stream_out *stream, struct audio_buffe
                 ms12->config_channel_mask = 0x3;
             }
         }
-        out_frames = dec_pcm_data->data_len / (2 * dec_pcm_data->data_ch);
-        aml_dec->out_frame_pts = dec_pcm_data->pts;
 
         void  *dec_data = (void *)dec_pcm_data->buf;
         if (1 == adev->start_mute_flag) {
@@ -221,14 +232,13 @@ int aml_audio_amldec_process(struct audio_stream_out *stream, struct audio_buffe
                  dec_pcm_data->data_len = aml_out->resample_handle->resample_size;
              }
         }
-        //for next loop
-        //ainput.pts = dec_pcm_data->pts + out_frames * 1000 * 90 /dec_pcm_data->data_sr;
-        aml_dec->out_frame_pts = ainput.pts;
-        pcm_abuffer.size = dec_pcm_data->data_len;
-        pcm_abuffer.buffer = dec_data;
-        pcm_abuffer.pts = dec_pcm_data->pts;
-        pcm_abuffer.format = AUDIO_FORMAT_PCM_16_BIT;
-        ret = aml_audio_ms12_process_wrapper(stream, &pcm_abuffer);
+
+        aml_dec->out_frame_pts = dec_pcm_data->pts;
+        out_abuffer.size   = dec_pcm_data->data_len;
+        out_abuffer.buffer = dec_data;
+        out_abuffer.pts    = dec_pcm_data->pts;
+        out_abuffer.format = AUDIO_FORMAT_PCM_16_BIT;
+        ret = aml_audio_ms12_process_wrapper(stream, &out_abuffer);
     } while ((left_bytes > 0) || aml_dec->fragment_left_size);
 
     return return_bytes;

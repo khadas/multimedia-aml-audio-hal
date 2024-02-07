@@ -38,6 +38,11 @@
 #include "aml_ac3_parser.h"
 #include "audio_hw_utils.h"
 
+#define DDP_OUTMIX_AUTO   0     //auto detect downmix
+#define DDP_OUTMIX_LTRT   1     //surround compatible downmix
+#define DDP_OUTMIX_LORO   2     //stereo downmix
+#define DDP_OUTMIX_STREAM 3     //No up or downmix is performed
+
 enum {
     EXITING_STATUS = -1001,
     NO_ENOUGH_DATA = -1002,
@@ -728,7 +733,7 @@ int dcv_decoder_process_patch(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
         int main_frame_size = 0;
         void *associate_frame_buffer = NULL;
         int associate_frame_size = 0;
-        dual_input_ret = scan_dolby_main_associate_frame(buffer
+        /*dual_input_ret = scan_dolby_main_associate_frame(buffer
                  , bytes
                  , &dual_decoder_used_bytes
                  , &main_frame_buffer
@@ -738,16 +743,18 @@ int dcv_decoder_process_patch(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
         if (dual_input_ret) {
             ALOGE("%s used size %d dont find the iec61937 format header, rescan next time!\n", __FUNCTION__, dual_decoder_used_bytes);
             goto EXIT;
-        }
+        }*/
+        associate_frame_size = aml_dec->ad_size;
+        main_frame_size = abuffer->size;
         ALOGV("main frame size =%d ad frame size =%d", main_frame_size, associate_frame_size);
         if ((main_frame_size + associate_frame_size) > ddp_dec->inbuf_size) {
             ALOGE("too big frame size =%d %d", main_frame_size, associate_frame_size);
             goto EXIT;
         }
         /* copy main data */
-        memcpy((char *)ddp_dec->inbuf, main_frame_buffer, main_frame_size);
+        memcpy((char *)ddp_dec->inbuf, abuffer->buffer, main_frame_size);
         /* copy ad data */
-        memcpy((char *)ddp_dec->inbuf + main_frame_size, associate_frame_buffer, associate_frame_size);
+        memcpy((char *)ddp_dec->inbuf + main_frame_size, aml_dec->ad_data, associate_frame_size);
         ddp_dec->remain_size = main_frame_size + associate_frame_size;
         mFrame_size = main_frame_size + associate_frame_size;
         n_bytes_frame = mFrame_size; // not used currently
@@ -970,6 +977,13 @@ int dcv_decoder_config(aml_dec_t * aml_dec, aml_dec_config_type_t config_type, a
         break;
     }
     case AML_DEC_CONFIG_DOWNMIX_TYPE: {
+        if (dec_config->downmix_type == AM_DOWNMIX_LTRT) {
+            dec_config->downmix_type = DDP_OUTMIX_LTRT;
+        } else if (dec_config->downmix_type == AM_DOWNMIX_LORO) {
+            dec_config->downmix_type = DDP_OUTMIX_LORO;
+        } else {
+            dec_config->downmix_type = DDP_OUTMIX_AUTO;
+        }
         ALOGI("downmix type %d",dec_config->downmix_type);
         ret = (*ddp_decoder_config)(handle, DDP_CONFIG_DOWNMIX_TYPE, (ddp_config_t *)&dec_config->downmix_type);
         break;

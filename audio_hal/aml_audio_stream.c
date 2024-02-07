@@ -1137,8 +1137,8 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
                     dtv_aml_out->dec_config.advol_level,dtv_aml_out->dec_config.mixer_level,
                     dtv_aml_out->dec_config.ad_fade,dtv_aml_out->dec_config.ad_pan);
             if (aml_dec) {
-                dprintf(fd, "[AML_HAL] format:%d,ad_data %p,ad_size %d,in_frame_pts %lld,out_frame_pts %lld,status %d,\n",
-                        aml_dec->format,aml_dec->ad_data,aml_dec->ad_size,aml_dec->in_frame_pts,aml_dec->out_frame_pts,aml_dec->status);
+                dprintf(fd, "[AML_HAL] format:%d,ad_data %p,ad_size %d,out_frame_pts %lld,status %d,\n",
+                        aml_dec->format,aml_dec->ad_data,aml_dec->ad_size,aml_dec->out_frame_pts,aml_dec->status);
                 dprintf(fd, "[AML_HAL] frame_cnt:%d,fragment_left_size %d,dev %p \n",
                         aml_dec->frame_cnt,aml_dec->fragment_left_size,aml_dec->dev);
                 dprintf(fd, "[AML_HAL] main data_format:%d,sub_format %d,buf_size %d,data_len %d,data_ch %d,data_sr %d,buf %p\n",

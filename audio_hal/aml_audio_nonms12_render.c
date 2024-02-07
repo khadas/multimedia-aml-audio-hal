@@ -120,13 +120,9 @@ ssize_t aml_audio_spdif_output(struct audio_stream_out *stream, void **spdifout_
 
 int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffer *abuffer)
 {
-    int decoder_ret = -1,ret = -1;
-    int dec_used_size = 0;
-    int left_bytes = 0;
-    int used_size = 0;
+    int ret = -1;
     bool  try_again = false;
     int ringbuf_latency = 0;
-    struct audio_buffer ainput;
 
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
@@ -134,11 +130,8 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
     struct aml_native_postprocess *VX_postprocess = &adev->native_postprocess;
 
     int return_bytes = abuffer->size;
-    int out_frames = 0;
-    void *input_buffer = (void *)abuffer->buffer;
     void *output_buffer = NULL;
     size_t output_buffer_bytes = 0;
-    int duration = 0;
     bool speed_enabled = false;
     bool dts_pcm_direct_output = false;
 
@@ -147,8 +140,8 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
 
     if ((AVSYNC_TYPE_MSYNC == aml_out->avsync_type) && (NULL != aml_out->avsync_ctx)) {
         uint64_t  cur_pts = abuffer->pts;
-        int outsize = abuffer->size;
-        uint32_t apts32 = 0;
+        int outsize       = abuffer->size;
+        uint32_t apts32  = 0;
         int tuning_delay = 0;
         if (NULL != aml_out->avsync_ctx->get_tuning_latency) {
             tuning_delay = aml_out->avsync_ctx->get_tuning_latency(stream);
@@ -157,259 +150,283 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
         msync_get_policy(stream, cur_pts);
     }
 
-    if (aml_out->aml_dec == NULL) {
-        config_output(stream, true);
+    //aml_dec
+    if (NULL == aml_out->aml_dec) {
+        ret = config_output(stream, true);
+        if (0 > ret) {
+            return return_bytes;
+        }
     }
+
     aml_dec_t *aml_dec = aml_out->aml_dec;
-
+    struct audio_buffer ainput;
     ainput.buffer = abuffer->buffer;
-    ainput.size = abuffer->size;
-    ainput.pts = abuffer->pts;
-    if (aml_dec) {
-        dec_data_info_t * dec_pcm_data = &aml_dec->dec_pcm_data;
-        dec_data_info_t * dec_raw_data = &aml_dec->dec_raw_data;
-        dec_data_info_t * raw_in_data  = &aml_dec->raw_in_data;
-        left_bytes = abuffer->size;
+    ainput.size   = abuffer->size;
+    ainput.pts    = abuffer->pts;
+    ainput.b_pts_valid = true;
 
-        aml_dec->in_frame_pts = (NULL_INT64 == ainput.pts) ? aml_dec->out_frame_pts : ainput.pts;
-        ainput.pts = aml_dec->in_frame_pts;
+    /* check the input apts and set valid flag */
+    if ((NULL_INT64 == ainput.pts) || (ainput.pts == aml_dec->last_in_frame_pts)) {
+        AM_LOGI_IF(adev->debug_flag, "ainput.pts(0x%llx)->out_frame_pts(0x%llx)", ainput.pts, aml_dec->out_frame_pts);
 
-        do {
-            ALOGV("%s() in raw len=%d", __func__, left_bytes);
-            used_size = 0;
-            ainput.buffer = abuffer->buffer + dec_used_size;
-            ainput.size = left_bytes;
-
-            AM_LOGI_IF(adev->debug_flag, "in pts:0x%llx (%lld ms) size: %d", ainput.pts, ainput.pts/90, ainput.size);
-            decoder_ret = aml_decoder_process(aml_dec, &ainput, &used_size);
-            if (decoder_ret == AML_DEC_RETURN_TYPE_CACHE_DATA) {
-                ALOGV("[%s:%d] cache the data to decode", __func__, __LINE__);
-                return abuffer->size;
-            } else if (decoder_ret < 0) {
-                ALOGV("[%s:%d] decoder error, ret:%d", __func__, __LINE__, decoder_ret);
-            }
-
-            left_bytes -= used_size;
-            dec_used_size += used_size;
-            AM_LOGI_IF(adev->debug_flag, "out pts:0x%llx (%lld ms) pcm len =%d raw len=%d used_size %d total used size %d left_bytes =%d",
-                dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len,dec_raw_data->data_len,
-                used_size, dec_used_size, left_bytes);
-
-            // write pcm data
-            if (dec_pcm_data->data_len > 0) {
-                if (aml_dec->format == AUDIO_FORMAT_PCM_32_BIT)
-                    aml_out->config.format = PCM_FORMAT_S16_LE;
-                // aml_audio_dump_audio_bitstreams("/data/dec_data.raw", dec_pcm_data->buf, dec_pcm_data->data_len);
-                out_frames = dec_pcm_data->data_len /( 2 * dec_pcm_data->data_ch);
-                aml_dec->out_frame_pts = dec_pcm_data->pts;
-
-                audio_format_t output_format = AUDIO_FORMAT_PCM_16_BIT;
-                void  *dec_data = (void *)dec_pcm_data->buf;
-                int pcm_len = dec_pcm_data->data_len;
-                if (adev->patch_src  == SRC_DTV &&
-                    (adev->start_mute_flag == 1 || adev->tv_mute)) {
-                    memset(dec_pcm_data->buf, 0, dec_pcm_data->data_len);
-                }
-
-                /* For dts certification:
-                 * DTS 88.2K/96K pcm direct output case.
-                 * If the PCM after decoding is 88.2k/96k, then direct output.
-                 * Need to check whether HDMI sink supports 88.2k/96k or not.*/
-                if (adev->hdmi_format == PCM
-                    && is_dts_format(aml_out->hal_internal_format)
-                    && dec_pcm_data->data_sr > 48000
-                    && check_sink_pcm_sr_cap(adev, dec_pcm_data->data_sr)) {
-                    dts_pcm_direct_output = true;
-                }
-
-                if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE ) {
-                    ret = aml_audio_resample_process_wrapper(&aml_out->resample_handle, dec_pcm_data->buf,
-                    pcm_len, dec_pcm_data->data_sr, dec_pcm_data->data_ch);
-                    if (ret != 0) {
-                        ALOGE("aml_audio_resample_process_wrapper failed");
-                    } else {
-                        dec_data = aml_out->resample_handle->resample_buffer;
-                        pcm_len = aml_out->resample_handle->resample_size;
-                    }
-                    aml_out->config.rate = OUTPUT_ALSA_SAMPLERATE;
-                } else {
-                    if (dec_pcm_data->data_sr > 0)
-                        aml_out->config.rate = dec_pcm_data->data_sr;
-                }
-                if (!adev->is_TV) {
-                    aml_out->config.channels = dec_pcm_data->data_ch;
-                }
-
-                /*process the stream volume before mix*/
-                if (aml_audio_property_get_bool("vendor.media.decoder.tone",false)) {
-                    if (2 == dec_pcm_data->data_ch) {
-                        appply_tone_16bit2ch(dec_pcm_data->buf, dec_pcm_data->data_len);
-                    }
-                }
-                if (!adev->useSubMix) {
-                    aml_audio_stream_volume_process(stream, dec_data, sizeof(int16_t), dec_pcm_data->data_ch, pcm_len);
-                }
-
-                if (dec_pcm_data->data_ch == 6) {
-                    ret = audio_VX_post_process(VX_postprocess, (int16_t *)dec_data, pcm_len);
-                    if (ret > 0) {
-                        pcm_len = ret; /* VX will downmix 6ch to 2ch, pcm size will be changed */
-                        dec_pcm_data->data_ch /= 3;
-                    }
-                }
-                if (adev->audio_hal_info.first_decoding_frame == false) {
-                    aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &adev->dec_stream_info);
-                    adev->audio_hal_info.first_decoding_frame = true;
-                    adev->audio_hal_info.is_decoding = true;
-                    ALOGI("[%s:%d] aml_decoder_stream_info %d %d", __func__, __LINE__, adev->dec_stream_info.dec_info.stream_ch, adev->dec_stream_info.dec_info.stream_sr);
-                }
-
-                if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)) {
-                    avsync_ctx_t *avsync_ctx = aml_out->avsync_ctx;
-                    int tuning_delay = 0;
-                    if (NULL != avsync_ctx->get_tuning_latency) {
-                        tuning_delay = avsync_ctx->get_tuning_latency(stream);
-                    }
-                    avsync_ctx->mediasync_ctx->out_start_apts = aml_dec->out_frame_pts;
-                    avsync_ctx->mediasync_ctx->cur_outapts    = aml_dec->out_frame_pts - tuning_delay;
-                    AM_LOGI_IF(adev->debug_flag, "sr:%d, ch:%d, format:0x%x, in_apts:%lld(%llx), "
-                        "out_pts:%lld, out_frames:%d, cur_outapts:%lld",
-                        dec_pcm_data->data_sr, dec_pcm_data->data_ch, dec_pcm_data->data_format,
-                        aml_dec->in_frame_pts, aml_dec->in_frame_pts, aml_dec->out_frame_pts, out_frames, avsync_ctx->mediasync_ctx->cur_outapts);
-
-                    if (adev->useSubMix) {
-                        struct subMixing *sm = adev->sm;
-                        struct amlAudioMixer *audio_mixer = sm->mixerData;
-                        ringbuf_latency = mixer_get_inport_latency_frames(audio_mixer, aml_out->inputPortID) / 48 * 90;
-                        avsync_ctx->mediasync_ctx->cur_outapts -= ringbuf_latency;
-                    }
-
-                    //sync process here
-                    sync_process_res sync_ret = mediasync_nonms12_process(stream);
-                    if (ESSYNC_AUDIO_EXIT == sync_ret) {
-                        break;
-                    }
-                    if (ESSYNC_AUDIO_DROP == sync_ret) {
-                        continue;
-                    }
-                }
-
-                // pcm case, asink do speed before audio_hal.
-                if (fabs(aml_out->output_speed - 1.0f) > 1e-6) {
-                    ret = aml_audio_speed_process_wrapper(&aml_out->speed_handle, dec_data,
-                                            pcm_len, aml_out->output_speed,
-                                            OUTPUT_ALSA_SAMPLERATE, dec_pcm_data->data_ch);
-                    if (ret != 0) {
-                        ALOGE("aml_audio_speed_process_wrapper failed");
-                    } else {
-
-                        ALOGV("data_len=%d, speed_size=%d\n", pcm_len, aml_out->speed_handle->speed_size);
-                        dec_data = aml_out->speed_handle->speed_buffer;
-                        pcm_len = aml_out->speed_handle->speed_size;
-                    }
-                }
-
-                //for next loop
-                //ainput.pts = dec_pcm_data->pts + out_frames * 1000 * 90 /dec_pcm_data->data_sr;
-                aml_dec->out_frame_pts = ainput.pts;
-                if (adev->patch_src == SRC_HDMIIN ||
-                            adev->patch_src == SRC_SPDIFIN ||
-                            adev->patch_src == SRC_LINEIN ||
-                            adev->patch_src == SRC_ATV) {
-
-                    if (patch && patch->need_do_avsync) {
-                         memset(dec_data, 0, pcm_len);
-                    } else {
-                        if (adev->mute_start)  {
-                            /* fade in start */
-                            ALOGI("start fade in");
-                            start_ease_in(adev);
-                            adev->mute_start = false;
-                        }
-                    }
-                    if (adev->audio_patching) {
-                        /*ease in or ease out*/
-                        aml_audio_ease_process(adev->audio_ease, dec_data, pcm_len);
-                    }
-
-                }
-
-                if (eDolbyMS12Lib == adev->dolby_lib_type_last || !adev->useSubMix) {
-                    /*ease in or ease out*/
-                    aml_audio_ease_process(adev->audio_ease, dec_data, pcm_len);
-                    aml_hw_mixer_mixing(&adev->hw_mixer, dec_data, pcm_len, output_format);
-                    if (audio_hal_data_processing(stream, dec_data, pcm_len, &output_buffer, &output_buffer_bytes, output_format) == 0) {
-                        hw_write(stream, output_buffer, output_buffer_bytes, output_format);
-                    }
-                } else {
-                    out_write_direct_pcm(stream, dec_data, pcm_len);
-                }
-            }
-
-            if (aml_out->optical_format != adev->optical_format) {
-                ALOGI("optical format change from 0x%x --> 0x%x", aml_out->optical_format, adev->optical_format);
-                aml_out->optical_format = adev->optical_format;
-                if (aml_out->spdifout_handle != NULL) {
-                    aml_audio_spdifout_close(aml_out->spdifout_handle);
-                    aml_out->spdifout_handle = NULL;
-                }
-                if (aml_out->spdifout2_handle != NULL) {
-                    aml_audio_spdifout_close(aml_out->spdifout2_handle);
-                    aml_out->spdifout2_handle = NULL;
-                }
-
-            }
-
-            // write raw data
-            /*for pcm case, we check whether it has muti channel pcm or 96k/88.2k pcm */
-            if (!dts_pcm_direct_output && !speed_enabled && audio_is_linear_pcm(aml_dec->format) && raw_in_data->data_ch > 2) {
-                aml_audio_spdif_output(stream, &aml_out->spdifout_handle, raw_in_data);
-            } else if (dts_pcm_direct_output && !speed_enabled) {
-                aml_audio_stream_volume_process(stream, dec_pcm_data->buf, sizeof(int16_t), dec_pcm_data->data_ch, dec_pcm_data->data_len);
-                aml_audio_spdif_output(stream, &aml_out->spdifout_handle, dec_pcm_data);
-            }
-
-            if (!dts_pcm_direct_output && !speed_enabled && aml_out->optical_format != AUDIO_FORMAT_PCM_16_BIT) {
-                if (dec_raw_data->data_sr > 0) {
-                    aml_out->config.rate = dec_raw_data->data_sr;
-                }
-
-                if (aml_dec->format == AUDIO_FORMAT_E_AC3 || aml_dec->format == AUDIO_FORMAT_AC3) {
-                    if (adev->dual_spdif_support) {
-                        /*output raw ddp to hdmi*/
-                        if (aml_dec->format == AUDIO_FORMAT_E_AC3 && aml_out->optical_format == AUDIO_FORMAT_E_AC3) {
-                            if (raw_in_data->data_len)
-                                aml_audio_spdif_output(stream, &aml_out->spdifout_handle, raw_in_data);
-                        }
-
-                        /*output dd data to spdif*/
-                        if (dec_raw_data->data_len > 0)
-                            aml_audio_spdif_output(stream, &aml_out->spdifout2_handle, dec_raw_data);
-                    } else {
-                        if (aml_dec->format == AUDIO_FORMAT_E_AC3 && aml_out->optical_format == AUDIO_FORMAT_E_AC3) {
-                            if (raw_in_data->data_len) {
-                                aml_audio_spdif_output(stream, &aml_out->spdifout_handle, raw_in_data);
-                            }
-                        } else if (aml_out->optical_format == AUDIO_FORMAT_AC3) {
-                            if (dec_raw_data->data_len) {
-                                aml_audio_spdif_output(stream, &aml_out->spdifout_handle, dec_raw_data);
-                            }
-                        }
-                    }
-                } else {
-                    aml_audio_spdif_output(stream, &aml_out->spdifout_handle, dec_raw_data);
-                }
-
-            }
-
-            /*special case  for dts , dts decoder need to follow aml_dec_api.h */
-            if ((aml_out->hal_internal_format == AUDIO_FORMAT_DTS ||
-                aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD )&&
-                decoder_ret == AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN ) {
-                try_again = true;
-            }
-        } while ((left_bytes > 0) || aml_dec->fragment_left_size || try_again);
+        /* if input apts invalid use the out_frame_pts instead */
+        ainput.pts            = aml_dec->out_frame_pts;
+        ainput.b_pts_valid    = false;
     }
+    aml_dec->last_in_frame_pts = ainput.pts;
+
+    dec_data_info_t * dec_pcm_data = &aml_dec->dec_pcm_data;
+    dec_data_info_t * dec_raw_data = &aml_dec->dec_raw_data;
+    dec_data_info_t * raw_in_data  = &aml_dec->raw_in_data;
+
+    int used_size     = 0;
+    int out_frames    = 0;
+    int dec_used_size = 0;
+    int left_bytes    = ainput.size;
+
+    do {
+        ALOGV("%s() in raw len=%d", __func__, left_bytes);
+        used_size = 0;
+        ainput.buffer += dec_used_size;
+        ainput.size = left_bytes;
+
+        AM_LOGI_IF(adev->debug_flag, "in pts:0x%llx (%lld ms) size: %d", ainput.pts, ainput.pts/90, ainput.size);
+        int decoder_ret = -1;
+        decoder_ret = aml_decoder_process(aml_dec, &ainput, &used_size);
+        if (decoder_ret == AML_DEC_RETURN_TYPE_CACHE_DATA) {
+            ALOGV("[%s:%d] cache the data to decode", __func__, __LINE__);
+            return abuffer->size;
+        } else if (decoder_ret < 0) {
+            AM_LOGW("aml_decoder_process error, ret:%d", decoder_ret);
+            break;
+        }
+
+        left_bytes    -= used_size;
+        dec_used_size += used_size;
+
+        /* cleanup the pts valid flag to false for next round, the aml dec will accumulate the output apts by decode frame,
+           and when pts valid is true, the aml dec will aligned output apts with input pts add cached frames for the input pts may not continue */
+        ainput.b_pts_valid     = false;
+        aml_dec->out_frame_pts = ainput.pts;
+        AM_LOGI_IF(adev->debug_flag, "out pts:0x%llx (%lld ms) pcm len =%d raw len=%d used_size %d total used size %d left_bytes =%d",
+            dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len,dec_raw_data->data_len,
+            used_size, dec_used_size, left_bytes);
+
+        // write pcm data
+        if (0 >= dec_pcm_data->data_len) {
+            continue;
+        }
+
+        if (aml_dec->format == AUDIO_FORMAT_PCM_32_BIT)
+            aml_out->config.format = PCM_FORMAT_S16_LE;
+        // aml_audio_dump_audio_bitstreams("/data/dec_data.raw", dec_pcm_data->buf, dec_pcm_data->data_len);
+        out_frames = dec_pcm_data->data_len /( 2 * dec_pcm_data->data_ch);
+        aml_dec->out_frame_pts = dec_pcm_data->pts;
+
+        audio_format_t output_format = AUDIO_FORMAT_PCM_16_BIT;
+        void  *dec_data = (void *)dec_pcm_data->buf;
+        int pcm_len = dec_pcm_data->data_len;
+        if (adev->patch_src  == SRC_DTV &&
+            (adev->start_mute_flag == 1 || adev->tv_mute)) {
+            memset(dec_pcm_data->buf, 0, dec_pcm_data->data_len);
+        }
+
+        /* For dts certification:
+         * DTS 88.2K/96K pcm direct output case.
+         * If the PCM after decoding is 88.2k/96k, then direct output.
+         * Need to check whether HDMI sink supports 88.2k/96k or not.*/
+        if (adev->hdmi_format == PCM
+            && is_dts_format(aml_out->hal_internal_format)
+            && dec_pcm_data->data_sr > 48000
+            && check_sink_pcm_sr_cap(adev, dec_pcm_data->data_sr)) {
+            dts_pcm_direct_output = true;
+        }
+
+        if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE ) {
+            ret = aml_audio_resample_process_wrapper(&aml_out->resample_handle, dec_pcm_data->buf,
+            pcm_len, dec_pcm_data->data_sr, dec_pcm_data->data_ch);
+            if (ret != 0) {
+                ALOGE("aml_audio_resample_process_wrapper failed");
+            } else {
+                dec_data = aml_out->resample_handle->resample_buffer;
+                pcm_len = aml_out->resample_handle->resample_size;
+            }
+            aml_out->config.rate = OUTPUT_ALSA_SAMPLERATE;
+        } else {
+            if (dec_pcm_data->data_sr > 0)
+                aml_out->config.rate = dec_pcm_data->data_sr;
+        }
+        if (!adev->is_TV) {
+            aml_out->config.channels = dec_pcm_data->data_ch;
+        }
+
+        /*process the stream volume before mix*/
+        if (aml_audio_property_get_bool("vendor.media.decoder.tone",false)) {
+            if (2 == dec_pcm_data->data_ch) {
+                appply_tone_16bit2ch(dec_pcm_data->buf, dec_pcm_data->data_len);
+            }
+        }
+        if (!adev->useSubMix) {
+            aml_audio_stream_volume_process(stream, dec_data, sizeof(int16_t), dec_pcm_data->data_ch, pcm_len);
+        }
+
+        if (dec_pcm_data->data_ch == 6) {
+            ret = audio_VX_post_process(VX_postprocess, (int16_t *)dec_data, pcm_len);
+            if (ret > 0) {
+                pcm_len = ret; /* VX will downmix 6ch to 2ch, pcm size will be changed */
+                dec_pcm_data->data_ch /= 3;
+            }
+        }
+        if (adev->audio_hal_info.first_decoding_frame == false) {
+            aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &adev->dec_stream_info);
+            adev->audio_hal_info.first_decoding_frame = true;
+            adev->audio_hal_info.is_decoding = true;
+            ALOGI("[%s:%d] aml_decoder_stream_info %d %d", __func__, __LINE__, adev->dec_stream_info.dec_info.stream_ch, adev->dec_stream_info.dec_info.stream_sr);
+        }
+
+        /* may move outside the decoder loop, when parser flow completed later. */
+        if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)) {
+            avsync_ctx_t *avsync_ctx = aml_out->avsync_ctx;
+            int tuning_delay = 0;
+            if (NULL != avsync_ctx->get_tuning_latency) {
+                tuning_delay = avsync_ctx->get_tuning_latency(stream);
+            }
+            avsync_ctx->mediasync_ctx->out_start_apts = aml_dec->out_frame_pts;
+            avsync_ctx->mediasync_ctx->cur_outapts    = aml_dec->out_frame_pts - tuning_delay;
+            AM_LOGI_IF(adev->debug_flag, "sr:%d, ch:%d, format:0x%x, in_apts:%lld(%llx), "
+                "out_pts:%lld, out_frames:%d, cur_outapts:%lld",
+                dec_pcm_data->data_sr, dec_pcm_data->data_ch, dec_pcm_data->data_format,
+                ainput.pts, ainput.pts, aml_dec->out_frame_pts, out_frames, avsync_ctx->mediasync_ctx->cur_outapts);
+
+            if (adev->useSubMix) {
+                struct subMixing *sm = adev->sm;
+                struct amlAudioMixer *audio_mixer = sm->mixerData;
+                ringbuf_latency = mixer_get_inport_latency_frames(audio_mixer, aml_out->inputPortID) / 48 * 90;
+                avsync_ctx->mediasync_ctx->cur_outapts -= ringbuf_latency;
+            }
+
+            //sync process here
+            sync_process_res sync_ret = mediasync_nonms12_process(stream);
+            if (ESSYNC_AUDIO_EXIT == sync_ret) {
+                break;
+            }
+            if (ESSYNC_AUDIO_DROP == sync_ret) {
+                continue;
+            }
+        }
+
+        // pcm case, asink do speed before audio_hal.
+        if (fabs(aml_out->output_speed - 1.0f) > 1e-6) {
+                ALOGE("aml_out->output_speed:%f, fabs:%f", aml_out->output_speed, fabs(aml_out->output_speed - 1.0f));
+            ret = aml_audio_speed_process_wrapper(&aml_out->speed_handle, dec_data,
+                                    pcm_len, aml_out->output_speed,
+                                    OUTPUT_ALSA_SAMPLERATE, dec_pcm_data->data_ch);
+            if (ret != 0) {
+                ALOGE("aml_audio_speed_process_wrapper failed");
+            } else {
+
+                ALOGV("data_len=%d, speed_size=%d\n", pcm_len, aml_out->speed_handle->speed_size);
+                dec_data = aml_out->speed_handle->speed_buffer;
+                pcm_len = aml_out->speed_handle->speed_size;
+            }
+        }
+
+        if (adev->patch_src == SRC_HDMIIN ||
+                    adev->patch_src == SRC_SPDIFIN ||
+                    adev->patch_src == SRC_LINEIN ||
+                    adev->patch_src == SRC_ATV) {
+
+            if (patch && patch->need_do_avsync) {
+                 memset(dec_data, 0, pcm_len);
+            } else {
+                if (adev->mute_start)  {
+                    /* fade in start */
+                    ALOGI("start fade in");
+                    start_ease_in(adev);
+                    adev->mute_start = false;
+                }
+            }
+            if (adev->audio_patching) {
+                /*ease in or ease out*/
+                aml_audio_ease_process(adev->audio_ease, dec_data, pcm_len);
+            }
+
+        }
+
+        if (eDolbyMS12Lib == adev->dolby_lib_type_last || !adev->useSubMix) {
+            /*ease in or ease out*/
+            aml_audio_ease_process(adev->audio_ease, dec_data, pcm_len);
+            aml_hw_mixer_mixing(&adev->hw_mixer, dec_data, pcm_len, output_format);
+            if (audio_hal_data_processing(stream, dec_data, pcm_len, &output_buffer, &output_buffer_bytes, output_format) == 0) {
+                hw_write(stream, output_buffer, output_buffer_bytes, output_format);
+            }
+        } else {
+            out_write_direct_pcm(stream, dec_data, pcm_len);
+        }
+
+        if (aml_out->optical_format != adev->optical_format) {
+            ALOGI("optical format change from 0x%x --> 0x%x", aml_out->optical_format, adev->optical_format);
+            aml_out->optical_format = adev->optical_format;
+            if (aml_out->spdifout_handle != NULL) {
+                aml_audio_spdifout_close(aml_out->spdifout_handle);
+                aml_out->spdifout_handle = NULL;
+            }
+            if (aml_out->spdifout2_handle != NULL) {
+                aml_audio_spdifout_close(aml_out->spdifout2_handle);
+                aml_out->spdifout2_handle = NULL;
+            }
+
+        }
+
+        // write raw data
+        /*for pcm case, we check whether it has muti channel pcm or 96k/88.2k pcm */
+        if (!dts_pcm_direct_output && !speed_enabled && audio_is_linear_pcm(aml_dec->format) && raw_in_data->data_ch > 2) {
+            aml_audio_spdif_output(stream, &aml_out->spdifout_handle, raw_in_data);
+        } else if (dts_pcm_direct_output && !speed_enabled) {
+            aml_audio_stream_volume_process(stream, dec_pcm_data->buf, sizeof(int16_t), dec_pcm_data->data_ch, dec_pcm_data->data_len);
+            aml_audio_spdif_output(stream, &aml_out->spdifout_handle, dec_pcm_data);
+        }
+
+        if (!dts_pcm_direct_output && !speed_enabled && aml_out->optical_format != AUDIO_FORMAT_PCM_16_BIT) {
+            if (dec_raw_data->data_sr > 0) {
+                aml_out->config.rate = dec_raw_data->data_sr;
+            }
+
+            if (aml_dec->format == AUDIO_FORMAT_E_AC3 || aml_dec->format == AUDIO_FORMAT_AC3) {
+                if (adev->dual_spdif_support) {
+                    /*output raw ddp to hdmi*/
+                    if (aml_dec->format == AUDIO_FORMAT_E_AC3 && aml_out->optical_format == AUDIO_FORMAT_E_AC3) {
+                        if (raw_in_data->data_len)
+                            aml_audio_spdif_output(stream, &aml_out->spdifout_handle, raw_in_data);
+                    }
+
+                    /*output dd data to spdif*/
+                    if (dec_raw_data->data_len > 0)
+                        aml_audio_spdif_output(stream, &aml_out->spdifout2_handle, dec_raw_data);
+                } else {
+                    if (aml_dec->format == AUDIO_FORMAT_E_AC3 && aml_out->optical_format == AUDIO_FORMAT_E_AC3) {
+                        if (raw_in_data->data_len) {
+                            aml_audio_spdif_output(stream, &aml_out->spdifout_handle, raw_in_data);
+                        }
+                    } else if (aml_out->optical_format == AUDIO_FORMAT_AC3) {
+                        if (dec_raw_data->data_len) {
+                            aml_audio_spdif_output(stream, &aml_out->spdifout_handle, dec_raw_data);
+                        }
+                    }
+                }
+            } else {
+                aml_audio_spdif_output(stream, &aml_out->spdifout_handle, dec_raw_data);
+            }
+
+        }
+
+        /*special case  for dts , dts decoder need to follow aml_dec_api.h */
+        if ((aml_out->hal_internal_format == AUDIO_FORMAT_DTS ||
+            aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD )&&
+            decoder_ret == AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN ) {
+            try_again = true;
+        }
+    } while ((left_bytes > 0) || aml_dec->fragment_left_size || try_again);
 
 exit:
     return return_bytes;
