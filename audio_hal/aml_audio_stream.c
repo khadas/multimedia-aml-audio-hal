@@ -912,10 +912,9 @@ void aml_stream_out_dump(struct aml_stream_out *aml_out, int fd)
         dprintf(fd, "\t\t-usecase: %s\n", usecase2Str(aml_out->usecase));
         dprintf(fd, "\t\t-out device: %#x\n", aml_out->out_device);
         dprintf(fd, "\t\t-standby: %s\n", aml_out->standby?"true":"false");
-        if (aml_out->is_normal_pcm) {
-            dprintf(fd, "\t\t-normal pcm: %s\n",
-                write_func_to_str(aml_out->write_func));
-        }
+        dprintf(fd, "\t\t-write func: %s\n", write_func_to_str(aml_out->write_func));
+        dprintf(fd, "\t\t-input port: %d\n", aml_out->inputPortID);
+        dprintf(fd, "\t\t-input type: %d\n", aml_out->inputPortType);
 
         uint64_t frames;
         struct timespec timestamp;
@@ -926,7 +925,6 @@ void aml_stream_out_dump(struct aml_stream_out *aml_out, int fd)
 
 void aml_adev_stream_out_dump(struct aml_audio_device *aml_dev, int fd) {
     dprintf(fd, "\n-------------[AML_HAL] StreamOut --------------------------------\n");
-    dprintf(fd, "[AML_HAL]    usecase_masks: %#x\n", aml_dev->usecase_masks);
     dprintf(fd, "[AML_HAL]    stream outs:\n");
     for (int i = 0; i < STREAM_USECASE_MAX ; i++) {
         struct aml_stream_out *aml_out = aml_dev->active_outputs[i];

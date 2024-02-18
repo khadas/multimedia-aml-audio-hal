@@ -139,7 +139,6 @@
 #endif
 /*[SEI-zhaopf-2018-10-29] add for HBG remote audio support } */
 
-#include "sub_mixing_factory.h"
 #include "amlAudioMixer.h"
 #include "a2dp_hal.h"
 #include "audio_bt_sco.h"
@@ -316,10 +315,11 @@ static int get_audio_patch_by_src_dev(struct audio_hw_device *dev,
                                       struct audio_patch **p_audio_patch);
 static int set_hdmi_format(struct aml_audio_device *adev, int val);
 
-ssize_t out_write_new(struct audio_stream_out *stream,
+static ssize_t out_write_new(struct audio_stream_out *stream,
                       const void *buffer,
                       size_t bytes);
 static int out_get_presentation_position (const struct audio_stream_out *stream, uint64_t *frames, struct timespec *timestamp);
+static int out_standby_new(struct audio_stream *stream);
 
 static aec_timestamp get_timestamp(void);
 
@@ -3333,12 +3333,6 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         out->stream.common.get_channels = out_get_channels;
         out->stream.common.get_format = out_get_format;
 
-        if ((eDolbyMS12Lib == adev->dolby_lib_type) && (!adev->is_TV)) {
-            // BOX with ms 12 need to use new method
-            out->stream.write = out_write_new;
-            out->stream.common.standby = out_standby_new;
-        }
-
         out->hal_channel_mask = config->channel_mask;
         out->hal_rate = config->sample_rate;
         out->hal_format = config->format;
@@ -3364,15 +3358,6 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
 
         out->stream.common.get_channels = out_get_channels_direct;
         out->stream.common.get_format = out_get_format_direct;
-
-        if ((eDolbyMS12Lib == adev->dolby_lib_type) && (!adev->is_TV)) {
-            // BOX with ms 12 need to use new method
-            out->stream.write = out_write_new;
-            out->stream.common.standby = out_standby_new;
-        } else {
-            out->stream.write = out_write_new;
-            out->stream.common.standby = out_standby_new;
-        }
 
         out->hal_channel_mask = config->channel_mask;
         out->hal_rate = config->sample_rate;
@@ -3509,17 +3494,6 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->stream.get_presentation_position = out_get_presentation_position;
     out->stream.set_event_callback = out_set_event_callback;
 
-    if (eDolbyMS12Lib == adev->dolby_lib_type) {
-        // BOX with ms 12 need to use new method
-        out->stream.pause = out_pause_new;
-        out->stream.resume = out_resume_new;
-        out->stream.flush = out_flush_new;
-    } else {
-        out->stream.pause = out_pause;
-        out->stream.resume = out_resume;
-        out->stream.flush = out_flush;
-    }
-
     out->out_device = devices;
     out->flags = flags;
     if (address && !strncmp(address, "AML_DTV_SOURCE", 14)) {
@@ -3565,7 +3539,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->need_convert = false;
     out->need_drop_size = 0;
     out->position_update = 0;
-    out->inputPortID = AML_MIXER_INPUT_PORT_BUTT;
+    out->inputPortID = -1;
     out->will_pause = false;
     out->eos = false;
     out->output_speed = 1.0f;
@@ -3772,9 +3746,9 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     ALOGI("%s: enter: dev(%p) stream(%p)", __func__, dev, stream);
 
     stream->common.standby(&stream->common);
-
-    if (out->dev_usecase_masks) {
-        adev->usecase_masks &= ~(1 << out->usecase);
+    if (out->inputPortID != -1 && adev->useSubMix) {
+        delete_mixer_input_port(adev->audio_mixer, out->inputPortID);
+        out->inputPortID = -1;
     }
 
     pthread_mutex_lock(&out->lock);
@@ -6502,9 +6476,6 @@ int do_output_standby_l(struct audio_stream *stream)
         }
     }
 
-    if (eDolbyMS12Lib != adev->dolby_lib_type_last && adev->useSubMix)
-       out_standby_subMixingPCM_l(stream);
-
     aml_out->status = STREAM_STANDBY;
     aml_out->standby= 1;
     aml_out->continuous_mode_check = true;
@@ -6523,44 +6494,7 @@ int do_output_standby_l(struct audio_stream *stream)
     }
     usecase_change_validate_l (aml_out, true);
     pthread_mutex_unlock(&adev->alsa_pcm_lock);
-    if (is_usecase_mix (aml_out->usecase) ) {
-        uint32_t usecase = adev->usecase_masks & ~ (1 << STREAM_PCM_MMAP);
-        /*unmask the mmap case*/
-        ALOGI ("%s current usecase_masks %x",__func__,adev->usecase_masks);
-        /* only release hw mixer when no direct output left */
-        if (usecase <= 1) {
-            if (eDolbyMS12Lib == adev->dolby_lib_type) {
-                // do nothing
-            } else {
-                aml_hw_mixer_deinit(&adev->hw_mixer);
-            }
 
-            if (!continuous_mode(adev)) {
-                adev->mix_init_flag = false;
-            } else {
-                if (is_dolby_ms12_main_stream(out)) {
-                    dolby_ms12_set_pause_flag(false);
-                }
-                if (eDolbyMS12Lib == adev->dolby_lib_type && adev->ms12.dolby_ms12_enable) {
-                    if (adev->need_remove_conti_mode == true) {
-                        ALOGI("%s,release ms12 here", __func__);
-                        bool set_ms12_non_continuous = true;
-                        get_dolby_ms12_cleanup(&adev->ms12, set_ms12_non_continuous);
-                        adev->ms12_out = NULL;
-                        //ALOGI("[%s:%d] get_dolby_ms12_cleanup\n", __FUNCTION__, __LINE__);
-                        adev->ms12.is_continuous_paused = false;
-                        adev->ms12.need_resume       = 0;
-                        adev->ms12.need_resync       = 0;
-                        adev->need_remove_conti_mode = false;
-                    }
-                }
-            }
-        }
-        if (adev->spdif_encoder_init_flag) {
-            // will cause MS12 ddp playing break..
-            //release_spdif_encoder_output_buffer(out);
-        }
-    }
     if (aml_out->is_normal_pcm) {
         set_system_app_mixing_status(aml_out, aml_out->status);
         aml_out->normal_pcm_mixing_config = false;
@@ -7160,7 +7094,7 @@ ssize_t hw_write (struct audio_stream_out *stream
                     ALOGE("%s() open failed", __func__);
                 }
             } else {
-                aml_out->pcm = getSubMixingPCMdev(adev->sm);
+                aml_out->pcm = getSubMixingPCMdev(adev);
                 if (aml_out->pcm == NULL) {
                     ALOGE("%s() get pcm handle failed", __func__);
                 }
@@ -7666,8 +7600,8 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
     if (adev->debug_flag) {
         ALOGI("[%s:%d] out:%p bytes:%zu,format:%#x,conti:%d,with_header:%d", __func__, __LINE__,
               aml_out, abuffer->size, aml_out->hal_internal_format,adev->continuous_audio_mode,aml_out->with_header);
-        ALOGI("[%s:%d] hal_format:%#x, out_usecase:%s, dev_usecase_masks:%#x", __func__, __LINE__,
-            aml_out->hal_format, usecase2Str(aml_out->usecase), adev->usecase_masks);
+        ALOGI("[%s:%d] hal_format:%#x, out_usecase:%s", __func__, __LINE__,
+            aml_out->hal_format, usecase2Str(aml_out->usecase));
     }
 
     if (write_buf == NULL) {
@@ -7682,7 +7616,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         if (ms12->ms12_main_stream_out != NULL && ms12->ms12_main_stream_out != aml_out) {
             AM_LOGI("main stream is not same, release the old one =%p  new =%p ", ms12->ms12_main_stream_out, aml_out);
-            out_standby_new((struct audio_stream *)ms12->ms12_main_stream_out);
+            ms12->ms12_main_stream_out->stream.common.standby((struct audio_stream *)ms12->ms12_main_stream_out);
             close_ms12_output_main_stream((struct audio_stream_out *)ms12->ms12_main_stream_out);
         }
     }
@@ -7711,34 +7645,6 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
         }
     }
 
-    case_cnt = popcount (adev->usecase_masks);
-    if (adev->mix_init_flag == false) {
-        ALOGI ("%s mix init, mask %#x",__func__,adev->usecase_masks);
-        pthread_mutex_lock (&adev->lock);
-        /* recovery from stanby case */
-        if (aml_out->status == STREAM_STANDBY) {
-            ALOGI("%s() recovery from standby, dev masks %#x, usecase[%s]",
-                  __func__, adev->usecase_masks, usecase2Str(aml_out->usecase));
-            adev->usecase_masks |= (1 << aml_out->usecase);
-            case_cnt = popcount(adev->usecase_masks);
-        }
-
-        if (aml_out->usecase == STREAM_PCM_HWSYNC || aml_out->usecase == STREAM_RAW_HWSYNC) {
-            audio_header_info_reset(aml_out->pheader);
-        }
-
-        need_reconfig_output = true;
-        adev->mix_init_flag =  true;
-        /*if mixer has started, no need restart*/
-        if (!adev->hw_mixer.start_buf) {
-            aml_hw_mixer_init(&adev->hw_mixer);
-        }
-        pthread_mutex_unlock(&adev->lock);
-    }
-    if (case_cnt > MAX_INPUT_STREAM_CNT) {
-        ALOGE ("%s usemask %x,we do not support two direct stream output at the same time.TO CHECK CODE FLOW!!!!!!",__func__,adev->usecase_masks);
-        return return_bytes;
-    }
     /*for ms12 continuous mode, we need update status here, instead of in hw_write*/
     if (aml_out->status == STREAM_STANDBY && continuous_mode(adev)) {
         aml_out->status = STREAM_HW_WRITING;
@@ -7965,7 +7871,6 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
     int retry = 0;
     unsigned int alsa_latency_frame = 0;
     pthread_mutex_lock(&adev->lock);
-    bool hw_mix = need_hw_mix(adev->usecase_masks);
     uint64_t enter_ns = 0;
     uint64_t leave_ns = 0;
 
@@ -7983,27 +7888,17 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
         __func__, __LINE__, bytes, adev->dolby_lib_type, frame_size);
     }
 
-    if ((aml_out->status == STREAM_HW_WRITING) && hw_mix) {
-        ALOGI("%s(), aux do alsa close\n", __func__);
-        pthread_mutex_lock(&adev->alsa_pcm_lock);
-        aml_alsa_output_close(stream);
-
-        ALOGI("%s(), aux alsa close done\n", __func__);
-        aml_out->status = STREAM_MIXING;
-        pthread_mutex_unlock(&adev->alsa_pcm_lock);
-    }
-
     if (aml_out->status == STREAM_STANDBY) {
         aml_out->status = STREAM_MIXING;
     }
 
-    if (aml_out->standby) {
+    if (aml_out->standby && eDolbyMS12Lib == adev->dolby_lib_type) {
         ALOGI("%s(), standby to unstandby", __func__);
         aml_out->audio_data_handle_state = AUDIO_DATA_HANDLE_START;
         aml_out->standby = false;
     }
 
-    if (aml_out->is_normal_pcm && !aml_out->normal_pcm_mixing_config) {
+    if (aml_out->is_normal_pcm && !aml_out->normal_pcm_mixing_config && eDolbyMS12Lib == adev->dolby_lib_type) {
         if (0 == set_system_app_mixing_status(aml_out, aml_out->status)) {
             aml_out->normal_pcm_mixing_config = true;
         } else {
@@ -8020,7 +7915,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
         }
         if (continuous_mode(adev)) {
             /*only system sound active*/
-            if (!hw_mix && (!(dolby_stream_active(adev) || hwsync_lpcm_active(adev)))) {
+            if (!(dolby_stream_active(adev) || hwsync_lpcm_active(adev))) {
                 /* here to check if the audio HDMI ARC format updated. */
                 if (((adev->arc_hdmi_updated) || (adev->a2dp_updated) || (adev->hdmi_format_updated) || (adev->bHDMIConnected_update))
                     && (adev->ms12.dolby_ms12_enable == true)) {
@@ -8131,12 +8026,11 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
             }
         }
     } else {
-        bytes_written = aml_hw_mixer_write(&adev->hw_mixer, buffer, bytes);
+        bytes_written = out_write_direct_pcm(stream, buffer, bytes);
         /*these data is skip for ms12, we still need calculate it*/
         if (eDolbyMS12Lib == adev->dolby_lib_type_last) {
             ms12->sys_audio_skip += bytes / frame_size;
         }
-        usleep(bytes_written * 1000000 / frame_size / out_get_sample_rate(&stream->common));
         if (aml_audio_property_get_bool("vendor.media.audiohal.mixer", false)) {
             aml_audio_dump_audio_bitstreams("/data/audio/mixerAux.raw", buffer, bytes);
         }
@@ -8175,7 +8069,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
     }
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-    ALOGI("[%lld.%9ld] write %d bytes, system level %d ms", (long long)ts.tv_sec, ts.tv_nsec, bytes, dolby_ms12_get_system_buffer_avail(NULL) / frame_size / 48);
+    ALOGI_IF(eDolbyMS12Lib == adev->dolby_lib_type, "[%lld.%9ld] write %d bytes, system level %d ms", (long long)ts.tv_sec, ts.tv_nsec, bytes, dolby_ms12_get_system_buffer_avail(NULL) / frame_size / 48);
 
 
 #ifndef BUILD_LINUX
@@ -8210,8 +8104,8 @@ ssize_t mixer_ad_buffer_write (struct audio_stream_out *stream, struct audio_buf
         return -1;
     }
 
-    AM_LOGI_IF(adev->debug_flag, "useSubMix:%d, db_lib:%d, hal_format:0x%x, usecase:0x%x, usecase_masks:0x%x. out:%p, in %zu",
-            adev->useSubMix, adev->dolby_lib_type, aml_out->hal_format, aml_out->usecase, adev->usecase_masks, aml_out, total_bytes);
+    AM_LOGI_IF(adev->debug_flag, "useSubMix:%d, db_lib:%d, hal_format:0x%x, usecase:0x%x, out:%p, in %zu",
+            adev->useSubMix, adev->dolby_lib_type, aml_out->hal_format, aml_out->usecase, aml_out, total_bytes);
 
     if (abuffer->buffer == NULL || abuffer->size == 0) {
         AM_LOGE ("invalid abuffer content, buf %p, sz %d\n", abuffer->buffer, abuffer->size);
@@ -8280,8 +8174,9 @@ ssize_t mixer_app_buffer_write(struct audio_stream_out *stream, struct audio_buf
    }
 
    if (eDolbyMS12Lib != adev->dolby_lib_type) {
-        ALOGW("[%s:%d] dolby_lib_type:%d, is not ms12, not support app write", __func__, __LINE__, adev->dolby_lib_type);
-        return -1;
+        AM_LOGI_IF(adev->debug_flag, "dolby_lib_type:%d, is not ms12,  app write to nonms12", adev->dolby_lib_type);
+        int  return_bytes = out_write_direct_pcm(stream, buffer, bytes);
+        return return_bytes;
    }
 
    if (is_bypass_dolbyms12(stream)) {
@@ -8365,131 +8260,44 @@ ssize_t process_buffer_write(struct audio_stream_out *stream, struct audio_buffe
 /* must be called with hw device mutexes locked */
 static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_standby)
 {
-    struct aml_audio_device *aml_dev = NULL;
-    bool hw_mix = false;
-    if (aml_out == NULL) {
-        ALOGE("%s stream is NULL", __func__);
-        return 0;
-    }
-    aml_dev = aml_out->dev;
-    if (is_standby) {
-        ALOGI("++[%s:%d], dev masks:%#x, is_standby:%d, out usecase:%s", __func__, __LINE__,
-            aml_dev->usecase_masks, is_standby, usecase2Str(aml_out->usecase));
-        /**
-         * If called by standby, reset out stream's usecase masks and clear the aml_dev usecase masks.
-         * So other active streams could know that usecase have been changed.
-         * But keep it's own usecase if out_write is called in the future to exit standby mode.
-         */
-        aml_out->write = NULL;
-
-        if (aml_out->dev_usecase_masks) {
-            aml_dev->usecase_masks &= ~(1 << aml_out->usecase);
-            aml_out->dev_usecase_masks = 0;
-        }
-        aml_dev->usecase_cnt[aml_out->usecase]--;
-        if ((aml_out->usecase == STREAM_RAW_DIRECT ||
-            aml_out->usecase == STREAM_RAW_HWSYNC)
-            && (eDolbyDcvLib == aml_dev->dolby_lib_type)) {
-            aml_dev->raw_to_pcm_flag = true;
-            ALOGI("enable raw_to_pcm_flag !!!");
-        }
-        ALOGI("--[%s:%d], dev masks:%#x, is_standby:%d, out usecase %s", __func__, __LINE__,
-            aml_dev->usecase_masks, is_standby, usecase2Str(aml_out->usecase));
-        return 0;
-    }
-
-    /* No usecase changes, do nothing */
-    if (((aml_dev->usecase_masks == aml_out->dev_usecase_masks) && aml_dev->usecase_masks) && (aml_dev->continuous_audio_mode == 0)) {
-        return 0;
-    }
-
-        /* check the usecase validation */
-    if (popcount(aml_dev->usecase_masks) > MAX_INPUT_STREAM_CNT) {
-        ALOGE("[%s:%d], invalid masks:%#x, out usecase:%s!", __func__, __LINE__,
-            aml_dev->usecase_masks, usecase2Str(aml_out->usecase));
-        return -EINVAL;
-    }
-
-    if (((aml_dev->continuous_audio_mode == 1) && (aml_dev->debug_flag > 1)) || \
-        (aml_dev->continuous_audio_mode == 0))
-        ALOGI("++++[%s:%d],continuous:%d dev masks:%#x,out masks:%#x,out usecase:%s,aml_out:%p", __func__,  __LINE__,
-            aml_dev->continuous_audio_mode, aml_dev->usecase_masks, aml_out->dev_usecase_masks, usecase2Str(aml_out->usecase), aml_out);
-
-    /* new output case entered, so no masks has been set to the out stream */
-    if (!aml_out->dev_usecase_masks) {
-        aml_dev->usecase_cnt[aml_out->usecase]++;
-        if (((1 << aml_out->usecase) & aml_dev->usecase_masks) && (!aml_out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM))  {
-            ALOGE("[%s:%d], usecase: %s already exists!!, aml_out:%p", __func__,  __LINE__, usecase2Str(aml_out->usecase), aml_out);
-            return -EINVAL;
-        }
-        /* add the new output usecase to aml_dev usecase masks */
-        aml_dev->usecase_masks |= 1 << aml_out->usecase;
-    }
-
-    /* choose the out_write functions by usecase masks */
-    hw_mix = need_hw_mix(aml_dev->usecase_masks);
-    if (aml_dev->continuous_audio_mode == 0) {
-        if (hw_mix) {
-            /**
-             * normal pcm write to aux buffer
-             * others write to main buffer
-             * may affect the output device
-             */
-            if (aml_out->is_normal_pcm) {
-                aml_out->write = mixer_aux_buffer_write;
-                aml_out->write_func = MIXER_AUX_BUFFER_WRITE;
-                ALOGI("%s(), non continue mode mixer_aux_buffer_write !", __FUNCTION__);
-            } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
-                aml_out->write = mixer_app_buffer_write;
-                aml_out->write_func = MIXER_APP_BUFFER_WRITE;
-                ALOGI("%s(), non continue mode mixer_app_buffer_write !", __FUNCTION__);
-            } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM) {
-                aml_out->write = mixer_ad_buffer_write;
-                ALOGI("[%s:%d], mixer_ad_buffer_write !", __func__, __LINE__);
-            } else {
-                aml_out->write = mixer_main_buffer_write;
-                aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
-                ALOGI("%s(), non continue mode mixer_main_buffer_write !", __FUNCTION__);
-            }
-        } else {
-            /**
-             * only one stream output will be processed then send to hw.
-             * This case only for normal output without mixing
-             */
-            aml_out->write = process_buffer_write;
-            aml_out->write_func = PROCESS_BUFFER_WRITE;
-            ALOGI("[%s:%d], non continue mode process_buffer_write ", __func__, __LINE__);
-        }
-    } else {
-        /**
-         * normal pcm write to aux buffer
-         * others write to main buffer
-         * may affect the output device
-         */
+    struct aml_audio_device *adev = aml_out->dev;
+    if (adev->dolby_lib_type == eDolbyMS12Lib) {
         if (aml_out->is_normal_pcm) {
             aml_out->write = mixer_aux_buffer_write;
             aml_out->write_func = MIXER_AUX_BUFFER_WRITE;
-            ALOGV("%s(), continue mode mixer_aux_buffer_write !", __FUNCTION__);
+            aml_out->inputPortType = AML_DOLBY_INPUT_SYSTEM;
+            AM_LOGI("mixer_aux_buffer_write!");
         } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             aml_out->write = mixer_app_buffer_write;
             aml_out->write_func = MIXER_APP_BUFFER_WRITE;
-            ALOGV("%s(), continue mode mixer_app_buffer_write !", __FUNCTION__);
+            aml_out->inputPortType = AML_DOLBY_INPUT_APP;
+            AM_LOGI("mixer_app_buffer_write!");
         } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM) {
             aml_out->write = mixer_ad_buffer_write;
-            ALOGV("[%s:%d], mixer_ad_buffer_write !", __func__, __LINE__);
+            aml_out->inputPortType = AML_DOLBY_INPUT_AD;
+            AM_LOGI("mixer_ad_buffer_write!");
         } else {
             aml_out->write = mixer_main_buffer_write;
             aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
-            ALOGV("%s(), continue mode mixer_main_buffer_write !", __FUNCTION__);
+            aml_out->inputPortType = AML_DOLBY_INPUT_MAIN;
+            AM_LOGI("mixer_main_buffer_write!");
         }
+    } else {
+        if (STREAM_PCM_NORMAL == aml_out->usecase) {
+            aml_out->write = mixer_aux_buffer_write;
+            aml_out->write_func = MIXER_AUX_BUFFER_WRITE;
+            AM_LOGI("mixer_aux_buffer_write !");
+        } else if (STREAM_PCM_MMAP == aml_out->usecase) {
+            aml_out->write = mixer_app_buffer_write;
+            aml_out->write_func = MIXER_APP_BUFFER_WRITE;
+            AM_LOGI("mixer_app_buffer_write !");
+        } else {
+            aml_out->write = mixer_main_buffer_write;
+            aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
+            AM_LOGI("mixer_main_buffer_write !");
+        }
+        aml_out->inputPortType = get_input_port_type(&aml_out->config, aml_out->flags);
     }
-
-    /* store the new usecase masks in the out stream */
-    aml_out->dev_usecase_masks = aml_dev->usecase_masks;
-    if (((aml_dev->continuous_audio_mode == 1) && (aml_dev->debug_flag > 1)) || \
-        (aml_dev->continuous_audio_mode == 0))
-        ALOGI("----[%s:%d], continuous:%d dev masks:%#x, out masks:%#x, out usecase:%s", __func__, __LINE__,
-            aml_dev->continuous_audio_mode, aml_dev->usecase_masks, aml_out->dev_usecase_masks, usecase2Str(aml_out->usecase));
     return 0;
 }
 
@@ -8636,14 +8444,6 @@ ssize_t out_write_new(struct audio_stream_out *stream,
      * out_device_change_validate_l(aml_out);
      * pthread_mutex_unlock(&aml_out->lock);
      */
-    pthread_mutex_lock(&adev->lock);
-    if (usecase_change_validate_l(aml_out, false) < 0) {
-        ALOGE("%s() failed", __func__);
-        pthread_mutex_unlock(&adev->lock);
-        aml_audio_trace_int("out_write_new", 0);
-        return 0;
-    }
-    pthread_mutex_unlock(&adev->lock);
 
 pheader_rewrite:
     if (true == aml_out->with_header) {
@@ -8775,8 +8575,6 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
             if (config->sample_rate == 96000 || config->sample_rate == 88200 ||
                     audio_channel_count_from_out_mask(config->channel_mask) > 2 || aml_out->tv_src_stream) {
                 aml_out->bypass_submix = true;
-                aml_out->stream.write = out_write_new;
-                aml_out->stream.common.standby = out_standby_new;
                 ALOGI("bypass submix");
             } else {
                 int retry_count = 0;
@@ -8790,41 +8588,28 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
                     retry_count++;
                     ALOGW("waiting dtv patch release before create submixing path %d\n",retry_count);
                 }
-                ret = initSubMixingInput(aml_out, config);
+                /* delete initSubMixingInput now, no longer need deleteSubMixingInput in adev_close_output_stream_new*/
+                //ret = initSubMixingInput(aml_out, config);
+                aml_out->audioCfg = *config;
                 aml_out->bypass_submix = false;
                 aml_out->inputPortID = -1;
                 if (ret < 0) {
                     ALOGE("initSub mixing input failed");
                 }
             }
-             //this is for STREAM_PCM_HWSYNC
-            if (aml_out->usecase == STREAM_PCM_HWSYNC) {
-                aml_out->timer_id = aml_audio_timer_create(sm_timer_callback_handler);
-                AM_LOGD("func:%s  timer_id:%d", __func__, aml_out->timer_id);
-            }
-        } else {
-            //aml_out->bypass_submix = true;
-            ALOGI("%s(), direct usecase: %s", __func__, usecase2Str(aml_out->usecase));
-            aml_out->stream.write = out_write_new;
-            aml_out->stream.common.standby = out_standby_new;
         }
-    } else {
-        aml_out->stream.write = out_write_new;
-        aml_out->stream.common.standby = out_standby_new;
     }
     aml_out->status = STREAM_STANDBY;
     if (adev->continuous_audio_mode == 0) {
         adev->spdif_encoder_init_flag = false;
     }
-    if (devices & AUDIO_DEVICE_OUT_ALL_A2DP) {
-        if (!audio_is_linear_pcm(aml_out->hal_format)) {
-            aml_out->stream.write = out_write_new;
-            aml_out->stream.common.standby = out_standby_new;
-            aml_out->stream.pause = out_pause_new;
-            aml_out->stream.resume = out_resume_new;
-            aml_out->stream.flush = out_flush_new;
-        }
-    }
+
+    aml_out->stream.write = out_write_new;
+    aml_out->stream.common.standby = out_standby_new;
+    aml_out->stream.pause = out_pause_new;
+    aml_out->stream.resume = out_resume_new;
+    aml_out->stream.flush = out_flush_new;
+
     aml_out->codec_type = get_codec_type(aml_out->hal_internal_format);
     aml_out->continuous_mode_check = true;
 
@@ -8881,6 +8666,22 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
     ALOGD("-%s: out %p: io handle:%d, usecase:%s card:%d alsa devices:%d", __func__,
         aml_out, handle, usecase2Str(aml_out->usecase), aml_out->card, aml_out->device);
 
+    pthread_mutex_lock(&adev->lock);
+    if (usecase_change_validate_l(aml_out, false) < 0) {
+        ALOGE("%s() failed", __func__);
+        pthread_mutex_unlock(&adev->lock);
+        aml_audio_trace_int("adev_open_output_stream_new", 0);
+        return 0;
+    }
+    pthread_mutex_unlock(&adev->lock);
+/*
+    if (adev->useSubMix) {
+        init_mixer_input_port(adev->audio_mixer, &aml_out->audioCfg, aml_out->flags,
+            on_notify_cbk, aml_out, on_input_avail_cbk, aml_out,
+            NULL, NULL, 1.0);
+        AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(config, aml_out->flags)));
+    }*/
+
     return 0;
 
 AUDIO_EASE_INIT_FAIL:
@@ -8924,7 +8725,8 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
             aml_out->usecase == STREAM_PCM_MMAP ||
             aml_out->usecase == STREAM_PCM_DIRECT) {
             if (!aml_out->bypass_submix) {
-                deleteSubMixingInput(aml_out);
+                 /* initSubMixingInput has been deleted in adev_open_output_stream_new, no longer need deleteSubMixingInput*/
+                //deleteSubMixingInput(aml_out);
             }
         }
         if (aml_out->usecase == STREAM_PCM_HWSYNC) {
@@ -8959,6 +8761,9 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
     adev_close_output_stream(dev, stream);
     //adev->dual_decoder_support = false;
     //destroy_aec_reference_config(adev->aec);
+    if (eDolbyMS12Lib ==  adev->dolby_lib_type && adev->audio_mixer) {
+        deleteHalSubMixing(adev);
+    }
     ALOGI("%s: exit", __func__);
 }
 
@@ -9727,11 +9532,6 @@ static int create_patch_l(struct audio_hw_device *dev,
     patch->need_do_avsync = true;
     patch->game_mode = aml_dev->game_mode;
 
-    if (aml_dev->useSubMix) {
-        // switch normal stream to old tv mode writing
-        switchNormalStream(aml_dev->active_outputs[STREAM_PCM_NORMAL], 0);
-    }
-
     if (patch->out_format == AUDIO_FORMAT_PCM_16_BIT) {
         AM_LOGD("init audio ringbuffer game %d",  patch->game_mode);
         if (!patch->game_mode)
@@ -9850,10 +9650,6 @@ int release_patch_l(struct aml_audio_device *aml_dev)
     aml_dev->audio_patch = NULL;
     aml_dev->patch_start = false;
     ALOGD("%s: exit", __func__);
-
-    if (aml_dev->useSubMix) {
-        switchNormalStream(aml_dev->active_outputs[STREAM_PCM_NORMAL], 1);
-    }
 
 exit:
     return 0;
@@ -10518,7 +10314,6 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     dprintf(fd, "[AML_HAL]      master volume: %10f, mute: %d\n", aml_dev->master_volume, aml_dev->master_mute);
     aml_decoder_info_dump(aml_dev, fd);
     aml_adev_stream_out_dump(aml_dev, fd);
-    dprintf(fd, "\n[AML_HAL]      usecase_masks: %#x\n", aml_dev->usecase_masks);
     dprintf(fd, "[AML_HAL]      dual: %d, mixing %d, ad_vol %d\n", aml_dev->dual_decoder_support, aml_dev->mixing_level, aml_dev->advol_level);
     dprintf(fd, "\nAML stream outs:\n");
 
@@ -10692,8 +10487,8 @@ static int adev_close(hw_device_t *device)
         }
         aml_audio_free(adev->aml_dtv_audio_instances);
     }
-    if (adev->sm) {
-        deleteHalSubMixing(adev->sm);
+    if (adev->audio_mixer) {
+        deleteHalSubMixing(adev);
     }
     pthread_mutex_destroy(&adev->dtv_patch_lock);
     pthread_mutex_destroy(&adev->patch_lock);
@@ -11109,14 +10904,6 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     ALOGI("eARC_TX eARC Mode get from property: %d\n", earctx_mode);
     }
 
-    if (eDolbyMS12Lib != adev->dolby_lib_type) {
-        adev->ms12.dolby_ms12_enable == false;
-    } else {
-        // in ms12 case, use new method for TV or BOX .zzz
-        adev->hw_device.open_output_stream = adev_open_output_stream_new;
-        adev->hw_device.close_output_stream = adev_close_output_stream_new;
-        ALOGI("%s,in ms12 case, use new method no matter if current platform is TV or BOX", __FUNCTION__);
-    }
     adev->atoms_lock_flag = false;
 
     if (eDolbyDcvLib == adev->dolby_lib_type) {
@@ -11227,7 +11014,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     // FIXME: current MS12 is not compatible with SUBMIXER, when MS12 lib exists, use ms12 system.
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         adev->useSubMix = false;
-    } else if (aml_get_jason_int_value(USE_SUB_MIX, 0)) {
+    } else if (aml_get_jason_int_value(USE_SUB_MIX, 1)) {
         adev->useSubMix = true;
     }
 
@@ -11236,7 +11023,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         adev->audio_focus_enable ? "TRUE": "FALSE");
 
     if (adev->useSubMix) {
-        ret = initHalSubMixing(&adev->sm, MIXER_LPCM, adev, adev->is_TV);
+        ret = initHalSubMixing(MIXER_LPCM, adev, adev->is_TV);
         adev->raw_to_pcm_flag = false;
     }
 

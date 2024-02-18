@@ -22,8 +22,18 @@
 #include <cutils/list.h>
 //#include <alsa_device_profile.h>
 
-#include "hw_avsync.h"
-#include "sub_mixing_factory.h"
+#include <linux/ioctl.h>
+#include <hardware/audio.h>
+#include <signal.h>
+#include "audio_data_process.h"
+enum MIXER_TYPE {
+    MIXER_LPCM = 1,
+    MIXER_MS12 = 2,
+};
+
+struct aml_stream_out;
+struct aml_audio_device;
+
 //#include "karaoke_manager.h"
 
 /* Max number of pcm mixing ports */

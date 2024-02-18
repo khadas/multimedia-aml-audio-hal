@@ -1001,8 +1001,7 @@ uint32_t out_get_outport_latency(const struct audio_stream_out *stream)
 {
     struct aml_stream_out *out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = out->dev;
-    struct subMixing *sm = adev->sm;
-    struct amlAudioMixer *audio_mixer = sm->mixerData;
+    struct amlAudioMixer *audio_mixer = adev->audio_mixer;
     int frames = 0, latency_ms = 0;
 #if 0
     if (out->out_device & AUDIO_DEVICE_OUT_ALL_A2DP) {

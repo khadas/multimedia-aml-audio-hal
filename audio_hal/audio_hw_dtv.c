@@ -562,8 +562,6 @@ extern int adev_open_output_stream_new(struct audio_hw_device *dev,
                                        struct audio_config *config,
                                        struct audio_stream_out **stream_out,
                                        const char *address __unused);
-ssize_t out_write_new(struct audio_stream_out *stream, const void *buffer,
-                      size_t bytes);
 bool is_need_check_ad_substream(struct aml_audio_patch *patch) {
     struct audio_hw_device *dev = patch->dev;
     struct aml_audio_device *aml_dev = (struct aml_audio_device *)dev;
@@ -603,10 +601,6 @@ int audio_set_spdif_clock(struct aml_stream_out *stream, int type)
     if (dev->patch_src != SRC_DTV || !dev->audio_patch->is_dtv_src) {
         AM_LOGE("[%s:%d] patch_src:%d, is_dtv_src:%d",
             __FUNCTION__, __LINE__,dev->patch_src, dev->audio_patch->is_dtv_src);
-        return 0;
-    }
-    if (!(dev->usecase_masks > 1)) {
-        AM_LOGE("usecase_masks:%d", dev->usecase_masks);
         return 0;
     }
 
@@ -681,7 +675,7 @@ int audio_dtv_patch_output_decoder(struct aml_audio_patch *patch,
         cur_package = patch->cur_package;
     }
 
-    AM_LOGI_IF(aml_dev->debug_flag, "%s str %p, is_ad %d. pk %p, sz %d. pts %llx(%d)", is_ad_stream ? "ad" : "main",
+    AM_LOGI_IF(aml_dev->debug_flag, "%s str %p, is_ad %d. pk %p, sz %d. pts %llx(%lld)", is_ad_stream ? "ad" : "main",
                aml_out, is_ad_stream, cur_package, cur_package->size, cur_package->pts, cur_package->pts/90);
     bool data_dump = aml_audio_property_get_bool("vendor.media.audiohal.patch.out", false);
     if ((!cur_package || !cur_package->data || !cur_package->size)) {
@@ -726,11 +720,11 @@ int audio_dtv_patch_output_decoder(struct aml_audio_patch *patch,
                 snprintf(file_name, 128, "/data/vendor/audiohal/dtv_audio_%s.es", is_ad_stream ? "ad" : "main");
                 aml_audio_dump_audio_bitstreams(file_name, out_frame_buffer, out_frame_size);
             }
-            ret = out_write_new(stream_out, out_frame_buffer, out_frame_size);
+            ret = stream_out->write(stream_out, out_frame_buffer, out_frame_size);
         }
     } else if (aml_dev->dolby_lib_type == eDolbyMS12Lib &&
         (patch->aformat == AUDIO_FORMAT_AC3 || patch->aformat == AUDIO_FORMAT_E_AC3 || patch->aformat == AUDIO_FORMAT_AC4)) {
-        ret = out_write_new(stream_out, in_frame_buffer, input_size);
+        ret = stream_out->write(stream_out, in_frame_buffer, input_size);
     } else if (aml_dev->dolby_lib_type_last != eDolbyMS12Lib ||
            (aml_dev->dolby_lib_type == eDolbyMS12Lib && !is_dolby_ms12_support_compression_format(patch->aformat))) {
         if (!is_ad_stream) {
@@ -738,7 +732,7 @@ int audio_dtv_patch_output_decoder(struct aml_audio_patch *patch,
                 aml_out->aml_dec->ad_data = patch->cur_ad_package->data;
                 aml_out->aml_dec->ad_size = patch->cur_ad_package->size;
             }
-            ret = out_write_new(stream_out, in_frame_buffer, input_size);
+            ret = stream_out->write(stream_out, in_frame_buffer, input_size);
         }
     }
 
@@ -1368,7 +1362,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
         we will output raw/lpcm directly.we need close device directly.
         we need call standy function to release the direct stream
         */
-        out_standby_new((struct audio_stream *)aml_out);
+        aml_out->stream.common.standby((struct audio_stream *)aml_out);
         pthread_mutex_lock(&aml_dev->lock);
         if (aml_dev->need_remove_conti_mode == true) {
             AM_LOGI("conntinous mode still there,release ms12 here");
@@ -2197,11 +2191,6 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
         goto err;
     }
 
-    if (aml_dev->useSubMix) {
-        // switch normal stream to old tv mode writing
-        switchNormalStream(aml_dev->active_outputs[STREAM_PCM_NORMAL], 0);
-    }
-
     ret = pthread_create(&(patch->audio_cmd_process_threadID), NULL,
                          audio_dtv_patch_process_threadloop, patch);
     if (ret != 0) {
@@ -2286,9 +2275,7 @@ int release_dtv_patch_l(struct aml_audio_device *aml_dev)
         aml_dev->start_mute_flag = 0;
     aml_dev->underrun_mute_flag = 0;
     AM_LOGI("-- Exit");
-    if (aml_dev->useSubMix) {
-        switchNormalStream(aml_dev->active_outputs[STREAM_PCM_NORMAL], 1);
-    }
+
     return 0;
 }
 

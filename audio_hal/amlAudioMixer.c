@@ -501,17 +501,18 @@ static int mixer_output_write(struct amlAudioMixer *audio_mixer)
                 mixer_output_startup(audio_mixer);
                 pthread_mutex_lock(&audio_mixer->outport_locks[port_index]);
             }
+#ifndef NO_AUDIO_CAP
+            pthread_mutex_lock(&adev->cap_buffer_lock);
+            if (adev->cap_buffer) {
+                IpcBuffer_write(adev->cap_buffer, (const unsigned char *)out_port->data_buf, (int) out_port->bytes_avail);
+            }
+            pthread_mutex_unlock(&adev->cap_buffer_lock);
+#endif
+
             if (out_port->process) {
                 out_port->process(out_port, out_port->data_buf, out_port->bytes_avail);
                 out_port->write(out_port, out_port->processed_buf, out_port->processed_bytes);
             } else {
-#ifndef NO_AUDIO_CAP
-                pthread_mutex_lock(&adev->cap_buffer_lock);
-                if (adev->cap_buffer) {
-                    IpcBuffer_write(adev->cap_buffer, (const unsigned char *)out_port->data_buf, (int) out_port->bytes_avail);
-                }
-                pthread_mutex_unlock(&adev->cap_buffer_lock);
-#endif
                 out_port->write(out_port, out_port->data_buf, out_port->bytes_avail);
             }
         }
@@ -1549,10 +1550,7 @@ bool has_hwsync_stream_running(struct audio_stream_out *stream)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
-    struct subMixing *sm = adev->sm;
-    if (sm == NULL)
-        return false;
-    struct amlAudioMixer *audio_mixer = sm->mixerData;
+    struct amlAudioMixer *audio_mixer = adev->audio_mixer;
     if (audio_mixer == NULL)
         return false;
 
@@ -1571,11 +1569,11 @@ bool has_hwsync_stream_running(struct audio_stream_out *stream)
 }
 
  void mixer_using_alsa_device_dump(int s32Fd, const struct aml_audio_device *pstAmlDev) {
-    if (NULL == pstAmlDev || NULL == pstAmlDev->sm) {
-        dprintf(s32Fd, "  [AML_HAL] device or sub mixing is NULL !\n");
+    if (NULL == pstAmlDev || NULL == pstAmlDev->audio_mixer) {
+        dprintf(s32Fd, "  [AML_HAL] device or amlAudioMixer is NULL !\n");
         return;
     }
-    struct amlAudioMixer *pstAudioMixer = (struct amlAudioMixer *)pstAmlDev->sm->mixerData;
+    struct amlAudioMixer *pstAudioMixer = (struct amlAudioMixer *)pstAmlDev->audio_mixer;
     if (NULL == pstAudioMixer) {
         dprintf(s32Fd, "  [AML_HAL] amlAudioMixer is NULL !\n");
         return;
@@ -1603,11 +1601,11 @@ bool has_hwsync_stream_running(struct audio_stream_out *stream)
 
 void mixer_dump(int s32Fd, const struct aml_audio_device *pstAmlDev)
 {
-    if (NULL == pstAmlDev || NULL == pstAmlDev->sm) {
+    if (NULL == pstAmlDev || NULL == pstAmlDev->audio_mixer) {
         dprintf(s32Fd, "[AML_HAL] [%s:%d] device or sub mixing is NULL !\n", __func__, __LINE__);
         return;
     }
-    struct amlAudioMixer *pstAudioMixer = (struct amlAudioMixer *)pstAmlDev->sm->mixerData;
+    struct amlAudioMixer *pstAudioMixer = (struct amlAudioMixer *)pstAmlDev->audio_mixer;
     if (NULL == pstAudioMixer) {
         dprintf(s32Fd, "[AML_HAL] [%s:%d] struct amlAudioMixer is NULL !\n", __func__, __LINE__);
         return;
@@ -1657,4 +1655,321 @@ int mixer_set_karaoke(struct amlAudioMixer *audio_mixer, struct kara_manager *ka
     return 0;
 }
 #endif
+
+int on_notify_cbk(void *data)
+{
+    struct aml_stream_out *out = data;
+    pthread_cond_broadcast(&out->cond);
+    return 0;
+}
+
+int on_input_avail_cbk(void *data)
+{
+    struct aml_stream_out *out = data;
+    pthread_cond_broadcast(&out->cond);
+    return 0;
+}
+
+static ssize_t aml_out_write_to_mixer(struct audio_stream_out *stream, const void* buffer,
+                                    size_t bytes)
+{
+    struct aml_stream_out *out = (struct aml_stream_out *)stream;
+    struct aml_audio_device *adev = out->dev;
+    struct amlAudioMixer *audio_mixer =  adev->audio_mixer;
+    const char *data = (char *)buffer;
+    size_t written_total = 0, frame_size = 4;
+    uint32_t latency_frames = 0;
+    struct timespec ts;
+
+    if (adev->is_netflix && STREAM_PCM_NORMAL == out->usecase) {
+        aml_audio_data_handle(stream, buffer, bytes);
+    }
+
+    int channel = 2;
+    switch (out->audioCfg.channel_mask) {
+        case AUDIO_CHANNEL_OUT_MONO:
+            channel = 1;
+        case AUDIO_CHANNEL_OUT_STEREO:
+            channel = 2;
+        case AUDIO_CHANNEL_OUT_5POINT1:
+            channel = 6;
+        case AUDIO_CHANNEL_OUT_7POINT1:
+            channel = 8;
+        default:
+            channel = 2;
+    }
+    if (48000 != out->audioCfg.sample_rate) {
+        int ret = aml_audio_resample_process_wrapper(&out->resample_handle, (char *)buffer, bytes, out->audioCfg.sample_rate, channel);
+        if (0 != ret) {
+            ALOGE("aml_audio_resample_process_wrapper failed");
+        } else {
+            data = out->resample_handle->resample_buffer;
+            bytes = out->resample_handle->resample_size;
+        }
+    }
+    out->config.rate = 48000;
+
+    do {
+        ssize_t written = 0;
+        AM_LOGV("stream usecase: %s, written_total %zu, bytes %zu",
+            usecase2Str(out->usecase), written_total, bytes);
+
+        written = mixer_write_inport(audio_mixer,
+                out->inputPortID, data, bytes - written_total);
+        if (written < 0) {
+            AM_LOGE("write failed, errno = %zu", written);
+            return written;
+        }
+
+        if (written > 0) {
+            written_total += written;
+            data += written;
+            //latency_frames = mixer_get_inport_latency_frames(audio_mixer, out->port_index) +
+             //       mixer_get_outport_latency_frames(audio_mixer);
+            //pthread_mutex_lock(&out->lock);
+            //clock_gettime(CLOCK_MONOTONIC, &out->timestamp);
+            //out->last_frames_postion += written / frame_size - latency_frames;
+            //pthread_mutex_unlock(&out->lock);
+        }
+        AM_LOGV("port index(%d) written(%zu), written_total(%zu), bytes(%zu)",
+            out->inputPortID, written, written_total, bytes);
+
+        if (written_total >= bytes) {
+            AM_LOGV("exit");
+            break;
+        }
+
+        //usleep((bytes- written_total) * 1000 / 5 / 48);
+        //if (out->port_index == 1) {
+            ts_wait_time_us(&ts, 5000);
+            AM_LOGV("-wait....");
+            pthread_mutex_lock(&out->cond_lock);
+            pthread_cond_timedwait(&out->cond, &out->cond_lock, &ts);
+            AM_LOGV("--wait wakeup");
+            pthread_mutex_unlock(&out->cond_lock);
+        //}
+    } while (1);
+
+    return written_total;
+}
+
+ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void *buffer,
+                                    size_t bytes)
+{
+    struct aml_stream_out *out = (struct aml_stream_out *)stream;
+    struct aml_audio_device *adev = out->dev;
+    struct amlAudioMixer *audio_mixer = adev->audio_mixer;
+    struct timespec tval, new_tval;
+    uint64_t us_since_last_write = 0;
+    //uint64_t begin_time, end_time;
+    ssize_t written = 0;
+    size_t remain = 0;
+    int frame_size = 4;
+    int64_t throttle_timeus = 0;//aml_audio_get_throttle_timeus(bytes);
+
+    if (out->standby) {
+        init_mixer_input_port(audio_mixer, &out->audioCfg, out->flags,
+            on_notify_cbk, out, on_input_avail_cbk, out,
+            NULL, NULL, 1.0);
+        AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(&out->audioCfg, out->flags)));
+        out->standby = false;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &tval);
+    //begin_time = get_systime_ns();
+    set_mixer_inport_volume(audio_mixer, out->inputPortID, out->volume_l);
+    out->last_volume_l = out->volume_l;
+    out->last_volume_r = out->volume_r;
+    written = aml_out_write_to_mixer(stream, buffer, bytes);
+    if (written >= 0) {
+        remain = bytes - written;
+        out->frame_write_sum += written / frame_size;
+        if (remain > 0) {
+            AM_LOGE("INVALID partial written");
+        }
+        clock_gettime(CLOCK_MONOTONIC, &new_tval);
+        if (tval.tv_sec > new_tval.tv_sec)
+            AM_LOGE("FATAL ERROR");
+        AM_LOGV("++bytes %zu, out->port_index %d", bytes, out->inputPortID);
+        //AM_LOGD(" %lld us, %lld", new_tval.tv_sec, tval.tv_sec);
+
+        us_since_last_write = (new_tval.tv_sec - out->timestamp.tv_sec) * 1000000 +
+                (new_tval.tv_nsec - out->timestamp.tv_nsec) / 1000;
+        //out->timestamp = new_tval;
+
+        int used_this_write = (new_tval.tv_sec - tval.tv_sec) * 1000000 +
+                (new_tval.tv_nsec - tval.tv_nsec) / 1000;
+        int target_us = bytes * 1000 / frame_size / 48;
+
+        AM_LOGV("time spent on write %" PRId64 " us, written %zd", us_since_last_write, written);
+        AM_LOGV("used_this_write %d us, target %d us", used_this_write, target_us);
+        throttle_timeus = target_us - us_since_last_write;
+        if (throttle_timeus > 0 && throttle_timeus < 200000) {
+            AM_LOGV("throttle time %" PRId64 " us", throttle_timeus);
+            if (throttle_timeus > 1800) {
+                AM_LOGV("actual throttle %" PRId64 " us, since last %" PRId64 " us",
+                        throttle_timeus, us_since_last_write);
+            } else {
+                AM_LOGV("%" PRId64 " us, but un-throttle", throttle_timeus);
+            }
+        } else if (throttle_timeus != 0) {
+            // first time write, sleep
+            //usleep(target_us - 100);
+            AM_LOGV("invalid throttle time %" PRId64 " us, us since last %" PRId64 " us", throttle_timeus, us_since_last_write);
+            AM_LOGV("\n\n");
+        }
+    } else {
+        AM_LOGE("write fail, err = %zd", written);
+    }
+
+    // TODO: means first write, need check this by method
+    if (us_since_last_write > 500000) {
+        usleep(bytes * 1000 / 48 / frame_size);
+        AM_LOGV("invalid duration %" PRIu64 " us", us_since_last_write);
+        //AM_LOGE("last   write %ld s,  %ld ms", out->timestamp.tv_sec, out->timestamp.tv_nsec/1000000);
+        //AM_LOGE("before write %ld s,  %ld ms", tval.tv_sec, tval.tv_nsec/1000000);
+        //AM_LOGE("after  write %ld s,  %ld ms", new_tval.tv_sec, new_tval.tv_nsec/1000000);
+    }
+
+exit:
+    // update new timestamp
+    clock_gettime(CLOCK_MONOTONIC, &out->timestamp);
+    out->lasttimestamp.tv_sec = out->timestamp.tv_sec;
+    out->lasttimestamp.tv_nsec = out->timestamp.tv_nsec;
+    if (written >= 0) {
+        uint32_t latency_frames = mixer_get_inport_latency_frames(audio_mixer, out->inputPortID);
+                //+ mixer_get_outport_latency_frames(audio_mixer);
+        if (out->frame_write_sum > latency_frames)
+            out->last_frames_position = out->frame_write_sum - latency_frames;
+        else
+            out->last_frames_position = out->frame_write_sum;
+
+        if (0) {
+            AM_LOGI("last position %" PRId64 ", latency_frames %d", out->last_frames_position, latency_frames);
+        }
+    }
+    if (out->status == STREAM_STANDBY) {
+        out->status = STREAM_HW_WRITING;
+    }
+
+    return written;
+}
+
+static int startMixingThread(struct amlAudioMixer *audio_mixer)
+{
+    return pcm_mixer_thread_run(audio_mixer);
+}
+
+
+static int initSubMixingOutput(
+        enum MIXER_TYPE type,
+        struct aml_audio_device *adev)
+{
+    R_CHECK_POINTER_LEGAL(-EINVAL, adev, "");
+    if (type == MIXER_LPCM) {
+        struct audioCfg cfg;
+        output_get_default_config(&cfg, adev->is_TV);
+        struct amlAudioMixer *amixer = newAmlAudioMixer(adev, cfg);
+        R_CHECK_POINTER_LEGAL(-ENOMEM, amixer, "newAmlAudioMixer failed");
+        adev->audio_mixer = amixer;
+        /* TV product has EQ DRC and sink gain */
+        //if (adev->eq_drc_inited) {
+        //    ALOGI("%s(), eq data addr %p", __func__, &adev->eq_data);
+        //    subMixingSetEQData(adev, &adev->eq_data);
+        //}
+        if (adev->is_TV) {
+            ALOGI("%s(), sink gain addr %p", __func__, adev->sink_gain);
+            subMixingSetSinkGain(adev, adev->sink_gain);
+        }
+        startMixingThread(adev->audio_mixer);
+    } else if (type == MIXER_MS12) {
+        //TODO
+        AM_LOGW("not support yet, in TODO list");
+    } else {
+        AM_LOGE("not support");
+        return -EINVAL;
+    }
+    return 0;
+};
+
+int initHalSubMixing(enum MIXER_TYPE type,
+        struct aml_audio_device *adev,
+        bool isTV)
+{
+    int ret = 0;
+    ALOGI("type %d, isTV %d", type, isTV);
+    ret = initSubMixingOutput(type, adev);
+    if (ret < 0) {
+        AM_LOGE("fail to init mixer");
+        goto err1;
+    }
+    return 0;
+err1:
+    return ret;
+}
+
+
+static int exitMixingThread(struct amlAudioMixer *audio_mixer)
+{
+    return pcm_mixer_thread_exit(audio_mixer);
+}
+
+static int releaseSubMixingOutput(struct amlAudioMixer *audio_mixer)
+{
+    R_CHECK_POINTER_LEGAL(-EINVAL, audio_mixer, "");
+    AM_LOGI("++");
+    exitMixingThread(audio_mixer);
+    freeAmlAudioMixer(audio_mixer);
+    audio_mixer = NULL;
+    return 0;
+}
+
+
+int deleteHalSubMixing(struct aml_audio_device *adev)
+{
+    releaseSubMixingOutput(adev->audio_mixer);
+    return 0;
+}
+
+static int subMixingOutMsg(struct aml_audio_device *adev, PORT_MSG msg, void *info, int info_len)
+{
+    struct amlAudioMixer *audio_mixer = NULL;
+    int ret = 0;
+
+    audio_mixer = adev->audio_mixer;
+    send_mixer_outport_message(audio_mixer, MIXER_OUTPUT_PORT_STEREO_PCM, msg, info, info_len);
+
+    return 0;
+}
+
+int subMixingSetSinkGain(struct aml_audio_device *adev, void *sink_gain)
+{
+    return subMixingOutMsg(adev, MSG_SINK_GAIN, &sink_gain, sizeof(sink_gain));
+}
+
+int subMixingSetEQData(struct aml_audio_device *adev, void *eq_data)
+{
+    return subMixingOutMsg(adev, MSG_EQ_DATA, &eq_data, sizeof(eq_data));
+}
+
+int subMixingSetSrcGain(struct aml_audio_device *adev, float gain)
+{
+    return subMixingOutMsg(adev, MSG_SRC_GAIN, &gain, sizeof(gain));
+}
+
+int subMixingSetAudioPostprocess(struct aml_audio_device *adev, void **postprocess)
+{
+    return subMixingOutMsg(adev, MSG_EFFECT, postprocess, sizeof(void *));
+}
+
+struct pcm *getSubMixingPCMdev(struct aml_audio_device *adev)
+{
+    return pcm_mixer_get_pcm_handle(adev->audio_mixer);
+}
+
+int subMixingOutputRestart(struct aml_audio_device *adev)
+{
+    struct amlAudioMixer *audio_mixer = adev->audio_mixer;
+    return mixer_outport_pcm_restart(audio_mixer);
+}
 

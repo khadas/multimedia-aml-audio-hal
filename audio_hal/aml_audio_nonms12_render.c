@@ -196,7 +196,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
         if (decoder_ret == AML_DEC_RETURN_TYPE_CACHE_DATA) {
             ALOGV("[%s:%d] cache the data to decode", __func__, __LINE__);
             return abuffer->size;
-        } else if (decoder_ret < 0) {
+        } else if (decoder_ret == AML_DEC_RETURN_TYPE_FAIL) {
             AM_LOGW("aml_decoder_process error, ret:%d", decoder_ret);
             break;
         }
@@ -299,8 +299,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
                 ainput.pts, ainput.pts, aml_dec->out_frame_pts, out_frames, avsync_ctx->mediasync_ctx->cur_outapts);
 
             if (adev->useSubMix) {
-                struct subMixing *sm = adev->sm;
-                struct amlAudioMixer *audio_mixer = sm->mixerData;
+                struct amlAudioMixer *audio_mixer = adev->audio_mixer;
                 ringbuf_latency = mixer_get_inport_latency_frames(audio_mixer, aml_out->inputPortID) / 48 * 90;
                 avsync_ctx->mediasync_ctx->cur_outapts -= ringbuf_latency;
             }
@@ -353,16 +352,16 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
 
         }
 
-        if (eDolbyMS12Lib == adev->dolby_lib_type_last || !adev->useSubMix) {
-            /*ease in or ease out*/
-            aml_audio_ease_process(adev->audio_ease, dec_data, pcm_len);
-            aml_hw_mixer_mixing(&adev->hw_mixer, dec_data, pcm_len, output_format);
-            if (audio_hal_data_processing(stream, dec_data, pcm_len, &output_buffer, &output_buffer_bytes, output_format) == 0) {
-                hw_write(stream, output_buffer, output_buffer_bytes, output_format);
-            }
-        } else {
-            out_write_direct_pcm(stream, dec_data, pcm_len);
+        if (!adev->useSubMix) {
+            adev->useSubMix = true;
+            ret = initHalSubMixing(MIXER_LPCM, adev, adev->is_TV);
+            adev->raw_to_pcm_flag = false;
+            /*init_mixer_input_port(adev->audio_mixer, &aml_out->audioCfg, aml_out->flags,
+                        on_notify_cbk, aml_out, on_input_avail_cbk, aml_out,
+                        NULL, NULL, 1.0);
+                    AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(&aml_out->audioCfg, aml_out->flags)));*/
         }
+        out_write_direct_pcm(stream, dec_data, pcm_len);
 
         if (aml_out->optical_format != adev->optical_format) {
             ALOGI("optical format change from 0x%x --> 0x%x", aml_out->optical_format, adev->optical_format);

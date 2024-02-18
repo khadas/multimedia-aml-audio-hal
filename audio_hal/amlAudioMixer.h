@@ -101,6 +101,17 @@ int mixer_outport_pcm_restart(struct amlAudioMixer *audio_mixer);
 void mixer_dump(int s32Fd, const struct aml_audio_device *pstAmlDev);
 void mixer_using_alsa_device_dump(int s32Fd, const struct aml_audio_device *pstAmlDev);
 bool has_hwsync_stream_running(struct audio_stream_out *stream);
+int on_notify_cbk(void *data);
+int on_input_avail_cbk(void *data);
+ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void *buffer, size_t bytes);
+int initHalSubMixing(enum MIXER_TYPE type, struct aml_audio_device *adev, bool isTV);
+int deleteHalSubMixing(struct aml_audio_device *adev);
+int subMixingSetSinkGain(struct aml_audio_device *adev, void *sink_gain);
+int subMixingSetEQData(struct aml_audio_device *adev, void *eq_data);
+int subMixingSetSrcGain(struct aml_audio_device *adev, float gain);
+int subMixingSetAudioPostprocess(struct aml_audio_device *adev, void **postprocess);
+struct pcm *getSubMixingPCMdev(struct aml_audio_device *adev);
+int subMixingOutputRestart(struct aml_audio_device *adev);
 /* usb karaoke for hal mixer */
 //int mixer_set_karaoke(struct amlAudioMixer *audio_mixer, struct kara_manager *kara);
 

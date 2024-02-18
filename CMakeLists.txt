@@ -149,9 +149,7 @@ add_library(audio_hal SHARED
 	audio_hal/audio_virtual_buf.c
 	audio_hal/dolby_lib_api.c
 	audio_hal/hw_avsync.c
-	audio_hal/hw_avsync_callbacks.c
 	audio_hal/spdif_encoder_api.c
-	audio_hal/sub_mixing_factory.c
 	audio_hal/aml_audio_dev2mix_process.c
 	audio_hal/aml_audio_ms12_render.c
 	audio_hal/aml_audio_nonms12_render.c
@@ -172,7 +170,6 @@ add_library(audio_hal SHARED
 	utils/alsa_device_parser.c
 	utils/aml_alsa_mixer.c
 	utils/aml_android_utils.c
-	utils/aml_audio_mixer.c
 	utils/aml_buffer_provider.c
 	utils/aml_data_utils.c
 	utils/aml_dump_debug.c

@@ -76,6 +76,13 @@ typedef enum {
     MS12_COMPRESSOR_SPEECH              = 5
 } MS12_COMPRESSOR_PROFILES;
 
+typedef enum {
+    AML_DOLBY_INPUT_MAIN,
+    AML_DOLBY_INPUT_SYSTEM,
+    AML_DOLBY_INPUT_APP,
+    AML_DOLBY_INPUT_AD,
+} AML_DOLBY_INPUT;
+
 /*
  *@brief get dolby ms12 prepared
  */

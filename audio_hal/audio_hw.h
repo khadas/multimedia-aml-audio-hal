@@ -451,8 +451,6 @@ struct aml_audio_device {
     enum IN_PORT active_inport;
     /* message to handle usecase changes */
     bool usecase_changed;
-    uint32_t usecase_masks;
-    int usecase_cnt[STREAM_USECASE_MAX];
     struct aml_stream_out *active_outputs[STREAM_USECASE_MAX];
     pthread_mutex_t patch_lock;
     pthread_mutex_t dtv_patch_lock;//this only use for locking adev->audio_patch in dtv source,
@@ -564,8 +562,7 @@ struct aml_audio_device {
     int system_app_mixing_status;
     int audio_type;
     struct aml_mixer_handle alsa_mixer;
-    struct subMixing *sm;
-    struct aml_audio_mixer *audio_mixer;
+    struct amlAudioMixer *audio_mixer;
     bool is_TV;
     bool is_STB;
     bool is_SBR;
@@ -779,7 +776,7 @@ struct aml_stream_out {
     struct timespec timestamp;
     struct timespec lasttimestamp;
     stream_usecase_t usecase;
-    uint32_t dev_usecase_masks;
+    //uint32_t dev_usecase_masks;
     /**
      * flag indicates that this stream need do mixing
      * int is_in_mixing: 1;
@@ -804,6 +801,7 @@ struct aml_stream_out {
     bool normal_pcm_mixing_config;
     uint32_t latency_frames;
     unsigned int inputPortID;
+    int inputPortType;
     int exiting;
     pthread_mutex_t cond_lock;
     pthread_cond_t cond;
@@ -1136,11 +1134,6 @@ ssize_t hw_write(struct audio_stream_out *stream
                     , audio_format_t output_format);
 
 int do_output_standby_l(struct audio_stream *stream);
-
-ssize_t out_write_new(struct audio_stream_out *stream,
-                      const void *buffer,
-                      size_t bytes);
-int out_standby_new(struct audio_stream *stream);
 int dsp_process_output(struct aml_audio_device *adev, void *in_buffer,
                        size_t bytes);
 int release_patch_l(struct aml_audio_device *adev);
