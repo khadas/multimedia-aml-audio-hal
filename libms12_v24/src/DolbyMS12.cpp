@@ -105,8 +105,7 @@ int (*FuncDolbyMS12MATEncoderProcess)(void *, const unsigned char *, int, const 
 int (*FuncDolbyMS12MATEncoderConfig)(void *, mat_enc_config_type_t, mat_enc_config_t *);
 /* MAT Encoder API End */
 
-int (*FuncDolbyMS12RegisterScaletempoCallback)(scaletempo_callback , void *);
-
+int (*FuncDolbyMS12RegisterCallbackbyType)(int, void*, void *);
 
 DolbyMS12::DolbyMS12() :
     mDolbyMS12LibHandle(NULL)
@@ -414,9 +413,9 @@ int DolbyMS12::GetLibHandle(char *dolby_ms12_path)
         ALOGW("%s, dlsym FunDolbMS12GetVersion fail, ignore it as version difference\n", __FUNCTION__);
     }
 
-    FuncDolbyMS12RegisterScaletempoCallback = (int (*)(scaletempo_callback , void *)) dlsym(mDolbyMS12LibHandle, "ms12_register_scaletempo_callback");
-    if (!FuncDolbyMS12RegisterScaletempoCallback) {
-        ALOGE("%s, dlsym ms12_output_register_output_callback fail\n", __FUNCTION__);
+    FuncDolbyMS12RegisterCallbackbyType = (int (*)(int, void*, void *)) dlsym(mDolbyMS12LibHandle, "ms12_register_callback_by_type");
+    if (!FuncDolbyMS12RegisterCallbackbyType) {
+        ALOGW("[%s:%d], dlsym FuncDolbyMS12RegisterCallbackbyType failed", __FUNCTION__, __LINE__);
     }
 
     ALOGD("-%s() line %d get libdolbyms12 success!", __FUNCTION__, __LINE__);
@@ -1468,19 +1467,17 @@ int DolbyMS12::DolbyMS12SetAlsaDelayFrame(int delay_frame)
     return ret;
 }
 
-int DolbyMS12::DolbyMS12RegisterScaletempoCallback(scaletempo_callback callback, void *priv_data)
+int DolbyMS12::DolbyMS12RegisterCallbackbytype(int type, void* callback, void *priv_data)
 {
     int ret = 0;
-    ALOGV("+%s()", __FUNCTION__);
-    if (!FuncDolbyMS12RegisterScaletempoCallback) {
-        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
-        return -1;
+    ALOGI("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12RegisterCallbackbyType) {
+        return ret;
     }
 
-    ret = (*FuncDolbyMS12RegisterScaletempoCallback)(callback, priv_data);
-    ALOGV("-%s() ret %d", __FUNCTION__, ret);
+    ret = (*FuncDolbyMS12RegisterCallbackbyType)(type, callback, priv_data);
+    ALOGI("ret %d, type:%d, callback:%p", ret, type, callback);
     return ret;
 }
-
 /*--------------------------------------------------------------------------*/
 }   // namespace android

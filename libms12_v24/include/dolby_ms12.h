@@ -289,8 +289,7 @@ int dolby_ms12_set_dolby_compression_format(int compression_format);
 
 /*@@
     @brief set the scheduler state
-*/
-int dolby_ms12_set_scheduler_state(int sch_state);
+dolby_ms12_register_scaletempo_callbackint dolby_ms12_set_scheduler_state(int sch_state);
 
 /*@@
     @brief get PCM's nframes which outputed by decoder
@@ -418,7 +417,10 @@ int dolby_ms12_ac4dec_check_the_pgi_is_present(int presentation_group_index);
 
 int dolby_ms12_set_alsa_delay_frame(int delay_frame);
 
-int dolby_ms12_register_scaletempo_callback(void *callback, void *priv_data);
+/*@@
+*  @brief dolby ms12 register callback by type
+*/
+int dolby_ms12_register_callback_by_type(int type, void *callback, void *priv_data);
 
 #ifdef __cplusplus
 }

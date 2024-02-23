@@ -35,7 +35,7 @@
 #include "aml_esmode_sync.h"
 #include "aml_android_utils.h"
 #include "amlAudioMixer.h"
-
+#include "hal_clipmeta.h"
 
 extern int insert_output_bytes (struct aml_stream_out *out, size_t size);
 
@@ -211,6 +211,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
 
         left_bytes    -= used_size;
         dec_used_size += used_size;
+        aml_out->consumedsize += used_size;
 
         /* cleanup the pts valid flag to false for next round, the aml dec will accumulate the output apts by decode frame,
            and when pts valid is true, the aml dec will aligned output apts with input pts add cached frames for the input pts may not continue */
@@ -225,6 +226,9 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
             continue;
         }
 
+        AM_LOGI_IF(adev->debug_flag, "used_size %d total used size %d left_bytes =%d pcm len =%d raw len=%d, bytes:%lld",
+            used_size, dec_used_size, left_bytes, dec_pcm_data->data_len, dec_raw_data->data_len, abuffer->size);
+
         if (aml_dec->format == AUDIO_FORMAT_PCM_32_BIT)
             aml_out->config.format = PCM_FORMAT_S16_LE;
         // aml_audio_dump_audio_bitstreams("/data/dec_data.raw", dec_pcm_data->buf, dec_pcm_data->data_len);
@@ -234,6 +238,35 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
         audio_format_t output_format = AUDIO_FORMAT_PCM_16_BIT;
         void  *dec_data = (void *)dec_pcm_data->buf;
         int pcm_len = dec_pcm_data->data_len;
+        int clip_flag = false;
+
+        if (is_dolby_format(aml_out->hal_internal_format))
+        {
+            int remain_samples = 0;
+            if (0 == aml_out->dec_cachedsize)
+            {
+                aml_out->dec_cachedsize = aml_out->consumedsize;
+            }
+            int offset = aml_out->consumedsize - aml_out->dec_cachedsize;
+            int bpf = sizeof(int16_t) * dec_pcm_data->data_ch;
+            int ret = 0;
+            clip_tbl_t clip_tbl_out;
+            memset(&clip_tbl_out, 0, sizeof(clip_tbl_t));
+            ret = hal_get_clip_tbl_by_offset(aml_out->clip_meta, offset, &clip_tbl_out);
+            if (0 == ret)
+            {
+                uint32_t discarded_samples_from_front = clip_tbl_out.clip_front * dec_pcm_data->data_sr / 1000000000;   //clip_front (ns)
+                uint32_t discarded_samples_from_end   = clip_tbl_out.clip_back * dec_pcm_data->data_sr / 1000000000;
+                remain_samples = hal_clip_data_by_samples(dec_data, pcm_len, bpf, discarded_samples_from_front, discarded_samples_from_end);
+                pcm_len = remain_samples * bpf;
+                clip_flag = true;
+            }
+
+            AM_LOGI_IF(adev->debug_flag, "input_bytes_size:%lld, dec_cachedsize:%lld, offset:%d, consumedsize:%lld, remain_samples:%d, bpf:%d, ch:%d, sr:%d, data_len:%d, pcm_len:%d",
+                aml_out->input_bytes_size, aml_out->dec_cachedsize, offset, aml_out->consumedsize,
+                remain_samples, bpf, dec_pcm_data->data_ch, dec_pcm_data->data_sr, dec_pcm_data->data_len, pcm_len);
+        }
+
         if (adev->patch_src  == SRC_DTV &&
             (adev->start_mute_flag == 1 || adev->tv_mute)) {
             memset(dec_pcm_data->buf, 0, dec_pcm_data->data_len);
@@ -292,6 +325,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
                 AM_LOGE("dtsvx doesn't enable, need to check!");
             }
         }
+
         if (adev->audio_hal_info.first_decoding_frame == false) {
             aml_decoder_get_info(aml_dec, AML_DEC_STREMAM_INFO, &adev->dec_stream_info);
             adev->audio_hal_info.first_decoding_frame = true;
@@ -387,7 +421,10 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
                 aml_audio_spdifout_close(aml_out->spdifout2_handle);
                 aml_out->spdifout2_handle = NULL;
             }
+        }
 
+        if (clip_flag == true) {
+            continue; //skip raw output for raw not clip and will block
         }
 
         // write raw data

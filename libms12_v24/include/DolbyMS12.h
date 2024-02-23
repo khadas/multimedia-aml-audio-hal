@@ -72,6 +72,7 @@ namespace android
 typedef int (*output_callback)(void *buffer, void *priv, size_t size);
 typedef int (*ms12sync_callback)(void *priv_data, unsigned long long , int, int);
 typedef int (*scaletempo_callback)(void *priv, void *info);
+typedef int (*clipmeta_callback)(void *priv, void *info, int offset);
 
 class DolbyMS12
 {
@@ -243,7 +244,7 @@ public:
 
     virtual int DolbyMS12SetAlsaDelayFrame(int delay_frame);
 
-    virtual int     DolbyMS12RegisterScaletempoCallback(scaletempo_callback callback, void *priv_data);
+    virtual int DolbyMS12RegisterCallbackbytype(int          type, void *callback, void *priv_data);
 
     // protected:
 

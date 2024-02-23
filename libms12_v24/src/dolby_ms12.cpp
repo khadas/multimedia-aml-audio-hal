@@ -818,11 +818,11 @@ extern "C" int dolby_ms12_ac4dec_check_the_pgi_is_present(int presentation_group
     return -1;
 }
 
-extern "C" int dolby_ms12_register_scaletempo_callback(void *callback, void *priv_data)
+extern "C" int dolby_ms12_register_callback_by_type(int type, void *callback, void *priv_data)
 {
     android::DolbyMS12* dolby_ms12_instance = getInstance();
     if (dolby_ms12_instance) {
-        return dolby_ms12_instance->DolbyMS12RegisterScaletempoCallback((android::scaletempo_callback)callback, priv_data);
+        return dolby_ms12_instance->DolbyMS12RegisterCallbackbytype(type, callback, priv_data);
     } else {
         return -1;
     }

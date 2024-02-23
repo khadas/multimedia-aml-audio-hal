@@ -2207,6 +2207,7 @@ static int out_flush_new (struct audio_stream_out *stream)
             }
             pthread_mutex_unlock(&ms12->lock);
         }
+        hal_clip_meta_cleanup(out->clip_meta);
     }
 
     if (out->hal_format == AUDIO_FORMAT_IEC61937) {
@@ -3813,6 +3814,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->will_pause = false;
     out->eos = false;
     out->output_speed = 1.0f;
+    out->clip_offset = 0;
+    out->clip_meta   = NULL;
 
 //#ifdef ENABLE_MMAP
 #ifndef BUILD_LINUX
@@ -3922,7 +3925,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     if (adev->user_setting_scaletempo && !(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         out->enable_scaletempo = true;
         hal_scaletempo_init(&out->scaletempo);
-        dolby_ms12_register_scaletempo_callback(ms12_scaletempo, out);
+        dolby_ms12_register_callback_by_type(CALLBACK_SCALE_TEMPO, (void*)ms12_scaletempo, out);
         ALOGI("%s %d, enable scaletempo %p", __FUNCTION__, __LINE__, out);
     }
 
@@ -4157,9 +4160,25 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     if (out->enable_scaletempo == true && !(out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         ALOGI("%s %d, release scaletempo %p", __FUNCTION__, __LINE__, out);
         out->enable_scaletempo = false;
-        dolby_ms12_register_scaletempo_callback(NULL, NULL);
+        dolby_ms12_register_callback_by_type(CALLBACK_SCALE_TEMPO, NULL, NULL);
         hal_scaletempo_release(out->scaletempo);
         out->scaletempo = NULL;
+    }
+
+    if (out->clip_meta) {
+        hal_clip_meta_release(out->clip_meta);
+        out->clip_meta = NULL;
+        out->clip_offset = 0;
+        dolby_ms12_register_callback_by_type(CALLBACK_CLIP_META, NULL, NULL);
+    }
+
+    if (out->llp_buf) {
+        aml_alsa_set_llp(false);
+        dolby_ms12_register_callback_by_type(CALLBACK_LLP_BUFFER, NULL, NULL);
+        unsetenv(LLP_BUFFER_NAME);
+        IpcBuffer_destroy(out->llp_buf);
+        out->llp_buf = NULL;
+        adev->sink_allow_max_channel = false;
     }
     out->need_sync   = false;
     out->with_header = false;
@@ -8814,6 +8833,24 @@ pheader_rewrite:
             write_buf = aml_out->pheader->hw_sync_body_buf;
         }
 
+        if ((0 != aml_out->pheader->clip_front) || (0 != aml_out->pheader->clip_back))
+        {
+            if (NULL == aml_out->clip_meta)
+            {
+                aml_out->clip_meta = hal_clip_meta_init();
+                if (0 != dolby_ms12_register_callback_by_type(CALLBACK_CLIP_META, (void*)ms12_clipmeta, aml_out))
+                {
+                    AM_LOGE("dolby_ms12_register_callback CALLBACK_CLIP_META fail!!");
+                }
+            }
+            AM_LOGI("inbytes:%d, outbytes:%d, offset:%lld, clip_front:%lld, clip_back:%lld", bytes, write_bytes,
+                    aml_out->clip_offset, aml_out->pheader->clip_front, aml_out->pheader->clip_back);
+            aml_out->clip_offset = aml_out->payload_offset;
+            hal_set_clip_info(aml_out->clip_meta, aml_out->clip_offset, aml_out->pheader->clip_front, aml_out->pheader->clip_back);
+        }
+
+        aml_out->payload_offset += write_bytes;
+
         if (true == aml_out->pheader->eos) {
             aml_out->eos = aml_out->pheader->eos;
             /* in nonms12 render case, there would pop noise when playback ending, as there's no fade out.
@@ -9008,7 +9045,7 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
 #else
             setenv(LLP_BUFFER_NAME, "1", 1);
             aml_alsa_set_llp(true);
-            dolby_ms12_register_scaletempo_callback(ms12_llp_callback, (void *)aml_out);
+            dolby_ms12_register_callback_by_type(CALLBACK_LLP_BUFFER, (void *)ms12_llp_callback, (void *)aml_out);
             if (audio_channel_count_from_out_mask(aml_out->hal_channel_mask) == 6) {
                 /* Allow MS12 MC output when LLP input is 6ch */
                 adev->sink_allow_max_channel = true;
@@ -9116,28 +9153,6 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
         }
 
     }
-
-#if 0
-    if (aml_out->llp_input_thread_created) {
-        aml_out->llp_input_thread_exit = true;
-        pthread_join(aml_out->llp_input_threadID, NULL);
-        aml_out->llp_input_thread_created = false;
-    }
-
-    if (aml_out->llp_buf) {
-        IpcBuffer_destroy(aml_out->llp_buf);
-        aml_out->llp_buf = NULL;
-    }
-#else
-    if (aml_out->llp_buf) {
-        aml_alsa_set_llp(false);
-        dolby_ms12_register_scaletempo_callback(NULL, NULL);
-        unsetenv(LLP_BUFFER_NAME);
-        IpcBuffer_destroy(aml_out->llp_buf);
-        aml_out->llp_buf = NULL;
-        adev->sink_allow_max_channel = false;
-    }
-#endif
 
     adev_close_output_stream(dev, stream);
     if (eDolbyMS12Lib ==  adev->dolby_lib_type && adev->audio_mixer) {

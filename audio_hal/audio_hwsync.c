@@ -109,14 +109,14 @@ int audio_header_find_frame(audio_header_t *p_header,
                 }
 
                 p_header->version_num = p_header->hw_sync_header[3];
-                if (p_header->version_num != 1 && p_header->version_num != 2) {
+                if (p_header->version_num != 1 && p_header->version_num != 2 && p_header->version_num != 3) {
                     ALOGI("invalid pheader version num %d", p_header->version_num);
                 }
             }
 
             if ((p_header->version_num == 1 && p_header->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V1) ||
-                (p_header->version_num == 2 && p_header->hw_sync_header_cnt == v2_hwsync_header)) {
-                uint64_t pts = 0, pts_raw = 0;
+                (p_header->version_num == 2 && p_header->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V2) ||
+                (p_header->version_num == 3 && p_header->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V3)) {
 
                 if (p_header->version_num == 2 && p_header->hw_sync_header_cnt == HW_AVSYNC_HEADER_SIZE_V2) {
                     v2_hwsync_header = hwsync_header_get_offset(&p_header->hw_sync_header[0]);
@@ -124,11 +124,16 @@ int audio_header_find_frame(audio_header_t *p_header,
                         ALOGE("buffer overwrite, check the header size %zu \n", v2_hwsync_header);
                         break;
                     }
-
                     if (v2_hwsync_header > p_header->hw_sync_header_cnt) {
                         ALOGV("need skip more sync header, %zu\n",v2_hwsync_header);
                         continue;
                     }
+                }
+
+                if ((3 == p_header->version_num) && (HW_AVSYNC_HEADER_SIZE_V3 == p_header->hw_sync_header_cnt)) {
+                    p_header->clip_front = hwsync_header_get_clip_front(p_header->hw_sync_header);
+                    p_header->clip_back  = hwsync_header_get_clip_back(p_header->hw_sync_header);
+                    AM_LOGI("clip_front:%lld, clip_back:%lld", p_header->clip_front, p_header->clip_back);
                 }
 
                 if ((in_bytes - remain) > p_header->hw_sync_header_cnt) {
@@ -154,6 +159,8 @@ int audio_header_find_frame(audio_header_t *p_header,
                 p_header->hw_sync_frame_size = p_header->hw_sync_body_cnt;
                 p_header->body_align_cnt = 0; //  alisan zz
                 p_header->hw_sync_header_cnt = 0; //8.1
+
+                uint64_t pts = 0, pts_raw = 0;
                 pts_raw = pts = hwsync_header_get_pts(&p_header->hw_sync_header[0]);
                 if (pts == HWSYNC_PTS_EOS) {
                     p_header->eos = true;

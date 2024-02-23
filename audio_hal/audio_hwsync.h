@@ -40,10 +40,12 @@
 
 #define HW_AVSYNC_HEADER_SIZE_V1 16
 #define HW_AVSYNC_HEADER_SIZE_V2 20
+#define HW_AVSYNC_HEADER_SIZE_V3 36
+
 /*head size is calculated with mOffset = ((int) Math.ceil(HEADER_V2_SIZE_BYTES / frameSizeInBytes)) * frameSizeInBytes;
  *current we only support to 8ch, the headsize is 32
  */
-#define HW_AVSYNC_MAX_HEADER_SIZE  32  /*max 8ch */
+#define HW_AVSYNC_MAX_HEADER_SIZE  40  /*max 8ch */
 
 
 //TODO: After precisely calc the pts, change it back to 1s
@@ -138,6 +140,8 @@ typedef struct  audio_header {
     uint64_t last_apts_from_header;
     uint64_t last_apts_from_header_raw;
     bool eos;
+    uint64_t clip_front;
+    uint64_t clip_back;
     pthread_mutex_t lock;
 } audio_header_t;
 
@@ -146,8 +150,7 @@ static inline bool hwsync_header_valid(uint8_t *header)
     return (header[0] == 0x55) &&
            (header[1] == 0x55) &&
            (header[2] == 0x00 || header[2] == 0x01) &&
-           (header[3] == 0x01 || header[3] == 0x02);
-           //(header[3] == 0x02);
+           (header[3] == 0x01 || header[3] == 0x02 || header[3] == 0x03);
 }
 
 static inline uint64_t hwsync_header_get_pts(uint8_t *header)
@@ -181,6 +184,29 @@ static inline uint32_t hwsync_header_get_offset(uint8_t *header)
 static inline char hwsync_header_get_sub_version(uint8_t *header)
 {
     return header[2];
+}
+
+static inline uint64_t hwsync_header_get_clip_front(uint8_t *header)
+{
+    return (((uint64_t)header[20]) << 56) |
+           (((uint64_t)header[21]) << 48) |
+           (((uint64_t)header[22]) << 40) |
+           (((uint64_t)header[23]) << 32) |
+           (((uint64_t)header[24]) << 24) |
+           (((uint64_t)header[25]) << 16) |
+           (((uint64_t)header[26]) << 8) |
+           ((uint64_t)header[27]);
+}
+static inline uint64_t hwsync_header_get_clip_back(uint8_t *header)
+{
+    return (((uint64_t)header[28]) << 56) |
+           (((uint64_t)header[29]) << 48) |
+           (((uint64_t)header[30]) << 40) |
+           (((uint64_t)header[31]) << 32) |
+           (((uint64_t)header[32]) << 24) |
+           (((uint64_t)header[33]) << 16) |
+           (((uint64_t)header[34]) << 8) |
+           ((uint64_t)header[35]);
 }
 
 static inline uint64_t get_pts_gap(uint64_t a, uint64_t b)

@@ -68,6 +68,7 @@
 #include "audio_format_parse.h"
 #include "aml_audio_heaacparser.h"
 #include "hal_scaletempo.h"
+#include "hal_clipmeta.h"
 
 /* number of frames per period */
 /*
@@ -804,6 +805,7 @@ struct aml_stream_out {
     bool direct_raw_config;
     bool is_device_differ_with_ms12;
     uint64_t total_write_size;
+    uint64_t payload_offset;
     int  ddp_frame_size;
     int dropped_size;
     unsigned long long mute_bytes;
@@ -918,6 +920,14 @@ struct aml_stream_out {
     bool will_pause;
     int fast_quit;
     bool eos;
+
+    //partial audio frame
+    clip_meta_t *clip_meta;
+    uint64_t clip_offset;
+    /* for dcvlib clip only start */
+    uint64_t dec_cachedsize;
+    uint64_t consumedsize;
+    /* for dcvlib clip only end */
 };
 
 typedef ssize_t (*write_func)(struct audio_stream_out *stream, const void *buffer, size_t bytes);
@@ -972,6 +982,13 @@ struct aml_stream_in {
     hdmiin_audio_packet_t audio_packet_type;
     hdmiin_audio_packet_t last_audio_packet_type;
 };
+
+typedef enum {
+    CALLBACK_SCALE_TEMPO = 0,
+    CALLBACK_LLP_BUFFER  = 1,
+    CALLBACK_CLIP_META   = 2,
+} ms12_callback_type_t;
+
 typedef  int (*do_standby_func)(struct aml_stream_out *out);
 typedef  int (*do_startup_func)(struct aml_stream_out *out);
 
@@ -1164,6 +1181,8 @@ int do_input_standby (struct aml_stream_in *in);
 int adev_ms12_prepare(struct audio_hw_device *dev);
 
 void adev_ms12_cleanup(struct audio_hw_device *dev);
+
+int ms12_clipmeta(void *priv_data, void *info, unsigned long long offset);
 
 /* 'bytes' are the number of bytes written to audio FIFO, for which 'timestamp' is valid.
  * 'available' is the number of frames available to read (for input) or yet to be played

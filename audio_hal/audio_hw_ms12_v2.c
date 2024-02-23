@@ -1047,7 +1047,7 @@ int get_the_dolby_ms12_prepared(
             if (out->scaletempo) {
                 hal_scaletempo_force_init(out->scaletempo);
             }
-            dolby_ms12_register_scaletempo_callback(ms12_scaletempo, (void *)out);
+            dolby_ms12_register_callback_by_type(CALLBACK_SCALE_TEMPO, (void*)ms12_scaletempo, (void *)out);
         }
         ms12->device = usecase_device_adapter_with_ms12(out->device,AUDIO_FORMAT_PCM_16_BIT/* adev->sink_format*/);
         ALOGI("%s out [dual_output_flag %d] adev [format sink %#x optical %#x] ms12 [output-format %#x device %d]",
@@ -3416,7 +3416,8 @@ int dolby_ms12_main_close(struct audio_stream_out *stream) {
         ALOGI("%s set sync callback NULL", __func__);
     }
 
-    dolby_ms12_register_scaletempo_callback(NULL, NULL);
+    //dolby_ms12_register_scaletempo_callback(NULL, NULL);
+    dolby_ms12_register_callback_by_type(CALLBACK_LLP_BUFFER, NULL, NULL);
     if (ms12->scaletempo) {
         hal_scaletempo_release((struct scale_tempo *)ms12->scaletempo);
         ms12->scaletempo = NULL;
@@ -3959,4 +3960,15 @@ void set_ms12_set_compressor_profile(struct dolby_ms12_desc *ms12, int profile)
         dolby_ms12_set_pcm_compressor_profile(profile);
         aml_ms12_update_runtime_params(ms12, parm);
     }
+}
+
+int ms12_clipmeta(void *priv_data, void *info, unsigned long long offset)
+{
+    if ((NULL == priv_data) || (NULL == info))
+    {
+        return -1;
+    }
+
+    hal_abuffer_clip_process(priv_data, (abuffer_info_t *)info, offset);
+    return 0;
 }
