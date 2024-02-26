@@ -146,6 +146,12 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
         if (NULL != aml_out->avsync_ctx->get_tuning_latency) {
             tuning_delay = aml_out->avsync_ctx->get_tuning_latency(stream);
         }
+        if (adev->useSubMix) {
+            struct amlAudioMixer *audio_mixer = adev->audio_mixer;
+            ringbuf_latency = mixer_get_inport_latency_frames(audio_mixer, aml_out->inputPortID) / 48 * 90;
+            AM_LOGI_IF(adev->debug_flag, "AVSYNC_TYPE_MSYNC ringbuf_latency:%d(90k) == %d(ms)", ringbuf_latency, ringbuf_latency / 90);
+            cur_pts -= ringbuf_latency;
+        }
         apts32 = cur_pts - tuning_delay;
         msync_get_policy(stream, cur_pts);
     }
@@ -301,6 +307,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
             if (adev->useSubMix) {
                 struct amlAudioMixer *audio_mixer = adev->audio_mixer;
                 ringbuf_latency = mixer_get_inport_latency_frames(audio_mixer, aml_out->inputPortID) / 48 * 90;
+                AM_LOGI_IF(adev->debug_flag, "AVSYNC_TYPE_MEDIASYNC ringbuf_latency:%d(90k) == %d(ms)", ringbuf_latency, ringbuf_latency / 90);
                 avsync_ctx->mediasync_ctx->cur_outapts -= ringbuf_latency;
             }
 

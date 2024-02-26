@@ -760,11 +760,12 @@ int dtv_avsync_get_apts_latency(struct audio_stream_out *stream)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *aml_dev = aml_out->dev;
-    int32_t video_delay = 0;
-    int32_t alsa_delay = 0;
+    int32_t video_delay_ms = 0;
+    int32_t alsa_delay_ms = 0;
     int32_t tuning_ms = 0;
     int total_latency = 0;
 
+    alsa_delay_ms = (int32_t)out_get_outport_latency(stream);
     if (aml_dev->dolby_lib_type == eDolbyMS12Lib) {
         tuning_ms = dtv_get_ms12_offset_latency(stream);
     } else {
@@ -780,10 +781,10 @@ int dtv_avsync_get_apts_latency(struct audio_stream_out *stream)
     tuning_ms += aml_audio_property_get_int(PROPERTY_LOCAL_PASSTHROUGH_LATENCY, 0);
 #endif
     if (aml_dev->is_TV) {
-        video_delay = 0;
+        video_delay_ms = 0;
     }
 
-    total_latency = (tuning_ms + alsa_delay + video_delay) * 90;
+    total_latency = (tuning_ms + alsa_delay_ms + video_delay_ms) * 90;
     return total_latency;
 }
 

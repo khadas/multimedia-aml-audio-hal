@@ -26,6 +26,12 @@
 #include <hardware/audio.h>
 #include <signal.h>
 #include "audio_data_process.h"
+
+#define BUFF_CNT                    (8)
+#define SYS_BUFF_CNT                (8) //ringbuf:10*8ms
+#define DIRECT_BUFF_CNT             (8)
+#define MMAP_BUFF_CNT               (8) /* Sometimes the time interval between BT stack writes is 40ms. */
+
 enum MIXER_TYPE {
     MIXER_LPCM = 1,
     MIXER_MS12 = 2,

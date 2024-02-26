@@ -41,11 +41,6 @@
 #include "audio_aec.h"
 #endif
 
-#define BUFF_CNT                    (4)
-#define SYS_BUFF_CNT                (50) //ringbuf:10*50ms
-#define DIRECT_BUFF_CNT             (8)
-#define MMAP_BUFF_CNT               (8) /* Sometimes the time interval between BT stack writes is 40ms. */
-
 static ssize_t input_port_write(input_port *port, const void *buffer, int bytes)
 {
     unsigned char *data = (unsigned char *)buffer;
@@ -350,14 +345,7 @@ input_port *new_input_port(
         goto err_rbuf_init;
     }
 
-    port->inport_start_threshold = 0;
-    /* increase the input size to prevent underrun */
-    if (enPortType == AML_MIXER_INPUT_PORT_PCM_MMAP) {
-        port->inport_start_threshold = thunk_size * 2;
-    } else if (AML_MIXER_INPUT_PORT_PCM_DIRECT == enPortType) {
-        port->inport_start_threshold = input_port_rbuf_size * 3 / 4;
-    }
-
+    port->inport_start_threshold = input_port_rbuf_size * 3 / 4;
     port->enInPortType = enPortType;
     //port->format = config->format;
     port->r_buf = ringbuf;

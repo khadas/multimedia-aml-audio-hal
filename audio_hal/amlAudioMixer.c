@@ -1369,6 +1369,9 @@ static void *mixer_16b_threadloop(void *data)
 
 uint32_t mixer_get_inport_latency_frames(struct amlAudioMixer *audio_mixer, uint8_t port_index)
 {
+    if (-1 == port_index) {
+        return MIXER_FRAME_COUNT * BUFF_CNT * 3 / 4; /* ==port->inport_start_threshold*/
+    }
     input_port *in_port = audio_mixer->in_ports[port_index];
     R_CHECK_POINTER_LEGAL(-EINVAL, in_port, "port_index:%d", port_index);
     return in_port->get_latency_frames(in_port);
