@@ -521,6 +521,17 @@ static void select_mode (struct aml_audio_device *adev)
     return;
 }
 
+static void ts_wait_time(struct timespec *ts, uint32_t time)
+{
+    clock_gettime(CLOCK_REALTIME, ts);
+    ts->tv_sec += time / 1000000;
+    ts->tv_nsec += (time * 1000) % 1000000000;
+    if (ts->tv_nsec >= 1000000000) {
+        ts->tv_sec++;
+        ts->tv_nsec -=1000000000;
+    }
+}
+
 /* must be called with hw device and output stream mutexes locked */
 static int start_output_stream (struct aml_stream_out *out)
 {
@@ -1905,6 +1916,7 @@ static int out_flush_new (struct audio_stream_out *stream)
     struct aml_stream_out *out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
+    struct timespec ts;
     ALOGI("%s(), stream(%p)\n", __func__, stream);
     out->frame_write_sum  = 0;
     out->last_frames_position = 0;
@@ -1986,6 +1998,9 @@ static int out_flush_new (struct audio_stream_out *stream)
             mediasync_wrap_setPause(out->avsync_ctx->mediasync_ctx->handle, false);
         }
     }
+
+    ts_wait_time(&ts, 100000);
+    pthread_cond_timedwait(&out->cond, &out->cond_lock, &ts);
 
     out->pause_status = false;
     ALOGI("%s(), stream(%p) exit\n", __func__, stream);
@@ -8447,6 +8462,7 @@ ssize_t out_write_new(struct audio_stream_out *stream,
 
 pheader_rewrite:
     if (true == aml_out->with_header) {
+        write_bytes = 0;
         if (NULL == aml_out->pheader) {
             aml_out->pheader = audio_header_info_init();
         }
@@ -8765,17 +8781,6 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
         deleteHalSubMixing(adev);
     }
     ALOGI("%s: exit", __func__);
-}
-
-static void ts_wait_time(struct timespec *ts, uint32_t time)
-{
-    clock_gettime(CLOCK_REALTIME, ts);
-    ts->tv_sec += time / 1000000;
-    ts->tv_nsec += (time * 1000) % 1000000000;
-    if (ts->tv_nsec >= 1000000000) {
-        ts->tv_sec++;
-        ts->tv_nsec -=1000000000;
-    }
 }
 
 #if 0

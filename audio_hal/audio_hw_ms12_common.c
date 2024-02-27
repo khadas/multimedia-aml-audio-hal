@@ -127,6 +127,7 @@ int dolby_ms12_main_pause(struct audio_stream_out *stream)
     //so, the delay need up to 96ms, from start to done, put 120ms here.
     aml_audio_sleep(64000);
 
+    pthread_cond_signal(&aml_out->cond);
     ms12->is_continuous_paused = true;
     ALOGI("%s sleep 64ms finished and exit", __func__);
     return 0;
