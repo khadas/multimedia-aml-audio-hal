@@ -67,7 +67,7 @@
   if we choose 64ms, it will cause ms12 underrun,
   so we choose 84ms now
 */
-#define MS12_SYS_INPUT_BUF_NS  (84000000LL)
+#define MS12_SYS_INPUT_BUF_NS  (40000000LL)
 
 #define NANO_SECOND_PER_SECOND 1000000000LL
 #define NANO_SECOND_PER_MILLISECOND 1000000LL
@@ -1815,14 +1815,14 @@ int dolby_ms12_system_process(
     pthread_mutex_unlock(&ms12->lock);
 
     /* Netflix UI mixer output has flow control so need skip flow control here */
-    if ((adev->continuous_audio_mode == 1) && (!adev->is_netflix) && (aml_out->hal_ch == 2)) {
+    if ((adev->continuous_audio_mode == 1)) {
         uint64_t input_ns = 0;
-        input_ns = (uint64_t)(*use_size) * NANO_SECOND_PER_SECOND / 4 / mixer_default_samplerate;
+        input_ns = (uint64_t)(*use_size) * NANO_SECOND_PER_SECOND / (aml_out->hal_ch * 2) / mixer_default_samplerate;
 
         if (ms12->system_virtual_buf_handle == NULL) {
             //aml_audio_sleep(input_ns/1000);
             if (input_ns == 0) {
-                input_ns = (uint64_t)(bytes) * NANO_SECOND_PER_SECOND / 4 / mixer_default_samplerate;
+                input_ns = (uint64_t)(bytes) * NANO_SECOND_PER_SECOND / (aml_out->hal_ch * 2) / mixer_default_samplerate;
             }
             audio_virtual_buf_open(&ms12->system_virtual_buf_handle, "ms12 system input", input_ns/2, MS12_SYS_INPUT_BUF_NS, MS12_SYS_BUF_INCREASE_TIME_MS);
         }
