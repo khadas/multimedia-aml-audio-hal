@@ -1029,7 +1029,7 @@ static bool is_4x_rate_fmt(audio_format_t afmt)
         (afmt == AUDIO_FORMAT_DOLBY_TRUEHD);
 }
 
-uint32_t out_get_latency (const struct audio_stream_out *stream)
+uint32_t out_get_latency_ms (const struct audio_stream_out *stream)
 {
     const struct aml_stream_out *out = (const struct aml_stream_out *) stream;
     return (out_get_latency_frames (stream) * 1000) / out->config.rate;
