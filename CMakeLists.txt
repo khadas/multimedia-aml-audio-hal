@@ -4,7 +4,15 @@ project(aml_audio_hal
 	VERSION 1.0)
 
 include(GNUInstallDirs)
-execute_process(COMMAND sh version_config.sh WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+if (DEFINED AML_BUILD_DIR)
+	message("AML_BUILD_DIR is defined.")
+else()
+	message("AML_BUILD_DIR is not defined, set default.")
+	set(AML_BUILD_DIR "./audio_hal")
+endif()
+
+execute_process(COMMAND sh version_config.sh ${AML_BUILD_DIR} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_subdirectory("audio_codec/libvorbis")
 add_subdirectory("audio_codec/libdts")
 add_subdirectory("audio_codec/libdcv")
@@ -235,7 +243,8 @@ target_include_directories(audio_hal PRIVATE
 	./utils/cJSON
 	./amlogic_AQ_tools
 	./dtv_audio_utils/audio_read_api
-	./audio_hal)
+	./audio_hal
+	${AML_BUILD_DIR})
 
 target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations -funwind-tables -fasynchronous-unwind-tables -fPIC)
 

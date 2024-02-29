@@ -29,4 +29,4 @@ echo commit id $COMMIT_ID
 VERSION_STRING=${MAJORVERSION}.${MINORVERSION}.${REVISION}-r${COMMIT_COUNT}-g${COMMIT_ID}
 
 #create version header file
-sed "s/@version@/\"${MODULE_NAME},version:${VERSION_STRING}\"/" audio_hal/audio_hal_version.h.in > audio_hal/audio_hal_version.h
+sed "s/@version@/\"${MODULE_NAME},version:${VERSION_STRING}\"/" audio_hal/audio_hal_version.h.in > $1/audio_hal_version.h
