@@ -5622,7 +5622,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
             }
             if (sscanf(value, "%d,%d,%d", &gain, &duration, &shape) == 3) {
                 char cmd[128] = {0};
-                sprintf(cmd, "-main1_mixgain %d,%d,%d -main2_mixgain %d,%d,%d -ui_mixgain %d,%d,%d",
+                sprintf(cmd, "-sys_prim_mixgain %d,%d,%d -sys_apps_mixgain %d,%d,%d -sys_syss_mixgain %d,%d,%d",
                     gain, duration, shape,
                     gain, duration, shape,
                     gain, duration, shape);
