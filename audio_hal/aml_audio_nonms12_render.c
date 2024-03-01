@@ -359,15 +359,6 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
 
         }
 
-        if (!adev->useSubMix) {
-            adev->useSubMix = true;
-            ret = initHalSubMixing(MIXER_LPCM, adev, adev->is_TV);
-            adev->raw_to_pcm_flag = false;
-            /*init_mixer_input_port(adev->audio_mixer, &aml_out->audioCfg, aml_out->flags,
-                        on_notify_cbk, aml_out, on_input_avail_cbk, aml_out,
-                        NULL, NULL, 1.0);
-                    AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(&aml_out->audioCfg, aml_out->flags)));*/
-        }
         out_write_direct_pcm(stream, dec_data, pcm_len);
 
         if (aml_out->optical_format != adev->optical_format) {

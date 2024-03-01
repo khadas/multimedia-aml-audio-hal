@@ -8447,22 +8447,6 @@ ssize_t out_write_new(struct audio_stream_out *stream,
         aml_out->is_sink_format_prepared = true;
     }
 
-    if (aml_out->continuous_mode_check) {
-        if (adev->dolby_lib_type_last == eDolbyMS12Lib) {
-            /*if these format can't be supported by ms12, we can bypass it*/
-            if (is_bypass_dolbyms12(stream)) {
-                if (adev->ms12.dolby_ms12_enable) {
-                    AM_LOGI("bypass aml_ms12, clean up aml_ms12");
-                    adev_ms12_cleanup((struct audio_hw_device *)adev);
-                }
-                adev->dolby_lib_type = eDolbyDcvLib;
-                aml_out->restore_dolby_lib_type = true;
-                AM_LOGI("bypass aml_ms12 change aml_dolby dcv lib type");
-            }
-        }
-        aml_out->continuous_mode_check = false;
-    }
-
 #if 0
     if ((adev->dolby_lib_type_last == eDolbyMS12Lib) &&
         (adev->audio_patching)) {
@@ -8639,7 +8623,6 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
                 }
                 /* delete initSubMixingInput now, no longer need deleteSubMixingInput in adev_close_output_stream_new*/
                 //ret = initSubMixingInput(aml_out, config);
-                aml_out->audioCfg = *config;
                 aml_out->bypass_submix = false;
                 aml_out->inputPortID = -1;
                 if (ret < 0) {
@@ -8648,6 +8631,7 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
             }
         }
     }
+    memcpy(&aml_out->audioCfg, config, sizeof(struct audio_config));
     aml_out->status = STREAM_STANDBY;
     if (adev->continuous_audio_mode == 0) {
         adev->spdif_encoder_init_flag = false;
@@ -8712,9 +8696,6 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
         aml_out->debug_stream = 1;
     }
 
-    ALOGD("-%s: out %p: io handle:%d, usecase:%s card:%d alsa devices:%d", __func__,
-        aml_out, handle, usecase2Str(aml_out->usecase), aml_out->card, aml_out->device);
-
     pthread_mutex_lock(&adev->lock);
     if (usecase_change_validate_l(aml_out, false) < 0) {
         ALOGE("%s() failed", __func__);
@@ -8723,13 +8704,39 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
         return 0;
     }
     pthread_mutex_unlock(&adev->lock);
-/*
+
+    if (aml_out->continuous_mode_check) {
+        if (adev->dolby_lib_type_last == eDolbyMS12Lib) {
+            /*if these format can't be supported by ms12, we can bypass it*/
+            if (is_bypass_dolbyms12(*stream_out)) {
+                if (adev->ms12.dolby_ms12_enable) {
+                    AM_LOGI("bypass aml_ms12, clean up aml_ms12");
+                    adev_ms12_cleanup((struct audio_hw_device *)adev);
+                }
+                adev->dolby_lib_type = eDolbyDcvLib;
+                aml_out->restore_dolby_lib_type = true;
+                AM_LOGI("bypass aml_ms12 change aml_dolby dcv lib type");
+            }
+        }
+        aml_out->continuous_mode_check = false;
+    }
+
     if (adev->useSubMix) {
         init_mixer_input_port(adev->audio_mixer, &aml_out->audioCfg, aml_out->flags,
-            on_notify_cbk, aml_out, on_input_avail_cbk, aml_out,
-            NULL, NULL, 1.0);
-        AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(config, aml_out->flags)));
-    }*/
+            on_notify_cbk, aml_out, on_input_avail_cbk, aml_out, NULL, NULL, 1.0);
+        AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(&aml_out->audioCfg, aml_out->flags)));
+    }
+    if (!adev->useSubMix && is_dts_format(aml_out->hal_internal_format)) {
+        adev->useSubMix = true;
+        ret = initHalSubMixing(MIXER_LPCM, adev, adev->is_TV);
+        adev->raw_to_pcm_flag = false;
+        init_mixer_input_port(adev->audio_mixer, &aml_out->audioCfg, aml_out->flags,
+            on_notify_cbk, aml_out, on_input_avail_cbk, aml_out, NULL, NULL, 1.0);
+        AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(&aml_out->audioCfg, aml_out->flags)));
+    }
+
+    ALOGD("-%s: out %p: io handle:%d, usecase:%s card:%d alsa devices:%d", __func__,
+        aml_out, handle, usecase2Str(aml_out->usecase), aml_out->card, aml_out->device);
 
     return 0;
 
@@ -8812,6 +8819,12 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
     //destroy_aec_reference_config(adev->aec);
     if (eDolbyMS12Lib ==  adev->dolby_lib_type && adev->audio_mixer) {
         deleteHalSubMixing(adev);
+        adev->audio_mixer =NULL;
+        adev->useSubMix = false;
+        int ret = adev_ms12_prepare((struct audio_hw_device *)adev);
+        if (0 != ret) {
+            ALOGE("%s, adev_ms12_prepare fail!\n", __func__);
+        }
     }
     ALOGI("%s: exit", __func__);
 }

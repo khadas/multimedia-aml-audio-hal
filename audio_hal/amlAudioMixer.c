@@ -1374,6 +1374,9 @@ uint32_t mixer_get_inport_latency_frames(struct amlAudioMixer *audio_mixer, uint
     }
     input_port *in_port = audio_mixer->in_ports[port_index];
     R_CHECK_POINTER_LEGAL(-EINVAL, in_port, "port_index:%d", port_index);
+    if (in_port->first_read) {
+        return MIXER_FRAME_COUNT * BUFF_CNT * 3 / 4; /* ==port->inport_start_threshold*/
+    }
     return in_port->get_latency_frames(in_port);
 }
 
@@ -1769,14 +1772,6 @@ ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void *buffer
     size_t remain = 0;
     int frame_size = 4;
     int64_t throttle_timeus = 0;//aml_audio_get_throttle_timeus(bytes);
-
-    if (out->standby) {
-        init_mixer_input_port(audio_mixer, &out->audioCfg, out->flags,
-            on_notify_cbk, out, on_input_avail_cbk, out,
-            NULL, NULL, 1.0);
-        AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(&out->audioCfg, out->flags)));
-        out->standby = false;
-    }
 
     clock_gettime(CLOCK_MONOTONIC, &tval);
     //begin_time = get_systime_ns();

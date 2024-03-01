@@ -258,8 +258,7 @@ static int setPortConfig(struct audioCfg *cfg, struct audio_config *config)
         config->channel_mask, config->format, config->sample_rate);
     if (config->channel_mask == 0)
         config->channel_mask = AUDIO_CHANNEL_OUT_STEREO;
-    if (config->format == 0)
-        config->format = AUDIO_FORMAT_PCM_16_BIT;
+    config->format = AUDIO_FORMAT_PCM_16_BIT;
     if (config->sample_rate == 0)
         config->sample_rate = 48000;
 
