@@ -3313,37 +3313,43 @@ int dolby_ms12_main_open(struct audio_stream_out *stream) {
         hal_internal_format == AUDIO_FORMAT_HE_AAC_V2) {
         if (patch && demux_info) {
             ms12->dual_decoder_support = demux_info->dual_decoder_support;
-            associate_audio_mixing_enable = demux_info->associate_audio_mixing_enable;
-            media_presentation_id = demux_info->media_presentation_id;
+            /*set the associate audio format*/
+            if (ms12->dual_decoder_support == true) {
+                set_audio_associate_format(hal_internal_format);
+                set_ms12_ad_vol(ms12, adev->advol_level);
+                dolby_ms12_set_associated_audio_mixing(demux_info->associate_audio_mixing_enable);
+                dolby_ms12_set_user_control_value_for_mixing_main_and_associated_audio(adev->mixing_level);
+                AM_LOGI("set_audio_associate_format %#x", hal_internal_format);
+            }
        } else {
             ms12->dual_decoder_support = 0;
-            associate_audio_mixing_enable = 0;
        }
     } else {
         ms12->dual_decoder_support = 0;
-        associate_audio_mixing_enable = 0;
+    }
+    if (hal_internal_format == AUDIO_FORMAT_AC4) {
+        if (patch && demux_info) {
+            char first_lang[4] = {0};
+            dtv_convert_language_to_string(demux_info->media_first_lang, first_lang);
+            set_ms12_ac4_1st_preferred_language_code(ms12, first_lang);
+            char second_lang[4] = {0};
+            dtv_convert_language_to_string(demux_info->media_second_lang, second_lang);
+            set_ms12_ac4_2nd_preferred_language_code(ms12, second_lang);
+
+            int prefer_selection_type = (patch->is_dtv_src) ? PERFER_SELECTION_BY_LANGUAGE : PERFER_SELECTION_BY_AD_TYPE;
+            ALOGI("%s line %d 1st %c %c %c 2nd %c %c %c pat %d\n",__func__, __LINE__, first_lang[0], first_lang[1], first_lang[2], second_lang[0], second_lang[1], second_lang[2], prefer_selection_type);
+            set_ms12_ac4_prefer_presentation_selection_by_associated_type_over_language(ms12, prefer_selection_type);
+            set_ms12_ac4_presentation_group_index(ms12, demux_info->media_presentation_id);
+        }
     }
 
     AM_LOGI("+() dual_decoder_support %d optical =0x%x sink =0x%x\n",
         ms12->dual_decoder_support, ms12->optical_format, ms12->sink_format);
-
-    /*set the associate audio format*/
-    if (ms12->dual_decoder_support == true) {
-        set_audio_associate_format(hal_internal_format);
-        set_ms12_ad_vol(ms12, adev->advol_level);
-        dolby_ms12_set_associated_audio_mixing(associate_audio_mixing_enable);
-        dolby_ms12_set_user_control_value_for_mixing_main_and_associated_audio(adev->mixing_level);
-        AM_LOGI("set_audio_associate_format %#x", hal_internal_format);
-    }
 #endif
 
     /*set the continuous output flag*/
     set_dolby_ms12_continuous_mode(false);
     dolby_ms12_set_atmos_lock_flag(adev->atoms_lock_flag);
-
-    if (hal_internal_format == AUDIO_FORMAT_AC4) {
-        set_ms12_ac4_presentation_group_index(ms12, media_presentation_id);
-    }
 
     if (patch && patch->input_src == AUDIO_DEVICE_IN_HDMI) {
         if (!adev->continuous_audio_mode &&

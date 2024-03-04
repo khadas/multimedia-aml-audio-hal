@@ -33,6 +33,7 @@ struct heaac_parser_info {
     int audioObjectType;
     int sampleRateHz;
     int channelCount;
+    int samples;
 };
 
 

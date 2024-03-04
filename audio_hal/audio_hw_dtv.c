@@ -679,7 +679,7 @@ int audio_dtv_patch_output_decoder(struct aml_audio_patch *patch,
                aml_out, is_ad_stream, cur_package, cur_package->size, cur_package->pts, cur_package->pts/90);
     bool data_dump = aml_audio_property_get_bool("vendor.media.audiohal.patch.out", false);
     if ((!cur_package || !cur_package->data || !cur_package->size)) {
-        ALOGI("cur_package %s data invalid", is_ad_stream ? "ad" : "main");
+        AM_LOGI("cur_package %s data invalid", is_ad_stream ? "ad" : "main");
         return ret;
     }
 
@@ -1424,9 +1424,6 @@ void *audio_dtv_patch_output_threadloop(void *data)
     //patch->dtv_audio_mode = get_dtv_audio_mode();
     patch->dtv_audio_tune = AUDIO_FREE;
     patch->first_apts_lookup_over = 0;
-    if (aml_out->heaac_parser_handle) {
-        aml_heaac_parser_reset(aml_out->heaac_parser_handle);
-    }
 
     if (patch->aformat == AUDIO_FORMAT_AAC_LATM || patch->aformat == AUDIO_FORMAT_HE_AAC_V1) {
         aml_out->heaac_info.is_loas = 1;
@@ -1542,7 +1539,6 @@ exit_outbuf:
     AM_LOGI("patch->output_thread_exit %d", patch->output_thread_exit);
     //set_dolby_ms12_runtime_sync(&(aml_dev->ms12), 0);//set normal output policy to ms12  //discontinue mode mask
     if (aml_out) {
-        aml_heaac_parser_close(aml_out->heaac_parser_handle);
         adev_close_output_stream_new(dev, stream_out);
     }
 
@@ -1588,9 +1584,6 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
             goto exit_open;
         }
         ad_aml_out = (struct aml_stream_out *)ad_stream_out;
-        if (ad_aml_out->heaac_parser_handle) {
-            aml_heaac_parser_reset(ad_aml_out->heaac_parser_handle);
-        }
     }
 
     AM_LOGI("create a AD output stream(%p) success now, ad_output_thread_exit %d", ad_aml_out, patch->ad_output_thread_exit);
@@ -1670,7 +1663,6 @@ exit_outbuf:
     AM_LOGI("patch->ad_output_thread_exit %d", patch->ad_output_thread_exit);
 
     if (ad_aml_out) {
-        aml_heaac_parser_close(ad_aml_out->heaac_parser_handle);
         adev_close_output_stream_new(dev, ad_stream_out);
     }
 exit_open:
@@ -2117,15 +2109,6 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
             //release_dtv_patch_l(aml_dev);
         } else {
             release_patch_l(aml_dev);
-        }
-    }
-    {
-        aml_dtv_audio_instances_t *dtv_audio_instances = (aml_dtv_audio_instances_t *)aml_dev->aml_dtv_audio_instances;
-        for (int index = 0; index < DVB_DEMUX_SUPPORT_MAX_NUM; index ++) {
-            dtv_audio_instances->demux_handle[index] = 0;
-            dtv_audio_instances->demux_info[index].media_presentation_id = -1;
-            dtv_audio_instances->demux_info[index].media_first_lang = -1;
-            dtv_audio_instances->demux_info[index].media_second_lang = -1;
         }
     }
     patch = aml_audio_calloc(1, sizeof(*patch));

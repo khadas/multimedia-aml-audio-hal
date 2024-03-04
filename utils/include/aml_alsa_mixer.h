@@ -33,6 +33,16 @@ typedef enum MIXER_AUDIO_I2S_MUTE {
     I2S_MUTE_MAX,
 } eMixerAudioI2sMute;
 
+/* Value of the Spdif Protection Mode */
+typedef enum MIXER_SPDIF_PROTECTION_MODE {
+    SPDIF_PROTECTION_MODE_NONE  = 0,
+    SPDIF_PROTECTION_MODE_NEVER = 1,
+    SPDIF_PROTECTION_MODE_ONCE  = 2,
+} eMixerSpdifProtectionMode;
+
+#define SPDIF_PROTECTION_ENABLE 65537
+#define SPDIF_PROTECTION_DISABLE 1
+
 /* Audio spdif mute */
 typedef enum MIXER_SPDIF_MUTE {
     SPDIF_MUTE_OFF = 0,

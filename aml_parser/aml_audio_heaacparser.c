@@ -948,7 +948,7 @@ static int parse_heaac_adts_frame_header(struct audio_bit_parser * bit_parser, c
         ALOGE("Invalid HEAAC ADTS frame size 0");
         return -1;
     }
-
+    heaac_info->samples = (number_of_raw_data_blocks_in_frame + 1) * 1024;
     heaac_info->frame_size = frame_size;
     heaac_info->sample_rate = convert_sampling_frequency_index_to_samplerate(sampling_frequency_index);
     heaac_info->channel_mask = convert_channel_configuration_to_channelmask(channel_configuration);
@@ -1161,6 +1161,7 @@ resync:
      */
     if (is_loas) {
         ret = parse_heaac_loas_frame_header(&heaac_parser_handle->bit_parser, parser_buf, heaac_parser_handle->buf_remain, heaac_info);
+#if 0 //do not parse adts header for we need trust the input format here.
         if (ret != 0) {
             sync_word_offset = seek_heaac_adts_sync_word((char*)in_buffer, numBytes);
             ALOGI("guess it is adts format sync_word_offset %d", sync_word_offset);
@@ -1178,6 +1179,7 @@ resync:
                goto resync;
             }
         }
+#endif
     } else if (is_adts) {
         ret = parse_heaac_adts_frame_header(&heaac_parser_handle->bit_parser, parser_buf, heaac_parser_handle->buf_remain, heaac_info);
     }

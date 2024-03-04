@@ -4034,6 +4034,10 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         aml_audio_resample_close(out->resample_handle);
         out->resample_handle = NULL;
     }
+    if (out->heaac_parser_handle) {
+        aml_heaac_parser_close(out->heaac_parser_handle);
+        out->heaac_parser_handle = NULL;
+    }
 
     /*the dolby lib is changed, so we need restore it*/
     if (out->restore_dolby_lib_type) {
@@ -5765,6 +5769,19 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     if (ret >= 0) {
         ALOGI("%s:OutputDestination=%s",__func__,value);
         adev_Updata_ActiveOutport(adev,value);
+        goto exit;
+    }
+
+    ret = str_parms_get_int(parms, "spdif_protection_mode", &val);
+    if (ret >= 0 ) {
+        if (val == SPDIF_PROTECTION_MODE_NEVER) {
+            aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_OUT_CHANNEL_STATUS, SPDIF_PROTECTION_ENABLE);
+            aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_B_OUT_CHANNEL_STATUS, SPDIF_PROTECTION_ENABLE);
+        } else if (val == SPDIF_PROTECTION_MODE_ONCE || val == SPDIF_PROTECTION_MODE_NONE) {
+            aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_OUT_CHANNEL_STATUS, SPDIF_PROTECTION_DISABLE);
+            aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_SPDIF_B_OUT_CHANNEL_STATUS, SPDIF_PROTECTION_DISABLE);
+        }
+        AM_LOGI("spdif_protection_mode:%d", val);
         goto exit;
     }
 
@@ -8935,6 +8952,8 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
 
     /* free stream ease resource  */
     aml_audio_ease_close(aml_out->audio_stream_ease);
+    /* free audio speed resource  */
+    aml_audio_speed_close(aml_out->speed_handle);
 
     /* call legacy close to reuse codes */
     pthread_mutex_lock(&adev->lock);
@@ -10174,6 +10193,14 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
     int ret = -1;
     aml_dev->no_underrun_max = aml_audio_property_get_int("vendor.media.audio_hal.nounderrunmax", 60);
     aml_dev->start_mute_max = aml_audio_property_get_int("vendor.media.audio_hal.startmutemax", 50);
+
+    aml_dtv_audio_instances_t *dtv_audio_instances = (aml_dtv_audio_instances_t *)aml_dev->aml_dtv_audio_instances;
+    for (int index = 0; index < DVB_DEMUX_SUPPORT_MAX_NUM; index ++) {
+        dtv_audio_instances->demux_handle[index] = 0;
+        dtv_audio_instances->demux_info[index].media_presentation_id = -1;
+        dtv_audio_instances->demux_info[index].media_first_lang = -1;
+        dtv_audio_instances->demux_info[index].media_second_lang = -1;
+    }
 
     if ((src_config->ext.device.type == AUDIO_DEVICE_IN_WIRED_HEADSET) || (src_config->ext.device.type == AUDIO_DEVICE_IN_BLUETOOTH_BLE)) {
         ALOGD("bluetooth voice search is in use, bypass adev_create_audio_patch()!!\n");
