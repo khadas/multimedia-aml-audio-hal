@@ -1011,6 +1011,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                             goto exit;
                         } else
                             AM_LOGI_IF(aml_dev->debug_flag, "input, main package %p alloc", dtv_package);
+                        memset(dtv_package, 0, sizeof(struct package));
                         if (dtv_ad_package == NULL && need_enable_dual_decoder(patch)) {
                             dtv_ad_package = aml_audio_calloc(1, sizeof(struct package));
                             if (!dtv_ad_package) {
@@ -1030,7 +1031,10 @@ void *audio_dtv_patch_input_threadloop(void *data)
                                 if (nRet != AM_AUDIO_Dmx_SUCCESS) {
                                     if (path_index == dtv_audio_instances->demux_index_working) {
                                         trycount++;
-                                        AM_LOGV("main trycount %d", trycount);
+                                        AM_LOGV("main trycount %d, %p", trycount, mEsData);
+                                        if (mEsData) {
+                                            patch->pts_dts_flag = mEsData->pts_dts_flag;
+                                        }
                                         if (trycount > 4 ) {
                                             trycount = 0;
                                             break;
@@ -1044,7 +1048,13 @@ void *audio_dtv_patch_input_threadloop(void *data)
                                     }
                                 } else {
                                    trycount = 0;
-                                   AM_LOGI_IF(aml_dev->debug_flag, "main size %d, pts %0llx", mEsData->size, mEsData->pts);
+                                   AM_LOGI_IF(aml_dev->debug_flag, "main size %d, pts %0llx(%llx), pts flag %d", mEsData->size, mEsData->pts, patch->last_valid_main_pts, mEsData->pts_dts_flag);
+                                   patch->pts_dts_flag = mEsData->pts_dts_flag;
+                                   if (NULL_INT64 != mEsData->pts) {
+                                        patch->last_valid_main_pts = mEsData->pts;
+                                   } else {
+                                        mEsData->pts = patch->last_valid_main_pts;
+                                   }
                                    if (data_dump) {
                                        aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/dtv_main_audio_dmx.es", mEsData->data, mEsData->size);
                                    }
@@ -1071,7 +1081,12 @@ void *audio_dtv_patch_input_threadloop(void *data)
                                         demux_info->ad_package_status = AD_PACK_STATUS_HOLD;
                                         break;
                                     } else {
-                                        AM_LOGI_IF(aml_dev->debug_flag, "ad size %d pts %0llx", mAdEsData->size, mAdEsData->pts);
+                                        AM_LOGI_IF(aml_dev->debug_flag, "ad size %d pts %0llx(%llx)", mAdEsData->size, mAdEsData->pts, patch->last_valid_ad_pts);
+                                        if (NULL_INT64 != mAdEsData->pts) {
+                                             patch->last_valid_ad_pts = mAdEsData->pts;
+                                        } else {
+                                             mAdEsData->pts = patch->last_valid_ad_pts;
+                                        }
                                         if (data_dump) {
                                             aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/dtv_ad_audio_dmx.es", mAdEsData->data, mAdEsData->size);
                                         }
@@ -1310,6 +1325,7 @@ exit:
     dtv_package_list_flush(list);
     if (ad_list)
         dtv_package_list_flush(ad_list);
+    patch->pts_dts_flag = 0;
 
     AM_LOGI("--patch->input_thread_exit %d ", patch->input_thread_exit);
     return ((void *)0);
@@ -1810,6 +1826,8 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                 patch->startplay_pcrpts = 0;
                 patch->startplay_apts_lookup = 0;
                 patch->startplay_vpts = 0;
+                patch->last_valid_main_pts = NULL_INT64;
+                patch->last_valid_ad_pts   = NULL_INT64;
 
                 patch->dtv_pcm_readed = patch->dtv_pcm_writed = 0;
                 patch->numDecodedSamples = patch->numOutputSamples = 0;
@@ -2136,6 +2154,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     patch->startplay_avsync_flag = 1;
     patch->ad_substream_checked_flag = false;
     patch->dtv_volume = 1.0;
+    patch->pts_dts_flag = 0;
 
     patch->output_thread_exit = 0;
     patch->cmd_process_thread_exit = 0;
@@ -2370,5 +2389,16 @@ bool dtv_is_secure(void *dtv_instances)
     } else {
         return false;
     }
+}
+
+int dtv_patch_get_es_pts_dts_flag(struct aml_audio_device *aml_dev)
+{
+    struct aml_audio_patch *patch = aml_dev->audio_patch;
+    if (patch == NULL) {
+        AM_LOGI("dtv patch == NULL");
+        return 0;
+    }
+    AM_LOGI("pts_dts_flag %d", patch->pts_dts_flag);
+    return patch->pts_dts_flag;
 }
 

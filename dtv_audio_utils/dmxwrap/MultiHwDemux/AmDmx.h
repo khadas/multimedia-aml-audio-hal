@@ -193,6 +193,7 @@ typedef enum dmx_input_source {
  * struct dmx_non_sec_es_header - non-sec Elementary Stream (ES) Header
  *
  * @pts_dts_flag:[1:0], 01:pts valid, 10:dts valid
+ * @pts_dts_flag:[3:2], 10:scb is scrambled, 01:pscp invalid
  * @pts:	pts value
  * @dts:	dts value
  * @len:	data len

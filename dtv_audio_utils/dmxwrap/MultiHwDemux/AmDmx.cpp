@@ -159,7 +159,7 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_handlePESpacket(AM_DMX_Device *dev, AM_DMX_
    #define AUDIO_STARTLEN 4
    int ulen=PATLOADSIZE-AUDIO_STARTLEN;
    int found=AM_FALSE;
-   int pos=0, try_count = 0;
+   int pos=0, try_count = 0, tmp_eslen = 0;
    findbuf[0]=0xff;
    findbuf[1]=0xff;
    findbuf[2]=0xff;
@@ -249,14 +249,15 @@ AM_ErrorCode_t AM_DMX_Device::AM_DMX_handlePESpacket(AM_DMX_Device *dev, AM_DMX_
        // ALOGI("PES_header_len  %d,%d,%d,%lld \n",PES_header_len,pan,fade,outpts);
     }
 #define SKIPLEN 3
-    *eslen = PES_packet_length -SKIPLEN-PES_header_len;
-    if (*eslen > 0 &&  *eslen < PESBUFFERLEN)
+    tmp_eslen = PES_packet_length -SKIPLEN-PES_header_len;
+    if (tmp_eslen > 0 &&  tmp_eslen < PESBUFFERLEN)
     {
-        memcpy(esbuf,PESbuffer+PES_START_LEN+SKIPLEN+PES_header_len,*eslen);
+        *eslen = tmp_eslen;
+        memcpy(esbuf,PESbuffer+PES_START_LEN+SKIPLEN+PES_header_len, *eslen);
     }
     else
     {
-        ALOGI("PESinfo... %d   %d\n",PES_packet_length ,PES_header_len);
+        ALOGI("PESinfo... %d   %d  %d",PES_packet_length,PES_header_len, *eslen);
         return AM_DMX_ERR_TIMEOUT;
     }
     //dmx_audio_dump_audio_bitstreams("/data/esraw.bin",esbuf,*eslen);
@@ -342,24 +343,26 @@ void* AM_DMX_Device::dmx_data_thread(void *arg)
                             header_es->len = 0;
                         }
                         read_len = 0;
-                        do {
-                              ret  = dev->drv->dvb_read(dev, filter, sec_buf + read_len + sizeof(struct dmx_non_sec_es_header), &sec_len);
-                              if (ret == AM_SUCCESS) {
-                                  read_len += sec_len;
-                                  sec_len = header_es->len - read_len;
-                              }
-                              if (read_len < header_es->len) {
-                                ALOGI("ret %d dvb_read audio len  %d frame len %d",ret, read_len ,header_es->len);
-                                usleep (20000);
-                              }
-                        } while (dev->enable_thread && !filter->to_be_stopped && read_len < header_es->len);
+                        if (header_es->len) {
+                            do {
+                                  ret  = dev->drv->dvb_read(dev, filter, sec_buf + read_len + sizeof(struct dmx_non_sec_es_header), &sec_len);
+                                  if (ret == AM_SUCCESS) {
+                                      read_len += sec_len;
+                                      sec_len = header_es->len - read_len;
+                                  }
+                                  if (read_len < header_es->len) {
+                                    ALOGI("ret %d dvb_read audio len  %d frame len %d",ret, read_len ,header_es->len);
+                                    usleep (20000);
+                                  }
+                            } while (dev->enable_thread && !filter->to_be_stopped && read_len < header_es->len);
+                        }
                         sec_len = sizeof(struct dmx_non_sec_es_header) + header_es->len;
                         //ALOGI("ret %d dvb_readmain audio len  %d %p \n",ret, read_len ,cb);
                     }
                     else //pes read
                     {
-                        AM_DMX_handlePESpacket(dev,filter,sec_buf,&sec_len,data);
-                        //ALOGI("ret %d dvb_readAD audio len  %d ,%p \n",ret,sec_len,cb);
+                        ret = AM_DMX_handlePESpacket(dev,filter,sec_buf,&sec_len,data);
+                        ALOGV("ret %d dvb_readAD audio len  %d ,%p \n",ret,sec_len,cb);
                     }
                 }
 #ifndef DMX_WAIT_CB

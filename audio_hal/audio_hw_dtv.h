@@ -105,5 +105,6 @@ extern void dtv_adjust_output_clock(struct aml_audio_patch * patch, int direct, 
 int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val);
 int dtv_patch_get_latency(struct aml_audio_device *aml_dev);
 bool dtv_is_secure(void *dtv_instances);
+int dtv_patch_get_es_pts_dts_flag(struct aml_audio_device *aml_dev);
 
 #endif

@@ -5877,14 +5877,12 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
         sprintf(temp_buf, "hal_param_dtv_demuxidbase=%d", dtv_get_demuxidbase());
         ALOGD("temp_buf %s", temp_buf);
         return strdup(temp_buf);
-    }
-    else if (strstr (keys, "hal_param_dtv_latencyms") ) {
+    } else if (strstr (keys, "hal_param_dtv_latencyms") ) {
         int latancyms = dtv_patch_get_latency(adev);
         sprintf(temp_buf, "hal_param_dtv_latencyms=%d", latancyms);
         ALOGD("temp_buf %s", temp_buf);
         return strdup(temp_buf);
-    }
-    else if (strstr (keys, "ac4_active_pres_id")) {
+    } else if (strstr (keys, "ac4_active_pres_id")) {
        int active_id_offset = -1;
         if ((eDolbyMS12Lib == adev->dolby_lib_type) && (adev->ms12.input_config_format == AUDIO_FORMAT_AC4)) {
             //should use the dolby_ms12_get_ac4_active_presentation() before or after get_dolby_ms12_cleanup()
@@ -5895,6 +5893,11 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
             pthread_mutex_unlock(&adev->ms12.lock);
         }
         sprintf(temp_buf, "ac4_active_pres_id=%d", active_id_offset);
+        return strdup(temp_buf);
+    } else if (strstr (keys, "hal_param_dtv_es_pts_dts_flag")) {
+        int flag = dtv_patch_get_es_pts_dts_flag(adev);
+        sprintf(temp_buf, "hal_param_dtv_es_pts_dts_flag=%d", flag);
+        ALOGD("temp_buf %s", temp_buf);
         return strdup(temp_buf);
     }
 #endif
