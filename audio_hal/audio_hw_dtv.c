@@ -918,48 +918,44 @@ void *audio_dtv_patch_input_threadloop(void *data)
             }
 
             /* add dtv package to package list */
-            while (!patch->input_thread_exit) {
+            while (!patch->input_thread_exit && dtv_package) {
                 pthread_mutex_lock(&patch->mutex);
-                if (dtv_package) {
-                    ret = dtv_package_add(list, dtv_package);
-                    if (ret == 0) {
-                        if (aml_dev->debug_flag > 0) {
-                            AM_LOGI("pthread_cond_signal dtv_package %p ", dtv_package);
-                        }
-                        pthread_cond_signal(&patch->cond);
-                        pthread_mutex_unlock(&patch->mutex);
-                        inbuf = NULL;
-                        dtv_package = NULL;
-                        demux_info->dtv_package = NULL;
-                        break;
-                    } else {
-                        AM_LOGI("list->pack_num %d full !!!", list->pack_num);
-                        pthread_mutex_unlock(&patch->mutex);
-                        usleep(150000);
-                        continue;
+                ret = dtv_package_add(list, dtv_package);
+                if (ret == 0) {
+                    if (aml_dev->debug_flag > 0) {
+                        AM_LOGI("pthread_cond_signal dtv_package %p ", dtv_package);
                     }
+                    pthread_cond_signal(&patch->cond);
+                    pthread_mutex_unlock(&patch->mutex);
+                    inbuf = NULL;
+                    dtv_package = NULL;
+                    demux_info->dtv_package = NULL;
+                    break;
+                } else {
+                    AM_LOGI("list->pack_num %d full !!!", list->pack_num);
+                    pthread_mutex_unlock(&patch->mutex);
+                    usleep(150000);
+                    continue;
                 }
             }
               /* add dtv package to package list */
-            while (!patch->input_thread_exit) {
+            while (!patch->input_thread_exit && dtv_ad_package) {
                 pthread_mutex_lock(&patch->assoc_mutex);
-                if (dtv_ad_package) {
-                    ret = dtv_package_add(ad_list, dtv_ad_package);
-                    if (ret == 0) {
-                        if (aml_dev->debug_flag > 0) {
-                            AM_LOGI("pthread_cond_signal dtv_package %p", dtv_ad_package);
-                        }
-                        pthread_cond_signal(&patch->ad_cond);
-                        pthread_mutex_unlock(&patch->assoc_mutex);
-                        dtv_ad_package = NULL;
-                        demux_info->dtv_ad_package = NULL;
-                        break;
-                    } else {
-                        AM_LOGI("list->pack_num %d full !!!", ad_list->pack_num);
-                        pthread_mutex_unlock(&patch->assoc_mutex);
-                        usleep(150000);
-                        continue;
+                ret = dtv_package_add(ad_list, dtv_ad_package);
+                if (ret == 0) {
+                    if (aml_dev->debug_flag > 0) {
+                        AM_LOGI("pthread_cond_signal dtv_package %p", dtv_ad_package);
                     }
+                    pthread_cond_signal(&patch->ad_cond);
+                    pthread_mutex_unlock(&patch->assoc_mutex);
+                    dtv_ad_package = NULL;
+                    demux_info->dtv_ad_package = NULL;
+                    break;
+                } else {
+                    AM_LOGI("list->pack_num %d full !!!", ad_list->pack_num);
+                    pthread_mutex_unlock(&patch->assoc_mutex);
+                    usleep(150000);
+                    continue;
                 }
             }
         } else {
