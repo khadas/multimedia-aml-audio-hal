@@ -25,12 +25,13 @@
 #include <string.h>
 
 #include "aml_audio_delay.h"
+#include "audio_hw_utils.h"
 
 #define ALIGN(size, align) ((size + align - 1) & (~(align - 1)))
 
 
 static aml_audio_delay_st g_stAudioOutputDelay[AML_DELAY_OUTPORT_BUTT];
-static int g_u32OutDelayMaxDefault[AML_DELAY_OUTPORT_BUTT] = {1000, 1000, 1000};
+static int g_u32OutDelayMaxDefault[AML_DELAY_OUTPORT_BUTT] = {1000, 1000, 1000, 1000, 1000, 1000};
 static bool g_bAudioDelayInit = false;
 
 int aml_audio_delay_init(int s32MaxDelayMs)
@@ -40,10 +41,6 @@ int aml_audio_delay_init(int s32MaxDelayMs)
     for (unsigned int i=0; i<AML_DELAY_OUTPORT_BUTT; i++) {
         int s32BfferSize = 0;
         unsigned int u32ChannelCnt = 2;
-        if (AML_DELAY_OUTPORT_ALL == i) {
-            /*calculate the max size for 8ch */
-            u32ChannelCnt = 8;
-        }
         g_u32OutDelayMaxDefault[i] = s32MaxDelayMs;
         s32BfferSize = 192 * u32ChannelCnt * 4 * g_u32OutDelayMaxDefault[i];
         ring_buffer_init(&g_stAudioOutputDelay[i].stDelayRbuffer, s32BfferSize);
@@ -59,6 +56,7 @@ int aml_audio_delay_deinit()
     }
     for (unsigned int i=0; i<AML_DELAY_OUTPORT_BUTT; i++) {
         ring_buffer_release(&g_stAudioOutputDelay[i].stDelayRbuffer);
+        g_stAudioOutputDelay[i].is_init_buffer = false;
     }
     g_bAudioDelayInit = false;
     return 0;
@@ -67,13 +65,29 @@ int aml_audio_delay_deinit()
 /*
 * s32DelayTimeMs: In milliseconds
 */
+int aml_audio_set_port_delay(char* port_name, int s32DelayTimeMs) {
+    if (strcmp(port_name, "speaker") == 0) {
+        aml_audio_delay_set_time(AML_DELAY_OUTPORT_SPEAKER, s32DelayTimeMs);
+    } else if (strcmp(port_name, "hdmi") == 0 || strcmp(port_name, "spdif") == 0 || strcmp(port_name, "arc") == 0) {
+        // set hdmi delay time will make SPDIF/SPDIF_RAW/SPDIF_B_RAW's delay same.
+        aml_audio_delay_set_time(AML_DELAY_OUTPORT_SPDIF, s32DelayTimeMs);
+    } else if (strcmp(port_name, "headphone") == 0) {
+        aml_audio_delay_set_time(AML_DELAY_OUTPORT_HEADPHONE, s32DelayTimeMs);
+    }
+    else {
+        ALOGI("[%s:%d] audio port is invalid", __func__, __LINE__);
+    }
+    return 0;
+}
+
 int aml_audio_delay_set_time(aml_audio_delay_type_e enAudioDelayType, int s32DelayTimeMs)
 {
     if (!g_bAudioDelayInit) {
         ALOGW("[%s:%d] audio delay not initialized", __func__, __LINE__);
         return -1;
     }
-    if (enAudioDelayType < AML_DELAY_OUTPORT_SPEAKER || enAudioDelayType >= AML_DELAY_OUTPORT_BUTT) {
+
+    if ((int)enAudioDelayType < AML_DELAY_OUTPORT_SPEAKER || enAudioDelayType >= AML_DELAY_OUTPORT_BUTT) {
         ALOGW("[%s:%d] delay type:%d invalid, min:%d, max:%d",
             __func__, __LINE__, enAudioDelayType, AML_DELAY_OUTPORT_SPEAKER, AML_DELAY_OUTPORT_BUTT-1);
         return -1;
@@ -83,8 +97,65 @@ int aml_audio_delay_set_time(aml_audio_delay_type_e enAudioDelayType, int s32Del
             __func__, __LINE__, s32DelayTimeMs, 0, g_u32OutDelayMaxDefault[enAudioDelayType]);
         return -1;
     }
+
+    if (s32DelayTimeMs > 0 && g_stAudioOutputDelay[enAudioDelayType].is_init_buffer == false)
+    {
+        int s32BufferSize = 0;
+        unsigned int u32ChannelCnt = 2;
+        int init_ret = 0;
+        s32BufferSize = 192 * u32ChannelCnt * 4 * g_u32OutDelayMaxDefault[enAudioDelayType]; // use max buffer size
+        init_ret = ring_buffer_init(&g_stAudioOutputDelay[enAudioDelayType].stDelayRbuffer, s32BufferSize);
+        if (init_ret != 0) {
+            ALOGE("[%s:%d] init is error", __func__, __LINE__);
+            return -1;
+        }
+        g_stAudioOutputDelay[enAudioDelayType].is_init_buffer = true;
+        if (enAudioDelayType == AML_DELAY_OUTPORT_SPDIF) {
+            s32BufferSize = 48000 * 2 * 2 / 1000 * g_u32OutDelayMaxDefault[AML_DELAY_OUTPORT_SPDIF_RAW]; // use max buffer size
+            init_ret = ring_buffer_init(&g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF_RAW].stDelayRbuffer, s32BufferSize);
+            if (init_ret != 0) {
+                ALOGE("[%s:%d] init is error", __func__, __LINE__);
+                return -1;
+            }
+            g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF_RAW].is_init_buffer = true;
+
+            s32BufferSize = 192000 * 2 * 2 * 4 / 1000 * g_u32OutDelayMaxDefault[AML_DELAY_OUTPORT_SPDIF_B_RAW]; // use max buffer size for AML_MAT
+            init_ret = ring_buffer_init(&g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF_B_RAW].stDelayRbuffer, s32BufferSize);
+            if (init_ret != 0) {
+                ALOGE("[%s:%d] init is error", __func__, __LINE__);
+                return -1;
+            }
+            g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF_B_RAW].is_init_buffer = true;
+        }
+    }
+
     g_stAudioOutputDelay[enAudioDelayType].delay_time = s32DelayTimeMs;
-    ALOGI("set audio output type:%d delay time: %dms", enAudioDelayType, s32DelayTimeMs);
+
+    // spdif/spdif raw/spdif b raw use same delay value
+    if (enAudioDelayType == AML_DELAY_OUTPORT_SPDIF ||
+            enAudioDelayType == AML_DELAY_OUTPORT_SPDIF_RAW ||
+            enAudioDelayType == AML_DELAY_OUTPORT_SPDIF_B_RAW ) {
+        g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF].delay_time = s32DelayTimeMs;
+        g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF_RAW].delay_time = s32DelayTimeMs;
+        g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF_B_RAW].delay_time = s32DelayTimeMs;
+    }
+
+    if (g_stAudioOutputDelay[enAudioDelayType].delay_time == 0) {
+        // drop all data in ring buffer
+        ring_buffer_release(&g_stAudioOutputDelay[enAudioDelayType].stDelayRbuffer);
+        g_stAudioOutputDelay[enAudioDelayType].is_init_buffer = false;
+
+        if (enAudioDelayType == AML_DELAY_OUTPORT_SPDIF) {
+            ring_buffer_release(&g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF_RAW].stDelayRbuffer);
+            g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF_RAW].is_init_buffer = false;
+
+            ring_buffer_release(&g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF_B_RAW].stDelayRbuffer);
+            g_stAudioOutputDelay[AML_DELAY_OUTPORT_SPDIF_B_RAW].is_init_buffer = false;
+        }
+    }
+
+    ALOGI("set audio output type:%d, delay time: %dms, has init buffer: %d",
+            enAudioDelayType, s32DelayTimeMs, g_stAudioOutputDelay[enAudioDelayType].is_init_buffer);
     return 0;
 }
 
@@ -94,7 +165,7 @@ int aml_audio_delay_clear(aml_audio_delay_type_e enAudioDelayType)
         ALOGW("[%s:%d] audio delay not initialized", __func__, __LINE__);
         return -1;
     }
-    if (enAudioDelayType < AML_DELAY_OUTPORT_SPEAKER || enAudioDelayType >= AML_DELAY_OUTPORT_BUTT) {
+    if ((int)enAudioDelayType < AML_DELAY_OUTPORT_SPEAKER || enAudioDelayType >= AML_DELAY_OUTPORT_BUTT) {
         ALOGW("[%s:%d] delay type:%d invalid, min:%d, max:%d",
             __func__, __LINE__, enAudioDelayType, AML_DELAY_OUTPORT_SPEAKER, AML_DELAY_OUTPORT_BUTT-1);
         return -1;
@@ -104,41 +175,64 @@ int aml_audio_delay_clear(aml_audio_delay_type_e enAudioDelayType)
     return 0;
 }
 
-int aml_audio_delay_process(aml_audio_delay_type_e enAudioDelayType, void *pData, int s32Size, audio_format_t enFormat)
+int aml_audio_delay_process(aml_audio_delay_type_e enAudioDelayType, void *pData, int s32Size,
+        audio_format_t enFormat, uint32_t sample_rate)
 {
     if (!g_bAudioDelayInit) {
         //ALOGW("[%s:%d] audio delay not initialized", __func__, __LINE__);
         return -1;
     }
-    if (enAudioDelayType < AML_DELAY_OUTPORT_SPEAKER || enAudioDelayType >= AML_DELAY_OUTPORT_BUTT) {
-        ALOGW("[%s:%d] delay type:%d invalid, min:%d, max:%d",
+
+    if ((int)enAudioDelayType < AML_DELAY_OUTPORT_SPEAKER || enAudioDelayType >= AML_DELAY_OUTPORT_BUTT) {
+        ALOGI("[%s:%d] delay type:%d invalid, min:%d, max:%d",
             __func__, __LINE__, enAudioDelayType, AML_DELAY_OUTPORT_SPEAKER, AML_DELAY_OUTPORT_BUTT-1);
         return -1;
+    }
+
+    if (g_stAudioOutputDelay[enAudioDelayType].is_init_buffer == false ||
+            g_stAudioOutputDelay[enAudioDelayType].delay_time == 0) {
+        ALOGV("%s:%d delay type:%d, 0ms delay, do nothing", __func__, __LINE__, enAudioDelayType);
+        return 0;
+    }
+
+    if (s32Size == 0) {
+        ALOGV("%s:%d delay type:%d, 0byte size, do nothing", __func__, __LINE__, enAudioDelayType);
+        return 0;
     }
 
     unsigned int    u32OneMsSize = 48 * 2 * 2;
     int             s32CurNeedDelaySize = 0;
     int             s32AvailDataSize = 0;
 
-    if (AML_DELAY_OUTPORT_ALL == enAudioDelayType) {
-        if (enFormat == AUDIO_FORMAT_E_AC3) {
-            u32OneMsSize = 192 * 4;// * abs(adev->delay_ms);
-        } else if (enFormat == AUDIO_FORMAT_AC3) {
-            u32OneMsSize = 48 * 4;// * abs(adev->delay_ms);
-        } else {
-            u32OneMsSize = 48 * 8 * 4; // 48k * 8ch * 4Byte
-        }
-    } else if (AML_DELAY_OUTPORT_SPEAKER == enAudioDelayType) {
+    if (AML_DELAY_OUTPORT_SPEAKER == enAudioDelayType || AML_DELAY_OUTPORT_HEADPHONE == enAudioDelayType) {
         if (AUDIO_FORMAT_PCM_16_BIT == enFormat) {
-            u32OneMsSize = 48 * 2 * 2;  // 48k * 2ch * 2Byte
+            u32OneMsSize = sample_rate * 2 * 2 / 1000;  // sample_rate * 2ch * 2Byte
+        } else if (AUDIO_FORMAT_PCM_32_BIT == enFormat) {
+            u32OneMsSize = sample_rate * 2 * 4 / 1000;  // sample_rate * 2ch * 4Byte
         } else {
-            u32OneMsSize = 48 * 2 * 4;  // 48k * 2ch * 4Byte
+            u32OneMsSize = sample_rate * 2 * 2 / 1000;  // sample_rate * 2ch * 2Byte
         }
     } else if (AML_DELAY_OUTPORT_SPDIF == enAudioDelayType) {
-        if (AUDIO_FORMAT_IEC61937 == enFormat) {
-            u32OneMsSize = 48 * 2 * 2;  // 48k * 2ch * 2Byte
+        if (AUDIO_FORMAT_PCM_16_BIT == enFormat) {
+            u32OneMsSize = sample_rate * 2 * 2 / 1000;  // sample_rate * 2ch * 2Byte
+        } else if (AUDIO_FORMAT_PCM_32_BIT == enFormat) {
+            u32OneMsSize = sample_rate * 2 * 4 / 1000;  // sample_rate * 2ch * 4Byte [Notes: alsa only support 32bit(4Byte)]
         } else {
-            u32OneMsSize = 48 * 2 * 4;  // 48k * 2ch * 4Byte [Notes: alsa only support 32bit(4Byte)]
+            u32OneMsSize = sample_rate * 2 * 2 / 1000;  // sample_rate * 2ch * 2Byte
+        }
+    } else if (AML_DELAY_OUTPORT_SPDIF_RAW == enAudioDelayType || AML_DELAY_OUTPORT_SPDIF_B_RAW == enAudioDelayType) {
+        if (enFormat == AUDIO_FORMAT_AC3) {
+            u32OneMsSize = sample_rate * 2 * 2 / 1000; // sample_rate * 2ch * 2Byte
+        } else if (enFormat == AUDIO_FORMAT_E_AC3) {
+            u32OneMsSize = sample_rate * 2 * 2 * 4 / 1000; // sample_rate * 2ch * 2Byte * 4(high bit rate)
+        } else if (enFormat == AUDIO_FORMAT_MAT) {
+            if (sample_rate == 44100 || sample_rate == 88200 || sample_rate == 176400) {
+                u32OneMsSize = 176400 * 2 * 2 * 4 / 1000; // 176400 * 2ch * 2Byte * 4(high bit rate)
+            } else if (sample_rate == 48000 || sample_rate == 96000 || sample_rate == 192000) {
+                u32OneMsSize = 192000 * 2 * 2 * 4 / 1000; // 192000 * 2ch * 2Byte * 4(high bit rate)
+            } else {
+                u32OneMsSize = 192000 * 2 * 2 * 4 / 1000; // 192000 * 2ch * 2Byte * 4(high bit rate)
+            }
         }
     }
 

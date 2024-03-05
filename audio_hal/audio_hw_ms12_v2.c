@@ -2016,6 +2016,7 @@ static ssize_t aml_ms12_spdif_output_new (struct audio_stream_out *stream,
             aml_audio_spdifout_mute(bitstream_desc->spdifout_handle, 0);
         }
     }
+
     ret = aml_audio_spdifout_processs(bitstream_desc->spdifout_handle, buffer, byte);
 
     /*it is earc output*/

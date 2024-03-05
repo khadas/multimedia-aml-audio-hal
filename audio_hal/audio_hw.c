@@ -5150,19 +5150,14 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 #ifdef ADD_AUDIO_DELAY_INTERFACE
-    ret = str_parms_get_int(parms, "hal_param_speaker_delay_time_ms", &val);
+    ret = str_parms_get_str(parms, "port_delay", value, sizeof(value));
     if (ret >= 0) {
-        aml_audio_delay_set_time(AML_DELAY_OUTPORT_SPEAKER, val);
-        goto exit;
-    }
-    ret = str_parms_get_int(parms, "hal_param_spdif_delay_time_ms", &val);
-    if (ret >= 0) {
-        aml_audio_delay_set_time(AML_DELAY_OUTPORT_SPDIF, val);
-        goto exit;
-    }
-    ret = str_parms_get_int(parms, "hal_param_all_delay_time_ms", &val);
-    if (ret >= 0) {
-        aml_audio_delay_set_time(AML_DELAY_OUTPORT_ALL, val);
+        char *port_name;
+        int port_delay = 0;
+        char *delimiter = ",";
+        port_name = strtok(value, delimiter);
+        port_delay = (atoi)(strtok(NULL, delimiter));
+        aml_audio_set_port_delay(port_name, port_delay);
         goto exit;
     }
 #endif
@@ -7247,12 +7242,10 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             apply_volume(adev->sink_gain[OUTPORT_HEADPHONE], hp_tmp_buf, sizeof(uint16_t), bytes);
 #ifdef ADD_AUDIO_DELAY_INTERFACE
             aml_audio_delay_process(AML_DELAY_OUTPORT_SPEAKER, spk_tmp_buf,
-                            out_frames * 2 * 4, AUDIO_FORMAT_PCM_32_BIT);
-            if (OUTPORT_SPEAKER == adev->active_outport && AUDIO_FORMAT_PCM_16_BIT == aml_out->hal_internal_format) {
-                // spdif(PCM) out delay process, frame size 2ch * 4 Byte
-                aml_audio_delay_process(AML_DELAY_OUTPORT_SPDIF, ps32SpdifTempBuffer,
-                        out_frames * 2 * 4, AUDIO_FORMAT_PCM_32_BIT);
-            }
+                out_frames * 2 * 4, AUDIO_FORMAT_PCM_32_BIT, aml_out->hal_rate);  //spk/hp output pcm
+            aml_audio_delay_process(AML_DELAY_OUTPORT_SPDIF, ps32SpdifTempBuffer,
+                out_frames * 2 * 4, AUDIO_FORMAT_PCM_32_BIT, aml_out->hal_rate);  //spdif output pcm
+
 #endif
             /* 2 ch 16 bit --> 8 ch 32 bit mapping, need 8X size of input buffer size */
             if (aml_out->tmp_buffer_8ch_size < 8 * bytes) {
@@ -7339,6 +7332,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             *output_buffer = (void *) buffer;
             *output_buffer_bytes = bytes;
             apply_volume(gain_speaker, *output_buffer, sizeof(uint16_t), bytes);
+            aml_audio_delay_process(AML_DELAY_OUTPORT_SPDIF, *output_buffer, *output_buffer_bytes, AUDIO_FORMAT_PCM_16_BIT, aml_out->hal_rate);
         }
     }
     /*when REPORT_DECODED_INFO is added, we will enable it*/
@@ -7467,12 +7461,6 @@ ssize_t hw_write (struct audio_stream_out *stream
     }
 
     if (aml_out->pcm || adev->a2dp_hal || is_sco_port(adev->active_outport)) {
-#ifdef ADD_AUDIO_DELAY_INTERFACE
-        ret = aml_audio_delay_process(AML_DELAY_OUTPORT_ALL, (void *) tmp_buffer, bytes, output_format);
-        if (ret < 0) {
-            //ALOGW("aml_audio_delay_process skip, ret:%#x", ret);
-        }
-#endif
         if (adjust_ms) {
             int adjust_bytes = 0;
             if ((output_format == AUDIO_FORMAT_E_AC3) || (output_format == AUDIO_FORMAT_AC3)) {
@@ -9711,7 +9699,8 @@ void *audio_patch_output_threadloop(void *data)
 #ifdef ADD_AUDIO_DELAY_INTERFACE
             // fixed switch between RAW and PCM noise, drop delay residual data
             aml_audio_delay_clear(AML_DELAY_OUTPORT_SPDIF);
-            aml_audio_delay_clear(AML_DELAY_OUTPORT_ALL);
+            aml_audio_delay_clear(AML_DELAY_OUTPORT_SPDIF_RAW);
+            aml_audio_delay_clear(AML_DELAY_OUTPORT_SPDIF_B_RAW);
 #endif
             /* we need standby a2dp when switch the format, in order to prevent UNDERFLOW in a2dp stack. */
             if (aml_dev->active_outport == OUTPORT_A2DP) {
@@ -10672,7 +10661,6 @@ static int adev_release_audio_patch(struct audio_hw_device *dev,
 #ifdef ADD_AUDIO_DELAY_INTERFACE
     aml_audio_delay_clear(AML_DELAY_OUTPORT_SPEAKER);
     aml_audio_delay_clear(AML_DELAY_OUTPORT_SPDIF);
-    aml_audio_delay_clear(AML_DELAY_OUTPORT_ALL);
 #endif
 #if defined(IS_ATOM_PROJECT)
 #ifdef DEBUG_VOLUME_CONTROL
@@ -11401,6 +11389,12 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         /*Now SoundBar type is depending on TV audio as only tv support multi-channel LPCM output*/
         adev->is_SBR = aml_audio_check_sbr_product();
         ALOGI("%s(), TV platform,soundbar platform %d", __func__,adev->is_SBR);
+    } else {
+        /* for stb/ott, fixed 2 channels speaker output for alsa*/
+        adev->default_alsa_ch = 2;
+        adev->is_STB = aml_get_jason_int_value(STB_PLATFORM,0);
+        ALOGI("%s(), OTT platform", __func__);
+    }
 #ifdef ADD_AUDIO_DELAY_INTERFACE
         ret = aml_audio_delay_init(aml_get_jason_int_value(AUDIO_DELAY_MAX, 1000));
         if (ret < 0) {
@@ -11408,12 +11402,6 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
             goto err;
         }
 #endif
-    } else {
-        /* for stb/ott, fixed 2 channels speaker output for alsa*/
-        adev->default_alsa_ch = 2;
-        adev->is_STB = aml_get_jason_int_value(STB_PLATFORM,0);
-        ALOGI("%s(), OTT platform", __func__);
-    }
 
 #else
 #if defined(TV_AUDIO_OUTPUT)

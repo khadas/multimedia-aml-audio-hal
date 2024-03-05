@@ -354,6 +354,7 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
     }
     phandle->audio_format = audio_format;
     phandle->channel_mask = spdif_config->channel_mask;
+    phandle->sample_rate = spdif_config->rate;
 
     if (!phandle->spdif_enc_init && phandle->need_spdif_enc) {
         ret = aml_spdif_encoder_open(&phandle->spdif_enc_handle, phandle->audio_format);
@@ -607,6 +608,23 @@ int aml_audio_spdifout_processs(void *phandle, void *buffer, size_t byte)
 
     }
 #endif
+
+#ifdef ADD_AUDIO_DELAY_INTERFACE
+    ALOGV("spdif/arc raw delay: format=0x%x, sample rate=%d", spdifout_phandle->audio_format, spdifout_phandle->sample_rate);
+    if (spdifout_phandle->audio_format == AUDIO_FORMAT_AC3) {
+        aml_audio_delay_process(AML_DELAY_OUTPORT_SPDIF_RAW,
+                (void *) output_buffer, output_buffer_bytes, spdifout_phandle->audio_format, spdifout_phandle->sample_rate);
+    } else if (spdifout_phandle->audio_format == AUDIO_FORMAT_E_AC3) {
+        aml_audio_delay_process(AML_DELAY_OUTPORT_SPDIF_B_RAW,
+                (void *) output_buffer, output_buffer_bytes, spdifout_phandle->audio_format, spdifout_phandle->sample_rate);
+    } else if (spdifout_phandle->audio_format == AUDIO_FORMAT_MAT) {
+        aml_audio_delay_process(AML_DELAY_OUTPORT_SPDIF_B_RAW,
+                (void *) output_buffer, output_buffer_bytes, spdifout_phandle->audio_format, spdifout_phandle->sample_rate);
+    } else {
+        ALOGI("Only support spdif/hdmi/arc DD/DDP/MAT raw delay, format=0x%x", spdifout_phandle->audio_format);
+    }
+#endif
+
     if ((aml_dev->patch_src == SRC_DTV && aml_dev->audio_patch) &&
         (aml_dev->discontinue_mute_flag || aml_dev->start_mute_flag ||
          aml_dev->tv_mute)) {
