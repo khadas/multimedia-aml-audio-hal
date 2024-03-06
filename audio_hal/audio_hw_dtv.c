@@ -727,13 +727,7 @@ int audio_dtv_patch_output_decoder(struct aml_audio_patch *patch,
         ret = stream_out->write(stream_out, in_frame_buffer, input_size);
     } else if (aml_dev->dolby_lib_type_last != eDolbyMS12Lib ||
            (aml_dev->dolby_lib_type == eDolbyMS12Lib && !is_dolby_ms12_support_compression_format(patch->aformat))) {
-        if (!is_ad_stream) {
-            if (aml_out->aml_dec && patch->cur_ad_package) {
-                aml_out->aml_dec->ad_data = patch->cur_ad_package->data;
-                aml_out->aml_dec->ad_size = patch->cur_ad_package->size;
-            }
             ret = stream_out->write(stream_out, in_frame_buffer, input_size);
-        }
     }
 
     return ret;

@@ -177,7 +177,7 @@ int aml_audio_amldec_process(struct audio_stream_out *stream, struct audio_buffe
 
     AM_LOGI_IF(adev->debug_flag, "new_in_pts:0x%llx (%lld ms) size: %d", ainput.pts, ainput.pts/90, ainput.size);
     do {
-        ainput.buffer += dec_used_size;
+        ainput.buffer += used_size;
         ainput.size   = left_bytes;
 
         AM_LOGI_IF(adev->debug_flag, "in pts:0x%llx (%lld ms) size: %d", ainput.pts, ainput.pts/90, ainput.size);

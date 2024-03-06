@@ -265,67 +265,6 @@ static int vorbis_decoder_release(aml_dec_t *aml_decoder)
     return 0;
 }
 
-static int vorbis_ad_decoder_process(aml_dec_t *aml_decoder, unsigned char *buffer, int bytes)
-{
-    int used_size = 0;
-    vorbis_decoder_t *vorbis_decoder = (vorbis_decoder_t *)aml_decoder;
-    aml_vorbis_config_t *vorbis_config = &vorbis_decoder->vorbis_config;
-    vorbis_decoder_operations_t *ad_vorbis_operation = &vorbis_decoder->ad_vorbis_operation;
-    dec_data_info_t *ad_dec_pcm_data = &aml_decoder->ad_dec_pcm_data;
-
-
-    if (aml_decoder->ad_size > 0) {
-        if ((vorbis_decoder->ad_remain_size + aml_decoder->ad_size) > VORBIS_REMAIN_BUFFER_SIZE) {
-            vorbis_decoder->ad_remain_size = 0;
-            memset(vorbis_decoder->ad_remain_data, 0, VORBIS_REMAIN_BUFFER_SIZE);
-        }
-        memcpy(vorbis_decoder->ad_remain_data + vorbis_decoder->ad_remain_size, aml_decoder->ad_data, aml_decoder->ad_size);
-        vorbis_decoder->ad_remain_size += aml_decoder->ad_size;
-        aml_decoder->ad_size = 0;
-    }
-
-    ad_dec_pcm_data->data_len = 0;
-    ALOGV("%s[%d]: vorbis_decoder->ad_remain_size %d", __FUNCTION__, __LINE__, vorbis_decoder->ad_remain_size);
-    while (vorbis_decoder->ad_remain_size > used_size) {
-        int pcm_len = VORBIS_MAX_LENGTH;
-        int decode_len = ad_vorbis_operation->decode(ad_vorbis_operation, (char *)(ad_dec_pcm_data->buf + ad_dec_pcm_data->data_len), &pcm_len,
-            (char *)vorbis_decoder->ad_remain_data + used_size, vorbis_decoder->ad_remain_size - used_size);
-        ALOGV("%s[%d]: ad decode_len %d, in %d, pcm_len %d, used_size %d", __FUNCTION__, __LINE__, decode_len, vorbis_decoder->ad_remain_size,
-            pcm_len, used_size);
-
-        if (decode_len > 0) {
-            used_size += decode_len;
-            if (pcm_len > 0) {
-                ad_dec_pcm_data->data_len += pcm_len;
-                if (ad_dec_pcm_data->data_len > ad_dec_pcm_data->buf_size) {
-                    ALOGE("%s[%d]: decode len %d  > buf_size %d ", __FUNCTION__, __LINE__, ad_dec_pcm_data->data_len, ad_dec_pcm_data->buf_size);
-                    break;
-                }
-
-                if (vorbis_decoder->ad_remain_size > used_size) {
-                    vorbis_decoder->ad_remain_size -= used_size;    //The remaining unconverted data size
-                    memmove(vorbis_decoder->ad_remain_data, vorbis_decoder->ad_remain_data + used_size, vorbis_decoder->ad_remain_size);
-                } else {
-                    vorbis_decoder->ad_remain_size = 0;    //All conversion
-                }
-                break;
-            }
-        } else {
-            if (vorbis_decoder->ad_remain_size > used_size) {
-                vorbis_decoder->ad_remain_size -= used_size;
-                memmove(vorbis_decoder->ad_remain_data, vorbis_decoder->ad_remain_data + used_size, vorbis_decoder->ad_remain_size);
-            }
-
-            ALOGV("%s[%d]: ad vorbis_decoder->ad_remain_size %d ad_dec_pcm_data->data_len %d used_size %d", __FUNCTION__, __LINE__,
-                vorbis_decoder->ad_remain_size, ad_dec_pcm_data->data_len, used_size);
-            break;
-        }
-    }
-
-    dump_vorbis_data(ad_dec_pcm_data->buf, ad_dec_pcm_data->data_len, "/data/vorbis_ad_output.pcm");
-    return 0;
-}
-
 static int vorbis_decoder_process(aml_dec_t *aml_decoder, struct audio_buffer *abuffer)
 {
     int ret = 0;
