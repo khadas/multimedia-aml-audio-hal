@@ -100,6 +100,8 @@ struct package {
     struct package * next;//next ptr
     uint64_t pts;
     int split_frame_size;
+    uint8_t ad_fade;
+    uint8_t ad_pan;
 };
 
 typedef struct {

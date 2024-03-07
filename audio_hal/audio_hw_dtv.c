@@ -447,14 +447,14 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                         dtv_audio_instances->demux_handle[path_id] = NULL;
                         pthread_mutex_unlock(&adev->dtv_lock);
 
-                        pthread_mutex_lock(&dtvsync->ms_lock);
+                        /*pthread_mutex_lock(&dtvsync->ms_lock);
                         if ((dtvsync->mediasync_new != NULL)) {
                             AM_LOGI("close mediasync_new:%p, mediasync:%p", dtvsync->mediasync_new, dtvsync->mediasync);
                             mediasync_wrap_destroy(dtvsync->mediasync_new);
                             dtvsync->mediasync_new = NULL;
                             dtvsync->mediasync = NULL;
                         }
-                        pthread_mutex_unlock(&dtvsync->ms_lock);
+                        pthread_mutex_unlock(&dtvsync->ms_lock);*/
                     }
                 } else {
                     if (demux_handle) {
@@ -469,14 +469,14 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                         dtv_audio_instances->demux_handle[path_id] = NULL;
                     }
                     uio_deinit_new(&patch->uio_fd);
-                    pthread_mutex_lock(&dtvsync->ms_lock);
+                    /*pthread_mutex_lock(&dtvsync->ms_lock);
                     if ((dtvsync->mediasync_new != NULL)) {
                         AM_LOGI("close mediasync_new:%p, mediasync:%p", dtvsync->mediasync_new, dtvsync->mediasync);
                         mediasync_wrap_destroy(dtvsync->mediasync_new);
                         dtvsync->mediasync_new = NULL;
                         dtvsync->mediasync = NULL;
                     }
-                    pthread_mutex_unlock(&dtvsync->ms_lock);
+                    pthread_mutex_unlock(&dtvsync->ms_lock);*/
                 }
                 memset(demux_info, 0, sizeof(aml_demux_audiopara_t));
                 demux_info->media_presentation_id  = -1;
@@ -1025,7 +1025,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                                 if (nRet != AM_AUDIO_Dmx_SUCCESS) {
                                     if (path_index == dtv_audio_instances->demux_index_working) {
                                         trycount++;
-                                        AM_LOGV("main trycount %d, %p", trycount, mEsData);
+                                        AM_LOGI_IF(aml_dev->debug_flag, "main trycount %d, %p", trycount, mEsData);
                                         if (mEsData) {
                                             patch->pts_dts_flag = mEsData->pts_dts_flag;
                                         }
@@ -1063,7 +1063,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                                         AM_LOGE("Get_ADAudio_Es failed");
                                         clock_gettime(CLOCK_MONOTONIC, &end_ts);
                                         int  data_get_cost_ms = calc_time_interval_us(&current_ts, &end_ts) / 1000;
-                                        AM_LOGI_IF(aml_dev->debug_flag, "data_get_cost_ms %d ms, list empty %d", data_get_cost_ms, dtv_package_is_empty(list));
+                                        AM_LOGI_IF(aml_dev->debug_flag, "data_get_cost_ms %d ms, %d %d", data_get_cost_ms, dtv_package_is_empty(list), dtv_package_is_empty(ad_list));
                                         if (!dtv_package_is_empty(list) && data_get_cost_ms < 1000) {
                                             usleep(5000);
                                             continue;
@@ -1136,24 +1136,25 @@ void *audio_dtv_patch_input_threadloop(void *data)
                             if (mAdEsData) {
                                 demux_info->ad_package_status = check_ad_package_status(dtv_package->pts, mAdEsData->pts, demux_info);
                                 if (demux_info->ad_package_status == AD_PACK_STATUS_HOLD) {
-                                    dtv_ad_package->size = 0;
-                                    dtv_ad_package->data = NULL;
+                                    aml_audio_free(dtv_ad_package);
+                                    dtv_ad_package = NULL;
+                                    demux_info->dtv_ad_package = NULL;
                                     AM_LOGI("%d, drop ad data", __LINE__);
                                 } else {
                                     dtv_ad_package->size = mAdEsData->size;
                                     dtv_ad_package->data = (char *)mAdEsData->data;
                                     dtv_ad_package->pts = mAdEsData->pts;
-                                    demux_info->ad_pan  = mAdEsData->adpan;
-                                    demux_info->ad_fade = mAdEsData->adfade;
+                                    dtv_ad_package->ad_pan  = mAdEsData->adpan;
+                                    dtv_ad_package->ad_fade = mAdEsData->adfade;
                                     aml_audio_free(mAdEsData);
                                     mAdEsData = NULL;
                                 }
                                 demux_info->mADEsData = mAdEsData;
                             } else if (dtv_ad_package) {
-                                dtv_ad_package->size = 0;
-                                dtv_ad_package->data = NULL;
-                                dtv_ad_package->pts = NULL;
+                                aml_audio_free(dtv_ad_package);
+                                dtv_ad_package = NULL;
                                 demux_info->mADEsData = NULL;
+                                demux_info->dtv_ad_package = NULL;
                             }
                         }
 
@@ -1209,49 +1210,45 @@ void *audio_dtv_patch_input_threadloop(void *data)
 
                     /* add dtv package to package list */
                     while (!patch->input_thread_exit &&
-                        path_index == dtv_audio_instances->demux_index_working) {
+                        path_index == dtv_audio_instances->demux_index_working && dtv_package && list) {
                         pthread_mutex_lock(&patch->mutex);
-                        if (dtv_package) {
-                            ret = dtv_package_add(list, dtv_package);
-                            if (ret == 0) {
-                                AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_package %p, pts:%llx, size:%d", dtv_package, dtv_package->pts, dtv_package->size);
-                                pthread_cond_signal(&patch->cond);
-                                pthread_mutex_unlock(&patch->mutex);
-                                dtv_package = NULL;
-                                demux_info->dtv_package = NULL;
-                                break;
-                            } else {
-                                AM_LOGI("list->pack_num %d full !!!", list->pack_num);
-                                pthread_mutex_unlock(&patch->mutex);
-                                pthread_mutex_unlock(&aml_dev->dtv_lock);
-                                usleep(150000);
-                                pthread_mutex_lock(&aml_dev->dtv_lock);
-                                continue;
-                            }
+                        ret = dtv_package_add(list, dtv_package);
+                        if (ret == 0) {
+                            AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_package %p, pts:%llx, size:%d", dtv_package, dtv_package->pts, dtv_package->size);
+                            pthread_cond_signal(&patch->cond);
+                            pthread_mutex_unlock(&patch->mutex);
+                            dtv_package = NULL;
+                            demux_info->dtv_package = NULL;
+                            break;
+                        } else {
+                            AM_LOGI("list->pack_num %d full !!!", list->pack_num);
+                            pthread_mutex_unlock(&patch->mutex);
+                            pthread_mutex_unlock(&aml_dev->dtv_lock);
+                            usleep(150000);
+                            pthread_mutex_lock(&aml_dev->dtv_lock);
+                            continue;
                         }
-
                     }
                     /* add dtv package to package list */
                     while (!patch->input_thread_exit &&
-                        path_index == dtv_audio_instances->demux_index_working && need_enable_dual_decoder(patch)) {
+                        path_index == dtv_audio_instances->demux_index_working && need_enable_dual_decoder(patch) &&
+                        dtv_ad_package && ad_list) {
                         pthread_mutex_lock(&patch->assoc_mutex);
-                        if (dtv_ad_package && ad_list) {
-                            ret = dtv_package_add(ad_list, dtv_ad_package);
-                            if (ret == 0) {
-                                AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_ad_package %p, pts:%llx, size:%d", dtv_ad_package, dtv_ad_package->pts, dtv_ad_package->size);
-                                pthread_cond_signal(&patch->ad_cond);
-                                pthread_mutex_unlock(&patch->assoc_mutex);
-                                dtv_ad_package = NULL;
-                                demux_info->dtv_ad_package = NULL;
-                                break;
-                            } else {
-                                AM_LOGI("list->pack_num %d full !!!", ad_list->pack_num);
-                                pthread_mutex_unlock(&patch->assoc_mutex);
-                                pthread_mutex_unlock(&aml_dev->dtv_lock);
-                                usleep(150000);
-                                pthread_mutex_lock(&aml_dev->dtv_lock);
-                                continue;
-                            }
+                        ret = dtv_package_add(ad_list, dtv_ad_package);
+                        if (ret == 0) {
+                            AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_ad_package %p, pts:%llx, size:%d", dtv_ad_package, dtv_ad_package->pts, dtv_ad_package->size);
+                            pthread_cond_signal(&patch->ad_cond);
+                            pthread_mutex_unlock(&patch->assoc_mutex);
+                            dtv_ad_package = NULL;
+                            demux_info->dtv_ad_package = NULL;
+                            break;
+                        } else {
+                            AM_LOGI("list->pack_num %d full !!!", ad_list->pack_num);
+                            pthread_mutex_unlock(&patch->assoc_mutex);
+                            pthread_mutex_unlock(&aml_dev->dtv_lock);
+                            usleep(150000);
+                            pthread_mutex_lock(&aml_dev->dtv_lock);
+                            continue;
                         }
                     }
                 }
@@ -1456,7 +1453,8 @@ void *audio_dtv_patch_output_threadloop(void *data)
             continue;
         } else {
             patch->cur_package = p_package;
-            AM_LOGI_IF(aml_dev->debug_flag, "package pts:%llx, package size:%d, dtv_first_apts_flag:%d", p_package->pts, p_package->size, patch->dtv_first_apts_flag);
+            AM_LOGI_IF(aml_dev->debug_flag, "package pts:%llx, package size:%d, dtv_first_apts_flag:%d, num %d", p_package->pts, p_package->size,
+                      patch->dtv_first_apts_flag, list->pack_num);
             /* if first package pts is invalid, we need drop it */
             if ((!patch->dtv_first_apts_flag) && (NULL_INT64 == p_package->pts))
             {
@@ -1508,30 +1506,6 @@ void *audio_dtv_patch_output_threadloop(void *data)
             patch->cur_package = NULL;
         }
 
-        aml_dec_t *aml_dec = aml_out->aml_dec;
-        if (aml_dev->mixing_level != aml_out->dec_config.mixer_level ) {
-            aml_out->dec_config.mixer_level = aml_dev->mixing_level;
-            aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_MIXER_LEVEL, &aml_out->dec_config);
-        }
-        if (demux_info->associate_audio_mixing_enable != aml_out->dec_config.ad_mixing_enable) {
-           aml_out->dec_config.ad_mixing_enable = demux_info->associate_audio_mixing_enable;
-           aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_MIXING_ENABLE, &aml_out->dec_config);
-        }
-
-        if (demux_info->ad_fade != aml_out->dec_config.ad_fade) {
-            aml_out->dec_config.ad_fade = demux_info->ad_fade;
-            aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_FADE, &aml_out->dec_config);
-        }
-        if (demux_info->ad_pan != aml_out->dec_config.ad_pan) {
-            aml_out->dec_config.ad_pan = demux_info->ad_pan;
-            aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_PAN, &aml_out->dec_config);
-        }
-
-        if (aml_dev->advol_level != aml_out->dec_config.advol_level) {
-           aml_out->dec_config.advol_level = aml_dev->advol_level;
-           aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_AD_VOL, &aml_out->dec_config);
-        }
-
         pthread_mutex_unlock(&(patch->dtv_output_mutex));
     }
     aml_audio_free(patch->out_buf);
@@ -1556,18 +1530,21 @@ exit_open:
     return ((void *)0);
 }
 
+#define QUEUE_AD_DATA_WHEN_START 1
 void *audio_dtv_patch_ad_output_threadloop(void *data)
 {
     struct aml_audio_patch *patch = (struct aml_audio_patch *)data;
     struct audio_hw_device *dev = patch->dev;
     struct aml_audio_device *aml_dev = (struct aml_audio_device *)dev;
     package_list *ad_list = patch->dtv_ad_package_list;
+    package_list *main_list = patch->dtv_package_list;
     struct audio_stream_out *ad_stream_out = NULL;
     struct aml_stream_out *ad_aml_out = NULL;
     struct audio_config stream_config;
     int ret= 0, ret_ad = 0;
     int apts_diff = 0;
-    struct timespec ts;
+    struct timespec ts, watch_start_ts;
+    bool watch_flag = false, need_hold_data = false;
 
     AM_LOGI("++ created. ad %d", need_enable_dual_decoder(patch));
     stream_config.sample_rate = 48000;
@@ -1607,6 +1584,38 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
             usleep(1000);
             continue;
         }
+#if QUEUE_AD_DATA_WHEN_START
+        /* as for DD_Disappearing-AA_ddp_DVB_h264_29fps.trp: first 10s has ad,
+          medium 10s has no ad data, then last 10s has ad again.
+          from no_ad to has_ad, need to use start threshold to queue some data,
+          to make sure ad has data continuously with main in mixer process*/
+        if (ad_list->pack_num == 0 && !watch_flag) {//1.save the ts when there's no ad data.
+            clock_gettime(CLOCK_MONOTONIC, &watch_start_ts);
+            watch_flag = true;
+        }
+        AM_LOGI_IF(aml_dev->debug_flag, "ad_num %d, main_num %d, watch_flag %d", ad_list->pack_num, main_list->pack_num, watch_flag);
+        if (watch_flag && ad_list->pack_num != 0) {
+            struct timespec cur_ts;
+            clock_gettime(CLOCK_MONOTONIC, &cur_ts);
+            int has_data_cost_ms = calc_time_interval_us(&watch_start_ts, &cur_ts) / 1000;
+            if (has_data_cost_ms > 1000) {//2.if the period time from no_data to has_data > 1s, need queue
+                need_hold_data = true;
+            }
+            watch_flag = false;
+        }
+        AM_LOGI_IF(aml_dev->debug_flag, "ad_num %d, main_num %d, watch_flag %d, need_hold_data %d", ad_list->pack_num, main_list->pack_num, watch_flag, need_hold_data);
+
+        /*start threshold to make ad has enough data,
+          avoid no ad when mix main data in ms12.
+        */
+        #define AD_START_THRESHOLD 2
+        if (ad_list->pack_num > AD_START_THRESHOLD && need_hold_data) {
+            need_hold_data = false;
+        } else if (need_hold_data) {
+            usleep(10000);
+            continue;
+        }
+#endif
         pthread_mutex_lock(&patch->assoc_mutex);
 
         struct package *p_package = NULL;
@@ -1619,7 +1628,7 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
             continue;
         } else {
             patch->cur_ad_package = p_package;
-            AM_LOGI_IF(aml_dev->debug_flag, "ad package %p, pts:%llx(sz %d)", p_package, p_package->pts, p_package->size);
+            AM_LOGI_IF(aml_dev->debug_flag, "ad package %p, pts:%llx(sz %d), num %d", p_package, p_package->pts, p_package->size, ad_list->pack_num);
         }
 
         pthread_mutex_unlock(&patch->assoc_mutex);
@@ -1628,23 +1637,23 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
         if (need_enable_dual_decoder(patch) && ad_stream_out) {
             ret_ad = audio_dtv_patch_output_decoder(patch, ad_stream_out);
 
-            AM_LOGV("AD pid %d fade %d  pan %d mixing_level %d advol %d. ret_ad %d",
-                demux_info->ad_pid, demux_info->ad_fade, demux_info->ad_pan, aml_dev->mixing_level, aml_dev->advol_level, ret_ad);
+            AM_LOGV("fade %d  pan %d mixing_level %d advol %d. ret_ad %d",
+                p_package->ad_fade, p_package->ad_pan, aml_dev->mixing_level, aml_dev->advol_level, ret_ad);
 
             if (eDolbyMS12Lib == aml_dev->dolby_lib_type &&
                 (ad_aml_out->hal_internal_format == AUDIO_FORMAT_HE_AAC_V1 || ad_aml_out->hal_internal_format == AUDIO_FORMAT_HE_AAC_V2) &&
-                (demux_info->ad_fade != aml_dev->ad_fade || demux_info->ad_pan != aml_dev->ad_pan)) {
+                (p_package->ad_fade != aml_dev->ad_fade || p_package->ad_pan != aml_dev->ad_pan)) {
                 struct dolby_ms12_desc *ms12 = &(aml_dev->ms12);
                 set_ms12_fade_pan
                 (ms12
-                , demux_info->ad_fade /* fade byte*/
+                , p_package->ad_fade /* fade byte*/
                 , 0 /*gain_byte_center*/
                 , 0 /*gain_byte_front */
                 , 0 /*gain_byte_surround*/
-                , demux_info->ad_pan /*pan byte*/
+                , p_package->ad_pan /*pan byte*/
                 );
-                aml_dev->ad_fade = demux_info->ad_fade;
-                aml_dev->ad_pan = demux_info->ad_pan;
+                aml_dev->ad_fade = p_package->ad_fade;
+                aml_dev->ad_pan = p_package->ad_pan;
             }
 
         }
@@ -1656,6 +1665,31 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
             aml_audio_free(patch->cur_ad_package);
             patch->cur_ad_package = NULL;
         }
+        #if 0
+        aml_dec_t *aml_dec = aml_out->aml_dec;
+        if (aml_dev->mixing_level != aml_out->dec_config.mixer_level ) {
+            aml_out->dec_config.mixer_level = aml_dev->mixing_level;
+            aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_MIXER_LEVEL, &aml_out->dec_config);
+        }
+        if (demux_info->associate_audio_mixing_enable != aml_out->dec_config.ad_mixing_enable) {
+           aml_out->dec_config.ad_mixing_enable = demux_info->associate_audio_mixing_enable;
+           aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_MIXING_ENABLE, &aml_out->dec_config);
+        }
+
+        if (demux_info->ad_fade != aml_out->dec_config.ad_fade) {
+            aml_out->dec_config.ad_fade = demux_info->ad_fade;
+            aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_FADE, &aml_out->dec_config);
+        }
+        if (demux_info->ad_pan != aml_out->dec_config.ad_pan) {
+            aml_out->dec_config.ad_pan = demux_info->ad_pan;
+            aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_PAN, &aml_out->dec_config);
+        }
+
+        if (aml_dev->advol_level != aml_out->dec_config.advol_level) {
+           aml_out->dec_config.advol_level = aml_dev->advol_level;
+           aml_decoder_set_config(aml_dec, AML_DEC_CONFIG_AD_VOL, &aml_out->dec_config);
+        }
+        #endif
         pthread_mutex_unlock(&(patch->dtv_ad_output_mutex));
     }
 
