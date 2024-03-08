@@ -21,6 +21,7 @@ extern "C" {
 #include <string.h>
 #include <cutils/log.h>
 #include <aml_ringbuffer.h>
+#include "audio_format_parse.h"
 #include "aml_malloc_debug.h"
 
 /*************************************************
@@ -458,6 +459,94 @@ int get_buffer_write_space(struct ring_buffer *rbuffer)
     pthread_mutex_unlock(&rbuffer->lock);
 
     return write_space;
+}
+
+// return value: The data size between sync word and read pointer of ring buffer
+// if return value is -1, it means we can not find sync word in ring buffer
+int find_61937_sync_word_position_in_ringbuffer(struct ring_buffer *rbuffer) {
+    int read_space = 0;
+    int pos_sync_word = -1;
+    int sync_word_size = 4;
+    unsigned char tmp_buf[4];
+
+    pthread_mutex_lock(&rbuffer->lock);
+    read_space = get_read_space(rbuffer->wr, rbuffer->rd, rbuffer->size, rbuffer->last_is_write);
+    if (read_space >= sync_word_size) {
+        // ring buffer  |-------------|---------------|-------------|
+        //           start_addr      rd              wr
+        if (rbuffer->rd < rbuffer->wr) {
+            pos_sync_word = find_61937_sync_word((char*)rbuffer->rd, read_space);
+        } else {
+            // ring buffer  |----second_read_size----|---------------|---first_read_size---|
+            //           start_addr                  wr              rd
+            int first_read_size = rbuffer->size - (rbuffer->rd - rbuffer->start_addr);
+            int second_read_size = rbuffer->wr - rbuffer->start_addr;
+            //Check if the synchronization word is in first_read_size
+            if (first_read_size >= sync_word_size) {
+                pos_sync_word = find_61937_sync_word((char*)rbuffer->rd, first_read_size);
+                if (pos_sync_word != -1) {
+                    goto find_exit;
+                }
+            }
+            //Check if the synchronization word is in second_read_size
+            if (second_read_size >= sync_word_size) {
+                pos_sync_word = find_61937_sync_word((char*)rbuffer->start_addr, second_read_size);
+                if (pos_sync_word != -1) {
+                    pos_sync_word += first_read_size;
+                    goto find_exit;
+                }
+            }
+            //Check if the synchronization word is in XXXX
+            // ring buffer  |X------------|---------------|----------XXX|
+            //           start_addr      rd              wr
+            if (first_read_size >=3 && second_read_size >=1)
+            {
+                tmp_buf[0]= rbuffer->start_addr[rbuffer->size - 3];
+                tmp_buf[1]= rbuffer->start_addr[rbuffer->size - 2];
+                tmp_buf[2]= rbuffer->start_addr[rbuffer->size - 1];
+                tmp_buf[3]= rbuffer->start_addr[0];
+                pos_sync_word = find_61937_sync_word((char*)tmp_buf, 4);
+                if (pos_sync_word != -1) {
+                    pos_sync_word = first_read_size - 3;
+                    goto find_exit;
+                }
+            }
+            //Check if the synchronization word is in XXXX
+            // ring buffer  |XX-----------|---------------|-----------XX|
+            //           start_addr      rd              wr
+            if (first_read_size >=2 && second_read_size >=2)
+            {
+                tmp_buf[0]= rbuffer->start_addr[rbuffer->size - 2];
+                tmp_buf[1]= rbuffer->start_addr[rbuffer->size - 1];
+                tmp_buf[2]= rbuffer->start_addr[0];
+                tmp_buf[3]= rbuffer->start_addr[1];
+                pos_sync_word = find_61937_sync_word((char*)tmp_buf, 4);
+                if (pos_sync_word != -1) {
+                    pos_sync_word = first_read_size - 2;
+                    goto find_exit;
+                }
+            }
+            //Check if the synchronization word is in XXXX
+            // ring buffer  |XXX----------|---------------|------------X|
+            //           start_addr      rd              wr
+            if (first_read_size >=1 && second_read_size >=3)
+            {
+                tmp_buf[0]= rbuffer->start_addr[rbuffer->size - 1];
+                tmp_buf[1]= rbuffer->start_addr[0];
+                tmp_buf[2]= rbuffer->start_addr[1];
+                tmp_buf[3]= rbuffer->start_addr[2];
+                pos_sync_word = find_61937_sync_word((char*)tmp_buf, 4);
+                if (pos_sync_word != -1) {
+                    pos_sync_word = first_read_size - 1;
+                    goto find_exit;
+                }
+            }
+        }
+    }
+
+find_exit:
+    pthread_mutex_unlock(&rbuffer->lock);
+    return pos_sync_word;
 }
 
 /*************************************************

@@ -24,6 +24,8 @@ struct audio_buffer {
     ssize_t size;
     uint64_t pts; //unit 90k;
     const void* buffer;
+    const void* iec_data_buf;// only used for HDMI source bypass
+    ssize_t iec_data_size;// only used for HDMI source bypass
 };
 
 #endif
