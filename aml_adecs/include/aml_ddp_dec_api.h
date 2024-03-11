@@ -63,7 +63,6 @@ struct dolby_ddp_dec {
     aml_dec_control_type_t digital_raw;
     int decoding_mode;
     int  mixer_level;
-    bool is_iec61937;
     int curFrmSize;
     int (*get_parameters)(void *, int *, int *, int *,int *,int *);
     int (*decoder_process)(unsigned char*, int, unsigned char *, int *, char *, int *, int, struct pcm_info *);

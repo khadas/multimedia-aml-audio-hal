@@ -359,7 +359,13 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
 
         }
 
-        out_write_direct_pcm(stream, dec_data, pcm_len);
+        if (adev->useSubMix) {
+            out_write_direct_pcm(stream, dec_data, pcm_len);
+        } else {
+            if (audio_hal_data_processing(stream, dec_data, pcm_len, &output_buffer, &output_buffer_bytes, output_format) == 0) {
+                hw_write(stream, output_buffer, output_buffer_bytes, output_format);
+            }
+        }
 
         if (aml_out->optical_format != adev->optical_format) {
             ALOGI("optical format change from 0x%x --> 0x%x", aml_out->optical_format, adev->optical_format);
@@ -506,15 +512,9 @@ static void ddp_decoder_config_prepare(struct audio_stream_out *stream, aml_dcv_
     } else if (aml_out->hal_internal_format == AUDIO_FORMAT_AC3) {
         ddp_config->nIsEc3 = 0;
     }
-    /*check if the input format is contained with 61937 format*/
-    if (aml_out->hal_format == AUDIO_FORMAT_IEC61937) {
-        ddp_config->is_iec61937 = true;
-    } else {
-        ddp_config->is_iec61937 = false;
-    }
 
-    ALOGI("%s digital_raw:%d, dual_output_flag:%d, is_61937:%d, IsEc3:%d"
-        , __func__, ddp_config->digital_raw, aml_out->dual_output_flag, ddp_config->is_iec61937, ddp_config->nIsEc3);
+    ALOGI("%s digital_raw:%d, dual_output_flag:%d, IsEc3:%d"
+        , __func__, ddp_config->digital_raw, aml_out->dual_output_flag, ddp_config->nIsEc3);
     return;
 }
 

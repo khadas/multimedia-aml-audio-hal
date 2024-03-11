@@ -562,7 +562,11 @@ int get_nonms12_tuning_latency_pts(struct audio_stream_out *stream)
     int bypass_delay_ms       = 0;
     int video_delay_ms        = 0;
 
-    alsa_delay_ms = (int32_t)out_get_outport_latency(stream);
+    if (adev->useSubMix) {
+        alsa_delay_ms = (int32_t)out_get_outport_latency(stream);
+    } else {
+        alsa_delay_ms = (int32_t)out_get_latency_frames(stream) / out->config.rate;
+    }
 
     if (adev->is_netflix) {
         input_latency_ms  = get_nonms12_netflix_tunnel_input_latency(out->hal_internal_format);

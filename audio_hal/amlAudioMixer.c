@@ -1691,29 +1691,31 @@ static ssize_t aml_out_write_to_mixer(struct audio_stream_out *stream, const voi
         aml_audio_data_handle(stream, buffer, bytes);
     }
 
-    int channel = 2;
-    switch (out->audioCfg.channel_mask) {
-        case AUDIO_CHANNEL_OUT_MONO:
-            channel = 1;
-        case AUDIO_CHANNEL_OUT_STEREO:
-            channel = 2;
-        case AUDIO_CHANNEL_OUT_5POINT1:
-            channel = 6;
-        case AUDIO_CHANNEL_OUT_7POINT1:
-            channel = 8;
-        default:
-            channel = 2;
-    }
-    if (48000 != out->audioCfg.sample_rate) {
-        int ret = aml_audio_resample_process_wrapper(&out->resample_handle, (char *)buffer, bytes, out->audioCfg.sample_rate, channel);
-        if (0 != ret) {
-            ALOGE("aml_audio_resample_process_wrapper failed");
-        } else {
-            data = out->resample_handle->resample_buffer;
-            bytes = out->resample_handle->resample_size;
+    if (out->write_func != MIXER_MAIN_BUFFER_WRITE) {
+        int channel = 2;
+        switch (out->audioCfg.channel_mask) {
+            case AUDIO_CHANNEL_OUT_MONO:
+                channel = 1;
+            case AUDIO_CHANNEL_OUT_STEREO:
+                channel = 2;
+            case AUDIO_CHANNEL_OUT_5POINT1:
+                channel = 6;
+            case AUDIO_CHANNEL_OUT_7POINT1:
+                channel = 8;
+            default:
+                channel = 2;
         }
+        if (48000 != out->audioCfg.sample_rate) {
+            int ret = aml_audio_resample_process_wrapper(&out->resample_handle, (char *)buffer, bytes, out->audioCfg.sample_rate, channel);
+            if (0 != ret) {
+                ALOGE("aml_audio_resample_process_wrapper failed");
+            } else {
+                data = out->resample_handle->resample_buffer;
+                bytes = out->resample_handle->resample_size;
+            }
+        }
+        out->config.rate = 48000;
     }
-    out->config.rate = 48000;
 
     do {
         ssize_t written = 0;

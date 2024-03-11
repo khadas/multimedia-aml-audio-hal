@@ -765,7 +765,11 @@ int dtv_avsync_get_apts_latency(struct audio_stream_out *stream)
     int32_t tuning_ms = 0;
     int total_latency = 0;
 
-    alsa_delay_ms = (int32_t)out_get_outport_latency(stream);
+    if (aml_dev->useSubMix) {
+        alsa_delay_ms = (int32_t)out_get_outport_latency(stream);
+    } else {
+        alsa_delay_ms = (int32_t)out_get_latency_frames(stream) / aml_out->config.rate;
+    }
     if (aml_dev->dolby_lib_type == eDolbyMS12Lib) {
         tuning_ms = dtv_get_ms12_offset_latency(stream);
     } else {

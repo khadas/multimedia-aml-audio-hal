@@ -139,7 +139,6 @@ typedef struct aml_dec {
 typedef struct aml_dcv_config {
     audio_format_t format;
     aml_dec_control_type_t digital_raw;
-    bool is_iec61937;
     int decoding_mode;
     int nIsEc3;
 } aml_dcv_config_t;

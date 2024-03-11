@@ -8309,6 +8309,10 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
             }
         }
     } else {
+        if (!adev->useSubMix) {
+            AM_LOGW("Submix is disable now, aux write isn't supported");
+            return bytes;
+        }
         bytes_written = out_write_direct_pcm(stream, buffer, bytes);
         /*these data is skip for ms12, we still need calculate it*/
         if (eDolbyMS12Lib == adev->dolby_lib_type_last) {
@@ -8457,6 +8461,10 @@ ssize_t mixer_app_buffer_write(struct audio_stream_out *stream, struct audio_buf
    }
 
    if (eDolbyMS12Lib != adev->dolby_lib_type) {
+        if (!adev->useSubMix) {
+            AM_LOGW("Submix is disable now, app write isn't supported");
+            return bytes;
+        }
         AM_LOGI_IF(adev->debug_flag, "dolby_lib_type:%d, is not ms12,  app write to nonms12", adev->dolby_lib_type);
         int  return_bytes = out_write_direct_pcm(stream, buffer, bytes);
         return return_bytes;
@@ -8964,7 +8972,7 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
             on_notify_cbk, aml_out, on_input_avail_cbk, aml_out, NULL, NULL, 1.0);
         AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(&aml_out->audioCfg, aml_out->flags)));
     }
-    if (!adev->useSubMix && is_dts_format(aml_out->hal_internal_format)) {
+    if (!adev->useSubMix && is_dts_format(aml_out->hal_internal_format) && adev->dolby_lib_type_last) {
         adev->useSubMix = true;
         ret = initHalSubMixing(MIXER_LPCM, adev, adev->is_TV);
         adev->raw_to_pcm_flag = false;
@@ -11351,7 +11359,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     // FIXME: current MS12 is not compatible with SUBMIXER, when MS12 lib exists, use ms12 system.
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         adev->useSubMix = false;
-    } else if (aml_get_jason_int_value(USE_SUB_MIX, 1)) {
+    } else if (aml_get_jason_int_value(USE_SUB_MIX, 0)) {
         adev->useSubMix = true;
     }
 
