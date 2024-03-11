@@ -81,6 +81,7 @@ static int select_digital_device(struct spdifout_handle *phandle) {
      *
      */
 
+    AM_LOGI("dual_spdif_support:%d", aml_dev->dual_spdif_support);
     if (!aml_dev->is_TV) {
         if (aml_dev->dual_spdif_support) {
             if (phandle->audio_format == AUDIO_FORMAT_AC3 ||
@@ -104,6 +105,7 @@ static int select_digital_device(struct spdifout_handle *phandle) {
     } else {
         if (aml_dev->dual_spdif_support) {
             int device_index = alsa_device_update_pcm_index(PORT_EARC, PLAYBACK);
+            AM_LOGI("device_index:%d, audio_format:0x%x, in_data_ch:%d optical_format:0x%x", device_index, phandle->audio_format, phandle->in_data_ch, aml_dev->optical_format);
             /*we have arc/earc port*/
             if (device_index != -1) {
                 /*TV spdif_a support arc/spdif, spdif_b only support spdif
@@ -146,9 +148,20 @@ static int select_digital_device(struct spdifout_handle *phandle) {
         } else {
             /*defaut we only use spdif_a to output spdif/arc*/
             device_id = DIGITAL_DEVICE;
+            int device_index = alsa_device_update_pcm_index(PORT_EARC, PLAYBACK);
+            if (device_index != -1) {
+                /* TV which supports earc prefers it as output device */
+                if (phandle->audio_format == AUDIO_FORMAT_E_AC3 ||
+                    phandle->audio_format == AUDIO_FORMAT_MAT ||
+                    (audio_is_linear_pcm(phandle->audio_format) && (phandle->in_data_ch == 8 || phandle->in_data_ch == 6)) ||
+                    (phandle->audio_format == AUDIO_FORMAT_DTS_HD && (phandle->in_data_ch == 8))) {
+                    device_id = EARC_DEVICE;
+                }
+            }
+            AM_LOGI("device_id:%d, device_index:%d", device_id, device_index);
         }
     }
-
+    AM_LOGI("return device_id:%d", device_id);
     return device_id;
 }
 
@@ -408,7 +421,7 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
         if (aml_spdif_format == AML_DTS && spdif_config->is_dtscd) {
             aml_spdif_format = AML_STEREO_PCM;
         }
-        ALOGI("%s channel =0x%x spdif format =0x%x spdif_port=0x%x", __func__, spdif_config->channel_mask, aml_spdif_format, phandle->spdif_port);
+        AM_LOGI("channel =0x%x rate=%d spdif format =0x%x spdif_port=0x%x",spdif_config->channel_mask, spdif_config->rate, aml_spdif_format, phandle->spdif_port);
         /*set spdif format*/
         if (phandle->spdif_port == PORT_SPDIF) {
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_FORMAT, aml_spdif_format);
@@ -693,8 +706,7 @@ int aml_audio_spdifout_close(void *phandle)
 int aml_audio_spdifout_mute(void *phandle, bool b_mute) {
     struct spdifout_handle *spdifout_phandle = (struct spdifout_handle *)phandle;
     if (phandle == NULL) {
-        ALOGE("[%s:%d] invalid param, phandle:%p, spdif_enc_handle:%p", __func__, __LINE__,
-            phandle, spdifout_phandle->spdif_enc_handle);
+        ALOGE("[%s:%d] invalid param, phandle:%p", __func__, __LINE__, phandle);
         return -1;
     }
 

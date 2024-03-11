@@ -141,12 +141,15 @@ struct dolby_ms12_desc {
     audio_format_t main_input_fmt;
     unsigned int   main_input_sr;
     void * ms12_bypass_handle;
+    pthread_mutex_t bypass_ms12_lock;
     bool   is_bypass_ms12;
+    bool   latest_bypass_status;
     int    atmos_info_change_cnt;
     int need_resume;
     int need_resync; /*handle from pause to resume sync*/
     bool dual_bitstream_support;
     struct bitstream_out_desc bitstream_out[BITSTREAM_OUTPUT_CNT];
+    pthread_mutex_t bitstream_a_lock;
     void * spdif_dec_handle;
     bool dual_decoder_support;
     uint64_t main_input_start_offset_ns;

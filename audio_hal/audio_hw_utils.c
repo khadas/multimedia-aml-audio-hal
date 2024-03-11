@@ -1538,6 +1538,7 @@ int halformat_convert_to_spdif(audio_format_t format, int ch_mask) {
             aml_spdif_format = AML_DOLBY_DIGITAL;
             break;
         case AUDIO_FORMAT_E_AC3:
+        case AUDIO_FORMAT_E_AC3_JOC:
             aml_spdif_format = AML_DOLBY_DIGITAL_PLUS;
             break;
         case AUDIO_FORMAT_DTS:

@@ -332,6 +332,130 @@ static void get_mic_characteristics(struct audio_microphone_characteristic_t* mi
 static void * g_aml_primary_adev = NULL;
 
 static int aml_audio_focus(struct aml_audio_device *adev, bool on);
+
+static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
+                                                         const void *in_buf,
+                                                         int32_t in_size,
+                                                         int32_t *used_size,
+                                                         void **output_buf,
+                                                         int32_t *out_size)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev = aml_out->dev;
+    audio_format_t audio_format = aml_out->hal_format;
+    int ret = -1;
+    if (!used_size) {
+        *used_size = 0;
+    }
+    if (!in_buf || !in_size|| !used_size|| !output_buf|| !out_size) {
+        AM_LOGE("parameter error");
+        goto parser_error;
+    }
+
+    if (audio_format == AUDIO_FORMAT_IEC61937) {
+        struct ac3_parser_info ac3_info = { 0 };
+        void * dolby_inbuf = NULL;
+        int32_t dolby_buf_size = 0;
+        int temp_used_size = 0;
+        void * temp_main_frame_buffer = NULL;
+        int temp_main_frame_size = 0;
+        if (!aml_out->spdif_dec_handle) {
+            ret = aml_spdif_decoder_open(&aml_out->spdif_dec_handle);
+            if (ret != 0) {
+                AM_LOGE(" aml_spdif_decoder_open fail");
+                goto parser_error;
+            }
+        }
+        ret = aml_spdif_decoder_process(aml_out->spdif_dec_handle, in_buf, in_size, used_size, output_buf, out_size);
+        if (output_buf && out_size) {
+            endian16_convert((void*)*output_buf, *out_size);
+        }
+        if (*out_size == 0) {
+            *used_size = in_size;
+            goto parser_error;
+        }
+
+        // for IEC data, we need get correct sample rate here?
+        audio_format_t output_format = aml_spdif_decoder_getformat(aml_out->spdif_dec_handle);
+        if (output_format == AUDIO_FORMAT_E_AC3
+            || output_format == AUDIO_FORMAT_AC3) {
+            void* dolby_inbuf = *output_buf;
+            int32_t dolby_buf_size = *out_size;
+
+            if (!aml_out->ac3_parser_handle) {
+                ret = aml_ac3_parser_open(&aml_out->ac3_parser_handle);
+                if (ret != 0) {
+                    AM_LOGE(" aml_ac3_parser_open fail");
+                    goto parser_error;
+                }
+            }
+            aml_ac3_parser_process(aml_out->ac3_parser_handle, dolby_inbuf, dolby_buf_size, &temp_used_size, &temp_main_frame_buffer, &temp_main_frame_size, &ac3_info);
+
+            //AM_LOGI("out(%p) hal_rate(%d) parser_rate(%d) hal_format(%x)", aml_out, aml_out->hal_rate, ac3_info.sample_rate, aml_out->hal_internal_format);
+            if (aml_out->hal_rate != ac3_info.sample_rate && ac3_info.sample_rate != 0) {
+                aml_out->hal_rate = ac3_info.sample_rate;
+                AM_LOGI("ac3/eac3 parser sample rate is %dHz", aml_out->hal_rate);
+            }
+        }
+    } else if (audio_format == AUDIO_FORMAT_AC4) {
+        struct ac4_parser_info ac4_info = { 0 };
+        if (!aml_out->ac4_parser_handle) {
+            ret = aml_ac4_parser_open(&aml_out->ac4_parser_handle);
+            if (ret != 0) {
+                AM_LOGE(" aml_ac4_parser_open fail");
+                goto parser_error;
+            }
+        }
+        ret = aml_ac4_parser_process(aml_out->ac4_parser_handle, in_buf, in_size, used_size, output_buf, out_size, &ac4_info);
+        ALOGV("frame size =%d frame rate=%d sample rate=%d used =%d", ac4_info.frame_size, ac4_info.frame_rate, ac4_info.sample_rate, *used_size);
+        if (*out_size == 0 && *used_size == 0) {
+            *used_size = in_size;
+            AM_LOGE("wrong ac4 frame size");
+            goto parser_error;
+        }
+    } else if ((audio_format == AUDIO_FORMAT_AC3) ||
+                (audio_format == AUDIO_FORMAT_E_AC3)) {
+        struct ac3_parser_info ac3_info = { 0 };
+        AM_LOGI_IF(adev->debug_flag, " ###### frame size %d #####", aml_out->ddp_frame_size);
+        if (!aml_out->ac3_parser_handle) {
+            ret = aml_ac3_parser_open(&aml_out->ac3_parser_handle);
+            if (ret != 0) {
+                AM_LOGE(" aml_ac3_parser_open fail");
+                goto parser_error;
+            }
+        }
+        ret = aml_ac3_parser_process(aml_out->ac3_parser_handle, in_buf, in_size, used_size, output_buf, out_size, &ac3_info);
+        aml_out->ddp_frame_size = out_size;
+        aml_out->ddp_frame_nblks = ac3_info.numblks;
+        aml_out->total_ddp_frame_nblks += aml_out->ddp_frame_nblks;
+        //dependent_frame = ac3_info.frame_dependent;
+        /*for patch mode, the hal_rate is not correct, we should correct it*/
+        if (ac3_info.sample_rate != 0 && *out_size) {
+            if (aml_out->hal_rate != ac3_info.sample_rate) {
+                aml_out->hal_rate = ac3_info.sample_rate;
+                AM_LOGI("ac3/eac3 parser sample rate is %dHz", aml_out->hal_rate);
+            }
+        }
+        if (ac3_info.frame_size == 0) {
+            if (*used_size == 0) {
+                *used_size = in_size;
+            }
+            goto parser_error;
+        }
+    } else {// no parser
+        *output_buf = in_buf;
+        *out_size = in_size;
+        *used_size = in_size;
+        ret = 0;
+    }
+
+    return ret;
+parser_error:
+    *output_buf = in_buf;
+    *out_size = in_size;
+    return ret;
+}
+
 void *aml_adev_get_handle(void)
 {
     return (void *)g_aml_primary_adev;
@@ -2016,8 +2140,12 @@ static int out_flush_new (struct audio_stream_out *stream)
         }
     }
 
-    if (out->hal_format == AUDIO_FORMAT_AC4) {
+    if (out->hal_format == AUDIO_FORMAT_IEC61937) {
+        aml_spdif_decoder_reset(out->spdif_dec_handle);
+    } if (out->hal_format == AUDIO_FORMAT_AC4) {
         aml_ac4_parser_reset(out->ac4_parser_handle);
+    } else if (out->hal_format == AUDIO_FORMAT_AC3 || out->hal_format == AUDIO_FORMAT_E_AC3) {
+        aml_ac3_parser_reset(out->ac3_parser_handle);
     }
 
     if (true == out->pause_status) {
@@ -3688,10 +3816,6 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         }
     }
 
-    if (out->hal_format == AUDIO_FORMAT_AC4) {
-        aml_ac4_parser_open(&out->ac4_parser_handle);
-    }
-
     if (adev->user_setting_scaletempo) {
         out->enable_scaletempo = true;
         hal_scaletempo_init(&out->scaletempo);
@@ -3818,12 +3942,6 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out->spdifenc_init = false;
     }
 
-    if (out->ac3_parser_init) {
-        aml_ac3_parser_close(out->ac3_parser_handle);
-        out->ac3_parser_handle = NULL;
-        out->ac3_parser_init = false;
-    }
-
     if (out->avsync_ctx) {
         if (out->avsync_ctx->msync_ctx) {
             if (out->avsync_ctx->msync_ctx->msync_session) {
@@ -3875,9 +3993,15 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out->resample_outbuf = NULL;
     }
 
-    if (out->hal_format == AUDIO_FORMAT_AC4) {
+    if (out->hal_format == AUDIO_FORMAT_IEC61937) {
+        aml_spdif_decoder_close(out->spdif_dec_handle);
+        out->spdif_dec_handle = NULL;
+    } if (out->hal_format == AUDIO_FORMAT_AC4) {
         aml_ac4_parser_close(out->ac4_parser_handle);
         out->ac4_parser_handle = NULL;
+    } else if (out->hal_format == AUDIO_FORMAT_AC3 || out->hal_format == AUDIO_FORMAT_E_AC3) {
+        aml_ac3_parser_close(out->ac3_parser_handle);
+        out->ac3_parser_handle = NULL;
     }
 
     if (continuous_mode(adev) && (eDolbyMS12Lib == adev->dolby_lib_type)) {
@@ -7641,9 +7765,17 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
     bool need_reconfig_output = false;
     bool need_reset_decoder = true;
     bool need_reconfig_samplerate = false;
-    void   *write_buf = (void *) abuffer->buffer;
+    void *write_buf = (void *) abuffer->buffer;
     size_t  write_bytes = abuffer->size;
+    void *parser_in_buf = (void *) abuffer->buffer;
+    int32_t parser_in_size = abuffer->size;
+    int32_t total_used_size = 0;
+    int32_t current_used_size = 0;
     int return_bytes = write_bytes;
+    struct audio_buffer abuffer_out = {0};
+    memcpy(&abuffer_out, abuffer, sizeof(abuffer_out));
+    abuffer_out.buffer = NULL;
+    abuffer_out.iec_data_buf = NULL;
 
     if (adev->debug_flag) {
         ALOGI("[%s:%d] out:%p bytes:%zu,format:%#x,conti:%d,with_header:%d", __func__, __LINE__,
@@ -7882,11 +8014,51 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
         ALOGD("%s:%d hal_format:%#x, output_format:0x%x, sink_format:0x%x",
             __func__, __LINE__, aml_out->hal_format, output_format, adev->sink_format);
     }
-    if (eDolbyMS12Lib == adev->dolby_lib_type) {
-        return_bytes = aml_audio_ms12_render(stream, abuffer);
-    } else {
-        return_bytes = aml_audio_nonms12_render(stream, abuffer);
+
+    int parser_count = 0;
+    AM_LOGI_IF(adev->debug_flag, "======== parser_in_size(%d) total_used_size(%d) b_pts_valid(%d) pts(%lldms)\n",
+        parser_in_size, total_used_size, abuffer->b_pts_valid, abuffer->pts/90);
+    if (aml_out->hal_format == AUDIO_FORMAT_IEC61937) {
+        abuffer_out.iec_data_buf = abuffer->buffer;
+        abuffer_out.iec_data_size = abuffer->size;
     }
+
+    if (aml_audio_property_get_bool("vendor.media.audiohal.indump", false)) {
+        aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/before_parser.raw",
+            abuffer->buffer, abuffer->size);
+    }
+    while (parser_in_size > total_used_size) {
+        /*AM_LOGI("Before parser  [%d]in_buf(%p) parser_in_buf(%d) total_used_size(%d)",
+            parser_count, parser_in_buf, parser_in_size, total_used_size);*/
+        ret = aml_audio_parser_process_wrapper(stream,
+                                                parser_in_buf + total_used_size,
+                                                parser_in_size - total_used_size,
+                                                &current_used_size,
+                                                &abuffer_out.buffer,
+                                                &abuffer_out.size);
+        if (ret != 0) {
+            AM_LOGE("aml_audio_parser_process_wrapper error");
+        }
+        if (aml_audio_property_get_bool("vendor.media.audiohal.indump", false)) {
+            aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/after_parser.raw",
+                abuffer_out.buffer, abuffer_out.size);
+        }
+        if (parser_count != 0) {
+            abuffer_out.b_pts_valid = false;
+        }
+        char *p = (char*)abuffer_out.buffer;
+        AM_LOGI_IF(adev->debug_flag, "After parser [%d]in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%d) b_pts_valid(%d) pts(%lldms)",
+            parser_count, parser_in_buf, abuffer_out.buffer, *p, *(p+1),
+            *(p+2),*(p+3),abuffer_out.size, abuffer_out.b_pts_valid, abuffer_out.pts/90);
+        total_used_size += current_used_size;
+        parser_count++;
+        if (eDolbyMS12Lib == adev->dolby_lib_type) {
+            return_bytes = aml_audio_ms12_render(stream, &abuffer_out);
+        } else {
+            return_bytes = aml_audio_nonms12_render(stream, &abuffer_out);
+        }
+    }
+
 exit:
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         if (continuous_mode(adev)) {
@@ -8520,6 +8692,9 @@ pheader_rewrite:
         abuffer.buffer = write_buf;
         abuffer.size = write_bytes;
         abuffer.pts = cur_pts;
+        if (abuffer.pts != HWSYNC_PTS_NA) {
+            abuffer.b_pts_valid = true;
+        }
         return_bytes = aml_out->write(stream, &abuffer);
     }
 
@@ -9159,7 +9334,7 @@ void *audio_patch_input_threadloop(void *data)
             }
 
             if (aml_audio_property_get_bool("vendor.media.audiohal.indump", false)) {
-                aml_audio_dump_audio_bitstreams("/data/audio/alsa_in_read.raw",
+                aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/alsa_in_read.raw",
                     patch->in_buf, read_bytes);
             }
         }
@@ -9234,7 +9409,6 @@ void *audio_patch_input_threadloop(void *data)
     return (void *)0;
 }
 
-
 void *audio_patch_output_threadloop(void *data)
 {
     struct aml_audio_patch *patch = (struct aml_audio_patch *)data;
@@ -9247,7 +9421,9 @@ void *audio_patch_output_threadloop(void *data)
     struct audio_config stream_config;
     struct timespec ts;
     int write_bytes = DEFAULT_PLAYBACK_PERIOD_SIZE * PLAYBACK_PERIOD_COUNT;
+    int original_write_bytes = write_bytes;
     int ret;
+    bool find_iec_sync_word = false;
     AM_LOGD("enter");
     stream_config.channel_mask = patch->out_chanmask;
     stream_config.sample_rate = patch->out_sample_rate;
@@ -9290,7 +9466,7 @@ void *audio_patch_output_threadloop(void *data)
     }
 
     out = (struct aml_stream_out *)stream_out;
-    patch->out_buf_size = write_bytes = out->config.period_size * audio_stream_out_frame_size(&out->stream);
+    patch->out_buf_size = write_bytes = original_write_bytes = out->config.period_size * audio_stream_out_frame_size(&out->stream);
     patch->out_buf = aml_audio_calloc(1, patch->out_buf_size);
     if (!patch->out_buf) {
         adev_close_output_stream_new(patch->dev, &out->stream);
@@ -9323,6 +9499,7 @@ void *audio_patch_output_threadloop(void *data)
             } else {
                 stream_config.sample_rate = audio_parse_get_audio_samplerate(patch->audio_parse_para);
             }
+
             ret = adev_open_output_stream_new(patch->dev,
                                               0,
                                               patch->output_src,
@@ -9341,6 +9518,7 @@ void *audio_patch_output_threadloop(void *data)
             if (out->hal_internal_format != AUDIO_FORMAT_PCM_16_BIT &&
                 out->hal_internal_format != AUDIO_FORMAT_PCM_32_BIT) {
                 out->hal_format = AUDIO_FORMAT_IEC61937;
+                find_iec_sync_word = false;
                 //Check DTS-CD
                 if (out->hal_internal_format == AUDIO_FORMAT_DTS ||
                     out->hal_internal_format == AUDIO_FORMAT_DTS_HD) {
@@ -9379,13 +9557,18 @@ void *audio_patch_output_threadloop(void *data)
             patch->digital_input_fmt_change = false;
         }
 
-        if (patch->aformat == AUDIO_FORMAT_E_AC3)
-            period_mul = EAC3_MULTIPLIER;
-        else if ((patch->aformat == AUDIO_FORMAT_MAT) || (patch->aformat == AUDIO_FORMAT_DTS_HD))
-            period_mul = HBR_MULTIPLIER;
-        else {
-            period_mul = 1;
+        period_mul = 1;
+        write_bytes = original_write_bytes;
+        if (out->hal_internal_format == AUDIO_FORMAT_AC3) {
+            write_bytes = AC3_PERIOD_SIZE;
+        } else if (out->hal_internal_format == AUDIO_FORMAT_E_AC3) {
+            write_bytes = EAC3_PERIOD_SIZE;
+        } else if (out->hal_internal_format == AUDIO_FORMAT_MAT) {
+            write_bytes = MAT_PERIOD_SIZE;
+        } else if (patch->aformat == AUDIO_FORMAT_DTS_HD){
+           period_mul = HBR_MULTIPLIER;
         }
+
         //ALOGI("%s  period_mul = %d ", __func__, period_mul);
 
         if (aml_dev->game_mode)
@@ -9410,11 +9593,40 @@ void *audio_patch_output_threadloop(void *data)
 
         ALOGV("%s(), ringbuffer level read after wait-- %d, %d * %d",
               __func__, get_buffer_read_space(ringbuffer), write_bytes, period_mul);
+
+        if (is_dolby_ms12_support_compression_format(out->hal_internal_format)) {
+            int pos_sync_word = -1;
+            int need_drop_size = 0;
+            int ring_buffer_read_space = get_buffer_read_space(ringbuffer);
+            pos_sync_word = find_61937_sync_word_position_in_ringbuffer(ringbuffer);
+
+            if (pos_sync_word >= 0) {
+                need_drop_size = pos_sync_word;
+                find_iec_sync_word = true;
+            } else if (pos_sync_word == -1 && (find_iec_sync_word == false || ring_buffer_read_space > write_bytes)) {
+                //write_bytes is frame size.
+                //We should be able to find sync word within a frame size.
+                //If we cannot find it, it is considered that there is a problem with the data
+                need_drop_size = ring_buffer_read_space;
+            } else if (pos_sync_word == -1) {
+                continue;
+            }
+
+            if (need_drop_size >0) {
+                AM_LOGE("data error, we drop data(%d) pos_sync_word(%d) find_sync_word(%d) read_space(%d)(%d) out_buf_size(%d), write_bytes(%d)",
+                    need_drop_size, pos_sync_word, find_iec_sync_word, ring_buffer_read_space, ringbuffer->size, patch->out_buf_size, write_bytes);
+                int drop_size = ring_buffer_seek(ringbuffer, need_drop_size);
+                if (drop_size != need_drop_size) {
+                    AM_LOGE("drop fail, need_drop_size(%d) actual drop_size(%d)", need_drop_size, drop_size);
+                }
+
+            }
+        }
         if (get_buffer_read_space(ringbuffer) >= (write_bytes * period_mul)) {
             ret = ring_buffer_read(ringbuffer,
                                    (unsigned char*)patch->out_buf, write_bytes * period_mul);
             if (ret == 0) {
-                AM_LOGE("ring_buffer read 0 data!");
+                AM_LOGE("ring_buffer read 0 data!  write_bytes(%d), period_mul(%d)", write_bytes, period_mul);
             }
 
             /* avsync for dev->dev patch*/
@@ -9446,9 +9658,7 @@ void *audio_patch_output_threadloop(void *data)
             if (patch && patch->input_src == AUDIO_DEVICE_IN_HDMI) {
                 stream_check_reconfig_param(stream_out);
             }
-
             stream_out->write(stream_out, patch->out_buf, ret);
-
         } else {
             ALOGV("%s(), no enough data in ring buffer, available data size:%d, need data size:%d", __func__,
                 get_buffer_read_space(ringbuffer), (write_bytes * period_mul));
@@ -10486,6 +10696,8 @@ static int adev_close(hw_device_t *device)
 
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         adev_ms12_cleanup((struct audio_hw_device *)device);
+        pthread_mutex_destroy(&adev->ms12.bitstream_a_lock);
+        pthread_mutex_destroy(&adev->ms12.bypass_ms12_lock);
         adev->ms12_out = NULL;
     }
 
@@ -11118,7 +11330,12 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
             ALOGE("%s, adev_ms12_prepare fail!\n", __func__);
             goto Err_MS12_MesgThreadCreate;
         }
-
+        if ((ret = pthread_mutex_init (&adev->ms12.bitstream_a_lock, NULL)) != 0) {
+            AM_LOGE("pthread_mutex_init fail, errno:%s", strerror(errno));
+        }
+        if ((ret = pthread_mutex_init (&adev->ms12.bypass_ms12_lock, NULL)) != 0) {
+            AM_LOGE("pthread_mutex_init fail, errno:%s", strerror(errno));
+        }
     }
     //set msync log level
     log_set_level(AVS_LOG_INFO);

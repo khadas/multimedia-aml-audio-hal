@@ -100,6 +100,17 @@ typedef struct audio_msync {
     uint64_t first_apts;  //record and print
 }audio_msync_t;//for AudioProcess mode
 
+typedef enum {
+    AV_SYNC_AUDIO_UNKNOWN = 0,
+    AV_SYNC_AUDIO_NORMAL_OUTPUT,
+    AV_SYNC_AUDIO_DROP_PCM,
+    AV_SYNC_AUDIO_INSERT,
+    AV_SYNC_AUDIO_HOLD,
+    AV_SYNC_AUDIO_MUTE,
+    AV_SYNC_AUDIO_RESAMPLE,
+    AV_SYNC_AUDIO_ADJUST_CLOCK,
+} av_sync_policy_e;
+
 typedef struct audio_avsync {
     audio_mediasync_t *mediasync_ctx;
     audio_msync_t *msync_ctx;
@@ -109,6 +120,7 @@ typedef struct audio_avsync {
     apts_tab_t pts_tab[HWSYNC_APTS_NUM];
     size_t payload_offset;
     int (*get_tuning_latency)(struct audio_stream_out *stream);
+    av_sync_policy_e last_sync_policy;
     pthread_mutex_t lock;
 }avsync_ctx_t;
 
