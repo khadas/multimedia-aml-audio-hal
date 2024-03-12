@@ -4061,7 +4061,11 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     }
     out->need_sync   = false;
     out->with_header = false;
-
+    if (out->write_func == MIXER_MAIN_BUFFER_WRITE) {
+        //clear the hal format when main close.
+        adev->audio_hal_info.update_type = TYPE_PCM;
+        aml_mixer_ctrl_set_int(&adev->alsa_mixer, AML_MIXER_ID_AUDIO_HAL_FORMAT, TYPE_PCM);
+    }
     pthread_mutex_unlock(&out->lock);
     adev->audio_hal_info.is_decoding = false;
     adev->audio_hal_info.first_decoding_frame = false;
