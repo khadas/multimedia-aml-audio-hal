@@ -7843,25 +7843,6 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
         aml_out->standby = false;
     }
 
-    // when connect bt, bt stream maybe open before hdmi stream close,
-    // bt stream mediasync is set to adev->hw_mediasync, and it would be
-    // release in hdmi stream close, so bt stream mediasync is invalid
-    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)) {
-        if ((aml_out->avsync_ctx->mediasync_ctx->handle != NULL) && (adev->hw_mediasync == NULL)) {
-            adev->hw_mediasync = mediasync_wrap_create();
-            pthread_mutex_lock(&(aml_out->avsync_ctx->lock));
-            aml_out->avsync_ctx->mediasync_ctx->handle = adev->hw_mediasync;
-            pthread_mutex_unlock(&(aml_out->avsync_ctx->lock));
-            ret = mediasync_wrap_bindInstance(aml_out->avsync_ctx->mediasync_ctx->handle, aml_out->avsync_ctx->mediasync_ctx->mediasync_id, MEDIA_AUDIO);
-            if (!ret)
-                ALOGD("%s: mediasync_wrap_bindInstance fail: ret=%d, id=%d", __func__, ret, aml_out->avsync_ctx->mediasync_ctx->mediasync_id);
-            audio_header_info_reset(aml_out->pheader);
-            avsync_ctx_reset(aml_out->avsync_ctx);
-            if (eDolbyMS12Lib == adev->dolby_lib_type)
-                dolby_ms12_hwsync_init();
-        }
-    }
-
     /*for ms12 continuous mode, we need update status here, instead of in hw_write*/
     if (aml_out->status == STREAM_STANDBY && continuous_mode(adev)) {
         aml_out->status = STREAM_HW_WRITING;
