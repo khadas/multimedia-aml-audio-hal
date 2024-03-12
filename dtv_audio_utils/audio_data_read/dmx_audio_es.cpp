@@ -49,7 +49,7 @@ AM_Dmx_Audio_ErrorCode_t Flush_Dmx_Audio(void *demux_handle) {
         ALOGD("demux not open !!!");
         return AM_AUDIO_Dmx_ERROR;
     }
-    ALOGI("%s %d",__FUNCTION__, __LINE__);
+    ALOGI("%s %d, handle:%p",__FUNCTION__, __LINE__, demux_handle);
     demux_wrapper->AmDemuxWrapperFlushData(demux_wrapper->filering_aud_pid);
     return AM_AUDIO_Dmx_SUCCESS;
 }

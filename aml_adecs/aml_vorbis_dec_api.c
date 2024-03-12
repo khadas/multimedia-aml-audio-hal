@@ -60,7 +60,6 @@ typedef struct {
     void *pdecoder_lib;
     char remain_data[VORBIS_REMAIN_BUFFER_SIZE];
     int remain_size;
-    bool ad_decoder_supported;
     bool ad_mixing_enable;
     int advol_level;
     int mixer_level;
@@ -212,7 +211,6 @@ static int vorbis_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t *dec_conf
 
     *ppaml_dec = (aml_dec_t *)vorbis_decoder;
     vorbis_decoder->aml_decoder.status = 1;
-    vorbis_decoder->ad_decoder_supported = dec_config->ad_decoder_supported;
     vorbis_decoder->ad_mixing_enable = dec_config->ad_mixing_enable;
     vorbis_decoder->mixer_level = dec_config->mixer_level;
     vorbis_decoder->advol_level = dec_config->advol_level;
@@ -220,7 +218,6 @@ static int vorbis_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t *dec_conf
     memset(vorbis_decoder->remain_data, 0, VORBIS_REMAIN_BUFFER_SIZE * sizeof(char));
     vorbis_decoder->ad_remain_size = 0;
     memset(vorbis_decoder->ad_remain_data , 0 ,VORBIS_REMAIN_BUFFER_SIZE * sizeof(char));
-    ALOGI("%s[%d]: vorbis_decoder->ad_decoder_supported = %d", __FUNCTION__, __LINE__, vorbis_decoder->ad_decoder_supported);
     ALOGE("%s[%d]: success", __FUNCTION__, __LINE__);
     return 0;
 

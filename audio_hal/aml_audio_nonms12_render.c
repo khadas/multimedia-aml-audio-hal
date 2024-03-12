@@ -717,12 +717,9 @@ static void ddp_decoder_config_prepare(struct audio_stream_out *stream, aml_dcv_
     }
 
     adev->dcvlib_bypass_enable = 0;
-
     ddp_config->digital_raw = AML_DEC_CONTROL_CONVERT;
 
-    if (demux_info && demux_info->dual_decoder_support) {
-        ddp_config->decoding_mode = DDP_DECODE_MODE_AD_DUAL;
-    } else if (aml_out->ad_substream_supported) {
+    if (aml_out->ad_substream_supported) {
         ddp_config->decoding_mode = DDP_DECODE_MODE_AD_SUBSTREAM;
     } else {
         ddp_config->decoding_mode = DDP_DECODE_MODE_SINGLE;
@@ -887,7 +884,6 @@ int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t f
     }
 
     if (demux_info) {
-        dec_config->ad_decoder_supported = demux_info->dual_decoder_support;
         dec_config->ad_mixing_enable = demux_info->associate_audio_mixing_enable;
         dec_config->mixer_level = adev->mixing_level;
         dec_config->advol_level = adev->advol_level;

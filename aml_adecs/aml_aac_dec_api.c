@@ -69,7 +69,6 @@ struct aac_dec_t {
     char remain_data[AAC_REMAIN_BUFFER_SIZE];
     int remain_size;
     uint64_t remain_data_pts; //unit 90k;
-    bool ad_decoder_supported;
     bool ad_mixing_enable;
     int advol_level;
     int  mixer_level;
@@ -240,13 +239,11 @@ static int faad_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t * dec_confi
     aml_dec->status = 1;
     aac_dec->ad_need_cache_frames = AAC_AD_NEED_CACHE_FRAME_COUNT;
     *ppaml_dec = (aml_dec_t *)aac_dec;
-    aac_dec->ad_decoder_supported = dec_config->ad_decoder_supported;
     aac_dec->ad_mixing_enable = dec_config->ad_mixing_enable;
     aac_dec->mixer_level = dec_config->mixer_level;
     aac_dec->advol_level = dec_config->advol_level;
     aac_dec->ad_fade = dec_config->ad_fade;
     aac_dec->ad_pan = dec_config->ad_pan;
-    ALOGI("aac_dec->ad_decoder_supported %d",aac_dec->ad_decoder_supported);
     aac_dec->remain_size = 0;
     memset(aac_dec->remain_data , 0 , AAC_REMAIN_BUFFER_SIZE * sizeof(char ));
     aac_dec->ad_remain_size = 0;
@@ -329,8 +326,8 @@ static int faad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffe
     int used_size = 0;
     int used_size_return = 0;
     int mark_remain_size = aac_dec->remain_size;
-    AM_LOGI_IF(aml_dec->debug_level, "remain_size %d bytes %d ad_decoder_supported %d ad_mixing_enable %d advol_level %d mixer_level %d",
-        aac_dec->remain_size ,bytes, aac_dec->ad_decoder_supported, aac_dec->ad_mixing_enable, aac_dec->advol_level,aac_dec->mixer_level );
+    AM_LOGI_IF(aml_dec->debug_level, "remain_size %d bytes %d ad_mixing_enable %d advol_level %d mixer_level %d",
+        aac_dec->remain_size ,bytes, aac_dec->ad_mixing_enable, aac_dec->advol_level,aac_dec->mixer_level );
     if (bytes > 0) {
         if (true == abuffer->b_pts_valid)
         {

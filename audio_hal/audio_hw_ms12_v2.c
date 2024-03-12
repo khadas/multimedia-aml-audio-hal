@@ -928,14 +928,11 @@ int get_the_dolby_ms12_prepared(
     if (input_format == AUDIO_FORMAT_AC3 || input_format == AUDIO_FORMAT_E_AC3 ||
         input_format == AUDIO_FORMAT_HE_AAC_V1 || input_format == AUDIO_FORMAT_HE_AAC_V2) {
         if (patch && demux_info) {
-            ms12->dual_decoder_support = demux_info->dual_decoder_support;
             associate_audio_mixing_enable = demux_info->associate_audio_mixing_enable;
        } else {
-            ms12->dual_decoder_support = 0;
             associate_audio_mixing_enable = 0;
        }
     } else {
-        ms12->dual_decoder_support = 0;
         associate_audio_mixing_enable = 0;
     }
     //update the runtime parameters after ms12 initialization is completed.
@@ -958,11 +955,11 @@ int get_the_dolby_ms12_prepared(
             set_ms12_ac4_prefer_presentation_selection_by_associated_type_over_language(ms12, prefer_selection_type);
         }
     }
-    ALOGI("+%s() dual_decoder_support %d optical =0x%x sink =0x%x sink max channel =%d, ad(%d)balance %d vol %d\n",
-        __FUNCTION__, ms12->dual_decoder_support, ms12->optical_format, ms12->sink_format, sink_max_channels, associate_audio_mixing_enable, adev->mixing_level, adev->advol_level);
+    ALOGI("+%s() optical =0x%x sink =0x%x sink max channel =%d, ad(%d)balance %d vol %d\n",
+        __FUNCTION__, ms12->optical_format, ms12->sink_format, sink_max_channels, associate_audio_mixing_enable, adev->mixing_level, adev->advol_level);
 
     /*set the associate audio format*/
-    if (ms12->dual_decoder_support == true) {
+    if (patch && demux_info) {
         set_audio_associate_format(input_format);
         set_ms12_ad_vol(ms12, adev->advol_level);
         ALOGI("%s set_audio_associate_format %#x", __FUNCTION__, input_format);
@@ -2078,8 +2075,7 @@ int ac3_and_eac3_bypass_process(struct audio_stream_out *stream, void *buffer, s
 
     pthread_mutex_lock(&ms12->bypass_ms12_lock);
     if (ms12->is_bypass_ms12
-        && is_ac3_or_eac3
-        && !ms12->dual_decoder_support) {
+        && is_ac3_or_eac3 ) {
         if (bytes != 0 && buffer != NULL) {
             if (aml_out->hal_rate == 44100 ||
                 aml_out->hal_rate == 176400) {
@@ -3268,22 +3264,12 @@ static int nbytes_of_dolby_ms12_downmix_output_pcm_frame()
     return pcm_out_channels*bytes_per_sample;
 }
 
-int dolby_ms12_main_open(struct audio_stream_out *stream) {
+int dolby_ms12_main_open(struct audio_stream_out *stream)
+{
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    int ret = 0, associate_audio_mixing_enable = 0 , media_presentation_id = -1, mixing_level = 0,ad_vol = 100;
-    struct aml_audio_patch *patch = adev->audio_patch;
     unsigned int sample_rate = aml_out->hal_rate;
-
-#ifdef USE_DTV
-    aml_demux_audiopara_t * demux_info = NULL;
-    if (patch) {
-        demux_info = (aml_demux_audiopara_t *)patch->demux_info;
-    }
-    bool do_sync_flag = (adev->patch_src == SRC_DTV) && patch;
-#endif
-
     audio_format_t hal_internal_format = ms12_get_audio_hal_format(aml_out->hal_internal_format);
 
     /*
@@ -3317,30 +3303,28 @@ int dolby_ms12_main_open(struct audio_stream_out *stream) {
     if (hal_internal_format == AUDIO_FORMAT_PCM_16_BIT) {
         sample_rate = DDP_OUTPUT_SAMPLE_RATE;
     }
-
 #ifdef USE_DTV
-    if (hal_internal_format == AUDIO_FORMAT_AC3 ||
-        hal_internal_format == AUDIO_FORMAT_E_AC3 ||
-        hal_internal_format == AUDIO_FORMAT_AC4 ||
-        hal_internal_format == AUDIO_FORMAT_HE_AAC_V1 ||
-        hal_internal_format == AUDIO_FORMAT_HE_AAC_V2 ||
-        hal_internal_format == AUDIO_FORMAT_PCM_16_BIT) {
-        if (patch && demux_info) {
-            ms12->dual_decoder_support = demux_info->dual_decoder_support;
-            /*set the associate audio format*/
-            if (ms12->dual_decoder_support == true) {
-                set_audio_associate_format(hal_internal_format);
-                set_ms12_ad_vol(ms12, adev->advol_level);
-                dolby_ms12_set_associated_audio_mixing(demux_info->associate_audio_mixing_enable);
-                dolby_ms12_set_user_control_value_for_mixing_main_and_associated_audio(adev->mixing_level);
-                AM_LOGI("set_audio_associate_format %#x", hal_internal_format);
-            }
-       } else {
-            ms12->dual_decoder_support = 0;
-       }
-    } else {
-        ms12->dual_decoder_support = 0;
+    struct aml_audio_patch * patch = adev->audio_patch;
+    aml_demux_audiopara_t * demux_info = NULL;
+    if (patch) {
+        demux_info = (aml_demux_audiopara_t *)patch->demux_info;
     }
+    if (patch && demux_info) {
+        if (hal_internal_format == AUDIO_FORMAT_AC3 ||
+            hal_internal_format == AUDIO_FORMAT_E_AC3 ||
+            hal_internal_format == AUDIO_FORMAT_AC4 ||
+            hal_internal_format == AUDIO_FORMAT_HE_AAC_V1 ||
+            hal_internal_format == AUDIO_FORMAT_HE_AAC_V2 ||
+            hal_internal_format == AUDIO_FORMAT_PCM_16_BIT) {
+            /*set the associate audio format*/
+            set_audio_associate_format(hal_internal_format);
+            set_ms12_ad_vol(ms12, adev->advol_level);
+            dolby_ms12_set_associated_audio_mixing(adev->associate_audio_mixing_enable);
+            dolby_ms12_set_user_control_value_for_mixing_main_and_associated_audio(adev->mixing_level);
+            AM_LOGI("set_audio_associate_format %#x", hal_internal_format);
+        }
+    }
+
     if (hal_internal_format == AUDIO_FORMAT_AC4) {
         if (patch && demux_info) {
             char first_lang[4] = {0};
@@ -3356,13 +3340,9 @@ int dolby_ms12_main_open(struct audio_stream_out *stream) {
             set_ms12_ac4_presentation_group_index(ms12, demux_info->media_presentation_id);
         }
     }
-
-    AM_LOGI("+() dual_decoder_support %d optical =0x%x sink =0x%x\n",
-        ms12->dual_decoder_support, ms12->optical_format, ms12->sink_format);
 #endif
-
-    /*set the continuous output flag*/
-    set_dolby_ms12_continuous_mode(false);
+    AM_LOGI("+() adev->associate_audio_mixing_enable %d optical =0x%x sink =0x%x\n",
+        adev->associate_audio_mixing_enable, ms12->optical_format, ms12->sink_format);
     dolby_ms12_set_atmos_lock_flag(adev->atoms_lock_flag);
 
     if (patch && patch->input_src == AUDIO_DEVICE_IN_HDMI) {
@@ -3440,11 +3420,6 @@ int dolby_ms12_main_close(struct audio_stream_out *stream) {
     if (ms12->scaletempo) {
         hal_scaletempo_release((struct scale_tempo *)ms12->scaletempo);
         ms12->scaletempo = NULL;
-    }
-
-    /*if the main/ad is closed, we should reset it to pcm*/
-    if (ms12->dual_decoder_support == true) {
-        set_audio_associate_format(AUDIO_FORMAT_PCM_16_BIT);
     }
 
     aml_ms12_main_decoder_close(ms12);

@@ -1132,8 +1132,8 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
             aml_demux_audiopara_t * tm = (aml_demux_audiopara_t *)pstPatch->demux_info;
             dprintf(fd, "[AML_HAL] demux_id:%d,security_mem_level %d,output_mode %d,has_video %d,main_fmt %d,main_pid %d,\n",
                     tm->demux_id,tm->security_mem_level,tm->output_mode,tm->has_video,tm->main_fmt,tm->main_pid);
-            dprintf(fd, "[AML_HAL] ad_fmt:%d,ad_pid %d,dual_decoder_support %d,associate_audio_mixing_enable %d,media_sync_id %d,media_presentation_id %d,\n",
-                    tm->ad_fmt,tm->ad_pid,tm->dual_decoder_support,tm->associate_audio_mixing_enable,tm->media_sync_id,tm->media_presentation_id);
+            dprintf(fd, "[AML_HAL] ad_fmt:%d,ad_pid %d,associate_audio_mixing_enable %d,media_sync_id %d,media_presentation_id %d,\n",
+                    tm->ad_fmt,tm->ad_pid,tm->associate_audio_mixing_enable,tm->media_sync_id,tm->media_presentation_id);
             dprintf(fd, "[AML_HAL] ad_package_status:%d,mEsData %p,mADEsData %p,dtv_pacakge %p,ad_fade %d,ad_pan %d,\n",
                     tm->ad_package_status,tm->mEsData,tm->mADEsData,tm->dtv_package,tm->ad_fade,tm->ad_pan);
         }
@@ -1142,8 +1142,8 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
         {
             struct aml_stream_out * dtv_aml_out = pstPatch->dtv_aml_out;
             aml_dec_t *aml_dec= dtv_aml_out->aml_dec;
-            dprintf(fd, "[AML_HAL] ad_decoder_supported:%d,ad_mixing_enable %d,advol_level %d,mixer_level %d,ad_fade %x,ad_pan %x,\n",
-                    dtv_aml_out->dec_config.ad_decoder_supported,dtv_aml_out->dec_config.ad_mixing_enable,
+            dprintf(fd, "[AML_HAL] ad_mixing_enable %d,advol_level %d,mixer_level %d,ad_fade %x,ad_pan %x,\n",
+                    dtv_aml_out->dec_config.ad_mixing_enable,
                     dtv_aml_out->dec_config.advol_level,dtv_aml_out->dec_config.mixer_level,
                     dtv_aml_out->dec_config.ad_fade,dtv_aml_out->dec_config.ad_pan);
             if (aml_dec) {

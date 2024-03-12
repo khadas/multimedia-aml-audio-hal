@@ -151,7 +151,6 @@ struct dolby_ms12_desc {
     struct bitstream_out_desc bitstream_out[BITSTREAM_OUTPUT_CNT];
     pthread_mutex_t bitstream_a_lock;
     void * spdif_dec_handle;
-    bool dual_decoder_support;
     uint64_t main_input_start_offset_ns;
     uint64_t main_input_ns;
     uint64_t main_input_bytes_offset;

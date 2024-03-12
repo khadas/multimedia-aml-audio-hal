@@ -64,7 +64,6 @@ struct mad_dec_t {
     char remain_data[MAD_REMAIN_BUFFER_SIZE];
     int remain_size;
     uint64_t remain_data_pts; //unit 90k;
-    bool ad_decoder_supported;
     bool ad_mixing_enable;
     int advol_level;
     int  mixer_level;
@@ -218,15 +217,12 @@ static int mad_decoder_init(aml_dec_t **ppaml_dec, aml_dec_config_t *dec_config)
     }
     aml_dec->status = 1;
     *ppaml_dec = (aml_dec_t *)mad_dec;
-    mad_dec->ad_decoder_supported = dec_config->ad_decoder_supported;
     mad_dec->ad_mixing_enable = dec_config->ad_mixing_enable;
     mad_dec->mixer_level = dec_config->mixer_level;
     mad_dec->advol_level = dec_config->advol_level;
     mad_dec->ad_fade = dec_config->ad_fade;
     mad_dec->ad_pan = dec_config->ad_pan;
     mad_dec->ad_need_cache_frames = MAD_AD_NEED_CACHE_FRAME_COUNT;
-
-    ALOGI("mad_dec->ad_decoder_supported %d",mad_dec->ad_decoder_supported);
     mad_dec->remain_size = 0;
     memset(mad_dec->remain_data , 0 , MAD_REMAIN_BUFFER_SIZE * sizeof(char ));
     mad_dec->ad_remain_size = 0;
@@ -308,8 +304,8 @@ static int mad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer
     int used_size = 0;
     int used_size_return = 0;
     int mark_remain_size = mad_dec->remain_size;
-    AM_LOGI_IF(aml_dec->debug_level, "remain_size %d bytes %d ad_decoder_supported %d ad_mixing_enable %d advol_level %d mixer_level %d",
-        mad_dec->remain_size ,bytes, mad_dec->ad_decoder_supported, mad_dec->ad_mixing_enable, mad_dec->advol_level,mad_dec->mixer_level );
+    AM_LOGI_IF(aml_dec->debug_level, "remain_size %d bytes %d %d ad_mixing_enable %d advol_level %d mixer_level %d",
+        mad_dec->remain_size ,bytes, mad_dec->ad_mixing_enable, mad_dec->advol_level,mad_dec->mixer_level );
     if (bytes > 0) {
         if ((mad_dec->remain_size  + bytes >=  MAD_REMAIN_BUFFER_SIZE) || (mad_dec->remain_size < 0)) {
            ALOGE("mad_dec->remain_size + bytes  %d > %d  ,overflow", mad_dec->remain_size + bytes, MAD_REMAIN_BUFFER_SIZE );

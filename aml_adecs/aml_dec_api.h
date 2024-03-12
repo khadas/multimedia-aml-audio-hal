@@ -227,7 +227,6 @@ typedef struct aml_dec_config {
     aml_vorbis_config_t vorbis_config;
 
     /*config for runtime*/
-    bool ad_decoder_supported;
     bool ad_mixing_enable;
     int advol_level;
     int  mixer_level;   /* AML_DEC_CONFIG_MIXER_LEVEL */

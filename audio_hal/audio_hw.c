@@ -5228,7 +5228,7 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     {//add tsplayer compatible cmd
         ret = str_parms_get_int(parms, "dual_decoder_support", &val);
         if (ret >= 0) {
-            ALOGI("dual_decoder_support  set to %d\n", val);
+            ALOGI("dual_decoder_support set to %d\n", val);
             dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_AD_SUPPORT ,val);
             goto exit;
         }
@@ -5264,7 +5264,6 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         }
         ret = str_parms_get_int(parms, "associate_audio_mixing_enable", &val);
         if (ret >= 0) {
-            adev->ad_switch_enable = val;
             dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_AD_ENABLE, val);
             goto exit;
         }
@@ -5350,7 +5349,6 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
 
         ret = str_parms_get_int(parms, "ad_switch_enable", &val);
         if (ret >= 0) {
-            adev->ad_switch_enable = val;
             dtv_patch_handle_event(dev, AUDIO_DTV_PATCH_CMD_SET_AD_ENABLE, val);
             ALOGI("ad_switch_enable set to %d\n", adev->associate_audio_mixing_enable);
             goto exit;
@@ -9142,8 +9140,6 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
 #endif
 
     adev_close_output_stream(dev, stream);
-    //adev->dual_decoder_support = false;
-    //destroy_aec_reference_config(adev->aec);
     if (eDolbyMS12Lib ==  adev->dolby_lib_type && adev->audio_mixer) {
         deleteHalSubMixing(adev);
         adev->audio_mixer =NULL;
@@ -10735,7 +10731,7 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     dprintf(fd, "[AML_HAL]      master volume: %10f, mute: %d\n", aml_dev->master_volume, aml_dev->master_mute);
     aml_decoder_info_dump(aml_dev, fd);
     aml_adev_stream_out_dump(aml_dev, fd);
-    dprintf(fd, "[AML_HAL]      dual: %d, mixing %d, ad_vol %d\n", aml_dev->dual_decoder_support, aml_dev->mixing_level, aml_dev->advol_level);
+    dprintf(fd, "[AML_HAL]      mixing %d, ad_vol %d\n", aml_dev->mixing_level, aml_dev->advol_level);
     dprintf(fd, "\nAML stream outs:\n");
 
 #ifdef AML_MALLOC_DEBUG

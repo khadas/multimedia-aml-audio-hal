@@ -321,7 +321,6 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 setInputCMDMask("-impcm");
             }
         } else {
-
             if ((mAudioStreamOutFormat == AUDIO_FORMAT_AC3) || (mAudioStreamOutFormat == AUDIO_FORMAT_E_AC3)) {
                 sprintf(ConfigParams[*row_index], "%s", "-im");
                 setInputCMDMask("-imddp");
@@ -483,6 +482,15 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_HEAAC_V2_FILE_NAME);
                 (*row_index)++;
                 ALOGD("%s() main1 %s", __FUNCTION__, DEFAULT_MAIN_HEAAC_V2_FILE_NAME);
+            } else { //others the format is pcm
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_PCM_FILE_NAME);
+                (*row_index)++;
+                mMainFlags = true;
+                mAppSoundFlags = true;
+                mSystemSoundFlags = true;
+                setInputCMDMask("-impcm");
             }
             if (mOTTSoundInputEnable == true &&
                 mAudioStreamOutFormat != AUDIO_FORMAT_AC4 &&
@@ -557,7 +565,6 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
             }
         }
     }
-
     if (mHasSystemInput == true) {
         sprintf(ConfigParams[*row_index], "%s", "-is");
         setInputCMDMask("-is");

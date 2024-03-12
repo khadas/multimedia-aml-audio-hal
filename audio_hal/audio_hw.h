@@ -484,8 +484,6 @@ struct aml_audio_device {
     struct listnode patch_list;
 
     bool dual_spdifenc_inited;
-    bool dual_decoder_support;
-
     /* Dolby MS12 lib variable start */
     struct dolby_ms12_desc ms12;
     bool dolby_ms12_need_recovery;
@@ -494,9 +492,7 @@ struct aml_audio_device {
     int advol_level;
     uint8_t ad_fade;
     uint8_t ad_pan;
-    bool ad_switch_enable;
     bool associate_audio_mixing_enable;
-    bool need_reset_for_dual_decoder;
     uint64_t a2dp_no_reconfig_ms12;
     /* Dolby MS12 lib variable end */
 
