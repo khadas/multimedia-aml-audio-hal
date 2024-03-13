@@ -60,8 +60,8 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio
     unsigned long long all_zero_len = 0;
     audio_format_t output_format = get_output_format (stream);
     if (adev->debug_flag) {
-        ALOGD("%s:%d hal_format:%#x, output_format:0x%x, sink_format:0x%x, apts:0x%llx, size:%z",
-            __func__, __LINE__, aml_out->hal_format, output_format, adev->sink_format, abuffer->pts, abuffer->size);
+        AM_LOGD("hal_format:%#x, output_format:0x%x, sink_format:0x%x, apts:0x%llx, size:%d",
+            aml_out->hal_format, output_format, adev->sink_format, abuffer->pts, abuffer->size);
     }
 
     remain_size = dolby_ms12_get_main_buffer_avail(NULL);
@@ -283,4 +283,98 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
     return return_bytes;
 }
 
+int aml_audio_ad_render(struct audio_stream_out *stream, struct audio_buffer *abuffer)
+{
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev  = aml_out->dev;
+    int return_bytes = abuffer->size;
+    int ret = -1;
+    //dolby codec: write ad data to ms12
+    if (eDolbyMS12Lib == adev->dolby_lib_type && is_dolby_ms12_support_compression_format(aml_out->hal_internal_format)) {
+        ms12_ad_process(stream, abuffer);
+        goto exit;
+    }
+
+    //nondolby codec: init aml_dec first
+    if (NULL == aml_out->aml_dec) {
+        ret = config_output(stream, true);
+        if (0 > ret) {
+            AM_LOGE("aml_dec for ad init failed");
+            return -1;
+        }
+    }
+
+    aml_dec_t *aml_dec = aml_out->aml_dec;
+    struct audio_buffer ainput;
+    ainput.buffer = abuffer->buffer;
+    ainput.size = abuffer->size;
+    ainput.pts = abuffer->pts;
+
+    dec_data_info_t * dec_pcm_data = &aml_dec->dec_pcm_data;
+    dec_data_info_t * dec_raw_data = &aml_dec->dec_raw_data;
+
+    int used_size     = 0;
+    int dec_used_size = 0;
+    int left_bytes    = ainput.size;
+    struct audio_buffer out_abuffer = {0};
+
+    //AM_LOGI_IF(adev->debug_flag, "out %p size: %d", aml_out, ainput.size);
+    do {
+        ainput.buffer += used_size;
+        ainput.size   = left_bytes;
+
+        AM_LOGI_IF(adev->debug_flag, "out %p,in pts:0x%llx (%lld ms) size: %d, used %d, total used %d", aml_out,
+            ainput.pts, ainput.pts/90, ainput.size, used_size, dec_used_size);
+        ret = aml_decoder_process(aml_dec, &ainput, &used_size);
+        if (0 > ret) {
+            AM_LOGW("aml_decoder_process error, ret:%d", ret);
+            break;
+        }
+        left_bytes    -= used_size;
+        dec_used_size += used_size;
+
+        AM_LOGI_IF(adev->debug_flag, "dec pcm len =%d raw len=%d used %d total used %d left_bytes =%d",
+            dec_pcm_data->data_len,dec_raw_data->data_len, used_size, dec_used_size, left_bytes);
+
+        if (0 >= dec_pcm_data->data_len) {
+            continue;
+        }
+
+        void *dec_data = (void *)dec_pcm_data->buf;
+        if (dec_pcm_data->data_sr > 0) {
+            aml_out->config.rate = dec_pcm_data->data_sr;
+        }
+
+        if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE) {
+             ret = aml_audio_resample_process_wrapper(&aml_out->resample_handle, dec_pcm_data->buf, dec_pcm_data->data_len, dec_pcm_data->data_sr, dec_pcm_data->data_ch);
+             if (ret != 0) {
+                 ALOGI("aml_audio_resample_process_wrapper failed");
+             } else {
+                 dec_data = aml_out->resample_handle->resample_buffer;
+                 dec_pcm_data->data_len = aml_out->resample_handle->resample_size;
+             }
+        }
+
+        aml_dec->out_frame_pts = dec_pcm_data->pts;
+        out_abuffer.size   = dec_pcm_data->data_len;
+        out_abuffer.buffer = dec_data;
+        out_abuffer.pts    = dec_pcm_data->pts;
+        out_abuffer.format = AUDIO_FORMAT_PCM_16_BIT;
+
+        //nondolby codec: then use mixer to mix ad
+        if (eDolbyMS12Lib == adev->dolby_lib_type) {//use ms12 to mix ad pcm
+            ret = ms12_ad_process(stream, &out_abuffer);
+        } else {
+            if (adev->useSubMix) {//use submix to mix ad pcm
+                out_write_direct_pcm(stream, out_abuffer.buffer, out_abuffer.size);
+            }
+        }
+
+        if (0 != ret) {
+            AM_LOGE("dolby_ms12_ad_process failed");
+        }
+    } while ((left_bytes > 0) || aml_dec->fragment_left_size);
+exit:
+    return return_bytes;
+}
 

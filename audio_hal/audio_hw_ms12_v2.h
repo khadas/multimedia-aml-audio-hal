@@ -107,6 +107,17 @@ int dolby_ms12_main_process(
     size_t *use_size);
 
 /*
+ *@brief dolby ad data process
+ *
+ * input parameters
+ *     stream: audio_stream_out handle
+ *     abuffer: data buffer address
+ */
+int ms12_ad_process (
+    struct audio_stream_out *stream,
+    struct audio_buffer *abuffer);
+
+/*
  *@brief set ms12 fade and pan parameter
  * input parameters
  *     struct dolby_ms12_desc *ms12: ms12 pointer

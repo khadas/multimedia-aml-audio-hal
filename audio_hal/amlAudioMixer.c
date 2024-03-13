@@ -1790,7 +1790,7 @@ ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void *buffer
         clock_gettime(CLOCK_MONOTONIC, &new_tval);
         if (tval.tv_sec > new_tval.tv_sec)
             AM_LOGE("FATAL ERROR");
-        AM_LOGV("++bytes %zu, out->port_index %d", bytes, out->inputPortID);
+        AM_LOGI_IF(adev->debug_flag, "++bytes %zu, written %zu, out->port_index %d(out %p)", bytes, written, out->inputPortID, out);
         //AM_LOGD(" %lld us, %lld", new_tval.tv_sec, tval.tv_sec);
 
         us_since_last_write = (new_tval.tv_sec - out->timestamp.tv_sec) * 1000000 +

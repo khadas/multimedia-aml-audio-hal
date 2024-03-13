@@ -24,6 +24,7 @@
  * @returns the process result
  */
 int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *abuffer);
+int aml_audio_ad_render(struct audio_stream_out *stream, struct audio_buffer *abuffer);
 
 #endif
 

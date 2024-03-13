@@ -579,9 +579,9 @@ public:
         bool is_ac4_single = ((curMask & MS12_INPUT_MASK_MAIN_AC4) == MS12_INPUT_MASK_MAIN_AC4);
         bool is_ddp_dual_input = ((curMask & ddp_dual_input) == ddp_dual_input);
         bool is_heaac_dual_input = ((curMask & heaac_dual_input) == heaac_dual_input);
-        ALOGI("%s() curMask %#x heaac_dual_input %#x is_heaac_dual_input %d\n", __FUNCTION__, curMask, heaac_dual_input, is_heaac_dual_input);
+        ALOGI("%s() curMask %#x heaac_dual_input %#x is_heaac_dual_input %d, mHasAssociateInput %d\n", __FUNCTION__, curMask, heaac_dual_input, is_heaac_dual_input, mHasAssociateInput);
 
-        if (is_ac4_single || is_ddp_dual_input || is_heaac_dual_input)
+        if (is_ac4_single || is_ddp_dual_input || is_heaac_dual_input || mHasAssociateInput)
             return true;
         else
             return false;

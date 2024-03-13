@@ -246,7 +246,8 @@ int aml_ms12_main_decoder_open(struct dolby_ms12_desc *ms12_desc
         (get_audio_associate_format() == AUDIO_FORMAT_AAC)||
         (get_audio_associate_format() == AUDIO_FORMAT_AAC_LATM)||
         (get_audio_associate_format() == AUDIO_FORMAT_HE_AAC_V1) ||
-        (get_audio_associate_format() == AUDIO_FORMAT_HE_AAC_V2)) {
+        (get_audio_associate_format() == AUDIO_FORMAT_HE_AAC_V2) ||
+        audio_is_linear_pcm(get_audio_associate_format())) {
         dolby_ms12_config_params_set_associate_flag(true);
     }
 

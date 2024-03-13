@@ -351,7 +351,8 @@ static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
                                                          int32_t in_size,
                                                          int32_t *used_size,
                                                          void **output_buf,
-                                                         int32_t *out_size)
+                                                         int32_t *out_size,
+                                                         int *frame_dur)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
@@ -455,7 +456,54 @@ static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
             }
             goto parser_error;
         }
-    } else {// no parser
+    }else if ((audio_format == AUDIO_FORMAT_AAC)
+            || (audio_format == AUDIO_FORMAT_AAC_LATM)
+            || (audio_format == AUDIO_FORMAT_HE_AAC_V1)
+            || (audio_format == AUDIO_FORMAT_HE_AAC_V2)) {
+            if (!aml_out->heaac_parser_handle) {
+                ret = aml_heaac_parser_open(&aml_out->heaac_parser_handle);
+                if (ret != 0) {
+                    AM_LOGE(" aml_heaac_parser_open fail");
+                    goto parser_error;
+                }
+            }
+            aml_out->heaac_info.debug_print = adev->debug_flag;
+
+            ret = aml_heaac_parser_process(aml_out->heaac_parser_handle,
+                                       in_buf,
+                                       in_size,
+                                       used_size,
+                                       output_buf,
+                                       out_size, &(aml_out->heaac_info));
+            if (*out_size <= 0 || !output_buf) {
+                AM_LOGW("do not get aac frames !!!");
+                *used_size = in_size;
+                ret = -1;
+                goto parser_error;
+            }
+
+            int sample_rate;
+            int channels;
+            int sample_size = aml_out->heaac_info.frame_size;
+
+            if (audio_format == AUDIO_FORMAT_AAC_LATM || audio_format == AUDIO_FORMAT_HE_AAC_V1) {
+                sample_rate = aml_out->heaac_info.sampleRateHz;
+                channels = aml_out->heaac_info.channel_mask;
+                //aac_info.samples = 2048;
+                *frame_dur = 0;  //todo:get frame pts here, calc it by decoder output now.
+            } else {
+                sample_rate = aml_out->heaac_info.sample_rate;
+                channels = aml_out->heaac_info.channelCount;
+                *frame_dur = aml_out->heaac_info.samples * 1000 * 90 / sample_rate;
+            }
+
+            AM_LOGI_IF(adev->debug_flag, "out_size %d in_size %d used_size %d, dur %x,"
+                        " framesize:%d, sample_rate:%d, channel_mask:%d, sampleRateHz:%d, channelCount:%d, numSubframes:%d",
+                        *out_size, in_size, *used_size, *frame_dur,
+                        aml_out->heaac_info.frame_size, aml_out->heaac_info.sample_rate, aml_out->heaac_info.channel_mask,
+                        aml_out->heaac_info.sampleRateHz, aml_out->heaac_info.channelCount, aml_out->heaac_info.numSubframes);
+
+        } else {// no parser
         *output_buf = in_buf;
         *out_size = in_size;
         *used_size = in_size;
@@ -3716,7 +3764,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
             out->volume_r_org = out->volume_l_org;
         }
     }
-    if (adev->is_TV) {
+    if (adev->is_TV && !(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         if (address && !strncmp(address, "AML_", 4)) {
             ALOGI("%s default set gain 1.0", __func__);
             adev->master_volume = 1.0;
@@ -3772,7 +3820,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
      * This is because out_set_parameters() with a route is not
      * guaranteed to be called after an output stream is opened.
      */
-    if (adev->is_TV) {
+    if (adev->is_TV && !(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         out->is_tv_platform = 1;
         out->config.channels = adev->default_alsa_ch;
         out->config.format = PCM_FORMAT_S32_LE;
@@ -3813,12 +3861,18 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         adev->ms12.p_pts_list->ms12_pcmoutstep_count = 0;
         pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
     }
+    if (!(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
+        out->avsync_ctx = avsync_ctx_init();
+        if (NULL == out->avsync_ctx) {
+            goto err;
+        }
 
-    out->avsync_ctx = avsync_ctx_init();
-    if (NULL == out->avsync_ctx) {
-        goto err;
+        /* updata hal_internal_format to ms12_out */
+        struct aml_stream_out *ms12_out = (struct aml_stream_out *)adev->ms12_out;
+        if (NULL != ms12_out) {
+            ms12_out->hal_internal_format = out->hal_internal_format;
+        }
     }
-
     /*if tunnel mode pcm is not 48Khz, resample to 48K*/
     if (flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
         ALOGD("%s format=%d rate=%d", __func__, out->hal_internal_format, out->config.rate);
@@ -3849,17 +3903,11 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         }
     }
 
-    if (adev->user_setting_scaletempo) {
+    if (adev->user_setting_scaletempo && !(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         out->enable_scaletempo = true;
         hal_scaletempo_init(&out->scaletempo);
         dolby_ms12_register_scaletempo_callback(ms12_scaletempo, out);
         ALOGI("%s %d, enable scaletempo %p", __FUNCTION__, __LINE__, out);
-    }
-
-    /* updata hal_internal_format to ms12_out */
-    struct aml_stream_out *ms12_out = (struct aml_stream_out *)adev->ms12_out;
-    if (NULL != ms12_out) {
-        ms12_out->hal_internal_format = out->hal_internal_format;
     }
 
     out->ddp_frame_size = aml_audio_get_ddp_frame_size();
@@ -4035,9 +4083,14 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     } else if (out->hal_format == AUDIO_FORMAT_AC3 || out->hal_format == AUDIO_FORMAT_E_AC3) {
         aml_ac3_parser_close(out->ac3_parser_handle);
         out->ac3_parser_handle = NULL;
+    } else if (out->hal_format == AUDIO_FORMAT_AAC || out->hal_format == AUDIO_FORMAT_AAC_LATM
+            || out->hal_format == AUDIO_FORMAT_HE_AAC_V1
+            || out->hal_format == AUDIO_FORMAT_HE_AAC_V2) {
+        aml_heaac_parser_close(out->heaac_parser_handle);
+        out->heaac_parser_handle = NULL;
     }
 
-    if (continuous_mode(adev) && (eDolbyMS12Lib == adev->dolby_lib_type)) {
+    if (continuous_mode(adev) && (eDolbyMS12Lib == adev->dolby_lib_type) && !(out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         if (out->volume_l != 1.0) {
             if (!audio_is_linear_pcm(out->hal_internal_format)) {
                 ALOGI("recover main volume to %f", adev->master_volume);
@@ -4081,11 +4134,11 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     }
 
     //we muted in audio_header_find_frame when find eos, here recover mute
-    if (adev->dolby_lib_type != eDolbyMS12Lib && is_dolby_format(out->hal_internal_format)) {
+    if (adev->dolby_lib_type != eDolbyMS12Lib && is_dolby_format(out->hal_internal_format) && !(out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         set_aed_master_volume_mute(&adev->alsa_mixer, false);
     }
 
-    if (out->enable_scaletempo == true) {
+    if (out->enable_scaletempo == true && !(out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         ALOGI("%s %d, release scaletempo %p", __FUNCTION__, __LINE__, out);
         out->enable_scaletempo = false;
         dolby_ms12_register_scaletempo_callback(NULL, NULL);
@@ -7853,6 +7906,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
     int32_t parser_in_size = abuffer->size;
     int32_t total_used_size = 0;
     int32_t current_used_size = 0;
+    int frame_duration = 0;
     int return_bytes = write_bytes;
     struct audio_buffer abuffer_out = {0};
     memcpy(&abuffer_out, abuffer, sizeof(abuffer_out));
@@ -8098,9 +8152,11 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
                                                 parser_in_size - total_used_size,
                                                 &current_used_size,
                                                 &abuffer_out.buffer,
-                                                &abuffer_out.size);
+                                                &abuffer_out.size,
+                                                &frame_duration);
         if (ret != 0) {
             AM_LOGE("aml_audio_parser_process_wrapper error");
+            break;
         }
         if (aml_audio_property_get_bool("vendor.media.audiohal.indump", false)) {
             aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/after_parser.raw",
@@ -8110,9 +8166,9 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
             abuffer_out.b_pts_valid = false;
         }
         char *p = (char*)abuffer_out.buffer;
-        AM_LOGI_IF(adev->debug_flag, "After parser [%d]in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%d) b_pts_valid(%d) pts(%lldms)",
+        AM_LOGI_IF(adev->debug_flag, "After parser [%d]in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%d) b_pts_valid(%d) pts(%lldms) dur %d",
             parser_count, parser_in_buf, abuffer_out.buffer, *p, *(p+1),
-            *(p+2),*(p+3),abuffer_out.size, abuffer_out.b_pts_valid, abuffer_out.pts/90);
+            *(p+2),*(p+3),abuffer_out.size, abuffer_out.b_pts_valid, abuffer_out.pts/90, frame_duration);
         total_used_size += current_used_size;
         parser_count++;
         if (eDolbyMS12Lib == adev->dolby_lib_type) {
@@ -8120,6 +8176,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
         } else {
             return_bytes = aml_audio_nonms12_render(stream, &abuffer_out);
         }
+        abuffer_out.pts += frame_duration;
     }
 
 exit:
@@ -8383,15 +8440,19 @@ ssize_t mixer_ad_buffer_write (struct audio_stream_out *stream, struct audio_buf
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
     struct aml_stream_out *ms12_out = (struct aml_stream_out *)adev->ms12_out;
-    int ret = -1, write_retry = 0;
+    int ret = -1, write_retry = 0, frame_duration = 0, parser_count = 0;
     size_t used_size = 0, total_bytes = abuffer->size;
+    void *parser_in_buf = (void *) abuffer->buffer;
+    int32_t total_parser_size = 0, current_parser_size = 0;
+    struct audio_buffer abuffer_out = {0};
+    abuffer_out.pts = abuffer->pts;
 
     if (abuffer == NULL || aml_out == NULL) {
         AM_LOGE ("invalid abuffer %p, out %p\n", abuffer, aml_out);
         return -1;
     }
 
-    AM_LOGI_IF(adev->debug_flag, "useSubMix:%d, db_lib:%d, hal_format:0x%x, usecase:0x%x, out:%p, in %zu",
+    AM_LOGI_IF(adev->debug_flag, "useSubMix:%d, db_lib:%d, hal_format:0x%x, usecase:0x%x, out:%p, in %d",
             adev->useSubMix, adev->dolby_lib_type, aml_out->hal_format, aml_out->usecase, aml_out, total_bytes);
 
     if (abuffer->buffer == NULL || abuffer->size == 0) {
@@ -8403,43 +8464,36 @@ ssize_t mixer_ad_buffer_write (struct audio_stream_out *stream, struct audio_buf
         aml_out->standby = false;
     }
 
-    if ((eDolbyMS12Lib == adev->dolby_lib_type) && !is_bypass_dolbyms12(stream)) {
-        ms12_out = (struct aml_stream_out *)adev->ms12_out;
-        if (ms12_out == NULL) {
-            // add protection here
-            AM_LOGI("ERRPR ms12_out = NULL,adev->ms12_out = %p", adev->ms12_out);
-            return total_bytes;
+    while (total_bytes > total_parser_size) {
+        /*AM_LOGI("Before parser  [%d]in_buf(%p) parser_in_buf(%d) total_used_size(%d)",
+            parser_count, parser_in_buf, parser_in_size, total_used_size);*/
+        ret = aml_audio_parser_process_wrapper(stream,
+                                                parser_in_buf + total_parser_size,
+                                                total_bytes - total_parser_size,
+                                                &current_parser_size,
+                                                &abuffer_out.buffer,
+                                                &abuffer_out.size,
+                                                &frame_duration);
+        if (ret != 0) {
+            AM_LOGE("aml_audio_parser_process_wrapper error");
+            break;
         }
-    }
-
-    if (eDolbyMS12Lib == adev->dolby_lib_type) {
-re_write:
-        ret = dolby_ms12_ad_process(stream, abuffer, &used_size);
-        if (ret == 0) {
-            if (used_size < abuffer->size && write_retry < 400) {
-                AM_LOGI_IF(adev->debug_flag, "dolby_ms12_ad_process used  %zu,write total %zu,left %zu\n", used_size, total_bytes, abuffer->size - used_size);
-                abuffer->buffer += used_size;
-                abuffer->size -= used_size;
-                aml_audio_sleep(10000);
-                if (adev->debug_flag >= 2) {
-                    AM_LOGI("sleeep 10ms\n");
-                }
-                write_retry++;
-                if (adev->ms12.dolby_ms12_enable) {
-                    goto re_write;
-                }
-            }
-            if (write_retry >= 400) {
-                AM_LOGE("write retry time output, left %zu", abuffer->size);
-                /* adjust payload_offset when there are unwritten bytes */
-            }
-        } else {
-            AM_LOGE("dolby_ms12_ad_process failed %d", ret);
+        if (aml_audio_property_get_bool("vendor.media.audiohal.indump", false)) {
+            aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/ad_after_parser.raw",
+                abuffer_out.buffer, abuffer_out.size);
         }
+        char *p = (char*)abuffer_out.buffer;
+        AM_LOGI_IF(adev->debug_flag, "After parser [%d]in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%d) used %d, total used %d, dur %d",
+            parser_count, parser_in_buf, abuffer_out.buffer, *p, *(p+1),
+            *(p+2),*(p+3),abuffer_out.size, current_parser_size, total_parser_size, frame_duration);
+        total_parser_size += current_parser_size;
+        parser_count++;
+        aml_audio_ad_render(stream, &abuffer_out);
+        abuffer_out.pts += frame_duration;
     }
 ad_exit:
-    AM_LOGI_IF(adev->debug_flag, "return %zu!\n", total_bytes);
-    return total_bytes;
+    AM_LOGI_IF(adev->debug_flag, "return %zu!\n", total_parser_size);
+    return total_parser_size;
 }
 
 ssize_t mixer_app_buffer_write(struct audio_stream_out *stream, struct audio_buffer *abuffer)
@@ -8582,6 +8636,10 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
             aml_out->write = mixer_app_buffer_write;
             aml_out->write_func = MIXER_APP_BUFFER_WRITE;
             AM_LOGI("mixer_app_buffer_write !");
+        } else if (aml_out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM) {
+            aml_out->write = mixer_ad_buffer_write;
+            aml_out->inputPortType = AML_DOLBY_INPUT_AD;
+            AM_LOGI("mixer_ad_buffer_write!");
         } else {
             aml_out->write = mixer_main_buffer_write;
             aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
@@ -8897,9 +8955,10 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
     adev->active_outputs[aml_out->usecase] = aml_out;
     pthread_mutex_unlock(&adev->lock);
 
-    /*In order to avoid the invalid adjustment of mastervol when there is no stream */
-    out_set_volume_l((struct audio_stream_out *)aml_out, aml_out->volume_l_org, aml_out->volume_r_org);
-
+    if (!(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
+        /*In order to avoid the invalid adjustment of mastervol when there is no stream */
+        out_set_volume_l((struct audio_stream_out *)aml_out, aml_out->volume_l_org, aml_out->volume_r_org);
+    }
     /* init ease for stream */
     if (aml_audio_ease_init(&aml_out->audio_stream_ease) < 0) {
         ALOGE("%s  aml_audio_ease_init faild\n", __func__);
@@ -8951,7 +9010,7 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
     }
     pthread_mutex_unlock(&adev->lock);
 
-    if (aml_out->continuous_mode_check) {
+    if (aml_out->continuous_mode_check && !(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         if (adev->dolby_lib_type_last == eDolbyMS12Lib) {
             /*if these format can't be supported by ms12, we can bypass it*/
             if (is_bypass_dolbyms12(*stream_out)) {

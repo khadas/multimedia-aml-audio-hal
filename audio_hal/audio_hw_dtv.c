@@ -659,80 +659,6 @@ int audio_set_spdif_clock(struct aml_stream_out *stream, int type)
     return 0;
 }
 
-int audio_dtv_patch_output_decoder(struct aml_audio_patch *patch,
-                        struct audio_stream_out *stream_out)
-{
-    struct audio_hw_device *dev = patch->dev;
-    struct aml_audio_device *aml_dev = (struct aml_audio_device *)dev;
-    ring_buffer_t *ringbuffer = &(patch->aml_ringbuffer);
-    struct aml_stream_out *aml_out = (struct aml_stream_out *)stream_out;
-    struct package *cur_package = NULL;
-
-    int ret = 0, is_ad_stream = (aml_out->flags & AUDIO_OUTPUT_FLAG_AD_STREAM) != 0;
-    if (is_ad_stream) {
-        cur_package = patch->cur_ad_package;
-    } else {
-        cur_package = patch->cur_package;
-    }
-
-    AM_LOGI_IF(aml_dev->debug_flag, "%s str %p, is_ad %d. pk %p, sz %d. pts %llx(%lld)", is_ad_stream ? "ad" : "main",
-               aml_out, is_ad_stream, cur_package, cur_package->size, cur_package->pts, cur_package->pts/90);
-    bool data_dump = aml_audio_property_get_bool("vendor.media.audiohal.patch.out", false);
-    if ((!cur_package || !cur_package->data || !cur_package->size)) {
-        AM_LOGI("cur_package %s data invalid", is_ad_stream ? "ad" : "main");
-        return ret;
-    }
-
-    int input_size = cur_package->size;
-    char *in_frame_buffer = cur_package->data;
-
-    if (aml_dev->dolby_lib_type == eDolbyMS12Lib &&
-        ((patch->aformat == AUDIO_FORMAT_HE_AAC_V1) || \
-        (patch->aformat == AUDIO_FORMAT_HE_AAC_V2))) {
-        if (!aml_out->heaac_parser_handle) {
-            aml_heaac_parser_open(&aml_out->heaac_parser_handle);
-        }
-
-        aml_out->heaac_info.debug_print = aml_dev->debug_flag;
-
-        int parser_used_size = 0;
-        int used_size = 0;
-        while (input_size > used_size && !patch->input_thread_exit) {
-            int32_t out_frame_size = 0;
-            char *out_frame_buffer = NULL;
-
-            aml_heaac_parser_process(aml_out->heaac_parser_handle,
-                                   in_frame_buffer + used_size,
-                                   input_size - used_size,
-                                   &parser_used_size,
-                                   (void *)&out_frame_buffer,
-                                   &out_frame_size, &(aml_out->heaac_info));
-            if (out_frame_size <= 0 || !out_frame_buffer) {
-                ALOGW("[%s:%d]do not get %s aac frames !!!", __func__, __LINE__, is_ad_stream ? "ad" : "main");
-                break;
-            }
-            used_size += parser_used_size;
-
-            AM_LOGI_IF(aml_dev->debug_flag, "is_ad %d, out_frame_size %d in_size %d used_size %d, pts %0" PRIx64 "", is_ad_stream, out_frame_size, input_size, used_size, cur_package->pts);
-
-            if (data_dump) {
-                char file_name[128] = { 0 };
-                snprintf(file_name, 128, "/data/vendor/audiohal/dtv_audio_%s.es", is_ad_stream ? "ad" : "main");
-                aml_audio_dump_audio_bitstreams(file_name, out_frame_buffer, out_frame_size);
-            }
-            ret = stream_out->write(stream_out, out_frame_buffer, out_frame_size);
-        }
-    } else if (aml_dev->dolby_lib_type == eDolbyMS12Lib &&
-        (patch->aformat == AUDIO_FORMAT_AC3 || patch->aformat == AUDIO_FORMAT_E_AC3 || patch->aformat == AUDIO_FORMAT_AC4)) {
-        ret = stream_out->write(stream_out, in_frame_buffer, input_size);
-    } else if (aml_dev->dolby_lib_type_last != eDolbyMS12Lib ||
-           (aml_dev->dolby_lib_type == eDolbyMS12Lib && !is_dolby_ms12_support_compression_format(patch->aformat))) {
-            ret = stream_out->write(stream_out, in_frame_buffer, input_size);
-    }
-
-    return ret;
-}
-
 static bool need_enable_dual_decoder(struct aml_audio_patch *patch)
 {
     struct audio_hw_device *dev = patch->dev;
@@ -829,7 +755,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
     if (need_enable_dual_decoder(patch)) {
         ad_list = patch->dtv_ad_package_list;
         dtv_package_list_init(ad_list);
-        AM_LOGE("keven, audio_dtv_patch_input_threadloop init ad_list");
+        AM_LOGE("audio_dtv_patch_input_threadloop init ad_list");
     }
 
     while (!patch->input_thread_exit) {
@@ -1057,7 +983,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
 
                             /* get ad data */
                             if (mAdEsData == NULL) {
-                                if (demux_info->dual_decoder_support && VALID_PID(demux_info->ad_pid)) {
+                                if (need_enable_dual_decoder(patch)) {
                                     nRet = Get_ADAudio_Es(demux_handle, &mAdEsData);
                                     if (nRet != AM_AUDIO_Dmx_SUCCESS) {
                                         AM_LOGE("Get_ADAudio_Es failed");
@@ -1133,7 +1059,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                                 continue;
                             }
 
-                            if (mAdEsData) {
+                            if (mAdEsData && dtv_ad_package) {
                                 demux_info->ad_package_status = check_ad_package_status(dtv_package->pts, mAdEsData->pts, demux_info);
                                 if (demux_info->ad_package_status == AD_PACK_STATUS_HOLD) {
                                     aml_audio_free(dtv_ad_package);
@@ -1173,8 +1099,8 @@ void *audio_dtv_patch_input_threadloop(void *data)
                             audio_queue_info.isworkingchannel = false;
                         audio_queue_info.tunit = MEDIASYNC_UNIT_PTS;
                         mediasync_wrap_queueAudioFrame(Dtvsync->mediasync, &audio_queue_info);
-                        AM_LOGI_IF(aml_dev->debug_flag, "queue pts:%llx, size:%d, dur:%d isneedupdate %d\n",
-                                 dtv_package->pts, dtv_package->size, Dtvsync->duration,audio_queue_info.isneedupdate);
+                        AM_LOGI_IF(aml_dev->debug_flag, "queue pts:%llx, size:%d, dur:%d isneedupdate %d, ret %d\n",
+                                 dtv_package->pts, dtv_package->size, Dtvsync->duration,audio_queue_info.isneedupdate, nRet);
                         if (path_index != dtv_audio_instances->demux_index_working) {
                             AM_LOGI_IF(aml_dev->debug_flag, "path_index  %d dtv_audio_instances->demux_index_working %d",
                                 path_index, dtv_audio_instances->demux_index_working);
@@ -1214,7 +1140,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                         pthread_mutex_lock(&patch->mutex);
                         ret = dtv_package_add(list, dtv_package);
                         if (ret == 0) {
-                            AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_package %p, pts:%llx, size:%d", dtv_package, dtv_package->pts, dtv_package->size);
+                            AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_package %p, pts:%llx, size:%d. num %d", dtv_package, dtv_package->pts, dtv_package->size, list->pack_num);
                             pthread_cond_signal(&patch->cond);
                             pthread_mutex_unlock(&patch->mutex);
                             dtv_package = NULL;
@@ -1236,7 +1162,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                         pthread_mutex_lock(&patch->assoc_mutex);
                         ret = dtv_package_add(ad_list, dtv_ad_package);
                         if (ret == 0) {
-                            AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_ad_package %p, pts:%llx, size:%d", dtv_ad_package, dtv_ad_package->pts, dtv_ad_package->size);
+                            AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_ad_package %p, pts:%llx, size:%d. num %d", dtv_ad_package, dtv_ad_package->pts, dtv_ad_package->size, ad_list->pack_num);
                             pthread_cond_signal(&patch->ad_cond);
                             pthread_mutex_unlock(&patch->assoc_mutex);
                             dtv_ad_package = NULL;
@@ -1397,6 +1323,13 @@ void *audio_dtv_patch_output_threadloop(void *data)
 
     aml_out = (struct aml_stream_out *)stream_out;
     patch->dtv_aml_out = aml_out;
+    if (patch->aformat == AUDIO_FORMAT_AAC_LATM || patch->aformat == AUDIO_FORMAT_HE_AAC_V1) {
+        aml_out->heaac_info.is_loas = 1;
+        aml_out->heaac_info.is_adts = 0;
+    } else if (patch->aformat == AUDIO_FORMAT_AAC || patch->aformat == AUDIO_FORMAT_HE_AAC_V2) {
+        aml_out->heaac_info.is_loas = 0;
+        aml_out->heaac_info.is_adts = 1;
+    }
 
     if (aml_out->avsync_ctx)
     {
@@ -1421,14 +1354,6 @@ void *audio_dtv_patch_output_threadloop(void *data)
     //patch->dtv_audio_mode = get_dtv_audio_mode();
     patch->dtv_audio_tune = AUDIO_FREE;
     patch->first_apts_lookup_over = 0;
-
-    if (patch->aformat == AUDIO_FORMAT_AAC_LATM || patch->aformat == AUDIO_FORMAT_HE_AAC_V1) {
-        aml_out->heaac_info.is_loas = 1;
-        aml_out->heaac_info.is_adts = 0;
-    } else if (patch->aformat == AUDIO_FORMAT_AAC || patch->aformat == AUDIO_FORMAT_HE_AAC_V2) {
-        aml_out->heaac_info.is_loas = 0;
-        aml_out->heaac_info.is_adts = 1;
-    }
     aml_demux_audiopara_t *demux_info = (aml_demux_audiopara_t *)patch->demux_info;
 
     prctl(PR_SET_NAME, (unsigned long)"dtv_output_data");
@@ -1453,7 +1378,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
             continue;
         } else {
             patch->cur_package = p_package;
-            AM_LOGI_IF(aml_dev->debug_flag, "package pts:%llx, package size:%d, dtv_first_apts_flag:%d, num %d", p_package->pts, p_package->size,
+            AM_LOGI_IF(aml_dev->debug_flag, "package(%p) pts:%llx, size:%d, first_apts_flag:%d, num %d", p_package, p_package->pts, p_package->size,
                       patch->dtv_first_apts_flag, list->pack_num);
             /* if first package pts is invalid, we need drop it */
             if ((!patch->dtv_first_apts_flag) && (NULL_INT64 == p_package->pts))
@@ -1486,17 +1411,13 @@ void *audio_dtv_patch_output_threadloop(void *data)
             get_sink_format(stream_out);
         }
 
-        if (patch->dtvsync) {
-            if (aml_dev->bHDMIConnected_update || aml_dev->a2dp_updated) {
-                ALOGI("reset_dtvsync (mediasync:%p)", patch->dtvsync->mediasync);
-                mediasync_wrap_reset(patch->dtvsync->mediasync);
-            }
+        if ((!p_package->data || !p_package->size)) {
+            AM_LOGI("cur_package data invalid");
+            goto free_package;
         }
 
-        ret = audio_dtv_patch_output_decoder(patch, stream_out);
-        AM_LOGV("fade %d  pan %d mixing_level %d advol %d. ret_main %d",
-                demux_info->ad_fade, demux_info->ad_pan, aml_dev->mixing_level, aml_dev->advol_level, ret);
-
+        ret = stream_out->write(stream_out, p_package->data, p_package->size);
+free_package:
         if (patch->cur_package) {
             if (patch->cur_package->data) {
                 aml_audio_free(patch->cur_package->data);
@@ -1520,11 +1441,6 @@ exit_outbuf:
 exit_open:
     if (aml_dev->audio_ease) {
         aml_dev->patch_start = false;
-    }
-
-    if (patch->dtvsync) {
-        ALOGI("mediasync_wrap_reset (mediasync:%p)", patch->dtvsync->mediasync);
-        mediasync_wrap_reset(patch->dtvsync->mediasync);
     }
     AM_LOGI("--");
     return ((void *)0);
@@ -1565,16 +1481,13 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
 
     AM_LOGI("create a AD output stream(%p) success now, ad_output_thread_exit %d", ad_aml_out, patch->ad_output_thread_exit);
     if (patch->aformat == AUDIO_FORMAT_AAC_LATM || patch->aformat == AUDIO_FORMAT_HE_AAC_V1) {
-        if (need_enable_dual_decoder(patch) && ad_aml_out) {
-            ad_aml_out->heaac_info.is_loas = 1;
-            ad_aml_out->heaac_info.is_adts = 0;
-        }
+        ad_aml_out->heaac_info.is_loas = 1;
+        ad_aml_out->heaac_info.is_adts = 0;
     } else if (patch->aformat == AUDIO_FORMAT_AAC || patch->aformat == AUDIO_FORMAT_HE_AAC_V2) {
-        if (need_enable_dual_decoder(patch) && ad_aml_out) {
-            ad_aml_out->heaac_info.is_loas = 0;
-            ad_aml_out->heaac_info.is_adts = 1;
-        }
+        ad_aml_out->heaac_info.is_loas = 0;
+        ad_aml_out->heaac_info.is_adts = 1;
     }
+
     aml_demux_audiopara_t *demux_info = (aml_demux_audiopara_t *)patch->demux_info;
     prctl(PR_SET_NAME, (unsigned long)"dtv_ad_output_data");
 
@@ -1635,9 +1548,19 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
 
         pthread_mutex_lock(&(patch->dtv_ad_output_mutex));
         if (need_enable_dual_decoder(patch) && ad_stream_out) {
-            ret_ad = audio_dtv_patch_output_decoder(patch, ad_stream_out);
+            if ((!p_package->data || !p_package->size)) {
+                AM_LOGI("cur_package ad data invalid");
+                goto free_package;
+            }
+            struct audio_buffer abuffer_out = {0};
+            abuffer_out.buffer = p_package->data;
+            abuffer_out.size = p_package->size;
+            abuffer_out.pts = p_package->pts;
 
-            AM_LOGV("fade %d  pan %d mixing_level %d advol %d. ret_ad %d",
+            //use specific write func of ad, instead of out_write_new: to skip unnecessary operations in out_write_new.
+            ret_ad = mixer_ad_buffer_write(ad_stream_out, &abuffer_out);
+
+            AM_LOGI_IF(aml_dev->debug_flag, "fade %d  pan %d mixing_level %d advol %d. ret_ad %d",
                 p_package->ad_fade, p_package->ad_pan, aml_dev->mixing_level, aml_dev->advol_level, ret_ad);
 
             if (eDolbyMS12Lib == aml_dev->dolby_lib_type &&
@@ -1657,6 +1580,7 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
             }
 
         }
+free_package:
         if (patch->cur_ad_package) {
             if (patch->cur_ad_package->data) {
                 aml_audio_free(patch->cur_ad_package->data);

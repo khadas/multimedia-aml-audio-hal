@@ -47,6 +47,7 @@ namespace android
 //here the file path is fake
 //@@pcm [main pcm sounds]
 #define DEFAULT_MAIN_PCM_FILE_NAME "/data/main48000Hz.wav"
+#define DEFAULT_ASSOCIATE_PCM_FILE_NAME "/data/ass48000Hz.wav"
 //@@pcm [application sounds]
 #define DEFAULT_APPLICATION_PCM_FILE_NAME "/data/app48000Hz.wav"
 //@@pcm [system sounds]
@@ -403,6 +404,18 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 mMainFlags = true;
                 mAppSoundFlags = false;
                 mSystemSoundFlags = false;
+            } else if ((mAudioStreamOutFormat & AUDIO_FORMAT_MAIN_MASK) == AUDIO_FORMAT_PCM) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-impcm");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_PCM_FILE_NAME);
+                (*row_index)++;
+
+                sprintf(ConfigParams[*row_index], "%s", "-ia");
+                setInputCMDMask("-ia");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_PCM_FILE_NAME);
+                (*row_index)++;
             }
         }
     }
@@ -528,6 +541,18 @@ int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_
                 setInputCMDMask("-ia");
                 (*row_index)++;
                 sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_HEAAC_V2_FILE_NAME);
+                (*row_index)++;
+            } else if ((mAudioStreamOutFormat & AUDIO_FORMAT_MAIN_MASK) == AUDIO_FORMAT_PCM) {
+                sprintf(ConfigParams[*row_index], "%s", "-im");
+                setInputCMDMask("-impcm");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_MAIN_PCM_FILE_NAME);
+                (*row_index)++;
+
+                sprintf(ConfigParams[*row_index], "%s", "-ia");
+                setInputCMDMask("-ia");
+                (*row_index)++;
+                sprintf(ConfigParams[*row_index], "%s", DEFAULT_ASSOCIATE_PCM_FILE_NAME);
                 (*row_index)++;
             }
         }

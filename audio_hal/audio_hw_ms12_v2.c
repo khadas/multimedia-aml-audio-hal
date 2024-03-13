@@ -1576,74 +1576,86 @@ exit:
     return ret;
 }
 
-int dolby_ms12_ad_process(
-    struct audio_stream_out *stream,
-    struct audio_buffer *abuffer,
-    size_t *use_size)
+#define MS12_AD_WRITE_RETRY_TIMES (500)
+bool ms12_ad_buf_avail_check(int associate_frame_size, int debug_print)
+{
+    int ad_avail = 0;
+    int main_max = 0;
+    bool bret = false;
+    ad_avail = dolby_ms12_get_associate_buffer_avail();
+    dolby_ms12_get_main_buffer_avail(&main_max);
+
+    /* after flush, max_size value will be set to 0 and after write first data,
+     * it will be initialized.
+     * main and AD should be same codec, so max buffer size is same
+     */
+    AM_LOGI_IF(debug_print, "ms12 main_max:%d, ad_avail:%d", main_max, ad_avail);
+    if (main_max == 0 || ((main_max - ad_avail) >= associate_frame_size)) {
+        bret = true;
+    }
+    return bret;
+}
+
+int ms12_ad_process (struct audio_stream_out *stream, struct audio_buffer *abuffer)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
-    int ms12_output_size = 0;
-    int dolby_ms12_input_bytes = 0;
+    int dolby_ms12_input_bytes = 0, write_retry = 0;
     void *associate_frame_buffer = abuffer->buffer;
-    int associate_frame_size = abuffer->size;
-    int main_max = 0;
+    int associate_frame_size     = abuffer->size;
 
-    AM_LOGI_IF(adev->debug_flag, "input ms12 ad bytes %d. ad avail %d",
-              associate_frame_size, dolby_ms12_get_associate_buffer_avail());
+    AM_LOGI_IF(adev->debug_flag, "input ms12 ad bytes %d, pts 0x%llx", associate_frame_size, abuffer->pts);
 
     /*set the dolby ms12 debug level*/
     dolby_ms12_enable_debug();
 
-    if (ms12->dolby_ms12_enable && adev->dual_decoder_support == true) {
-        if (associate_frame_buffer && (associate_frame_size > 0)) {
-            /*we check whether there is enough space*/
-            //if (is_dolby_ms12_support_compression_format(aml_out->hal_internal_format))
-            if (1) {
-                int ad_avail = 0;
-                int wait_retry = 0;
-                while (wait_retry < MS12_MAIN_WRITE_RETIMES) {
-                    ad_avail = dolby_ms12_get_associate_buffer_avail();
-                    dolby_ms12_get_main_buffer_avail(&main_max);
-                    /* after flush, max_size value will be set to 0 and after write first data,
-                     * it will be initialized.
-                     * main and AD should be same codec, so max buffer size is same
-                     */
-                    AM_LOGV("ms12 main_max:%d, ad_avail:%d, associate_frame_size %d", main_max, ad_avail, associate_frame_size);
-                    if (main_max == 0 || (main_max - ad_avail >= associate_frame_size)) {
-                        break;
-                    }
-                    aml_audio_sleep(20*1000);
-                    wait_retry++;
-                }
+    if (!ms12->dolby_ms12_enable) {
+        AM_LOGE("ms12->dolby_ms12_enable is:%d, error!", ms12->dolby_ms12_enable);
+        return -1;
+    }
 
-            }
+    if (!associate_frame_buffer || (0 >= associate_frame_size)) {
+        AM_LOGE("associate_frame_buffer:%p, associate_frame_size:%d, error!!", associate_frame_buffer, associate_frame_size);
+        return -1;
+    }
 
-            dolby_ms12_input_bytes = dolby_ms12_input_associate(ms12->dolby_ms12_ptr
-                                       , (const void *)associate_frame_buffer
-                                       , (size_t)associate_frame_size
-                                       , ms12->input_config_format
-                                       , audio_channel_count_from_out_mask(ms12->config_channel_mask)
-                                       , ms12->config_sample_rate
-                                      );
+    /* need check whether there is enough space before write */
+    do {
+        if (ms12_ad_buf_avail_check(associate_frame_size, adev->debug_flag)) {
+            break;
         }
+        aml_audio_sleep(10000);
+        AM_LOGI("sleep 10, wait ad buffer");
+        write_retry++;
+    } while (MS12_AD_WRITE_RETRY_TIMES > write_retry);
+
+    write_retry = 0;
+    do {
+        /* dolby associate write */
+        dolby_ms12_input_bytes = dolby_ms12_input_associate (ms12->dolby_ms12_ptr,
+                                       (const void *)associate_frame_buffer,
+                                       (size_t)associate_frame_size,
+                                       ms12->input_config_format,
+                                       audio_channel_count_from_out_mask(ms12->config_channel_mask),
+                                       ms12->config_sample_rate);
         AM_LOGI_IF(adev->debug_flag, "ad_frame_size %d ret dolby_ms12 input_bytes %d",
                 associate_frame_size, dolby_ms12_input_bytes);
 
-        if (dolby_ms12_input_bytes > 0)
-            *use_size = dolby_ms12_input_bytes;
-        else
-            *use_size = 0;
-ad_exit:
-        if (get_ms12_dump_enable(DUMP_MS12_INPUT_ASSOCIATE)) {
-            dump_ms12_output_data((void*)associate_frame_buffer, dolby_ms12_input_bytes, MS12_INPUT_SYS_ASSOCIATE_FILE);
+        if (dolby_ms12_input_bytes > 0) {
+            associate_frame_buffer += dolby_ms12_input_bytes;
+            associate_frame_size   -= dolby_ms12_input_bytes;
+        } else { //write fail need sleep and retry
+            aml_audio_sleep(10000);
+            write_retry++;
+            AM_LOGI("sleep 10, retry write");
         }
-        return 0;
-    } else {
-        ALOGI("dual_decoder_support:%d, ad input error", adev->dual_decoder_support);
-        return -1;
+    } while ((0 < associate_frame_size) && (MS12_AD_WRITE_RETRY_TIMES > write_retry));
+
+    if (get_ms12_dump_enable(DUMP_MS12_INPUT_ASSOCIATE)) {
+        dump_ms12_output_data((void*)associate_frame_buffer, dolby_ms12_input_bytes, MS12_INPUT_SYS_ASSOCIATE_FILE);
     }
+    return 0;
 }
 
 /*
@@ -3310,7 +3322,8 @@ int dolby_ms12_main_open(struct audio_stream_out *stream) {
         hal_internal_format == AUDIO_FORMAT_E_AC3 ||
         hal_internal_format == AUDIO_FORMAT_AC4 ||
         hal_internal_format == AUDIO_FORMAT_HE_AAC_V1 ||
-        hal_internal_format == AUDIO_FORMAT_HE_AAC_V2) {
+        hal_internal_format == AUDIO_FORMAT_HE_AAC_V2 ||
+        hal_internal_format == AUDIO_FORMAT_PCM_16_BIT) {
         if (patch && demux_info) {
             ms12->dual_decoder_support = demux_info->dual_decoder_support;
             /*set the associate audio format*/
