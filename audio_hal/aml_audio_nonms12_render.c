@@ -192,7 +192,6 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
 
     do {
         ALOGV("%s() in raw len=%d", __func__, left_bytes);
-        used_size = 0;
         ainput.buffer += used_size;
         ainput.size = left_bytes;
 
