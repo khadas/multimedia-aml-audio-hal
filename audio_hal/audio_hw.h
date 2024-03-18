@@ -676,6 +676,7 @@ struct aml_audio_device {
     int minfo_atmos_flag;
 #endif
     bool audio_focus_enable;
+    int audio_focus_volume;
     uint32_t decoder_drc_control;
     uint32_t dap_drc_control;
     uint32_t downmix_type;

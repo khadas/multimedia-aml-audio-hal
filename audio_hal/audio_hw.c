@@ -1765,6 +1765,15 @@ static int out_set_volume_l (struct audio_stream_out *stream, float left, float 
     out->volume_r_org = right;//right stream volume
     out->volume_l = out->volume_l_org * adev->master_volume;//out stream vol=stream vol * master vol
     out->volume_r = out->volume_r_org * adev->master_volume;
+
+    float tmp_volume_l = out->volume_l;
+    float tmp_volume_r = out->volume_r;
+
+    if (adev->audio_focus_enable) {
+        tmp_volume_l = out->volume_l * (adev->audio_focus_volume / 100.0L);
+        tmp_volume_r = out->volume_l * (adev->audio_focus_volume / 100.0L);
+    }
+    ALOGI("%s ori:%f  tmp:%f", __func__, out->volume_l, tmp_volume_l);
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         /* when MS12 lib is available, control stream volume by adjusting
          * main_volume (after first mixing between main1/main2/UI sound)
@@ -1803,17 +1812,17 @@ static int out_set_volume_l (struct audio_stream_out *stream, float left, float 
             ALOGI("Set apps mixgain %d", gain);
 #endif
         } else /*if (is_dolby_format || is_ms12_pcm_volume_control || esmode)*/ {
-            if (out->volume_l != out->volume_r) {
+            if (tmp_volume_l != tmp_volume_r) {
                 ALOGW("%s, left:%f right:%f NOT match", __FUNCTION__, left, right);
             }
-            ALOGI("dolby_ms12_set_main_volume %f", out->volume_l);
+            ALOGI("dolby_ms12_set_main_volume %f", tmp_volume_l);
             out->ms12_vol_ctrl = true;
-            if (out->volume_l <= FLOAT_ZERO) {
+            if (tmp_volume_l <= FLOAT_ZERO) {
                 set_ms12_main_audio_mute(&adev->ms12, true, 32);
-                adev->ms12.main_volume = out->volume_l;
+                adev->ms12.main_volume = tmp_volume_l;
             } else {
                 set_ms12_main_audio_mute(&adev->ms12, false, 32);
-                set_ms12_main_volume(&adev->ms12, out->volume_l);
+                set_ms12_main_volume(&adev->ms12, tmp_volume_l);
             }
         }
     }
@@ -1823,15 +1832,6 @@ static int out_set_volume_l (struct audio_stream_out *stream, float left, float 
 
 static int out_set_volume (struct audio_stream_out *stream, float left, float right)
 {
-    struct aml_stream_out *out = (struct aml_stream_out *) stream;
-    struct aml_audio_device *adev = out->dev;
-
-    if (adev->audio_focus_enable) {
-        if (get_mmap_pcm_active_count(adev)) {
-            left *= aml_audio_get_focus_volume_ratio();
-            right *= aml_audio_get_focus_volume_ratio();
-        }
-    }
     return out_set_volume_l(stream, left, right);
 }
 
@@ -3765,13 +3765,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         out->volume_l_org = 1.0;//stream volume
         out->volume_r_org = 1.0;
     }
-    if (adev->audio_focus_enable) {
-        if (get_mmap_pcm_active_count(adev) >= 1 && !(flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) {
-            ALOGI("TTS sound is playing, set volume ratio!!");
-            out->volume_l_org = out->volume_l_org * aml_audio_get_focus_volume_ratio();
-            out->volume_r_org = out->volume_l_org;
-        }
-    }
+
     if (adev->is_TV && !(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         if (address && !strncmp(address, "AML_", 4)) {
             ALOGI("%s default set gain 1.0", __func__);
@@ -4073,6 +4067,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     }
 #endif
     if (adev->audio_focus_enable) {
+        adev->audio_focus_enable = false;
         if (out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ && (get_mmap_pcm_active_count(adev) == 0)) {
            ALOGI("last TTS sound closed, set other sound volume as orignal of itself");
            aml_audio_focus(adev, false);
@@ -5804,6 +5799,24 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+    ret = str_parms_get_int(parms,"audio_focus_enable", &val);
+    if (ret >= 0) {
+        if (val == 1)
+            adev->audio_focus_enable = true;
+        else
+            adev->audio_focus_enable = false;
+        ALOGI("%s:audio focus %s", __func__, adev->audio_focus_enable? "enable": "disable");
+        goto exit;
+    }
+
+    ret = str_parms_get_int(parms,"audio_focus_volume", &val);
+    if (ret >= 0) {
+        adev->audio_focus_volume = val;
+        if (adev->audio_focus_enable)
+            aml_audio_focus(adev, true);
+        ALOGI("%s:audio_focus_volume is %d", __func__, adev->audio_focus_volume);
+        goto exit;
+    }
 
 #ifdef BUILD_LINUX
     ret = str_parms_get_str(parms, "setenv", value, sizeof(value));
@@ -7139,6 +7152,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             apply_volume_16to32(volume, effect_tmp_buf, spk_tmp_buf, bytes);
             apply_volume_16to32(source_gain, tmp_buffer, ps32SpdifTempBuffer, bytes);
             apply_volume(adev->sink_gain[OUTPORT_HEADPHONE], hp_tmp_buf, sizeof(uint16_t), bytes);
+
 #ifdef ADD_AUDIO_DELAY_INTERFACE
             aml_audio_delay_process(AML_DELAY_OUTPORT_SPEAKER, spk_tmp_buf,
                 out_frames * 2 * 4, AUDIO_FORMAT_PCM_32_BIT, aml_out->hal_rate);  //spk/hp output pcm
@@ -10184,17 +10198,10 @@ static int aml_audio_focus(struct aml_audio_device *adev, bool on)
 
     pthread_mutex_lock (&adev->lock);
     for (int i = 0; i < STREAM_USECASE_MAX; i++) {
-       struct aml_stream_out *aml_out = adev->active_outputs[i];
-       struct audio_stream_out *out = (struct audio_stream_out *)aml_out;
-       if (aml_out && !(aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) {
-            if (on) {
-                volume = aml_out->volume_l_org * aml_audio_get_focus_volume_ratio();
-            } else {
-                volume = aml_out->volume_l_org / aml_audio_get_focus_volume_ratio();
-                if (volume > 1.0f)
-                    volume = 1.0f;
-            }
-            out_set_volume_l(out, volume, volume);
+        struct aml_stream_out *aml_out = adev->active_outputs[i];
+        struct audio_stream_out *out = (struct audio_stream_out *)aml_out;
+        if (aml_out && !(aml_out->flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) && !aml_out->is_ms12_stream) {
+            out_set_volume_l(out, aml_out->volume_l_org, aml_out->volume_l_org);
         }
     }
     pthread_mutex_unlock (&adev->lock);
@@ -10585,7 +10592,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         adev->useSubMix = true;
     }
 
-    adev->audio_focus_enable = aml_get_jason_int_value(Audio_Focus_Enable, 0);
+    //adev->audio_focus_enable = aml_get_jason_int_value(Audio_Focus_Enable, 0);
     ALOGI("%s(), set useSubMix %s, audio focus: %s", __func__, adev->useSubMix ? "TRUE": "FALSE",
         adev->audio_focus_enable ? "TRUE": "FALSE");
 
