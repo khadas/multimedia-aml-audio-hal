@@ -429,7 +429,7 @@ sync_process_res mediasync_nonms12_process(struct audio_stream_out *stream)
             ret = ESSYNC_AUDIO_DROP;
             break;
         case MEDIASYNC_AUDIO_INSERT:
-            mediasync_nonms12_process_insert(stream, &async_policy);
+            mediasync_nonms12_process_insert(stream, async_policy);
             break;
         case DTVSYNC_AUDIO_ADJUST_CLOCK:
             //aml_dtvsync_ms12_adjust_clock(stream_out, async_policy->param1);
