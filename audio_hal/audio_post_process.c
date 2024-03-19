@@ -17,7 +17,8 @@
 #include "audio_post_process.h"
 #include "Virtualx.h"
 #include "aml_dec_api.h"
-#include "aml_dts_dec_api.h"
+#include "aml_dtshd_dec_api.h"
+#include "aml_dtsx_dec_api.h"
 
 static int check_dts_config(struct aml_native_postprocess *native_postprocess) {
     int cur_channels = dca_get_out_ch_internal();
@@ -25,7 +26,9 @@ static int check_dts_config(struct aml_native_postprocess *native_postprocess) {
     if (native_postprocess->vx_force_stereo == 1)
         cur_channels = 2;
 
-    if (cur_channels >= 6) {
+    if (cur_channels >= 8) {
+        cur_channels = 8;
+    } else if (cur_channels >= 6) {
         cur_channels = 6;
     } else {
         cur_channels = 2;
@@ -38,11 +41,7 @@ static int check_dts_config(struct aml_native_postprocess *native_postprocess) {
             cur_channels, native_postprocess->vx_force_stereo);
 
         VirtualX_reset(native_postprocess);
-        if (cur_channels == 6) {
-            VirtualX_Channel_reconfig(native_postprocess, 6);
-        } else {
-            VirtualX_Channel_reconfig(native_postprocess, 2);
-        }
+        VirtualX_Channel_reconfig(native_postprocess, cur_channels);
         native_postprocess->effect_in_ch = cur_channels;
     }
 
@@ -68,7 +67,7 @@ int audio_post_process(struct aml_native_postprocess *native_postprocess, int16_
     for (j = 0; j < native_postprocess->num_postprocessors; j++) {
         effect_handle_t effect = native_postprocess->postprocessors[j];
         if (effect != NULL) {
-            if (native_postprocess->libvx_exist && native_postprocess->effect_in_ch == 6 && j == 0) {
+            if (native_postprocess->libvx_exist && (native_postprocess->effect_in_ch == 6 || native_postprocess->effect_in_ch == 8) && j == 0) {
                 /* skip multi channel processing for dts streaming in VX */
                 continue;
             } else {
@@ -93,18 +92,20 @@ int audio_VX_post_process(struct aml_native_postprocess *native_postprocess, int
     audio_buffer_t in_buf;
     audio_buffer_t out_buf;
 
+    if (native_postprocess->libvx_exist) {
+        check_dts_config(native_postprocess);
+    }
     effect_handle_t effect = native_postprocess->postprocessors[0];
-    if (effect && (*effect) && (*effect)->process && in_buffer &&
-        native_postprocess->libvx_exist && native_postprocess->effect_in_ch == 6) {
+    if (effect != NULL && native_postprocess->libvx_exist && (native_postprocess->effect_in_ch == 6 || native_postprocess->effect_in_ch == 8)) {
         /* do multi channel processing for dts streaming in VX */
-        in_buf.frameCount = bytes/12;
-        out_buf.frameCount = bytes/12;
+        in_buf.frameCount = bytes/native_postprocess->effect_in_ch/2;
+        out_buf.frameCount = bytes/native_postprocess->effect_in_ch/2;
         in_buf.s16 = out_buf.s16 = in_buffer;
         ret = (*effect)->process(effect, &in_buf, &out_buf);
         if (ret < 0) {
             ALOGE("[%s:%d]vx(%p) postprocess failed, ret %d\n", __func__, __LINE__, effect, ret);
         } else {
-            ret = bytes/3;
+            ret = bytes/(native_postprocess->effect_in_ch/2);
         }
     }
 
@@ -131,6 +132,27 @@ static int VirtualX_setparameter(struct aml_native_postprocess *native_postproce
 
     return replyData;
 }
+int32_t VirtualX_getparameter(struct aml_native_postprocess *native_postprocess, int param)
+{
+    if (!native_postprocess || !native_postprocess->libvx_exist) {
+        ALOGE("VirtualX_getparameter native_postprocess is null");
+        return -1;
+    }
+    uint32_t cmdSize = (sizeof(effect_param_t) + sizeof(uint32_t));
+    uint32_t replySize = (sizeof(effect_param_t) + sizeof(uint32_t) + sizeof(uint32_t));
+    uint32_t tmpCmdData[sizeof(effect_param_t) / sizeof(uint32_t) + 2] = {0};
+    uint32_t tmpReplayData[sizeof(effect_param_t) / sizeof(uint32_t) + 2] = {0};
+    effect_param_t *pCmdData = (effect_param_t *)tmpCmdData;
+    effect_param_t *pReplyData = (effect_param_t *)tmpReplayData;
+    effect_handle_t effect = native_postprocess->postprocessors[0];
+    pCmdData->psize = sizeof(uint32_t);
+    pCmdData->vsize = sizeof(uint32_t);
+    *(uint32_t *)pCmdData->data = param;
+    if (effect != NULL) {
+        (*effect)->command(effect, EFFECT_CMD_GET_PARAM, cmdSize, (void *)pCmdData, &replySize, (void *)pReplyData);
+    }
+    return (int32_t)pReplyData->data[pCmdData->psize];
+}
 
 void VirtualX_reset(struct aml_native_postprocess *native_postprocess)
 {
@@ -151,6 +173,7 @@ void VirtualX_Channel_reconfig(struct aml_native_postprocess *native_postprocess
                                     ch_num, EFFECT_CMD_SET_PARAM);
         if (ret != ch_num) {
             ALOGE("Set VX(%p) input channel error: channel %d, ret = %d\n", native_postprocess->postprocessors[0], ch_num, ret);
+            dca_set_out_ch_internal(2);
         }
     }
 

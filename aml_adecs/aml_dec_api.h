@@ -88,6 +88,11 @@ typedef enum {
     AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN  = -3,    /* Cache a lot of data, needs to be decoded multiple times. */
 } aml_dec_return_type_t;
 
+typedef enum eDTSLibType {
+    eDTSNull  = 0,
+    eDTSHDLib = 1,
+    eDTSXLib  = 2,
+} eDTSLibType_t;
 typedef struct aml_dec_stream_info {
     int stream_sr;    /** the sample rate in stream*/
     int stream_ch;    /** the original channels in stream*/
@@ -151,6 +156,18 @@ typedef struct aml_dca_config {
     int output_ch;
     void *dev;
 } aml_dca_config_t;
+typedef struct aml_dtsx_config {
+    audio_format_t format;
+    aml_dec_control_type_t digital_raw;
+    int sink_dev_type;
+    int passthroug_enable;
+    int is_hdmi_output;
+    bool is_dtscd;
+    bool is_iec61937;
+    int output_ch;
+    void *dev;
+    void *stream;
+} aml_dtsx_config_t;
 
 typedef struct aml_pcm_config {
     audio_format_t pcm_format;
@@ -201,6 +218,7 @@ typedef struct aml_dec_config {
     /*config for decoder init*/
     aml_dcv_config_t dcv_config;
     aml_dca_config_t dca_config;
+    aml_dtsx_config_t dtsx_config;
     aml_mad_config_t mad_config;
     aml_faad_config_t faad_config;
     aml_pcm_config_t pcm_config;
@@ -249,6 +267,7 @@ int aml_decoder_process(aml_dec_t *aml_dec, struct audio_buffer *abuffer, int * 
 int aml_decoder_set_config(aml_dec_t *aml_dec, aml_dec_config_type_t config_type, aml_dec_config_t * dec_config);
 void aml_decoder_calc_coefficient(unsigned char ad_fade,float * mix_coefficient,float * ad_coefficient);
 int aml_decoder_get_info(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_dec_info_t * dec_info);
-
+eDTSLibType_t detect_dts_lib_type(void);
+eDTSLibType_t get_dts_lib_type(void);
 
 #endif

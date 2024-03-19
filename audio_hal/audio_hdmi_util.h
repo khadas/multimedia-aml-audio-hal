@@ -65,6 +65,7 @@ struct format_desc {
     /* only used by dd+ format */
     bool   atmos_supported;
     bool   MAT_PCM_48kHz_only;
+    unsigned int dts_vsdb_byte3;
 };
 
 /*
