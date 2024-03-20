@@ -266,18 +266,8 @@ void aml_audio_set_spdif_format(int spdif_port, eMixerSpdif_Format aml_spdif_for
     /* i2s2hdmi multi-ch use spdifa fmt too */
     if (spdif_port == PORT_SPDIF) {
         spdif_format_ctr_id = AML_MIXER_ID_SPDIF_FORMAT;
-        if (aml_spdif_format == AML_DOLBY_DIGITAL_PLUS) {
-            audio_route_set_spdif_mute(&aml_dev->alsa_mixer, 1);
-        } else {
-            if (aml_dev->spdif_enable) {
-                audio_route_set_spdif_mute(&aml_dev->alsa_mixer, 0);
-            }
-        }
     } else if (spdif_port == PORT_SPDIFB) {
         spdif_format_ctr_id = AML_MIXER_ID_SPDIF_B_FORMAT;
-        if (aml_dev->spdif_enable) {
-            audio_route_set_spdif_mute(&aml_dev->alsa_mixer, 0);
-        }
     } else if (spdif_port == PORT_I2S2HDMI) {
         spdif_format_ctr_id = AML_MIXER_ID_I2S2HDMI_FORMAT;
     }
