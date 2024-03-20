@@ -69,7 +69,6 @@
 #include "dmx_audio_es.h"
 #include "uio_audio_api.h"
 #include "aml_ddp_dec_api.h"
-#include "aml_dts_dec_api.h"
 #include "audio_dtv_utils.h"
 #include "audio_hw_ms12_common.h"
 

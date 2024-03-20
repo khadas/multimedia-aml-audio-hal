@@ -63,7 +63,8 @@
 #include "aml_audio_resample_manager.h"
 #include "aml_audio_resampler.h"
 #include "aml_dec_api.h"
-#include "aml_dts_dec_api.h"
+#include "aml_dtshd_dec_api.h"
+#include "aml_dtsx_dec_api.h"
 #include "audio_format_parse.h"
 #include "aml_audio_heaacparser.h"
 #include "hal_scaletempo.h"
@@ -158,9 +159,13 @@ enum audio_hal_format {
     TYPE_MAT_ATMOS = 14,
     TYPE_AC4_ATMOS = 15,
     TYPE_DTS_HP = 16,
-    // TYPE_DTS_X = 17,
-    TYPE_AAC  = 17,
-    TYPE_HEAAC = 18,
+    TYPE_DDP_ATMOS_PROMPT_ON_ATMOS = 17,
+    TYPE_TRUE_HD_ATMOS_PROMPT_ON_ATMOS = 18,
+    TYPE_MAT_ATMOS_PROMPT_ON_ATMOS = 19,
+    TYPE_AC4_ATMOS_PROMPT_ON_ATMOS = 20,
+    TYPE_AAC  = 21,
+    TYPE_HEAAC = 22,
+    TYPE_DTSX = 23,
 };
 
 #define FRAMESIZE_16BIT_STEREO 4
@@ -455,6 +460,7 @@ struct aml_audio_device {
     /* message to handle usecase changes */
     bool usecase_changed;
     struct aml_stream_out *active_outputs[STREAM_USECASE_MAX];
+    pthread_mutex_t active_outputs_lock;
     pthread_mutex_t patch_lock;
     pthread_mutex_t dtv_patch_lock;//this only use for locking adev->audio_patch in dtv source,
                                     //since ms12_output will use adev->audio_patch to do media sync
@@ -502,6 +508,7 @@ struct aml_audio_device {
     int dolby_lib_type;
     int dolby_lib_type_last;
     int dolby_decode_enable;   /*it can decode dolby, not passthrough lib*/
+    int dts_lib_type;
     int dts_decode_enable;
 
     /*used for dts decoder*/
@@ -678,6 +685,7 @@ struct aml_audio_device {
     aml_dec_info_t dec_stream_info;
     /* -End- */
 
+    bool vx_enable;
     bool user_setting_scaletempo;
 
     bool is_hdmi_arc_interact_done;
@@ -837,6 +845,7 @@ struct aml_stream_out {
     struct pcm *pcm2; /*used for dual bitstream output*/
     int pcm2_mute_cnt;
     bool tv_src_stream;
+    bool is_ms12_stream;
     unsigned int write_func;
     uint64_t  last_frame_reported;
     struct timespec  last_timestamp_reported;

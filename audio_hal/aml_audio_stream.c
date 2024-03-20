@@ -1177,6 +1177,7 @@ void aml_decoder_info_dump(struct aml_audio_device *adev, int fd)
 {
     dprintf(fd, "\n-------------[AML_HAL] licence decoder --------------------------\n");
     dprintf(fd, "[AML_HAL]    dolby_lib: %d\n", adev->dolby_lib_type);
+    dprintf(fd, "[AML_HAL]    dts_lib: %d\n", adev->dts_lib_type);
     dprintf(fd, "[AML_HAL]    MS12 library size:\n");
     dprintf(fd, "             \t-V2 Encrypted: %d\n", get_file_size("/usr/lib/libdolbyms12.so"));
     dprintf(fd, "             \t-V2 Decrypted: %d\n", get_file_size("/tmp/ds/0x4d_0x5331_0x32.so"));
@@ -1318,6 +1319,8 @@ void get_audio_indicator(struct aml_audio_device *dev, char *temp_buf) {
         sprintf (temp_buf, "audioindicator=DTS HD");
     else if (adev->audio_hal_info.update_type == TYPE_DTS_EXPRESS)
         sprintf (temp_buf, "audioindicator=DTS EXPRESS");
+    else if (adev->audio_hal_info.update_type == TYPE_DTSX)
+        sprintf (temp_buf, "audioindicator=DTSX");
 
     if ((adev->audio_hal_info.update_type == TYPE_DTS
         || adev->audio_hal_info.update_type == TYPE_DTS_HD
@@ -1434,10 +1437,10 @@ void update_audio_format(struct aml_audio_device *adev, audio_format_t format)
 {
     int atmos_flag = 0;
     int update_type = TYPE_PCM;
-    pthread_mutex_lock (&adev->lock);
+    pthread_mutex_lock (&adev->active_outputs_lock);
     bool is_dolby_active = dolby_stream_active(adev);
     bool is_dts_active = dts_stream_active(adev);
-    pthread_mutex_unlock (&adev->lock);
+    pthread_mutex_unlock (&adev->active_outputs_lock);
     bool is_dolby_format = is_dolby_ms12_support_compression_format(format);
     /*
      *for dolby & pcm case or dolby case

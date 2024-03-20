@@ -93,6 +93,9 @@ ssize_t aml_audio_spdif_output(struct audio_stream_out *stream, void **spdifout_
         }
         if (spdif_config.audio_format == AUDIO_FORMAT_IEC61937) {
             spdif_config.sub_format = data_info->sub_format;
+            if ((/*spdif_config.sub_format == AUDIO_FORMAT_MPEGH || */spdif_config.sub_format == AUDIO_FORMAT_DTS_HD) && spdif_config.data_ch == 8) {
+                spdif_config.channel_mask = AUDIO_CHANNEL_OUT_7POINT1;
+            }
         } else if (audio_is_linear_pcm(spdif_config.audio_format)) {
             if (data_info->data_ch == 6) {
                 spdif_config.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
@@ -275,11 +278,18 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
             aml_audio_stream_volume_process(stream, dec_data, sizeof(int16_t), dec_pcm_data->data_ch, pcm_len);
         }
 
-        if (dec_pcm_data->data_ch == 6) {
-            ret = audio_VX_post_process(VX_postprocess, (int16_t *)dec_data, pcm_len);
-            if (ret > 0) {
-                pcm_len = ret; /* VX will downmix 6ch to 2ch, pcm size will be changed */
-                dec_pcm_data->data_ch /= 3;
+        if (dec_pcm_data->data_ch == 6 || dec_pcm_data->data_ch == 8) {
+            if (!adev->vx_enable) {
+                ret = audio_VX_post_process(VX_postprocess, (int16_t *)dec_data, pcm_len);
+                if (ret > 0) {
+                    pcm_len = ret; /* VX will downmix 6ch to 2ch, pcm size will be changed */
+                    dec_pcm_data->data_ch = 2;
+                    if (aml_getprop_bool("vendor.media.audiohal.vxdump")) {
+                        aml_audio_dump_audio_bitstreams("/tmp/audio_dump/after_vx1.pcm", dec_data, pcm_len);
+                    }
+                }
+            } else {
+                AM_LOGE("dtsvx doesn't enable, need to check!");
             }
         }
         if (adev->audio_hal_info.first_decoding_frame == false) {
@@ -434,6 +444,199 @@ exit:
     return return_bytes;
 }
 
+int aml_audio_nonms12_dec_render(struct audio_stream_out *stream, struct audio_buffer *abuffer)
+{
+    int decoder_ret = -1;
+    int dec_used_size = 0;
+    int left_bytes = 0;
+    int used_size = 0;
+    bool  try_again = false;
+    size_t bytes = abuffer->size;
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev = aml_out->dev;
+    struct aml_audio_patch *patch = adev->audio_patch;
+    int return_bytes = bytes;
+    struct audio_buffer ainput;
+    ainput.buffer = abuffer->buffer;
+    ainput.size   = abuffer->size;
+    ainput.pts    = abuffer->pts;
+    ainput.b_pts_valid = true;
+    if (aml_out->aml_dec == NULL) {
+        config_output(stream, true);
+    }
+    aml_dec_t *aml_dec = aml_out->aml_dec;
+    if (aml_dec) {
+        left_bytes = bytes;
+        do {
+            ALOGV("%s() in raw len=%d", __func__, left_bytes);
+            used_size = 0;
+            ainput.buffer += dec_used_size;
+            ainput.size = left_bytes;
+            decoder_ret = aml_decoder_process(aml_dec, &ainput, &used_size);
+            if (decoder_ret == AML_DEC_RETURN_TYPE_CACHE_DATA) {
+                ALOGV("[%s:%d] cache the data to decode", __func__, __LINE__);
+                return bytes;
+            } else if (decoder_ret < 0) {
+                ALOGV("[%s:%d] aml_decoder_process error, ret:%d", __func__, __LINE__, decoder_ret);
+            }
+            left_bytes -= used_size;
+            dec_used_size += used_size;
+            if ((aml_out->hal_internal_format == AUDIO_FORMAT_DTS ||
+                aml_out->hal_internal_format == AUDIO_FORMAT_DTS_HD )&&
+                decoder_ret == AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN ) {
+                try_again = true;
+            }
+        } while ((left_bytes > 0) || aml_dec->fragment_left_size || try_again);
+    }
+    return return_bytes;
+}
+void aml_audio_nonms12_output(struct audio_stream_out *stream)
+{
+    int alsa_latency = 0, ret = -1;
+    int decoder_latency = 0;
+    struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
+    struct aml_audio_device *adev = aml_out->dev;
+    struct aml_native_postprocess *VX_postprocess = &adev->native_postprocess;
+    int out_frames = 0;
+    void *output_buffer = NULL;
+    size_t output_buffer_bytes = 0;
+    int duration = 0;
+    bool speed_enabled = false;
+    bool dts_pcm_direct_output = false;
+    bool hdmi2earc_bypass_mode = false;
+    aml_dec_t *aml_dec = aml_out->aml_dec;
+    if (aml_dec) {
+        dec_data_info_t * dec_pcm_data = &aml_dec->dec_pcm_data;
+        dec_data_info_t * dec_raw_data = &aml_dec->dec_raw_data;
+        dec_data_info_t * raw_in_data  = &aml_dec->raw_in_data;
+        if (1) {
+            if (aml_out->optical_format != adev->optical_format) {
+                ALOGI("optical format change from 0x%x --> 0x%x", aml_out->optical_format, adev->optical_format);
+                aml_out->optical_format = adev->optical_format;
+                if (aml_out->spdifout_handle != NULL) {
+                    aml_audio_spdifout_close(aml_out->spdifout_handle);
+                    aml_out->spdifout_handle = NULL;
+                }
+                if (aml_out->spdifout2_handle != NULL) {
+                    aml_audio_spdifout_close(aml_out->spdifout2_handle);
+                    aml_out->spdifout2_handle = NULL;
+                }
+            }
+            if (dec_pcm_data->data_len > 0) {
+                audio_format_t output_format = AUDIO_FORMAT_PCM_16_BIT;
+                void  *dec_data = (void *)dec_pcm_data->buf;
+                int pcm_len = dec_pcm_data->data_len;
+                if ((adev->patch_src == SRC_DTV) &&
+                    (adev->start_mute_flag == 1 || adev->tv_mute)) {
+                    memset(dec_pcm_data->buf, 0, dec_pcm_data->data_len);
+                }
+                if (adev->hdmi_format == PCM
+                    && is_dts_format(aml_out->hal_internal_format)
+                    && dec_pcm_data->data_sr > 48000
+                    && check_sink_pcm_sr_cap(adev, dec_pcm_data->data_sr)) {
+                    dts_pcm_direct_output = true;
+                }
+                if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE) {
+                    ret = aml_audio_resample_process_wrapper(&aml_out->resample_handle, dec_pcm_data->buf,
+                    pcm_len, dec_pcm_data->data_sr, dec_pcm_data->data_ch);
+                    if (ret != 0) {
+                        ALOGE("aml_audio_resample_process_wrapper failed");
+                    } else {
+                        dec_data = aml_out->resample_handle->resample_buffer;
+                        pcm_len = aml_out->resample_handle->resample_size;
+                    }
+                    aml_out->config.rate = OUTPUT_ALSA_SAMPLERATE;
+                } else {
+                    if (dec_pcm_data->data_sr > 0)
+                        aml_out->config.rate = dec_pcm_data->data_sr;
+                }
+                if (!adev->is_TV) {
+                    aml_out->config.channels = dec_pcm_data->data_ch;
+                }
+                aml_audio_stream_volume_process(stream, dec_data, sizeof(int16_t), dec_pcm_data->data_ch, pcm_len);
+                if (dec_pcm_data->data_ch == 6 || dec_pcm_data->data_ch == 8) {
+                    if (!adev->vx_enable) {
+                        ret = audio_VX_post_process(VX_postprocess, (int16_t *)dec_data, pcm_len);
+                        if (ret > 0) {
+                            pcm_len = ret; /* VX will downmix 6ch/8ch to 2ch, pcm size will be changed */
+                            dec_pcm_data->data_ch = 2;
+                            if (aml_getprop_bool("vendor.media.audiohal.vxdump")) {
+                                aml_audio_dump_audio_bitstreams("/tmp/audio_dump/after_vx.pcm", dec_data, pcm_len);
+                            }
+                        }
+                    } else {
+                        AM_LOGE("dtsvx doesn't enable, need to check!");
+                    }
+                }
+                /*if (adev->dev2mix_patch) {
+                    tv_in_write(stream, dec_data, pcm_len);
+                    if (aml_out->is_tv_platform == 1) {
+                        memset(dec_data, 0, pcm_len);
+                    }
+                } else */if (adev->patch_src == SRC_HDMIIN ||
+                            adev->patch_src == SRC_SPDIFIN ||
+                            adev->patch_src == SRC_LINEIN ||
+                            adev->patch_src == SRC_ATV) {
+                    {
+                        if (adev->mute_start)  {
+                            ALOGI("start fade in");
+                            start_ease_in(adev);
+                            adev->mute_start = false;
+                        }
+                    }
+                    if (adev->audio_patching) {
+                        aml_audio_ease_process(adev->audio_ease, dec_data, pcm_len);
+                    }
+                    if (aml_getprop_bool("media.audiohal.outdump")) {
+                        aml_audio_dump_audio_bitstreams("/nvram/audio/tv_non12_before_mixer.raw",
+                            dec_data, pcm_len);
+                    }
+                }
+                if (adev->optical_format == AUDIO_FORMAT_PCM_16_BIT) {
+                    aml_hw_mixer_mixing(&adev->hw_mixer, dec_data, pcm_len, output_format);
+                    if (aml_getprop_bool("vendor.media.audiohal.outdump")) {
+                        aml_audio_dump_audio_bitstreams("/tmp/audio_dump/non_ms12_after_mix.raw",
+                            dec_data, pcm_len);
+                    }
+                }
+                {
+                    if (adev->useSubMix) {
+                        out_write_direct_pcm(stream, dec_data, pcm_len);
+                    } else {
+                        if (audio_hal_data_processing(stream, dec_data, pcm_len, &output_buffer, &output_buffer_bytes, output_format) == 0)
+                            hw_write(stream, output_buffer, output_buffer_bytes, output_format);
+                    }
+                }
+            }
+            if (!dts_pcm_direct_output && !speed_enabled && audio_is_linear_pcm(aml_dec->format) && raw_in_data->data_ch > 2 || hdmi2earc_bypass_mode == true) {
+                aml_audio_spdif_output(stream, &aml_out->spdifout_handle, raw_in_data);
+            } else if (dts_pcm_direct_output && !speed_enabled) {
+                aml_audio_stream_volume_process(stream, dec_pcm_data->buf, sizeof(int16_t), dec_pcm_data->data_ch, dec_pcm_data->data_len);
+                aml_audio_spdif_output(stream, &aml_out->spdifout_handle, dec_pcm_data);
+            }
+            if (!dts_pcm_direct_output && !speed_enabled && aml_out->optical_format != AUDIO_FORMAT_PCM_16_BIT) {
+                if (dec_raw_data->data_sr > 0) {
+                    aml_out->config.rate = dec_raw_data->data_sr;
+                }
+                if (aml_dec->format == AUDIO_FORMAT_E_AC3 || aml_dec->format == AUDIO_FORMAT_AC3) {
+                    if (adev->dual_spdif_support) {
+                        if (aml_dec->format == AUDIO_FORMAT_E_AC3 && aml_out->optical_format == AUDIO_FORMAT_E_AC3) {
+                            if (raw_in_data->data_len)
+                                aml_audio_spdif_output(stream, &aml_out->spdifout_handle, raw_in_data);
+                        }
+                        if (dec_raw_data->data_len > 0)
+                            aml_audio_spdif_output(stream, &aml_out->spdifout2_handle, dec_raw_data);
+                    } else {
+                        if (raw_in_data->data_len)
+                            aml_audio_spdif_output(stream, &aml_out->spdifout_handle, raw_in_data);
+                    }
+                } else {
+                    aml_audio_spdif_output(stream, &aml_out->spdifout_handle, dec_raw_data);
+                }
+            }
+        }
+    }
+}
 static audio_format_t get_dcvlib_output_format(audio_format_t src_format, struct aml_audio_device *aml_dev)
 {
     audio_format_t output_format = AUDIO_FORMAT_PCM_16_BIT;
@@ -476,6 +679,30 @@ bool aml_decoder_output_compatible(struct audio_stream_out *stream, audio_format
     return is_compatible;
 }
 
+int dca_get_out_ch_internal(void)
+{
+    struct aml_audio_device *adev = (struct aml_audio_device *)adev_get_handle();
+    if (!adev)
+        return -1;
+    if (adev->dts_lib_type == eDTSXLib) {
+        return dtsx_get_out_ch_internal();
+    } else {
+        return dtshd_get_out_ch_internal();
+    }
+}
+//Auto config output channel for Virtual X:
+//-1:default without vx. 0:auto config output according to DecMode. 2:always downmix to stereo.
+int dca_set_out_ch_internal(int ch_num)
+{
+    struct aml_audio_device *adev = (struct aml_audio_device *)adev_get_handle();
+    if (!adev)
+        return -1;
+    if (adev->dts_lib_type == eDTSXLib) {
+        return dtsx_set_out_ch_internal(ch_num);
+    } else {
+        return dtshd_set_out_ch_internal(ch_num);
+    }
+}
 
 static void ddp_decoder_config_prepare(struct audio_stream_out *stream, aml_dcv_config_t * ddp_config)
 {
@@ -517,24 +744,65 @@ static void ddp_decoder_config_prepare(struct audio_stream_out *stream, aml_dcv_
     return;
 }
 
-static void dts_decoder_config_prepare(struct audio_stream_out *stream, aml_dca_config_t * dts_config)
+static void dts_decoder_config_prepare(struct audio_stream_out *stream, aml_dec_config_t *dec_config)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
+    struct aml_arc_hdmi_desc *p_hdmi_descs = &adev->hdmi_descs;
 
     adev->dtslib_bypass_enable = 0;
 
-    dts_config->digital_raw = AML_DEC_CONTROL_CONVERT;
-    dts_config->is_dtscd = aml_out->is_dtscd;
-    if (aml_out->hal_format == AUDIO_FORMAT_IEC61937 && !dts_config->is_dtscd) {
-        dts_config->is_iec61937 = true;
+    if ((adev->active_outport == OUTPORT_HEADPHONE) ||
+        (adev->active_outport == OUTPORT_A2DP) ||
+        (adev->active_outport == OUTPORT_HDMI_ARC)) {
+        if (adev->native_postprocess.libvx_exist)
+            dca_set_out_ch_internal(2);
     } else {
-        dts_config->is_iec61937 = false;
+        if (adev->native_postprocess.libvx_exist)
+            dca_set_out_ch_internal(0);
+    }
+    if (adev->dts_lib_type == eDTSXLib) {
+        dec_config->dtsx_config.digital_raw = AML_DEC_CONTROL_CONVERT;
+        dec_config->dtsx_config.is_dtscd = aml_out->is_dtscd;
+        if (aml_out->hal_format == AUDIO_FORMAT_IEC61937 && !dec_config->dtsx_config.is_dtscd) {
+            dec_config->dtsx_config.is_iec61937 = true;
+    } else {
+            dec_config->dtsx_config.is_iec61937 = false;
     }
 
-    dts_config->dev = (void *)adev;
-    ALOGI("%s digital_raw:%d, dual_output_flag:%d, is_iec61937:%d, is_dtscd:%d"
-        , __func__, dts_config->digital_raw, aml_out->dual_output_flag, dts_config->is_iec61937, dts_config->is_dtscd);
+        dec_config->dtsx_config.dev = (void *)adev;
+        dec_config->dtsx_config.stream = (void*)aml_out;
+        if (adev->hdmi_format == BYPASS) {
+            dec_config->dtsx_config.passthroug_enable = 1;
+        } else {
+            dec_config->dtsx_config.passthroug_enable = 0;
+        }
+        if ((adev->active_outport & OUTPORT_HDMI_ARC) != 0 || (adev->active_outport & AUDIO_DEVICE_OUT_HDMI) != 0) {
+            dec_config->dtsx_config.is_hdmi_output = 1;
+        } else {
+            dec_config->dtsx_config.is_hdmi_output = 0;
+        }
+        if (p_hdmi_descs->dtshd_fmt.is_support) {
+            dec_config->dtsx_config.sink_dev_type = p_hdmi_descs->dtshd_fmt.dts_vsdb_byte3;
+        } else {
+            dec_config->dtsx_config.sink_dev_type = 0; //CA(0),MA(1),P1(2),P2(4)
+        }
+        ALOGI("[%s:%d] digital_raw:%d, dual_output_flag:%d, is_iec61937:%d, is_dtscd:%d, passthroug:%d, is_hdmi_output:%d", __func__, __LINE__,
+            dec_config->dtsx_config.digital_raw, aml_out->dual_output_flag, dec_config->dtsx_config.is_iec61937,
+            dec_config->dtsx_config.is_dtscd, dec_config->dtsx_config.passthroug_enable, dec_config->dtsx_config.is_hdmi_output);
+    } else if (adev->dts_lib_type == eDTSHDLib) {
+        dec_config->dca_config.digital_raw = AML_DEC_CONTROL_CONVERT;
+        if (aml_out->hal_format == AUDIO_FORMAT_IEC61937) {
+            dec_config->dca_config.is_iec61937 = true;
+        } else {
+            dec_config->dca_config.is_iec61937 = false;
+        }
+        dec_config->dca_config.dev = (void *)adev;
+        ALOGI("[%s:%d] digital_raw:%d, dual_output_flag:%d, is_iec61937:%d, is_dtscd:%d", __func__, __LINE__,
+            dec_config->dca_config.digital_raw, aml_out->dual_output_flag, dec_config->dca_config.is_iec61937, dec_config->dca_config.is_dtscd);
+    } else {
+        ALOGE("[%s:%d] Without any dts library", __func__, __LINE__);
+    }
     return;
 }
 
@@ -639,7 +907,7 @@ int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t f
     }
     case AUDIO_FORMAT_DTS:
     case AUDIO_FORMAT_DTS_HD: {
-        dts_decoder_config_prepare(stream, &dec_config->dca_config);
+        dts_decoder_config_prepare(stream, dec_config);
         break;
     }
     case AUDIO_FORMAT_PCM_16_BIT:

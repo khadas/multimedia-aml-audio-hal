@@ -39,6 +39,7 @@
 #include <memory.h>
 
 #include "aml_dec_api.h"
+#include "Virtualx.h"
 
 #if ANDROID_PLATFORM_SDK_VERSION >= 25 //8.0
 #include <system/audio-base.h>
@@ -2218,8 +2219,12 @@ static int out_flush_new (struct audio_stream_out *stream)
         }
     }
 
-    ts_wait_time(&ts, 100000);
-    pthread_cond_timedwait(&out->cond, &out->cond_lock, &ts);
+    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+        pthread_mutex_lock(&out->cond_lock);
+        ts_wait_time(&ts, 100000);
+        pthread_cond_timedwait(&out->cond, &out->cond_lock, &ts);
+        pthread_mutex_unlock(&out->cond_lock);
+    }
 
     out->pause_status = false;
     ALOGI("%s(), stream(%p) exit\n", __func__, stream);
@@ -3573,6 +3578,10 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         out->tv_src_stream = true;
     }
 
+    if (address && !strncmp(address, "MS12", 4)) {
+        out->is_ms12_stream = true;
+        AM_LOGI("aml ms12 stream(%d)", out->is_ms12_stream);
+    }
     if (flags == AUDIO_OUTPUT_FLAG_NONE)
         flags = AUDIO_OUTPUT_FLAG_PRIMARY;
     if (config->channel_mask == AUDIO_CHANNEL_NONE)
@@ -3861,7 +3870,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
         adev->ms12.p_pts_list->ms12_pcmoutstep_count = 0;
         pthread_mutex_unlock(&adev->ms12.p_pts_list->list_lock);
     }
-    if (!(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
+    if (!(flags & AUDIO_OUTPUT_FLAG_AD_STREAM) && !out->is_ms12_stream) {
         out->avsync_ctx = avsync_ctx_init();
         if (NULL == out->avsync_ctx) {
             goto err;
@@ -3995,6 +4004,10 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
 
     ALOGI("%s: enter: dev(%p) stream(%p)", __func__, dev, stream);
 
+    if (out->aml_dec) {
+        aml_decoder_release(out->aml_dec);
+        out->aml_dec = NULL;
+    }
     stream->common.standby(&stream->common);
     if (out->inputPortID != -1 && adev->useSubMix) {
         delete_mixer_input_port(adev->audio_mixer, out->inputPortID);
@@ -4023,7 +4036,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out->spdifenc_init = false;
     }
 
-    if (out->avsync_ctx) {
+    if (!out->is_ms12_stream && out->avsync_ctx) {
         if (out->avsync_ctx->msync_ctx) {
             if (out->avsync_ctx->msync_ctx->msync_session) {
                 msync_unblock_start(out->avsync_ctx->msync_ctx);
@@ -4098,7 +4111,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
             }
         }
     }
-    if (out->pheader) {
+    if (!out->is_ms12_stream && out->pheader) {
         aml_audio_free(out->pheader);
         out->pheader = NULL;
     }
@@ -4111,10 +4124,6 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         out->spdifout2_handle = NULL;
     }
 
-    if (out->aml_dec) {
-        aml_decoder_release(out->aml_dec);
-        out->aml_dec = NULL;
-    }
 
     if (out->resample_handle) {
         aml_audio_resample_close(out->resample_handle);
@@ -4950,6 +4959,27 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         goto exit;
     }
 
+    ret = str_parms_get_str (parms, "vx_enable", value, sizeof (value) );
+    if (ret >= 0) {
+        if (strcmp(value, "true") == 0) {
+            adev->vx_enable = true;
+            if (Check_VX_lib()) {
+                if (VirtualX_getparameter(&adev->native_postprocess, DTS_PARAM_VX_ENABLE_I32) == 1
+                    && VirtualX_getparameter(&adev->native_postprocess, DTS_PARAM_TSX_PROCESS_DISCARD_I32) == 0) {
+                    dca_set_out_ch_internal(0);
+                } else {
+                    dca_set_out_ch_internal(2);
+                }
+            } else {
+                dca_set_out_ch_internal(2);
+            }
+        } else {
+            adev->vx_enable = false;
+            dca_set_out_ch_internal(2);
+        }
+        ALOGI("%s:%d vx_enable=%d", __FUNCTION__, __LINE__, adev->vx_enable);
+        goto exit;
+    }
 
     /*use dolby_lib_type_last to check ms12 type, because durig playing DTS file,
       this type will be changed to dcv*/
@@ -8077,11 +8107,6 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
         if (!aml_out->is_ms12_main_decoder) {
             pthread_mutex_lock(&adev->trans_lock);
             ms12_out->hal_internal_format = aml_out->hal_internal_format;
-            ms12_out->avsync_type = aml_out->avsync_type;
-            ms12_out->with_header = aml_out->with_header;
-            ms12_out->need_sync   = aml_out->need_sync;
-            ms12_out->pheader = aml_out->pheader;
-            ms12_out->avsync_ctx = aml_out->avsync_ctx;
             ms12_out->hal_ch = aml_out->hal_ch;
             ms12_out->hal_rate = aml_out->hal_rate;
             pthread_mutex_unlock(&adev->trans_lock);
@@ -8174,9 +8199,12 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
         if (eDolbyMS12Lib == adev->dolby_lib_type) {
             return_bytes = aml_audio_ms12_render(stream, &abuffer_out);
         } else {
+            if (is_dts_format(aml_out->hal_internal_format) && get_dts_lib_type() == eDTSXLib) {
+                return_bytes = aml_audio_nonms12_dec_render(stream, &abuffer_out);
+            } else {
             return_bytes = aml_audio_nonms12_render(stream, &abuffer_out);
+            }
         }
-        abuffer_out.pts += frame_duration;
     }
 
 exit:
@@ -8366,11 +8394,11 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
             }
         }
     } else {
-        if (!adev->useSubMix) {
-            AM_LOGW("Submix is disable now, aux write isn't supported");
-            return bytes;
+        if (adev->useSubMix) {
+            bytes_written = out_write_direct_pcm(stream, buffer, bytes);
+        } else {
+            bytes_written = aml_hw_mixer_write(&adev->hw_mixer, buffer, bytes);
         }
-        bytes_written = out_write_direct_pcm(stream, buffer, bytes);
         /*these data is skip for ms12, we still need calculate it*/
         if (eDolbyMS12Lib == adev->dolby_lib_type_last) {
             ms12->sys_audio_skip += bytes / frame_size;
@@ -8951,9 +8979,9 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
     aml_out->continuous_mode_check = true;
 
     /*when a new stream is opened here, we can add it to active stream*/
-    pthread_mutex_lock(&adev->lock);
+    pthread_mutex_lock(&adev->active_outputs_lock);
     adev->active_outputs[aml_out->usecase] = aml_out;
-    pthread_mutex_unlock(&adev->lock);
+    pthread_mutex_unlock(&adev->active_outputs_lock);
 
     if (!(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         /*In order to avoid the invalid adjustment of mastervol when there is no stream */
@@ -9001,15 +9029,6 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
         aml_out->debug_stream = 1;
     }
 
-    pthread_mutex_lock(&adev->lock);
-    if (usecase_change_validate_l(aml_out, false) < 0) {
-        ALOGE("%s() failed", __func__);
-        pthread_mutex_unlock(&adev->lock);
-        aml_audio_trace_int("adev_open_output_stream_new", 0);
-        return 0;
-    }
-    pthread_mutex_unlock(&adev->lock);
-
     if (aml_out->continuous_mode_check && !(flags & AUDIO_OUTPUT_FLAG_AD_STREAM)) {
         if (adev->dolby_lib_type_last == eDolbyMS12Lib) {
             /*if these format can't be supported by ms12, we can bypass it*/
@@ -9026,6 +9045,11 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
         aml_out->continuous_mode_check = false;
     }
 
+    if (usecase_change_validate_l(aml_out, false) < 0) {
+        ALOGE("%s() failed", __func__);
+        aml_audio_trace_int("adev_open_output_stream_new", 0);
+        return 0;
+    }
     if (adev->useSubMix) {
         init_mixer_input_port(adev->audio_mixer, &aml_out->audioCfg, aml_out->flags,
             on_notify_cbk, aml_out, on_input_avail_cbk, aml_out, NULL, NULL, 1.0);
@@ -9069,7 +9093,7 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
     aml_audio_speed_close(aml_out->speed_handle);
 
     /* call legacy close to reuse codes */
-    pthread_mutex_lock(&adev->lock);
+    pthread_mutex_lock(&adev->active_outputs_lock);
     if (adev->active_outputs[aml_out->usecase] == aml_out) {
         adev->active_outputs[aml_out->usecase] = NULL;
     } else {
@@ -9080,7 +9104,7 @@ void adev_close_output_stream_new(struct audio_hw_device *dev,
             }
         }
     }
-    pthread_mutex_unlock(&adev->lock);
+    pthread_mutex_unlock(&adev->active_outputs_lock);
 
     if (adev->useSubMix) {
         if (aml_out->is_normal_pcm ||
@@ -10782,7 +10806,7 @@ int adev_ms12_prepare(struct audio_hw_device *dev) {
                                       AUDIO_OUTPUT_FLAG_NONE,
                                       &stream_config,
                                       &stream_out,
-                                      NULL);
+                                      "MS12");
     if (ret < 0) {
         ALOGE("%s: open output stream failed", __func__);
         return ret;
@@ -10798,6 +10822,7 @@ int adev_ms12_prepare(struct audio_hw_device *dev) {
 
     /*the stream will be used in ms12, don't close it*/
     //adev_close_output_stream_new(dev, stream_out);
+    AM_LOGD("exit");
     return 0;
 }
 
@@ -10895,6 +10920,7 @@ static int adev_close(hw_device_t *device)
     }
     pthread_mutex_destroy(&adev->dtv_patch_lock);
     pthread_mutex_destroy(&adev->patch_lock);
+    pthread_mutex_destroy(&adev->active_outputs_lock);
     pthread_mutex_destroy(&adev->dtv_lock);
 #ifdef ADD_AUDIO_DELAY_INTERFACE
     if (adev->is_TV) {
@@ -11255,7 +11281,12 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->dolby_lib_type = detect_dolby_lib_type();
     adev->dolby_lib_type_last = adev->dolby_lib_type;
     adev->dolby_decode_enable = dolby_lib_decode_enable(adev->dolby_lib_type_last);
+    adev->dts_lib_type = detect_dts_lib_type();
+    if (adev->dts_lib_type == eDTSXLib) {
+        adev->dts_decode_enable = 1;
+    } else {
     adev->dts_decode_enable = dts_lib_decode_enable();
+    }
     adev->is_ms12_tuning_dat = is_ms12_tuning_dat_in_dut();
 
     /* convert MS to data buffer length need to cache */
@@ -11298,6 +11329,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->continuous_audio_mode = adev->continuous_audio_mode_default;
     pthread_mutex_init(&adev->alsa_pcm_lock, NULL);
     pthread_mutex_init(&adev->patch_lock, NULL);
+    pthread_mutex_init(&adev->active_outputs_lock, NULL);
     pthread_mutex_init(&adev->dtv_patch_lock, NULL);
     open_mixer_handle(&adev->alsa_mixer);
 

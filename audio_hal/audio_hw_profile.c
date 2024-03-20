@@ -747,8 +747,23 @@ char*  get_hdmi_sink_cap_new(const char *keys, audio_format_t format, struct aml
         /*check dts-hd/dts*/
         audio_cap_item = get_edid_support_audio_format(AUDIO_FORMAT_DTS_HD);
         if (audio_cap_item) {
-            size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DTS|AUDIO_FORMAT_DTS_HD");
+            p_hdmi_descs->dts_fmt.is_support = 1;
+            size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DTS");
+            /*as we don't support dts decoder, then we can't support dts hd passthrough*/
+            if (adev->dts_decode_enable) {
+                size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DTS_HD");
+            }
             p_hdmi_descs->dtshd_fmt.is_support = 1;
+            if (audio_cap_item->dep_value >= 0) {
+                /*
+                 * For some devices(AVR/Soundbar) using older versions of DTSX, it will send two
+                 * identical DTS-HD SADs with the difference being vsdb.
+                 * We only use SADs with maximum support capabilities. Refer to #format_desc.dts_vsdb_byte3.
+                 */
+                 p_hdmi_descs->dtshd_fmt.dts_vsdb_byte3 = \
+                    audio_cap_item->dep_value > p_hdmi_descs->dtshd_fmt.dts_vsdb_byte3 ? audio_cap_item->dep_value : p_hdmi_descs->dtshd_fmt.dts_vsdb_byte3;
+            }
+            AM_LOGI("dts-hd vendor special byte3:0x%x\n", p_hdmi_descs->dtshd_fmt.dts_vsdb_byte3);
         } else if ((audio_cap_item = get_edid_support_audio_format(AUDIO_FORMAT_DTS)) != NULL) {
             size += sprintf(aud_cap + size, "|%s", "AUDIO_FORMAT_DTS");
             p_hdmi_descs->dts_fmt.is_support = 1;

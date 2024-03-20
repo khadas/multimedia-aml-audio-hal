@@ -109,7 +109,8 @@ add_library(audio_hal SHARED
 	aml_adecs/aml_aac_dec_api.c
 	aml_adecs/aml_ddp_dec_api.c
 	aml_adecs/aml_dec_api.c
-	aml_adecs/aml_dts_dec_api.c
+	aml_adecs/aml_dtshd_dec_api.c
+	aml_adecs/aml_dtsx_dec_api.c
 	aml_adecs/aml_mpeg_dec_api.c
 	aml_adecs/aml_pcm_dec_api.c
 	aml_adecs/aml_adpcm_dec_api.c

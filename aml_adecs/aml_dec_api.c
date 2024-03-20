@@ -33,7 +33,7 @@
 
 #include "aml_dec_api.h"
 #include "aml_ddp_dec_api.h"
-#include "aml_dts_dec_api.h"
+#include "aml_dtsx_dec_api.h"
 #include "aml_pcm_dec_api.h"
 #include "aml_adpcm_dec_api.h"
 #include "aml_mpeg_dec_api.h"
@@ -42,8 +42,16 @@
 #include "aml_vorbis_dec_api.h"
 #include "audio_hw_utils.h"
 
+#ifdef BUILD_LINUX
+#define DTS_X_LIB_PATH_A        "/vendor/lib/libHwAudio_dtsx.so"
+#define DTS_HD_LIB_PATH_A       "/usr/lib/libHwAudio_dtshd.so"
+#else
+#define DTS_X_LIB_PATH_A        "/odm/lib/libHwAudio_dtsx.so"
+#define DTS_HD_LIB_PATH_A       "/odm/lib/libHwAudio_dtshd.so"
+#endif
 #define AML_DEC_FRAGMENT_FRAMES     (512)
 #define AML_DEC_MAX_FRAMES          (AML_DEC_FRAGMENT_FRAMES * 4)
+static eDTSLibType_t gDtsLibType = eDTSNull;
 
 static aml_dec_func_t * get_decoder_function(audio_format_t format)
 {
@@ -57,7 +65,14 @@ static aml_dec_func_t * get_decoder_function(audio_format_t format)
         return NULL;
     case AUDIO_FORMAT_DTS:
     case AUDIO_FORMAT_DTS_HD: {
-        return &aml_dca_func;
+        if (gDtsLibType == eDTSXLib) {
+            return &aml_dtsx_func;
+        } else if (gDtsLibType == eDTSHDLib) {
+            return &aml_dca_func;
+        } else {
+            ALOGE("[%s:%d] Without any dts library", __func__, __LINE__);
+            return NULL;
+        }
     }
     case AUDIO_FORMAT_PCM_16_BIT:
     case AUDIO_FORMAT_PCM_32_BIT:
@@ -251,9 +266,9 @@ static void UpdateDecodeInfo_ChannelConfiguration(char *sysfs_buf, int ch_num) {
         case 8:
             sprintf (sysfs_buf, "ch_configuration %d", TIF_HAL_PLAYBACK_AUDIO_SOURCE_CHANNEL_CONFIGURATION_7_1);
             break;
-        default:
+        /*default:
             ALOGE("unsupport yet");
-            break;
+            break;*/
     }
     sysfs_set_sysfs_str(REPORT_DECODED_INFO, sysfs_buf);
 }
@@ -391,4 +406,39 @@ void aml_decoder_calc_coefficient(unsigned char ad_fade,float * mix_coefficient,
             }
             *mix_coefficient = mixing_coefficient;
             *ad_coefficient = ad_mixing_coefficient;
+}
+eDTSLibType_t detect_dts_lib_type(void)
+{
+    void *hDTSLibHanle = NULL;
+    // the priority would be "DTSX > DTSHD" lib
+    // DTSX is first priority
+    if (access(DTS_X_LIB_PATH_A, R_OK) == 0) {
+        // try to open lib see if it's OK?
+        hDTSLibHanle = dlopen(DTS_X_LIB_PATH_A, RTLD_NOW);
+        if (hDTSLibHanle != NULL) {
+            dlclose(hDTSLibHanle);
+            hDTSLibHanle = NULL;
+            gDtsLibType = eDTSXLib;
+            ALOGI("[%s:%d] Found libHwAudio_dtsx lib", __func__, __LINE__);
+            return eDTSXLib;
+        }
+    }
+    // DTSHD is second priority
+    if (access(DTS_HD_LIB_PATH_A, R_OK) == 0) {
+        // try to open lib see if it's OK?
+        hDTSLibHanle = dlopen(DTS_HD_LIB_PATH_A, RTLD_NOW);
+        if (hDTSLibHanle != NULL) {
+            dlclose(hDTSLibHanle);
+            hDTSLibHanle = NULL;
+            gDtsLibType = eDTSHDLib;
+            ALOGI("[%s:%d] Found libHwAudio_dtshd lib", __func__, __LINE__);
+            return eDTSHDLib;
+        }
+    }
+    ALOGW("[%s:%d] Failed to find libHwAudio_dtsx.so and libHwAudio_dtshd.so, %s", __FUNCTION__, __LINE__, dlerror());
+    return eDTSNull;
+}
+eDTSLibType_t get_dts_lib_type(void)
+{
+    return gDtsLibType;
 }

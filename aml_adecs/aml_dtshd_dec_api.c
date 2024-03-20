@@ -35,11 +35,11 @@
 #include <cutils/properties.h>
 
 #include "audio_hw.h"
-#include "aml_dts_dec_api.h"
-#include "audio_hw_utils.h"
+#include "aml_dtshd_dec_api.h"
+
 
 #ifdef BUILD_LINUX
-#define DOLBY_DTSHD_LIB_PATH "/usr/lib/libHwAudio_dtshd.so"
+#define DOLBY_DTSHD_LIB_PATH     "/usr/lib/libHwAudio_dtshd.so"
 #else
 #define DOLBY_DTSHD_LIB_PATH     "/odm/lib/libHwAudio_dtshd.so"
 #endif
@@ -52,7 +52,7 @@
 #define DTS_TYPE_IV    0x11
 
 #define IEC61937_HEADER_LENGTH  8
-#define IEC_DTS_HD_APPEND_LENGTH 12
+#define IEC_DTS_HD_APPEND_LNGTH 12
 #define IEC61937_PA_OFFSET  0
 #define IEC61937_PA_SIZE    2
 #define IEC61937_PB_OFFSET  2
@@ -70,18 +70,25 @@
 #define AML_DCA_SW_CORE_24                          0x80fe7f01
 #define AML_DCA_SW_SUBSTREAM_M                      0x64582025
 #define AML_DCA_SW_SUBSTREAM                        0x58642520
+#define AML_DTS_EXT_SYNCWORD_XCH                    0x5A5A5A5AU
+#define AML_DTS_EXT_SYNCWORD_XXCH                   0x47004A03U
+#define AML_DTS_EXT_SYNCWORD_XXCHM                  0x0047034AU
+#define AML_DTS_EXT_SYNCWORD_X96                    0x1D95F262U
+#define AML_DTS_EXT_SYNCWORD_X96M                   0x951D62F2U
+#define AML_DTS_EXT_SYNCWORD_XBR                    0x655E315EU
+#define AML_DTS_EXT_SYNCWORD_XBRM                   0x5E655E31U
+#define AML_DTS_EXT_SYNCWORD_LBR                    0x0A801921U
+#define AML_DTS_EXT_SYNCWORD_LBRM                   0x800A2119U
+#define AML_DTS_EXT_SYNCWORD_XLL                    0x41A29547U
+#define AML_DTS_EXT_SYNCWORD_XLLM                   0xA2414795U
 #define AML_DCA_PROP_DEBUG_FLAG                     "vendor.media.audio.dtsdebug"
 #define AML_DCA_PROP_DUMP_INPUT_RAW                 "vendor.media.audio.dtsdump.input.raw"
 #define AML_DCA_PROP_DUMP_OUTPUT_PCM                "vendor.media.audio.dtsdump.output.pcm"
 #define AML_DCA_PROP_DUMP_OUTPUT_RAW                "vendor.media.audio.dtsdump.output.raw"
-#define AML_DCA_DUMP_FILE_DIR                       "/data/vendor/audiohal/"
+#define AML_DCA_DUMP_FILE_DIR                       "/nvram/vendor/audiohal/"
 
 
 #define DCA_CHECK_NULL_STR(x)     (NULL == x ? #x : "")
-#define DCA_CHECK_STATUS(status, state_code)       (status & state_code)
-#define DCA_ADD_STATUS(status, state_code)       (status |= state_code)
-#define DCA_CLEAR_STATUS(status, state_code)       (status &= ~state_code)
-
 
 enum
 {
@@ -89,20 +96,20 @@ enum
     NO_ENOUGH_DATA = -1002,
 };
 
-///< From dtshd_dec_api_common.h. It belongs to the pub header, so it won't change.
-enum AML_DTS_STREAMTYPE_MASK
+///< From dtshd_dec_api_common.h. It belongs to the pubheader, so it won't change.
+enum DTS_STRMTYPE_MASK
 {
-    DTSSTREAMTYPE_DTS_UNKNOWN              = 0x00000000,
-    DTSSTREAMTYPE_DTS_LEGACY           = 0x00000001,
-    DTSSTREAMTYPE_DTS_ES_MATRIX        = 0x00000002,
-    DTSSTREAMTYPE_DTS_ES_DISCRETE      = 0x00000004,
-    DTSSTREAMTYPE_DTS_9624             = 0x00000008,
-    DTSSTREAMTYPE_DTS_ES_8CH_DISCRETE  = 0x00000010,
-    DTSSTREAMTYPE_DTS_HIRES            = 0x00000020,
-    DTSSTREAMTYPE_DTS_MA               = 0x00000040,
-    DTSSTREAMTYPE_DTS_LBR              = 0x00000080,
-    DTSSTREAMTYPE_DTS_LOSSLESS         = 0x00000100,
-    DTSSTREAMTYPE_DTS_HEADPHONE        = 0x10000000   ///< for headphoneX, fake streamtype
+    DTSSTRMTYPE_UNKNOWN              = 0x00000000,
+    DTSSTRMTYPE_DTS_LEGACY           = 0x00000001,
+    DTSSTRMTYPE_DTS_ES_MATRIX        = 0x00000002,
+    DTSSTRMTYPE_DTS_ES_DISCRETE      = 0x00000004,
+    DTSSTRMTYPE_DTS_9624             = 0x00000008,
+    DTSSTRMTYPE_DTS_ES_8CH_DISCRETE  = 0x00000010,
+    DTSSTRMTYPE_DTS_HIRES            = 0x00000020,
+    DTSSTRMTYPE_DTS_MA               = 0x00000040,
+    DTSSTRMTYPE_DTS_LBR              = 0x00000080,
+    DTSSTRMTYPE_DTS_LOSSLESS         = 0x00000100,
+    DTSSTRMTYPE_DTS_HEADPHONE        = 0x10000000   ///< for headphoneX, fake streamtype
 };
 
 struct dca_dts_debug {
@@ -122,12 +129,128 @@ static int (*dts_decoder_cleanup)();
 static int (*dts_decoder_process)(char * , int , int *, char *, int *, struct pcm_info *, char *, int *);
 static int (*dts_decoder_config)(dca_config_type_e, union dca_config_s *);
 static int (*dts_decoder_getinfo)(dca_info_type_e, union dca_info_s *);
-void *gDtsDecoderLibHandler = NULL;
+static void *gDtsDecoderLibHandler = NULL;
 static int _dts_syncword_scan(unsigned char *read_pointer, unsigned int *pTemp0);
 static int _dts_frame_scan(struct dca_dts_dec *dts_dec);
 static int _dts_pcm_output(struct dca_dts_dec *dts_dec);
 static int _dts_raw_output(struct dca_dts_dec *dts_dec);
 static int _dts_stream_type_mapping(unsigned int stream_type);
+static int _dts_extension_check(unsigned char *buffer, int size);
+
+static void endian16_convert(void *buf, int size)
+{
+    int i;
+    unsigned short *p = (unsigned short *)buf;
+    for (i = 0; i < size / 2; i++, p++) {
+      *p = ((*p & 0xff) << 8) | ((*p) >> 8);
+    }
+}
+
+static int _dts_extension_check(unsigned char *buffer, int size)
+{
+    int i = 0;
+    unsigned int u32Temp = 0;
+    bool is_cpf_present = false;
+    bool is_little_endian = false;
+    bool is_core_present = false;
+    bool is_exss_present = false;
+    int cpf_offset = 4;     // dts syncword(4)
+    int pcmr_offset = 12;   // dts syncword(4) + metadata offset(8)
+
+    /*
+        Check Policy:   Present:1  Absent:0
+                CoreSSOnly    CoreSS+ES    CoreSS+ExSS    ExSSOnly
+        CoreSS       1             1           1             0
+        ExSS         0             0           1             1
+        bES          0             1          1/0            0
+    */
+
+    if (size < pcmr_offset) {
+        return -1;
+    }
+    ALOGV("sky_debug: frame_size: 0x%x \n", size);
+    for (i = 0; i < (size - 3); i++) {
+        u32Temp = 0;
+
+        u32Temp  = buffer[i + 0];
+        u32Temp <<= 8;
+        u32Temp |= buffer[i + 1];
+        u32Temp <<= 8;
+        u32Temp |= buffer[i + 2];
+        u32Temp <<= 8;
+        u32Temp |= buffer[i + 3];
+
+        if (i == 0) {
+            if (u32Temp == AML_DCA_SW_CORE_16) {
+                is_little_endian = true;
+                is_core_present = true;
+            } else if (u32Temp == AML_DCA_SW_CORE_16M) {
+                is_little_endian = false;
+                is_core_present = true;
+            } else {
+                ALOGV("sky_debug syncword 0x%x \n", u32Temp);
+            }
+        }
+
+        // check ES flag present or not.
+        if (is_core_present && !is_exss_present) {
+            if (i == cpf_offset && !is_little_endian) {
+                if (buffer[cpf_offset] & 0x02) {
+                    ALOGV("sky_debug: check cpf present, big_endian\n");
+                    is_cpf_present = true;
+                }
+            } else if (i == (cpf_offset + 1) && is_little_endian) {
+                if (buffer[cpf_offset + 1] & 0x02) {
+                    is_cpf_present = true;
+                    ALOGV("sky_debug: check cpf present, little_endian\n");
+                }
+            }
+
+            // check bES flag. (48Khz 5.1 bitstream with ES)
+            if (i == pcmr_offset && !is_cpf_present && !is_little_endian) {
+                if (buffer[pcmr_offset] & 0x40) {
+                    ALOGV("sky_debug: cpf 0 big_endian\n");
+                    return 1;
+                }
+            } else if (i == (pcmr_offset + 1) && !is_cpf_present && is_little_endian) {
+                if (buffer[pcmr_offset + 1] & 0x40) {
+                    ALOGV("sky_debug: cpf 0 little_endian\n");
+                    return 1;
+                }
+            } else if (i == (pcmr_offset + 1) && is_cpf_present && !is_little_endian) {
+                if (buffer[pcmr_offset + 1] & 0x20) {
+                    ALOGV("sky_debug: cpf 1 big_endian\n");
+                    return 1;
+                }
+            } else if (i == (pcmr_offset + 2) && is_cpf_present && is_little_endian) {
+                if (buffer[pcmr_offset + 2] & 0x20) {
+                    ALOGV("sky_debug: cpf 1 little_endian\n");
+                    return 1;
+                }
+            }
+        }
+
+        /* 16-bit extension stream */
+        if (!is_little_endian &&
+            (u32Temp == AML_DTS_EXT_SYNCWORD_XCH || u32Temp == AML_DTS_EXT_SYNCWORD_XXCH ||
+             u32Temp == AML_DTS_EXT_SYNCWORD_X96 || u32Temp == AML_DTS_EXT_SYNCWORD_XBR ||
+             u32Temp == AML_DTS_EXT_SYNCWORD_LBR || u32Temp ==AML_DTS_EXT_SYNCWORD_XLL ||
+             u32Temp == AML_DCA_SW_SUBSTREAM_M)) {
+            ALOGV("sky_debug: dts extension present big_endian sync:0x%x\n", u32Temp);
+            is_exss_present = true;
+            return 1;
+        } else if (is_little_endian &&
+            (u32Temp == AML_DTS_EXT_SYNCWORD_XCH || u32Temp == AML_DTS_EXT_SYNCWORD_XXCHM ||
+             u32Temp == AML_DTS_EXT_SYNCWORD_X96M || u32Temp == AML_DTS_EXT_SYNCWORD_XBRM ||
+             u32Temp == AML_DTS_EXT_SYNCWORD_LBRM || u32Temp ==AML_DTS_EXT_SYNCWORD_XLLM ||
+             u32Temp == AML_DCA_SW_SUBSTREAM)) {
+            is_exss_present = true;
+            ALOGV("sky_debug: dts extension present little_endian sync:0x%x\n", u32Temp);
+            return 1;
+        }
+    }
+    return 0;
+}
 
 static int _dts_syncword_scan(unsigned char *read_pointer, unsigned int *pTemp0)
 {
@@ -244,7 +367,7 @@ static int _dts_frame_scan(struct dca_dts_dec *dts_dec)
                     // point to the address after pd
                     read_pointer = read_pointer + IEC61937_PD_SIZE;
                 } else if ((frame_info->iec61937_data_type == DTS_TYPE_IV)
-                            && (unuse_size > IEC_DTS_HD_APPEND_LENGTH + IEC61937_HEADER_LENGTH)) {
+                            && (unuse_size > IEC_DTS_HD_APPEND_LNGTH + IEC61937_HEADER_LENGTH)) {
                     /*refer kodi how to add 12 bytes header for DTS HD
                     01 00 00 00 00 00 00 00 fe fe ** **, last 2 bytes for data size
                     */
@@ -260,7 +383,7 @@ static int _dts_frame_scan(struct dca_dts_dec *dts_dec)
                     }
                     //ALOGD("size data=0x%x 0x%x\n",read_pointer[10],read_pointer[11]);
                     // point to the address after 12 bytes header
-                    read_pointer = read_pointer + IEC_DTS_HD_APPEND_LENGTH;
+                    read_pointer = read_pointer + IEC_DTS_HD_APPEND_LNGTH;
                 }
             }
 
@@ -278,11 +401,14 @@ static int _dts_frame_scan(struct dca_dts_dec *dts_dec)
             frame_size = frame_info->size;
         }
 
-        // If framesize is 2013(Pd 0x3EE8 >>3 ) and ASPF(a.k.a Audio Sync Word Insertion Flag) is 1.
+        // If framesize is 2013 or 2031, (such as 2013(Pd 0x3EE8 >>3 )) and ASPF(a.k.a Audio Sync Word Insertion Flag) is 1.
         // The last byte will be used as a parameter for DSYNC verification and needs to be given to the decoder together.
-        // Due to the endian problem, 2014 bytes need to be passed in, and the one extra byte, the decoder will discard it.
+        // Due to the endian problem, one more bytes need to be passed in, and the one extra byte, the decoder will discard it.
         if (frame_size == 2013) {
             frame_size = 2014;
+        }
+        if (frame_size == 2031) {
+            frame_size = 2032;
         }
 
         //ALOGD("remain:%d, frame:%d, read:%p, rd:%p, drop:%d"
@@ -303,7 +429,6 @@ static int _dts_frame_scan(struct dca_dts_dec *dts_dec)
         unsigned int syncword = 0;
         unsigned int check_size = 0;
         int tmp_syncword_pos = -1;
-        int first_sync_word_pos = 0;
         while ((frame_size <= 0) && (unuse_size > IEC61937_HEADER_LENGTH)) {
             if (_dts_syncword_scan(read_pointer, &syncword)) {
                 tmp_syncword_pos = read_pointer - input_rbuffer->start_addr;
@@ -318,7 +443,6 @@ static int _dts_frame_scan(struct dca_dts_dec *dts_dec)
                 } else if (!frame_info->syncword) {
                     frame_info->syncword_pos = tmp_syncword_pos;
                     frame_info->syncword = syncword;
-                    first_sync_word_pos = tmp_syncword_pos;
                 }
                 //ALOGD("syncword :0x%x, syncword_pos:%d", frame_info->syncword, frame_info->syncword_pos);
             }
@@ -337,16 +461,10 @@ static int _dts_frame_scan(struct dca_dts_dec *dts_dec)
             check_size = input_rbuffer->size + frame_info->check_pos - frame_info->syncword_pos;
         }
 
-        if (first_sync_word_pos > 0) {
-            ring_buffer_seek(input_rbuffer, first_sync_word_pos);
-            dts_dec->remain_size -= first_sync_word_pos;
-            ALOGD("drop %d bytes before found the syncword.", first_sync_word_pos);
-        }
-
         //ALOGD("check_pos:%d, syncword_pos:%d, read_pointer:%p, check_size:%d"
         //    , frame_info->check_pos, frame_info->syncword_pos, read_pointer, check_size);
 
-        // no valid frame was found beyond size of MAX_DCA_FRAME_LENGTH, maybe it is dirty data, so drop it
+        // no valid frame was found beyond size of MAX_DCA_FRAME_LENGTH, meybe it is dirty data, so drop it
         if ((frame_size <= 0) && (check_size >= MAX_DCA_FRAME_LENGTH)) {
             ring_buffer_seek(input_rbuffer, check_size);
             dts_dec->remain_size -= check_size;
@@ -398,7 +516,6 @@ static int _dts_raw_output(struct dca_dts_dec *dts_dec)
 {
     aml_dec_t *aml_dec = (aml_dec_t *)dts_dec;
     dec_data_info_t *dec_raw_data = &aml_dec->dec_raw_data;
-    unsigned int syncword = 0;
     if (dts_debug.fp_output_raw) {
         fwrite(dec_raw_data->buf, 1, dts_dec->outlen_raw, dts_debug.fp_output_raw);
     }
@@ -409,8 +526,6 @@ static int _dts_raw_output(struct dca_dts_dec *dts_dec)
     } else {
         dec_raw_data->sub_format = AUDIO_FORMAT_DTS;
     }
-    /*we check whether the data is iec61937 or dts raw*/
-    dec_raw_data->is_dtscd = _dts_syncword_scan(dec_raw_data->buf, &syncword);
     dec_raw_data->data_ch = 2;
     if (dts_dec->pcm_out_info.sample_rate == 44100)
         dec_raw_data->data_sr = 44100;
@@ -534,29 +649,29 @@ static int _dts_stream_type_mapping(unsigned int stream_type)
     int dts_type = TYPE_DTS;
     int temp_stream_type;
 
-    temp_stream_type = stream_type & (~DTSSTREAMTYPE_DTS_HEADPHONE);
+    temp_stream_type = stream_type & (~DTSSTRMTYPE_DTS_HEADPHONE);
     switch (temp_stream_type) {
-        case DTSSTREAMTYPE_DTS_LEGACY:
-        case DTSSTREAMTYPE_DTS_ES_MATRIX:
-        case DTSSTREAMTYPE_DTS_ES_DISCRETE:
-        case DTSSTREAMTYPE_DTS_9624:
-        case DTSSTREAMTYPE_DTS_ES_8CH_DISCRETE:
-        case DTSSTREAMTYPE_DTS_HIRES:
+        case DTSSTRMTYPE_DTS_LEGACY:
+        case DTSSTRMTYPE_DTS_ES_MATRIX:
+        case DTSSTRMTYPE_DTS_ES_DISCRETE:
+        case DTSSTRMTYPE_DTS_9624:
+        case DTSSTRMTYPE_DTS_ES_8CH_DISCRETE:
+        case DTSSTRMTYPE_DTS_HIRES:
             dts_type = TYPE_DTS;
             break;
-        case DTSSTREAMTYPE_DTS_MA:
-        case DTSSTREAMTYPE_DTS_LOSSLESS:
+        case DTSSTRMTYPE_DTS_MA:
+        case DTSSTRMTYPE_DTS_LOSSLESS:
             dts_type = TYPE_DTS_HD;
             break;
-        case DTSSTREAMTYPE_DTS_LBR:
+        case DTSSTRMTYPE_DTS_LBR:
             dts_type = TYPE_DTS_EXPRESS;
             break;
 
-        case DTSSTREAMTYPE_DTS_HEADPHONE:
+        case DTSSTRMTYPE_DTS_HEADPHONE:
             dts_type = TYPE_DTS_HP;
             break;
 
-        case DTSSTREAMTYPE_DTS_UNKNOWN:
+        case DTSSTRMTYPE_UNKNOWN:
         default:
             dts_type = TYPE_DTS;
             break;
@@ -592,25 +707,27 @@ int dca_decoder_init_patch(aml_dec_t **ppaml_dec, aml_dec_config_t *dec_config)
     dts_dec->stream_type = 0;
     dts_dec->is_headphone_x = false;
 
-    if (dca_decoder_init(dts_dec->digital_raw) < 0) {
+    dts_dec->status = dca_decoder_init(dts_dec->digital_raw);
+    if (dts_dec->status < 0) {
         goto error;
     }
-    dts_dec->status |= DCA_INITED;
+    dts_dec->status = 1;
     dts_dec->remain_size = 0;
-    dts_dec->half_frame_remain_size = 0;
     dts_dec->decoder_process = dca_decode_process;
 
     dts_dec->frame_info.syncword = 0;
     dts_dec->frame_info.syncword_pos = 0;
     dts_dec->frame_info.check_pos = 0;
     dts_dec->frame_info.is_little_endian = false;
+    dts_dec->frame_info.is_dts_es = false;
+    dts_dec->frame_info.is_extension_check = 0;
     dts_dec->frame_info.iec61937_data_type = 0;
     dts_dec->frame_info.size = 0;
 
     dts_dec->inbuf = (unsigned char*) aml_audio_malloc(MAX_DCA_FRAME_LENGTH);  ///< same as dca decoder
     dec_pcm_data->buf_size = MAX_DCA_FRAME_LENGTH * 2;
     dec_pcm_data->buf = (unsigned char *)aml_audio_malloc(dec_pcm_data->buf_size);
-    dec_raw_data->buf_size = MAX_DCA_FRAME_LENGTH * 2;
+    dec_raw_data->buf_size = MAX_DCA_FRAME_LENGTH;
     dec_raw_data->buf = (unsigned char *)aml_audio_malloc(dec_raw_data->buf_size);
     if (!dec_pcm_data->buf || !dec_raw_data->buf || !dts_dec->inbuf) {
         ALOGE("%s malloc memory failed!", __func__);
@@ -620,7 +737,7 @@ int dca_decoder_init_patch(aml_dec_t **ppaml_dec, aml_dec_config_t *dec_config)
     memset(dec_raw_data->buf , 0, dec_raw_data->buf_size);
     memset(raw_in_data, 0, sizeof(dec_data_info_t));  ///< no use
 
-    if (ring_buffer_init(&dts_dec->input_ring_buf, MAX_DCA_FRAME_LENGTH * 3)) {
+    if (ring_buffer_init(&dts_dec->input_ring_buf, MAX_DCA_FRAME_LENGTH * 4)) {
         ALOGE("%s init ring buffer failed!", __func__);
         goto error;
     }
@@ -748,14 +865,14 @@ int dca_decoder_release_patch(aml_dec_t *aml_dec)
 int dca_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer)
 {
     struct dca_dts_dec *dts_dec = NULL;
+    int bytes = abuffer->size;
+    char * buffer = abuffer->buffer;
     struct aml_audio_device *adev = NULL;
     struct ring_buffer *input_rbuffer = NULL;
     dec_data_info_t *dec_pcm_data = NULL;
     dec_data_info_t *dec_raw_data = NULL;
     int frame_size = 0;
     int used_size = 0;
-    const char *buffer = abuffer->buffer;
-    int bytes = abuffer->size;
 
     if (!aml_dec || !buffer) {
         ALOGE("[%s:%d] Invalid parameter: %s %s", __func__, __LINE__, DCA_CHECK_NULL_STR(aml_dec), DCA_CHECK_NULL_STR(buffer));
@@ -792,22 +909,15 @@ int dca_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer)
         }
     }
 
-    if (DCA_CHECK_STATUS(dts_dec->status, DCA_PROCESS_HALF_FRAME)) {
-        frame_size = dts_dec->half_frame_remain_size;
-        ALOGI("half_frame_decode frame_size:%d\n", frame_size);
-    } else {
-        frame_size = _dts_frame_scan(dts_dec);
-        if (frame_size > 0) {
-            ring_buffer_read(input_rbuffer, dts_dec->inbuf, frame_size);
-            dts_dec->remain_size -= frame_size;
-            if (dts_dec->is_iec61937 && !dts_dec->frame_info.is_little_endian) {
-                endian16_convert(dts_dec->inbuf, frame_size);
-            }
-        }
-    }
-
+    frame_size = _dts_frame_scan(dts_dec);
     if (frame_size > 0) {
-        used_size = dts_dec->decoder_process(dts_dec->inbuf + dts_dec->half_frame_used_size,
+        ring_buffer_read(input_rbuffer, dts_dec->inbuf, frame_size);
+        dts_dec->remain_size -= frame_size;
+        if (dts_dec->is_iec61937 && !dts_dec->frame_info.is_little_endian) {
+            endian16_convert(dts_dec->inbuf, frame_size);
+        }
+
+        used_size = dts_dec->decoder_process(dts_dec->inbuf,
                                 frame_size,
                                 dec_pcm_data->buf,
                                 &dts_dec->outlen_pcm,
@@ -820,22 +930,19 @@ int dca_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer)
                 , dts_dec->pcm_out_info.channel_num, dts_dec->outlen_raw);
         }
 
-        if (used_size < frame_size) {
-            DCA_ADD_STATUS(dts_dec->status, DCA_PROCESS_HALF_FRAME);
-            dts_dec->half_frame_remain_size = frame_size - used_size;
-            dts_dec->half_frame_used_size = used_size;
-            ALOGI("half_frame_decode remain_size:%d used_size:%d\n", dts_dec->half_frame_remain_size, dts_dec->half_frame_used_size);
-        } else {
-            DCA_CLEAR_STATUS(dts_dec->status, DCA_PROCESS_HALF_FRAME);
-            dts_dec->half_frame_remain_size = 0;
-            dts_dec->half_frame_used_size = 0;
-        }
-
         if ((dts_dec->outlen_pcm > 0) && (used_size > 0)) {
             _dts_pcm_output(dts_dec);
         }
 
         if ((dts_dec->outlen_raw > 0) && (used_size > 0)) {
+            if (!dts_dec->frame_info.is_extension_check) {
+                dts_dec->frame_info.is_dts_es = _dts_extension_check(dts_dec->inbuf, frame_size);
+                dts_dec->frame_info.is_extension_check = true;
+            }
+
+            if (dts_dec->frame_info.is_dts_es) {
+                memset(dec_raw_data->buf, 0, dts_dec->outlen_raw);
+            }
             _dts_raw_output(dts_dec);
         }
 
@@ -849,7 +956,7 @@ int dca_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer)
                 int ret = (*dts_decoder_getinfo)(DCA_STREAM_INFO, (dca_info_t *)&dca_info);
                 if (!ret) {
                     dts_dec->stream_type = _dts_stream_type_mapping(dca_info.stream_info.stream_type);
-                    dts_dec->is_headphone_x = !!(dca_info.stream_info.stream_type & DTSSTREAMTYPE_DTS_HEADPHONE);
+                    dts_dec->is_headphone_x = !!(dca_info.stream_info.stream_type & DTSSTRMTYPE_DTS_HEADPHONE);
                 } else {
                     dts_dec->stream_type = -1;
                     dts_dec->is_headphone_x = false;
@@ -863,12 +970,10 @@ int dca_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer)
         if ((dts_dec->outlen_pcm > 0) && (used_size > 0)) {
             /* Cache a lot of data, needs to be decoded multiple times. */
             aml_dec->frame_cnt++;
+            return AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN;
+        } else {
+            return AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN;
         }
-        dec_pcm_data->pts = abuffer->pts;
-
-        AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d",
-            dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size);
-        return AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN;
     } else if (frame_size == 0) {
         return AML_DEC_RETURN_TYPE_CACHE_DATA;
     } else {
@@ -901,7 +1006,7 @@ int dca_decoder_config(aml_dec_t * aml_dec, aml_dec_config_type_t config_type, a
         return ret;
     }
 
-    if (!DCA_CHECK_STATUS(dts_dec->status, DCA_INITED)) {
+    if (dts_dec->status != 1) {
         return ret;
     }
 
@@ -932,7 +1037,7 @@ int dca_decoder_getinfo(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_d
         return ret;
     }
 
-    if (!DCA_CHECK_STATUS(dts_dec->status, DCA_INITED)) {
+    if (dts_dec->status != 1) {
         return ret;
     }
 
@@ -951,7 +1056,7 @@ int dca_decoder_getinfo(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_d
                 aml_dec_info->dec_info.stream_drop_num = dca_info.stream_info.dropped_frames;
                 aml_dec_info->dec_info.stream_decode_num = dca_info.stream_info.decode_frames;
                 dts_dec->stream_type = _dts_stream_type_mapping(dca_info.stream_info.stream_type);
-                dts_dec->is_headphone_x = !!(dca_info.stream_info.stream_type & DTSSTREAMTYPE_DTS_HEADPHONE);
+                dts_dec->is_headphone_x = !!(dca_info.stream_info.stream_type & DTSSTRMTYPE_DTS_HEADPHONE);
                 ///< aml_dec_info->dec_info.output_bLFE = // not support yet
             } else {
                 memset(aml_dec_info, 0, sizeof(aml_dec_info_t));
@@ -982,7 +1087,7 @@ int dca_decoder_getinfo(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_d
     return ret;
 }
 
-int dca_get_out_ch_internal(void)
+int dtshd_get_out_ch_internal(void)
 {
     ///< not init yet.
     if (!dts_decoder_getinfo)
@@ -998,7 +1103,7 @@ int dca_get_out_ch_internal(void)
     }
 }
 
-int dca_set_out_ch_internal(int ch_num)
+int dtshd_set_out_ch_internal(int ch_num)
 {
     if (!dts_decoder_config) {
         ///< static param, will take effect after decoder_init.

@@ -232,6 +232,74 @@ int aml_hw_mixer_mixing(struct aml_hw_mixer *mixer, void *buffer, int bytes, aud
     return 0;
 }
 
+int aml_hw_mixer_mch_in_mixing(struct aml_hw_mixer *mixer, void *buffer, int in_frames, audio_format_t format, int in_ch)
+{
+    int32_t i, tail, j;
+    int32_t cached_bytes, read_bytes = in_frames * 4;//4 is frame_size for 2ch 16bit data
+    int need_mixed_ch = 2;
+    if (in_ch <= 0) {
+        ALOGE("%s(), ch(%d) not support!", __func__, in_ch);
+        return -1;
+    } else if (in_ch == 1) {
+        need_mixed_ch = 1;
+    }
+    pthread_mutex_lock(&mixer->lock);
+    cached_bytes = aml_hw_mixer_get_content_l(mixer);
+    if (cached_bytes < read_bytes) {
+        read_bytes = cached_bytes;
+    }
+    if (format == AUDIO_FORMAT_PCM_16_BIT) {
+        int32_t tmp;
+        int16_t *tmp_buffer = (int16_t *)buffer;
+        int16_t *cached_buf = (int16_t *)(mixer->start_buf + mixer->rp);
+        if (read_bytes + mixer->rp > mixer->buf_size) {
+            tail = mixer->buf_size - mixer->rp;
+            for (i = 0; i < tail / 4; i++) {// tail / 4 is frame num
+                for (j = 0; j < need_mixed_ch; j++) {
+                    tmp = (int32_t)*tmp_buffer + (int32_t)*cached_buf++;
+                    *tmp_buffer++ = CLIPSHORT(tmp);
+                }
+                if (in_ch > 2) {// cached_buf is 2ch 16bit data, tmp_buffer is in_ch 16 bit data,we only mix cached_buf to the L/R ch of tmp_buffer
+                    tmp_buffer = tmp_buffer + (in_ch -2);
+                } else if (need_mixed_ch == 1) {//cached_buf is 2ch 16bit data, tmp_buffer is 1ch 16 bit data, we only mix L ch data of cached_buf to tmp_buffer
+                    cached_buf = cached_buf + 1;
+                }
+            }
+            read_bytes -= tail;
+            cached_buf = (int16_t *)mixer->start_buf;
+            for (i = 0; i < read_bytes / 4; i++) {// read_bytes / 4 is frame num
+                for (j = 0; j < need_mixed_ch; j++) {
+                    tmp = (int32_t)*tmp_buffer + (int32_t)*cached_buf++;
+                    *tmp_buffer++ = CLIPSHORT(tmp);
+                }
+                if (in_ch > 2) {// cached_buf is 2ch 16bit data, tmp_buffer is in_ch 16 bit data,we only mix cached_buf to the L/R ch of tmp_buffer
+                    tmp_buffer = tmp_buffer + (in_ch -2);
+                } else if (need_mixed_ch == 1) {//cached_buf is 2ch 16bit data, tmp_buffer is 1ch 16 bit data, we only mix L ch data of cached_buf to tmp_buffer
+                    cached_buf = cached_buf + 1;
+                }
+            }
+            mixer->rp = read_bytes;
+        } else {
+            for (i = 0; i < read_bytes / 4; i++) {// read_bytes / 4 is frame num
+                for (j = 0; j < need_mixed_ch; j++) {
+                    tmp = (int32_t)*tmp_buffer + (int32_t)*cached_buf++;
+                    *tmp_buffer++ = CLIPSHORT(tmp);
+                }
+                if (in_ch > 2) {// cached_buf is 2ch 16bit data, tmp_buffer is in_ch 16 bit data,we only mix cached_buf to the L/R ch of tmp_buffer
+                    tmp_buffer = tmp_buffer + (in_ch -2);
+                } else if (need_mixed_ch == 1) {//cached_buf is 2ch 16bit data, tmp_buffer is 1ch 16 bit data, we only mix L ch data of cached_buf to tmp_buffer
+                    cached_buf = cached_buf + 1;
+                }
+            }
+            mixer->rp += read_bytes;
+            mixer->rp %= mixer->buf_size;
+        }
+    } else {
+        ALOGE("%s(), format %#x not support!", __func__, format);
+    }
+    pthread_mutex_unlock(&mixer->lock);
+    return 0;
+}
 //need called by device mutux locked
 int aml_hw_mixer_read(struct aml_hw_mixer *mixer, void *r_buf, uint32_t size)
 {
