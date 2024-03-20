@@ -8673,7 +8673,7 @@ static int usecase_change_validate_l(struct aml_stream_out *aml_out, bool is_sta
             aml_out->write_func = MIXER_MAIN_BUFFER_WRITE;
             AM_LOGI("mixer_main_buffer_write !");
         }
-        aml_out->inputPortType = get_input_port_type(&aml_out->config, aml_out->flags);
+        aml_out->inputPortType = get_input_port_type(&aml_out->audioCfg, aml_out->flags);
     }
     return 0;
 }
@@ -8938,10 +8938,10 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
                and the audio patch is enabled, we do not need to wait DTV exit as it is
                enabled by DTV itself */
             if (config->sample_rate == 96000 || config->sample_rate == 88200 ||
-                    audio_channel_count_from_out_mask(config->channel_mask) > 2 || aml_out->tv_src_stream) {
-                aml_out->bypass_submix = true;
-                ALOGI("bypass submix");
-            } else {
+                    audio_channel_count_from_out_mask(config->channel_mask) > 2) {
+                AM_LOGI("need resample or downmix!");
+            }
+            {
                 int retry_count = 0;
                 /* when dvb switch to neflix,dvb send cmd stop and dtv decoder_state
                     AUDIO_DTV_PATCH_DECODER_STATE_INIT, but when hdmi plug in and out dvb

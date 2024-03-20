@@ -52,7 +52,7 @@
 #define AED_DEFAULT_VOLUME          (831)
 
 #define DOLBY_DCV_LIB_PATH_A        "/usr/lib/libHwAudio_dcvdec.so"
-#define DCV_BYPASS_LIB_SIZE         (10000)
+#define DCV_BYPASS_LIB_SIZE         (15000)
 
 static audio_format_t ms12_max_support_output_format() {
 #if defined(MS12_V24_ENABLE) || defined(MS12_V26_ENABLE)
