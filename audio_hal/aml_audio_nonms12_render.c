@@ -312,7 +312,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
         }
 
         if (dec_pcm_data->data_ch == 6 || dec_pcm_data->data_ch == 8) {
-            if (!adev->vx_enable) {
+            if (adev->vx_enable) {
                 ret = audio_VX_post_process(VX_postprocess, (int16_t *)dec_data, pcm_len);
                 if (ret > 0) {
                     pcm_len = ret; /* VX will downmix 6ch to 2ch, pcm size will be changed */
@@ -592,7 +592,7 @@ void aml_audio_nonms12_output(struct audio_stream_out *stream)
                 }
                 aml_audio_stream_volume_process(stream, dec_data, sizeof(int16_t), dec_pcm_data->data_ch, pcm_len);
                 if (dec_pcm_data->data_ch == 6 || dec_pcm_data->data_ch == 8) {
-                    if (!adev->vx_enable) {
+                    if (adev->vx_enable) {
                         ret = audio_VX_post_process(VX_postprocess, (int16_t *)dec_data, pcm_len);
                         if (ret > 0) {
                             pcm_len = ret; /* VX will downmix 6ch/8ch to 2ch, pcm size will be changed */

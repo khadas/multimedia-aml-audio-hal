@@ -15,10 +15,13 @@
 #include <cutils/log.h>
 
 #include "audio_post_process.h"
-#include "Virtualx.h"
 #include "aml_dec_api.h"
 #include "aml_dtshd_dec_api.h"
-#include "aml_dtsx_dec_api.h"
+#ifdef DTS_VX_V4_ENABLE
+#include "Virtualx_v4.h"
+#else
+#include "Virtualx.h"
+#endif
 
 static int check_dts_config(struct aml_native_postprocess *native_postprocess) {
     int cur_channels = dca_get_out_ch_internal();
@@ -112,7 +115,7 @@ int audio_VX_post_process(struct aml_native_postprocess *native_postprocess, int
     return ret;
 }
 
-static int VirtualX_setparameter(struct aml_native_postprocess *native_postprocess, int param, int ch_num, int cmdCode)
+int VirtualX_setparameter(struct aml_native_postprocess *native_postprocess, int param, int param_value, int cmdCode)
 {
     effect_handle_t effect = native_postprocess->postprocessors[0];
     int32_t replyData = 0;
@@ -124,7 +127,7 @@ static int VirtualX_setparameter(struct aml_native_postprocess *native_postproce
     p->psize = sizeof(uint32_t);
     p->vsize = sizeof(uint32_t);
     *(int32_t *)p->data = param;
-    *((int32_t *)p->data + 1) = ch_num;
+    *((int32_t *)p->data + 1) = param_value;
 
     if (effect && (*effect) && (*effect)->command) {
         (*effect)->command(effect, cmdCode, cmdSize, (void *)p, &replySize, &replyData);
@@ -169,7 +172,11 @@ void VirtualX_Channel_reconfig(struct aml_native_postprocess *native_postprocess
 
     if (native_postprocess->libvx_exist) {
         ret = VirtualX_setparameter(native_postprocess,
+#ifdef DTS_VX_V4_ENABLE
+                                    PARAM_CHANNEL_NUM,
+#else
                                     DTS_PARAM_CHANNEL_NUM,
+#endif
                                     ch_num, EFFECT_CMD_SET_PARAM);
         if (ret != ch_num) {
             ALOGE("Set VX(%p) input channel error: channel %d, ret = %d\n", native_postprocess->postprocessors[0], ch_num, ret);

@@ -121,6 +121,7 @@ typedef struct dec_data_info {
     int data_sr;
     bool is_dtscd;
     uint64_t pts; //unit 90k;
+    int data_pcm_ch;
     //int data_bitwidth;
 } dec_data_info_t;
 

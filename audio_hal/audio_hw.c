@@ -39,7 +39,12 @@
 #include <memory.h>
 
 #include "aml_dec_api.h"
+#ifdef DTS_VX_V4_ENABLE
+#include "Virtualx_v4.h"
+#else
 #include "Virtualx.h"
+#endif
+
 
 #if ANDROID_PLATFORM_SDK_VERSION >= 25 //8.0
 #include <system/audio-base.h>
@@ -2391,7 +2396,8 @@ static int out_add_audio_effect(const struct audio_stream *stream, effect_handle
 
     effect_descriptor_t tmpdesc;
     (*effect)->get_descriptor(effect, &tmpdesc);
-    if (0 == strcmp(tmpdesc.name, "VirtualX")) {
+    //Set dts vx sound effect to the first in the sound effect array
+    if (0 == strncmp(tmpdesc.name, "VirtualX",strlen("VirtualX"))) {
         dev->native_postprocess.libvx_exist = Check_VX_lib();
         ALOGI("%s, add audio effect: '%s' exist flag : %s", __FUNCTION__, VIRTUALX_LICENSE_LIB_PATH,
             (dev->native_postprocess.libvx_exist) ? "true" : "false");
@@ -4987,26 +4993,31 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
 
     ret = str_parms_get_str (parms, "vx_enable", value, sizeof (value) );
     if (ret >= 0) {
-        if (strcmp(value, "true") == 0) {
-            adev->vx_enable = true;
-            if (Check_VX_lib()) {
+        if (Check_VX_lib()) { //need to check whether dts vx lib exists first
+            if (strcmp(value, "true") == 0) {
+                adev->vx_enable = true;
+#ifdef DTS_VX_V4_ENABLE
+                if (0 == VirtualX_setparameter(&adev->native_postprocess,VIRTUALX4_PARAM_ENABLE,1,EFFECT_CMD_SET_PARAM)
+                     && 0 == VirtualX_getparameter(&adev->native_postprocess, PARAM_TSX_PROCESS_DISCARD_I32) ) {
+#else
                 if (VirtualX_getparameter(&adev->native_postprocess, DTS_PARAM_VX_ENABLE_I32) == 1
                     && VirtualX_getparameter(&adev->native_postprocess, DTS_PARAM_TSX_PROCESS_DISCARD_I32) == 0) {
-                    dca_set_out_ch_internal(0);
+#endif
+                    dca_set_out_ch_internal(0);//If vx4 enable successful or vx2 is enabled,config output auto
                 } else {
-                    dca_set_out_ch_internal(2);
+                    adev->vx_enable = false;
+                    dca_set_out_ch_internal(2);//If vx4 enable failed or vx2 is disable, set config output stero
                 }
-            } else {
-                dca_set_out_ch_internal(2);
+            } else { //set dts vx false
+                adev->vx_enable = false;
+#ifdef DTS_VX_V4_ENABLE
+                VirtualX_setparameter(&adev->native_postprocess,VIRTUALX4_PARAM_ENABLE,0,EFFECT_CMD_SET_PARAM);
+#endif
+                dca_set_out_ch_internal(2);//set vx4 or vx2 disabled,set config output stero
             }
-        } else {
-            adev->vx_enable = false;
-            dca_set_out_ch_internal(2);
-        }
-        ALOGI("%s:%d vx_enable=%d", __FUNCTION__, __LINE__, adev->vx_enable);
+       }
         goto exit;
     }
-
     /*use dolby_lib_type_last to check ms12 type, because durig playing DTS file,
       this type will be changed to dcv*/
     if (eDolbyMS12Lib == adev->dolby_lib_type_last) {

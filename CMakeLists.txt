@@ -51,6 +51,7 @@ option(USE_DIAG_LOG "Support diagnostic logging for RDK" OFF)
 option(USE_MEDIA_INFO "Support media info API reporting" OFF)
 option(USE_MS12_V26 "Use MS12 v2.6" OFF)
 option(USE_MSYNC "Compile with MSYNC option" ON)
+option(USE_DTS_VX4 "Use DTS VX4" ON)
 
 if(USE_MS12_V26)
 add_subdirectory("libms12_v26")
@@ -58,6 +59,12 @@ add_definitions(-DMS12_V26_ENABLE)
 else()
 add_subdirectory("libms12_v24")
 add_definitions(-DMS12_V24_ENABLE)
+endif()
+
+#For DTS VX version selected
+if(USE_DTS_VX4)
+    message("Use DTS VX4")
+    add_definitions(-DDTS_VX_V4_ENABLE)
 endif()
 
 if(DISABLE_SERVER)

@@ -36,7 +36,11 @@
 
 #include "audio_hw.h"
 #include "aml_dtsx_dec_api.h"
+#ifdef DTS_VX_V4_ENABLE
+#include "Virtualx_v4.h"
+#else
 #include "Virtualx.h"
+#endif
 #include "aml_hw_mixer.h"
 #include "aml_audio_nonms12_render.h"
 
@@ -649,9 +653,9 @@ static int _dtsx_pcm_output(dtsx_dec_t *dtsx_dec)
 
     dec_pcm_data->data_format = AUDIO_FORMAT_PCM_16_BIT;
     if (nChannel > 0) {
-        dec_pcm_data->data_ch = nChannel;
+        dec_pcm_data->data_ch = dec_pcm_data->data_pcm_ch = nChannel;
     } else {
-        dec_pcm_data->data_ch = 2;
+        dec_pcm_data->data_ch = dec_pcm_data->data_pcm_ch = 2;
     }
 
     if (nSampleRate > 0) {
@@ -907,8 +911,13 @@ static int _dtsx_dualcore_init(dtsx_dec_t *p_dtsx_dec)
     snprintf(p_dtsx_dec->init_argv[cmd_count++], DTSX_PARAM_STRING_LEN, "dtsx_core2_spkrout=%d", _dtsx_config_params.core2_spkr_out);
 
     if (Check_VX_lib()) {
-        if (VirtualX_getparameter(&adev->native_postprocess, DTS_PARAM_VX_ENABLE_I32) == 1 && !adev->vx_enable
-            && VirtualX_getparameter(&adev->native_postprocess, DTS_PARAM_TSX_PROCESS_DISCARD_I32) == 0) {
+#ifdef DTS_VX_V4_ENABLE
+    if (1 == VirtualX_getparameter(&adev->native_postprocess, VIRTUALX4_PARAM_ENABLE) && adev->vx_enable
+            && 0 == VirtualX_getparameter(&adev->native_postprocess, PARAM_TSX_PROCESS_DISCARD_I32)) {
+#else
+    if (1 == VirtualX_getparameter(&adev->native_postprocess, DTS_PARAM_VX_ENABLE_I32) && adev->vx_enable
+            && 0 == VirtualX_getparameter(&adev->native_postprocess, DTS_PARAM_TSX_PROCESS_DISCARD_I32)) {
+#endif
             _dtsx_config_params.auto_config_out_for_vx = DTSX_CORE2_OUTPUT_TYPE_ATUO;
         } else {
             _dtsx_config_params.auto_config_out_for_vx = DTSX_CORE2_OUTPUT_TYPE_STEREO;
@@ -1754,14 +1763,15 @@ int dtsx_get_out_ch_internal(void)
     int nChannel =0;
     int nBitWidth =0;
 
-    int rc = _aml_dts_postprocess_get_out_info(_dtsx_dec->p_dtsx_pp_inst, DTS_DSP2_OUTPUTBUS0, &nSampleRate, &nChannel, &nBitWidth);
-    if (rc != 0) {
+    //int rc = _aml_dts_postprocess_get_out_info(_dtsx_dec->p_dtsx_pp_inst, DTS_DSP2_OUTPUTBUS0, &nSampleRate, &nChannel, &nBitWidth);
+    nChannel = _dtsx_dec->aml_dec.dec_pcm_data.data_pcm_ch;
+    if (nChannel == 0) {
         ALOGE("[%s:%d] _aml_dts_postprocess_get_out_info fail", __func__, __LINE__);
         return -1;
     } else {
         if (_dtsx_debug.debug_flag) {
-            ALOGD("[%s:%d] Pcm [BUS-0] output nSampleRate(%d), nChannel(%d), nBitWidth(%d)",
-                __func__, __LINE__, nSampleRate, nChannel, nBitWidth);
+            ALOGD("[%s:%d] Pcm [BUS-0] output nChannel(%d)",
+                __func__, __LINE__, nChannel);
         }
         return nChannel;
     }

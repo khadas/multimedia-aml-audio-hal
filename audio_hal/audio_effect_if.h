@@ -16,6 +16,8 @@ typedef enum AML_AUDIO_EFFECT_TYPE {
     AML_EFFECT_TREBLEBASS,
     AML_EFFECT_HPEQ,
     AML_EFFECT_AVL,
+    AML_EFFECT_VIRTUALX,
+    AML_EFFECT_VIRTUALX_v4,
     AML_EFFECT_MAX,
 } aml_audio_effect_type_e;
 
