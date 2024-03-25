@@ -469,6 +469,13 @@ static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
                 }
             }
             aml_out->heaac_info.debug_print = adev->debug_flag;
+            if (audio_format == AUDIO_FORMAT_AAC_LATM || audio_format == AUDIO_FORMAT_HE_AAC_V1) {
+                aml_out->heaac_info.is_loas = 1;
+                aml_out->heaac_info.is_adts = 0;
+            } else if (audio_format == AUDIO_FORMAT_AAC || audio_format == AUDIO_FORMAT_HE_AAC_V2) {
+                aml_out->heaac_info.is_loas = 0;
+                aml_out->heaac_info.is_adts = 1;
+            }
 
             ret = aml_heaac_parser_process(aml_out->heaac_parser_handle,
                                        in_buf,
@@ -8205,6 +8212,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
             return_bytes = aml_audio_nonms12_render(stream, &abuffer_out);
             }
         }
+        abuffer_out.pts += frame_duration;
     }
 
 exit:

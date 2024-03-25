@@ -1322,13 +1322,6 @@ void *audio_dtv_patch_output_threadloop(void *data)
 
     aml_out = (struct aml_stream_out *)stream_out;
     patch->dtv_aml_out = aml_out;
-    if (patch->aformat == AUDIO_FORMAT_AAC_LATM || patch->aformat == AUDIO_FORMAT_HE_AAC_V1) {
-        aml_out->heaac_info.is_loas = 1;
-        aml_out->heaac_info.is_adts = 0;
-    } else if (patch->aformat == AUDIO_FORMAT_AAC || patch->aformat == AUDIO_FORMAT_HE_AAC_V2) {
-        aml_out->heaac_info.is_loas = 0;
-        aml_out->heaac_info.is_adts = 1;
-    }
 
     if (aml_out->avsync_ctx)
     {
@@ -1479,13 +1472,6 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
     }
 
     AM_LOGI("create a AD output stream(%p) success now, ad_output_thread_exit %d", ad_aml_out, patch->ad_output_thread_exit);
-    if (patch->aformat == AUDIO_FORMAT_AAC_LATM || patch->aformat == AUDIO_FORMAT_HE_AAC_V1) {
-        ad_aml_out->heaac_info.is_loas = 1;
-        ad_aml_out->heaac_info.is_adts = 0;
-    } else if (patch->aformat == AUDIO_FORMAT_AAC || patch->aformat == AUDIO_FORMAT_HE_AAC_V2) {
-        ad_aml_out->heaac_info.is_loas = 0;
-        ad_aml_out->heaac_info.is_adts = 1;
-    }
 
     aml_demux_audiopara_t *demux_info = (aml_demux_audiopara_t *)patch->demux_info;
     prctl(PR_SET_NAME, (unsigned long)"dtv_ad_output_data");
