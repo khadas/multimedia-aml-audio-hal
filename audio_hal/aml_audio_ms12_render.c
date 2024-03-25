@@ -242,7 +242,7 @@ int aml_audio_amldec_process(struct audio_stream_out *stream, struct audio_buffe
             aml_out->config.rate = dec_pcm_data->data_sr;
         }
 
-        if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE) {
+        if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE && dec_pcm_data->data_sr > 0) {
              ret = aml_audio_resample_process_wrapper(&aml_out->resample_handle, dec_pcm_data->buf, dec_pcm_data->data_len, dec_pcm_data->data_sr, dec_pcm_data->data_ch);
              if (ret != 0) {
                  ALOGI("aml_audio_resample_process_wrapper failed");
@@ -292,6 +292,12 @@ int aml_audio_ad_render(struct audio_stream_out *stream, struct audio_buffer *ab
     //dolby codec: write ad data to ms12
     if (eDolbyMS12Lib == adev->dolby_lib_type && is_dolby_ms12_support_compression_format(aml_out->hal_internal_format)) {
         ms12_ad_process(stream, abuffer);
+        goto exit;
+    } else if (eDolbyDcvLib == adev->dolby_lib_type && (aml_out->hal_internal_format == AUDIO_FORMAT_AC3 || aml_out->hal_internal_format == AUDIO_FORMAT_E_AC3)) {
+        aml_dec_t *aml_dec = aml_out->aml_dec;
+        int used = 0;
+        ret = aml_decoder_ad_process(stream, abuffer, &used);
+        AM_LOGI_IF(adev->debug_flag, "ad_frame_size %d used %d, ret %d", abuffer->size, used, ret);
         goto exit;
     }
 

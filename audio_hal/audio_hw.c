@@ -8233,21 +8233,25 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
             abuffer_out.b_pts_valid = false;
         }
         char *p = (char*)abuffer_out.buffer;
-        AM_LOGI_IF(adev->debug_flag, "After parser [%d]in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%d) b_pts_valid(%d) pts(%lldms) dur %d",
-            parser_count, parser_in_buf, abuffer_out.buffer, *p, *(p+1),
-            *(p+2),*(p+3),abuffer_out.size, abuffer_out.b_pts_valid, abuffer_out.pts/90, frame_duration);
         total_used_size += current_used_size;
         parser_count++;
-        if (eDolbyMS12Lib == adev->dolby_lib_type) {
-            return_bytes = aml_audio_ms12_render(stream, &abuffer_out);
-        } else {
-            if (is_dts_format(aml_out->hal_internal_format) && get_dts_lib_type() == eDTSXLib) {
-                return_bytes = aml_audio_nonms12_dec_render(stream, &abuffer_out);
+        AM_LOGI_IF(adev->debug_flag, "After parser [%d]current_used_size %d, total_used_size %d, p %p", parser_count, current_used_size, total_used_size, p);
+        if (p != NULL) {
+            AM_LOGI_IF(adev->debug_flag, "After parser in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%d) b_pts_valid(%d) pts(%lldms) dur %d",
+                parser_in_buf, abuffer_out.buffer, *p, *(p+1),
+                *(p+2),*(p+3),abuffer_out.size, abuffer_out.b_pts_valid, abuffer_out.pts/90, frame_duration);
+
+            if (eDolbyMS12Lib == adev->dolby_lib_type) {
+                return_bytes = aml_audio_ms12_render(stream, &abuffer_out);
             } else {
-            return_bytes = aml_audio_nonms12_render(stream, &abuffer_out);
+                if (is_dts_format(aml_out->hal_internal_format) && get_dts_lib_type() == eDTSXLib) {
+                    return_bytes = aml_audio_nonms12_dec_render(stream, &abuffer_out);
+                } else {
+                    return_bytes = aml_audio_nonms12_render(stream, &abuffer_out);
+                }
             }
+            abuffer_out.pts += frame_duration;
         }
-        abuffer_out.pts += frame_duration;
     }
 
 exit:
@@ -8554,13 +8558,17 @@ ssize_t mixer_ad_buffer_write (struct audio_stream_out *stream, struct audio_buf
                 abuffer_out.buffer, abuffer_out.size);
         }
         char *p = (char*)abuffer_out.buffer;
-        AM_LOGI_IF(adev->debug_flag, "After parser [%d]in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%d) used %d, total used %d, dur %d",
-            parser_count, parser_in_buf, abuffer_out.buffer, *p, *(p+1),
-            *(p+2),*(p+3),abuffer_out.size, current_parser_size, total_parser_size, frame_duration);
         total_parser_size += current_parser_size;
         parser_count++;
-        aml_audio_ad_render(stream, &abuffer_out);
-        abuffer_out.pts += frame_duration;
+        AM_LOGI_IF(adev->debug_flag, "After parser [%d]current_used_size %d, total_used_size %d, p %p", parser_count, current_parser_size, total_parser_size, p);
+        if (p != NULL) {
+            AM_LOGI_IF(adev->debug_flag, "After parser in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%d) used %d, total used %d, dur %d",
+                parser_in_buf, abuffer_out.buffer, *p, *(p+1),
+                *(p+2),*(p+3),abuffer_out.size, current_parser_size, total_parser_size, frame_duration);
+
+            aml_audio_ad_render(stream, &abuffer_out);
+            abuffer_out.pts += frame_duration;
+        }
     }
 ad_exit:
     AM_LOGI_IF(adev->debug_flag, "return %zu!\n", total_parser_size);

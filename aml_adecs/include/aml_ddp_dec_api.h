@@ -35,8 +35,9 @@ typedef enum  {
 
 typedef enum  {
     DDP_DECODE_MODE_SINGLE = 1,
-    DDP_DECODE_MODE_AD_DUAL = 2,
+    DDP_DECODE_MODE_AD_DUAL = 2,//pack main/ad data, write main+ad into ddp_decoder_process
     DDP_DECODE_MODE_AD_SUBSTREAM = 3,
+    DDP_DECODE_MODE_AD_INDEPENDENT = 4,//not pack main/ad data; write ad by ddp_decoder_ad_process
 } ddp_decoding_mode_t;
 
 typedef union ddp_config {
@@ -82,6 +83,7 @@ struct dolby_ddp_dec {
 int dcv_decoder_init_patch(aml_dec_t ** ppaml_dec, aml_dec_config_t * dec_config);
 int dcv_decoder_release_patch(aml_dec_t * aml_dec);
 int dcv_decoder_process_patch(aml_dec_t * aml_dec, struct audio_buffer *abuffer);
+int dcv_decode_ad_process(struct dolby_ddp_dec *ddp_dec, struct audio_buffer *abuffer);
 int dcv_decoder_get_framesize(unsigned char*buffer, int bytes, int* p_head_offset);
 int is_ad_substream_supported(unsigned char *buffer,int bytes);
 int dcv_decoder_config(aml_dec_t * aml_dec, aml_dec_config_type_t config_type, aml_dec_config_t * dec_config);

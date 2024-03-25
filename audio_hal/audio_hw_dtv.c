@@ -1486,6 +1486,9 @@ void *audio_dtv_patch_output_threadloop(void *data)
             AM_LOGI("cur_package data invalid");
             goto free_package;
         }
+        if (!aml_out->aml_dec && patch->aformat == AUDIO_FORMAT_E_AC3) {
+            aml_out->ad_substream_supported = is_ad_substream_supported((unsigned char *)p_package->data, p_package->size);
+        }
 
         ret = stream_out->write(stream_out, p_package->data, p_package->size);
         patch->decoder_offset += patch->cur_package->size;

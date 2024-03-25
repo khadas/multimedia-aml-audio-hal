@@ -273,6 +273,33 @@ static void UpdateDecodeInfo_ChannelConfiguration(char *sysfs_buf, int ch_num) {
     sysfs_set_sysfs_str(REPORT_DECODED_INFO, sysfs_buf);
 }
 
+int aml_decoder_ad_process(struct audio_stream_out *stream, struct audio_buffer *abuffer, int *used_bytes)
+{
+    int ret = -1;
+    aml_dec_func_t *dec_fun = NULL;
+    struct aml_stream_out *out = (struct aml_stream_out *)stream;
+    dec_fun = get_decoder_function(out->hal_format);
+    *used_bytes = 0;
+    if (dec_fun == NULL) {
+        ALOGW("[%s:%d] get_decoder_function format:%#x is null", __func__, __LINE__, out->hal_format);
+        return -1;
+    }
+
+    if (dec_fun->f_ad_process) {
+        ret = dec_fun->f_ad_process(out->aml_dec, abuffer);
+    } else {
+        ALOGE("[%s:%d] f_ad_process is null", __func__, __LINE__);
+        return -1;
+    }
+    if (ret >= 0 ) {
+       *used_bytes = ret;
+       return AML_DEC_RETURN_TYPE_OK;
+    } else {
+       return ret;
+    }
+
+}
+
 int aml_decoder_process(aml_dec_t *aml_dec, struct audio_buffer *abuffer, int *used_bytes)
 {
     int ret = -1;

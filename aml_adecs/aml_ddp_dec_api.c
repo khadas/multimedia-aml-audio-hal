@@ -124,6 +124,7 @@ const short frmsizetab[MAXFSCOD][MAXDDDATARATE] = {
 static int (*ddp_decoder_init)(int, int,void **);
 static int (*ddp_decoder_cleanup)(void *);
 static int (*ddp_decoder_process)(char *, int, int *, int, char *, int *, struct pcm_info *, char *, int *,void *);
+static int (*ddp_decoder_ad_process)(char *, int, int *,void *);
 static int (*ddp_decoder_config)(void *, ddp_config_type_t, ddp_config_t *);
 
 static void *gDDPDecoderLibHandler = NULL;
@@ -380,6 +381,14 @@ static int dcv_decoder_init(int decoding_mode, aml_dec_control_type_t digital_ra
     } else {
         ALOGV("<%s::%d>--[ddp_decoder_process:]", __FUNCTION__, __LINE__);
     }
+    ddp_decoder_ad_process = (int (*)(char * , int , int *, void *))
+                          dlsym(gDDPDecoderLibHandler, "ddp_decoder_ad_process");
+    if (ddp_decoder_ad_process == NULL) {
+        ALOGE("%s,cant find decoder lib,%s\n", __FUNCTION__, dlerror());
+        goto Error;
+    } else {
+        ALOGE("<%s::%d>--[ddp_decoder_ad_process:]", __FUNCTION__, __LINE__);
+    }
 
     ddp_decoder_cleanup = (int (*)(void *)) dlsym(gDDPDecoderLibHandler, "ddp_decoder_cleanup");
     if (ddp_decoder_cleanup == NULL) {
@@ -453,6 +462,32 @@ static int dcv_decode_process(struct dolby_ddp_dec *ddp_dec, unsigned char*input
     return used_size;
 }
 
+int dcv_decode_ad_process(struct dolby_ddp_dec *ddp_dec, struct audio_buffer *abuffer)
+{
+    int ret = AML_DEC_RETURN_TYPE_OK, used = 0, total_used = 0, write_retry = 0;
+    #define AD_WRITE_RETRY_TIMES 10
+    if (ddp_decoder_ad_process == NULL || handle == NULL) {
+        AM_LOGE("no ad_process func");
+        return AML_DEC_RETURN_TYPE_FAIL;
+    }
+    do {
+        ret = (*ddp_decoder_ad_process)((char *) (abuffer->buffer + total_used)
+                                     , (abuffer->size - total_used)
+                                     , &used
+                                     , handle);
+        if (ret >= 0) {
+           total_used += used;
+           AM_LOGI("used %d, total_used %d, ret %d", used, total_used, ret);
+        } else { //write fail need retry
+           write_retry++;
+           aml_audio_sleep(20000);
+           AM_LOGI("ret %d, used %d, total_used %d, left %d, sleep 10, retry write", ret, used, total_used, abuffer->size - total_used);
+        }
+    } while ((total_used < abuffer->size) && (AD_WRITE_RETRY_TIMES > write_retry));
+
+    return total_used;
+}
+
 int dcv_decoder_init_patch(aml_dec_t ** ppaml_dec, aml_dec_config_t * dec_config)
 {
     struct dolby_ddp_dec *ddp_dec = NULL;
@@ -462,7 +497,8 @@ int dcv_decoder_init_patch(aml_dec_t ** ppaml_dec, aml_dec_config_t * dec_config
 
     if (dcv_config->decoding_mode != DDP_DECODE_MODE_SINGLE &&
         dcv_config->decoding_mode != DDP_DECODE_MODE_AD_DUAL &&
-        dcv_config->decoding_mode != DDP_DECODE_MODE_AD_SUBSTREAM) {
+        dcv_config->decoding_mode != DDP_DECODE_MODE_AD_SUBSTREAM &&
+        dcv_config->decoding_mode != DDP_DECODE_MODE_AD_INDEPENDENT) {
         ALOGE("wrong decoder mode =%d", dcv_config->decoding_mode);
         goto error;
     }
@@ -932,7 +968,7 @@ int dcv_decoder_config(aml_dec_t * aml_dec, aml_dec_config_type_t config_type, a
     }
     case AML_DEC_CONFIG_MIXING_ENABLE: {
         int  mixer_level = dec_config->mixer_level;
-        if (!dec_config->ad_mixing_enable)
+        if (!dec_config->ad_mixing_enable && (ddp_dec->decoding_mode != DDP_DECODE_MODE_AD_SUBSTREAM))
             mixer_level = -32;
         ALOGI("dec_config->mixer_level %d",mixer_level);
         ret = (*ddp_decoder_config)(handle, DDP_CONFIG_MIXER_LEVEL, (ddp_config_t *)&mixer_level);
@@ -994,6 +1030,7 @@ aml_dec_func_t aml_dcv_func = {
     .f_init                 = dcv_decoder_init_patch,
     .f_release              = dcv_decoder_release_patch,
     .f_process              = dcv_decoder_process_patch,
+    .f_ad_process           = dcv_decode_ad_process,
     .f_config               = dcv_decoder_config,
     .f_info                 = dcv_decoder_info,
 };

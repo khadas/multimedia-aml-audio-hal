@@ -256,6 +256,7 @@ typedef struct aml_dec_func {
     F_Init                  f_init;
     F_Release               f_release;
     F_Process               f_process;
+    F_Process               f_ad_process;
     F_Config                f_config;
     F_Info                  f_info;
 } aml_dec_func_t;
@@ -264,6 +265,7 @@ int aml_decoder_init(aml_dec_t **aml_dec, audio_format_t format, aml_dec_config_
 int aml_decoder_release(aml_dec_t *aml_dec);
 int aml_decoder_info(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_dec_info_t * dec_info);
 int aml_decoder_process(aml_dec_t *aml_dec, struct audio_buffer *abuffer, int * used_bytes);
+int aml_decoder_ad_process(struct audio_stream_out *stream, struct audio_buffer *abuffer, int *used_bytes);
 int aml_decoder_set_config(aml_dec_t *aml_dec, aml_dec_config_type_t config_type, aml_dec_config_t * dec_config);
 void aml_decoder_calc_coefficient(unsigned char ad_fade,float * mix_coefficient,float * ad_coefficient);
 int aml_decoder_get_info(aml_dec_t *aml_dec, aml_dec_info_type_t info_type, aml_dec_info_t * dec_info);

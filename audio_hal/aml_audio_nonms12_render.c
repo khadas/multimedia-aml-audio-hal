@@ -202,10 +202,10 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
         int decoder_ret = -1;
         decoder_ret = aml_decoder_process(aml_dec, &ainput, &used_size);
         if (decoder_ret == AML_DEC_RETURN_TYPE_CACHE_DATA) {
-            ALOGV("[%s:%d] cache the data to decode", __func__, __LINE__);
+            AM_LOGI_IF(adev->debug_flag, " cache the data to decode");
             return abuffer->size;
         } else if (decoder_ret == AML_DEC_RETURN_TYPE_FAIL) {
-            AM_LOGW("aml_decoder_process error, ret:%d", decoder_ret);
+            AM_LOGI_IF(adev->debug_flag, "aml_decoder_process error, ret:%d", decoder_ret);
             break;
         }
 
@@ -283,7 +283,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
             dts_pcm_direct_output = true;
         }
 
-        if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE ) {
+        if (dec_pcm_data->data_sr != OUTPUT_ALSA_SAMPLERATE && dec_pcm_data->data_sr > 0) {
             ret = aml_audio_resample_process_wrapper(&aml_out->resample_handle, dec_pcm_data->buf,
             pcm_len, dec_pcm_data->data_sr, dec_pcm_data->data_ch);
             if (ret != 0) {
@@ -759,7 +759,7 @@ static void ddp_decoder_config_prepare(struct audio_stream_out *stream, aml_dcv_
     if (aml_out->ad_substream_supported) {
         ddp_config->decoding_mode = DDP_DECODE_MODE_AD_SUBSTREAM;
     } else {
-        ddp_config->decoding_mode = DDP_DECODE_MODE_SINGLE;
+        ddp_config->decoding_mode = DDP_DECODE_MODE_AD_INDEPENDENT;
     }
 
     audio_format_t output_format = get_dcvlib_output_format(aml_out->hal_internal_format, adev);
@@ -773,8 +773,8 @@ static void ddp_decoder_config_prepare(struct audio_stream_out *stream, aml_dcv_
         ddp_config->nIsEc3 = 0;
     }
 
-    ALOGI("%s digital_raw:%d, dual_output_flag:%d, IsEc3:%d"
-        , __func__, ddp_config->digital_raw, aml_out->dual_output_flag, ddp_config->nIsEc3);
+    ALOGI("%s digital_raw:%d, dual_output_flag:%d, IsEc3:%d, mode %d, %d"
+        , __func__, ddp_config->digital_raw, aml_out->dual_output_flag, ddp_config->nIsEc3, ddp_config->decoding_mode, aml_out->ad_substream_supported);
     return;
 }
 
