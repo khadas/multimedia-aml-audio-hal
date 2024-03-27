@@ -10649,7 +10649,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     // FIXME: current MS12 is not compatible with SUBMIXER, when MS12 lib exists, use ms12 system.
     if (eDolbyMS12Lib == adev->dolby_lib_type) {
         adev->useSubMix = false;
-    } else if (aml_get_jason_int_value(USE_SUB_MIX, 0)) {
+    } else if (aml_get_jason_int_value(USE_SUB_MIX, 1)) {
         adev->useSubMix = true;
     }
 
