@@ -85,6 +85,17 @@ enum {
     TSYNC_MODE_AMASTER,
     TSYNC_MODE_PCRMASTER,
 };
+typedef struct ps_alloc_para {
+    uint32_t mMaxCount;
+    uint32_t mLookupThreshold;
+    uint32_t kDoubleCheckThreshold;
+} ptsserver_alloc_para;
+typedef struct checkoutptsoffset {
+    uint64_t offset;
+    uint64_t pts_90k;
+    uint64_t pts_64;
+} checkout_pts_offset;
+
 #ifdef BUILD_LINUX
 #ifndef __unused
 #define __unused __attribute__((unused))

@@ -389,6 +389,7 @@ struct aml_audio_patch {
     unsigned int cur_outapts;
     unsigned int anchor_apts;
     unsigned int show_first_frame;
+    unsigned int decoder_offset ;
     pthread_mutex_t dtv_output_mutex;
     pthread_mutex_t dtv_ad_output_mutex;
     pthread_mutex_t dtv_input_mutex;
@@ -444,6 +445,7 @@ struct aml_audio_patch {
     int64_t last_valid_main_pts;
     int64_t last_valid_ad_pts;
     uint8_t pts_dts_flag;
+    int32_t PServerDev;
 };
 
 stream_usecase_t convert_usecase_mask_to_stream_usecase(usecase_mask_t mask);

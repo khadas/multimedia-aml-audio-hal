@@ -334,19 +334,28 @@ static int mad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer
               ALOGE("decode len %d  > buf_size %d ", dec_pcm_data->data_len, dec_pcm_data->buf_size);
               break;
           }
-          if (dec_pcm_data->data_len) {
-              dec_pcm_data->pts = mad_dec->remain_data_pts;
-              if (used_size >= mark_remain_size) {
-                  used_size_return = used_size - mark_remain_size;
-                  mad_dec->remain_size = 0;
-              } else {
-                   used_size_return = 0;
-                   mad_dec->remain_size = mark_remain_size - used_size;
-                   memmove(mad_dec->remain_data, mad_dec->remain_data + used_size, mad_dec->remain_size );
-              }
-              break;
-          }
+        mad_op->getinfo(mad_op,&pAudioInfo);
+        mad_dec->stream_info.stream_sr = pAudioInfo.samplerate;
+        mad_dec->stream_info.stream_ch = pAudioInfo.channels;
+        mad_dec->stream_info.stream_bitrate = pAudioInfo.bitrate;
+        mad_dec->stream_info.stream_error_num = pAudioInfo.error_num;
+        mad_dec->stream_info.stream_drop_num = pAudioInfo.drop_num;
+        mad_dec->stream_info.stream_decode_num = pAudioInfo.decode_num;
 
+        if (dec_pcm_data->data_len) {
+            mad_dec->remain_size = mad_dec->remain_size - used_size;
+            dec_pcm_data->pts = mad_dec->remain_data_pts;
+            if (used_size >= mark_remain_size) {
+                used_size_return = bytes;
+            } else {
+                used_size_return = 0;
+                mad_dec->remain_size = mark_remain_size - used_size;
+            }
+
+            mad_dec->remain_data_pts = mad_dec->remain_data_pts + dec_pcm_data->data_len /( 2 * pAudioInfo.channels) * 1000 * 90 /pAudioInfo.samplerate;
+            memmove(mad_dec->remain_data, mad_dec->remain_data + used_size, mad_dec->remain_size);
+            break;
+        }
       } else {
           ALOGV("decode_len %d in %d pcm_len %d used_size %d mad_dec->remain_size %d", decode_len,  bytes, pcm_len, used_size, mad_dec->remain_size);
           used_size_return = bytes;
@@ -357,13 +366,7 @@ static int mad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer
           break;
       }
     }
-    mad_op->getinfo(mad_op,&pAudioInfo);
-    mad_dec->stream_info.stream_sr = pAudioInfo.samplerate;
-    mad_dec->stream_info.stream_ch = pAudioInfo.channels;
-    mad_dec->stream_info.stream_bitrate = pAudioInfo.bitrate;
-    mad_dec->stream_info.stream_error_num = pAudioInfo.error_num;
-    mad_dec->stream_info.stream_drop_num = pAudioInfo.drop_num;
-    mad_dec->stream_info.stream_decode_num = pAudioInfo.decode_num;
+
 
     if (pAudioInfo.channels == 1 && dec_pcm_data->data_len) {
             int16_t *samples_data = (int16_t *)dec_pcm_data->buf;
