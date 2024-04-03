@@ -132,7 +132,7 @@ re_write:
         // MS12 bypass flow is here
         av_sync_policy_e av_sync_policy = AV_SYNC_AUDIO_NORMAL_OUTPUT;
         if ((AVSYNC_TYPE_NULL != aml_out->avsync_type) && (NULL != aml_out->avsync_ctx)) {
-            av_sync_policy = aml_out->avsync_ctx->last_sync_policy;
+            av_sync_policy = get_and_map_avsync_policy(aml_out->avsync_ctx, aml_out->avsync_type);
         }
 
         // Fixme: we only process drop policy, other policy we do not process

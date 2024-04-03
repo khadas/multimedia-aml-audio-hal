@@ -122,7 +122,6 @@ typedef struct audio_avsync {
     apts_tab_t pts_tab[HWSYNC_APTS_NUM];
     size_t payload_offset;
     int (*get_tuning_latency)(struct audio_stream_out *stream);
-    av_sync_policy_e last_sync_policy;
     pthread_mutex_t lock;
 }avsync_ctx_t;
 
@@ -235,4 +234,5 @@ void msync_unblock_start(audio_msync_t *msync_ctx);
 int msync_set_first_pts(audio_msync_t *msync_ctx, uint32_t pts);
 bool skip_check_when_gap(struct audio_stream_out *stream, size_t offset, uint64_t apts);
 int msync_get_policy(struct audio_stream_out *stream, uint64_t apts);
+av_sync_policy_e get_and_map_avsync_policy(avsync_ctx_t *avsync_ctx, int avsync_type);
 #endif

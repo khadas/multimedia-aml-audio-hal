@@ -682,3 +682,65 @@ int avsync_lookup_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t *p_apts
     pthread_mutex_unlock(&avsync_ctx->lock);
     return ret;
 }
+
+av_sync_policy_e get_and_map_avsync_policy(avsync_ctx_t *avsync_ctx, int avsync_type)
+{
+    av_sync_policy_e audio_sync_policy = AV_SYNC_AUDIO_UNKNOWN;
+    switch (avsync_type)
+    {
+        case AVSYNC_TYPE_MEDIASYNC:
+            {
+                audio_mediasync_t *mediasync_ctx = avsync_ctx->mediasync_ctx;
+                switch (mediasync_ctx->apolicy.audiopolicy)
+                {
+                    case MEDIASYNC_AUDIO_DROP_PCM:
+                        audio_sync_policy = AV_SYNC_AUDIO_DROP_PCM;
+                        break;
+                    case MEDIASYNC_AUDIO_INSERT:
+                        audio_sync_policy = AV_SYNC_AUDIO_INSERT;
+                        break;
+                    case MEDIASYNC_AUDIO_NORMAL_OUTPUT:
+                        audio_sync_policy = AV_SYNC_AUDIO_NORMAL_OUTPUT;
+                        break;
+                    case MEDIASYNC_AUDIO_ADJUST_CLOCK:
+                        audio_sync_policy = AV_SYNC_AUDIO_ADJUST_CLOCK;
+                        break;
+                    case MEDIASYNC_AUDIO_RESAMPLE:
+                        audio_sync_policy = AV_SYNC_AUDIO_RESAMPLE;
+                        break;
+                    case MEDIASYNC_AUDIO_MUTE:
+                        audio_sync_policy = AV_SYNC_AUDIO_MUTE;
+                        break;
+                    default :
+                        audio_sync_policy = AV_SYNC_AUDIO_UNKNOWN;
+                        break;
+                }
+            }
+            break;
+        case AVSYNC_TYPE_MSYNC:
+            {
+                audio_msync_t *msync_ctx = avsync_ctx->msync_ctx;
+                switch (msync_ctx->msync_action)
+                {
+                    case AV_SYNC_AA_DROP:
+                        audio_sync_policy = AV_SYNC_AUDIO_DROP_PCM;
+                        break;
+                    case AV_SYNC_AA_INSERT:
+                        audio_sync_policy = AV_SYNC_AUDIO_INSERT;
+                        break;
+                    case AV_SYNC_AA_RENDER:
+                        audio_sync_policy = AV_SYNC_AUDIO_NORMAL_OUTPUT;
+                        break;
+                    default :
+                        audio_sync_policy = AV_SYNC_AUDIO_UNKNOWN;
+                        break;
+                }
+            }
+            break;
+        default :
+            audio_sync_policy = AV_SYNC_AUDIO_UNKNOWN;
+            break;
+    }
+    return audio_sync_policy;
+}
+

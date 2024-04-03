@@ -3035,36 +3035,6 @@ Aml_MS12_SyncPolicy_t ms12_avsync_callback(void *priv_data, unsigned long long u
         avsync_ctx->last_dec_out_frame = u64DecOutFrame;
         avsync_ctx->last_lookup_apts   = apts;
         avsync_ctx->last_output_apts   = new_apts;
-
-        switch (audio_sync_policy.eSyncPolicy) {
-            case MS12_SYNC_AUDIO_UNKNOWN:
-                avsync_ctx->last_sync_policy = AV_SYNC_AUDIO_UNKNOWN;
-                break;
-            case MS12_SYNC_AUDIO_NORMAL_OUTPUT:
-                avsync_ctx->last_sync_policy = AV_SYNC_AUDIO_NORMAL_OUTPUT;
-                break;
-            case MS12_SYNC_AUDIO_DROP_PCM:
-                avsync_ctx->last_sync_policy = AV_SYNC_AUDIO_DROP_PCM;
-                break;
-            case MS12_SYNC_AUDIO_INSERT:
-                avsync_ctx->last_sync_policy = AV_SYNC_AUDIO_INSERT;
-                break;
-            case MS12_SYNC_AUDIO_HOLD:
-                avsync_ctx->last_sync_policy = AV_SYNC_AUDIO_HOLD;
-                break;
-            case MS12_SYNC_AUDIO_MUTE:
-                avsync_ctx->last_sync_policy = AV_SYNC_AUDIO_MUTE;
-                break;
-            case MS12_SYNC_AUDIO_RESAMPLE:
-                avsync_ctx->last_sync_policy = AV_SYNC_AUDIO_RESAMPLE;
-                break;
-            case MS12_SYNC_AUDIO_ADJUST_CLOCK:
-                avsync_ctx->last_sync_policy = AV_SYNC_AUDIO_ADJUST_CLOCK;
-                break;
-            default:
-                avsync_ctx->last_sync_policy = AV_SYNC_AUDIO_NORMAL_OUTPUT;
-                break;
-        }
     }while (0);
 
     AM_LOGI_IF(adev->debug_flag, "eSyncPolicy:%d, <out>", audio_sync_policy.eSyncPolicy);
