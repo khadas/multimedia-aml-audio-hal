@@ -7232,8 +7232,27 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                 aml_audio_switch_output_mode((int16_t *)effect_tmp_buf, bytes, adev->sound_track_mode);
             }
 
+            if (adev->stream_write_data) {
+                adev->stream_write_data = Stop_watch(adev->last_write_ts, 800);// no audio data more than 800ms
+            }
+            bool audio_effect_enable = adev->stream_write_data;
+            if (adev->last_audio_effect_enable != audio_effect_enable) {
+                adev->last_audio_effect_enable = audio_effect_enable;
+                if (audio_effect_enable) {
+                    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+                        if (adev->active_outport == OUTPORT_SPEAKER) {
+                            set_ms12_full_dap_disable(&adev->ms12, false);
+                        }
+                    }
+                } else {
+                    if (eDolbyMS12Lib == adev->dolby_lib_type) {
+                        set_ms12_full_dap_disable(&adev->ms12, true);
+                    }
+                }
+            }
+
             /*aduio effect process for speaker*/
-            if (adev->active_outport != OUTPORT_A2DP) {
+            if (adev->active_outport != OUTPORT_A2DP && audio_effect_enable) {
                 audio_post_process(&adev->native_postprocess, effect_tmp_buf, out_frames);
             }
 
@@ -8818,6 +8837,9 @@ ssize_t out_write_new(struct audio_stream_out *stream,
      * out_device_change_validate_l(aml_out);
      * pthread_mutex_unlock(&aml_out->lock);
      */
+
+    clock_gettime(CLOCK_MONOTONIC, &adev->last_write_ts);
+    adev->stream_write_data = true;
 
 pheader_rewrite:
     if (true == aml_out->with_header) {
@@ -10728,6 +10750,8 @@ static char *adev_dump(const audio_hw_device_t *device, int fd)
     dprintf(fd, "\n");
     dprintf(fd, "[AML_HAL]      hdmi_format     : %10d |  active_outport    :    %s | active_inport: %s\n",
         aml_dev->hdmi_format, outputPort2Str(aml_dev->active_outport), inputPort2Str(aml_dev->active_inport));
+    dprintf(fd, "[AML_HAL]  audio_effect_enable : %10d | stream_write_data  :    %d\n",
+        aml_dev->last_audio_effect_enable, aml_dev->stream_write_data);
     dprintf(fd, "[AML_HAL]      A2DP gain       : %10f |  patch_src         :    %s\n",
         aml_dev->sink_gain[OUTPORT_A2DP], patchSrc2Str(aml_dev->patch_src));
     dprintf(fd, "[AML_HAL]      SPEAKER gain    : %10f |  HDMI gain         :    %f\n",
@@ -11529,6 +11553,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     aml_audio_set_drc_control("-drc 1 -bs 0 -cs 0", &adev->decoder_drc_control);
     aml_audio_set_drc_control("-dap_drc 1 -b 0 -c 0", &adev->dap_drc_control);
 
+    adev->last_audio_effect_enable = true;
     ALOGD("%s: exit  dual_spdif_support(%d)", __func__, adev->dual_spdif_support);
     return 0;
 
