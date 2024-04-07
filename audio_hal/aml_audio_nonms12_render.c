@@ -26,7 +26,7 @@
 
 #include "audio_hw.h"
 #include "audio_hw_utils.h"
-#include "audio_dtv_utils.h"
+#include "dtv_patch_utils.h"
 #include "aml_dec_api.h"
 #include "aml_ddp_dec_api.h"
 #include "aml_audio_spdifout.h"

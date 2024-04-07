@@ -20,5 +20,5 @@
 #include "audio_hw_ms12_v2.h"
 
 sync_process_res mediasync_nonms12_process(struct audio_stream_out *stream);
-
+int mediasync_get_policy(struct audio_stream_out *stream);
 #endif //end of _AML_ESMODE_SYNC_H_

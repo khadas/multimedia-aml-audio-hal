@@ -20,7 +20,7 @@
 #define _AUDIO_HW_UTILS_H_
 #include <system/audio.h>
 #include "audio_hw.h"
-#include "audio_hw_dtv.h"
+#include "dtv_patch.h"
 #include "aml_audio_types_def.h"
 #include "aml_audio_stream.h"
 #include "audio_mediasync_wrap.h"
@@ -184,5 +184,7 @@ static inline void endian16_convert(void *buf, int size)
 }
 
 void aml_alsa_pcm_info_dump(struct pcm* pcm, int fd);
+int halformat_convert_to_arcformat(audio_format_t format, int ch_mask);
+void check_audio_level(const char *name, const void *buffer, size_t bytes);
 
 #endif

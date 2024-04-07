@@ -26,6 +26,7 @@
 #include <hardware/audio.h>
 #include <signal.h>
 #include "audio_data_process.h"
+#include "hw_avsync.h"
 
 #define BUFF_CNT                    (8)
 #define SYS_BUFF_CNT                (8) //ringbuf:10*8ms

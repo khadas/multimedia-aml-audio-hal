@@ -31,7 +31,7 @@
 #include "dolby_lib_api.h"
 #include "aml_audio_stream.h"
 #include "alsa_config_parameters.h"
-#include "audio_hw_dtv.h"
+#include "dtv_patch.h"
 #include "aml_audio_timer.h"
 
 

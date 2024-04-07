@@ -51,7 +51,7 @@
 #include "aml_esmode_sync.h"
 #include "aml_dump_debug.h"
 #include "audio_hw_ms12_common.h"
-#include "hal_scaletempo.h"
+#include "aml_audio_scaletempo.h"
 
 #define DOLBY_DRC_LINE_MODE 0
 #define DOLBY_DRC_RF_MODE   1

@@ -370,5 +370,6 @@ int ms12_scaletempo(void *priv_data, void *info);
 
 void set_ms12_encoder_chmod_locking(struct dolby_ms12_desc *ms12, bool is_lock_on);
 void set_ms12_set_compressor_profile(struct dolby_ms12_desc *ms12, int profile);
+audio_format_t ms12_get_audio_hal_format(audio_format_t hal_format);
 
 #endif //end of _AUDIO_HW_MS12_H_

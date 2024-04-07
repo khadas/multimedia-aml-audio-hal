@@ -32,6 +32,9 @@
 #ifdef ENABLE_AEC_APP
 #include "audio_aec.h"
 #endif
+#ifndef NO_AUDIO_CAP
+#include <IpcBuffer/IpcBuffer_c.h>
+#endif
 
 #include "amlAudioMixer.h"
 #include "audio_hw_utils.h"

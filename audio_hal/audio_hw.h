@@ -45,7 +45,7 @@
 #include "audio_port.h"
 #include "aml_audio_ease.h"
 #include "aml_malloc_debug.h"
-#include "audio_hdmi_util.h"
+#include "hdmirx_utils.h"
 #include "aml_audio_speed_manager.h"
 #include "aml_audio_aec.h"
 
@@ -65,9 +65,10 @@
 #include "aml_dec_api.h"
 #include "aml_dtshd_dec_api.h"
 #include "aml_dtsx_dec_api.h"
-#include "audio_format_parse.h"
+#include "tv_patch_format_parser.h"
 #include "aml_audio_heaacparser.h"
-#include "hal_scaletempo.h"
+
+#include "aml_audio_scaletempo.h"
 #include "hal_clipmeta.h"
 
 /* number of frames per period */
@@ -1120,7 +1121,6 @@ static inline int get_mmap_pcm_active_count(struct aml_audio_device *adev)
  *@brief get_output_format get the output format always return the "sink_format" of adev
  */
 audio_format_t get_output_format(struct audio_stream_out *stream);
-void *audio_patch_output_threadloop(void *data);
 
 /*
  *@brief audio_hal_data_processing

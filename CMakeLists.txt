@@ -16,7 +16,7 @@ execute_process(COMMAND sh version_config.sh ${AML_BUILD_DIR} WORKING_DIRECTORY 
 add_subdirectory("audio_codec/libvorbis")
 add_subdirectory("audio_codec/libdts")
 add_subdirectory("audio_codec/libdcv")
-add_subdirectory("audio_hal/libaudioprocessing")
+add_subdirectory("utils/libaudioprocessing")
 
 add_library(spdifenc STATIC
 	utils/SPDIFEncoderAD.cpp
@@ -54,10 +54,10 @@ option(USE_MSYNC "Compile with MSYNC option" ON)
 option(USE_DTS_VX4 "Use DTS VX4" ON)
 
 if(USE_MS12_V26)
-add_subdirectory("libms12_v26")
+add_subdirectory("decoder/libms12_v26")
 add_definitions(-DMS12_V26_ENABLE)
 else()
-add_subdirectory("libms12_v24")
+add_subdirectory("decoder/libms12_v24")
 add_definitions(-DMS12_V24_ENABLE)
 endif()
 
@@ -72,8 +72,8 @@ if(DISABLE_SERVER)
 endif()
 
 if(USE_DTV)
-    list(APPEND DTV_FILES audio_hal/audio_hw_dtv.c)
-    list(APPEND DTV_FILES audio_hal/audio_dtv_utils.c)
+    list(APPEND DTV_FILES input/dtv_patch.c)
+    list(APPEND DTV_FILES input/dtv_patch_utils.c)
     list(APPEND DVB_AUDIO_INC ./dtv_audio_utils/sync)
     list(APPEND DVB_AUDIO_INC ./dtv_audio_utils/dmxwrap/MultiHwDemux)
     list(APPEND DVB_AUDIO_LIBS -L./dtv_audio_utils -ldvbaudioutils)
@@ -92,10 +92,10 @@ option(USE_EQ_DRC "Compile with EQ/DRC" OFF)
 
 if(USE_EQ_DRC)
 	list(APPEND EQ_DRC_FILES
-		amlogic_AQ_tools/audio_eq_drc_compensation.c
-		amlogic_AQ_tools/audio_eq_drc_parser.c
-		amlogic_AQ_tools/ini/dictionary.c
-		amlogic_AQ_tools/ini/iniparser.c)
+		aml_aq_hw/audio_eq_drc_compensation.c
+		aml_aq_hw/audio_eq_drc_parser.c
+		aml_aq_hw/ini/dictionary.c
+		aml_aq_hw/ini/iniparser.c)
 	add_definitions(-DUSE_EQ_DRC)
 endif()
 
@@ -113,32 +113,32 @@ endif()
 file(GLOB BASIC_UTILS_FILES "utils/basic_utils/*.cpp")
 file(GLOB BASIC_CUTILS_FILES "utils/basic_cutils/*.c")
 add_library(audio_hal SHARED
-	aml_adecs/aml_aac_dec_api.c
-	aml_adecs/aml_ddp_dec_api.c
-	aml_adecs/aml_dec_api.c
-	aml_adecs/aml_dtshd_dec_api.c
-	aml_adecs/aml_dtsx_dec_api.c
-	aml_adecs/aml_mpeg_dec_api.c
-	aml_adecs/aml_pcm_dec_api.c
-	aml_adecs/aml_adpcm_dec_api.c
-	aml_adecs/aml_flac_dec_api.c
-	aml_adecs/aml_vorbis_dec_api.c
-	aml_parser/ac3_parser_utils.c
-	aml_parser/aml_ac3_parser.c
-	aml_parser/aml_audio_ac3parser.c
-	aml_parser/aml_audio_ac4parser.c
-	aml_parser/aml_audio_bitsparser.c
-	aml_parser/aml_audio_matparser.c
-	aml_parser/aml_audio_heaacparser.c
-	aml_resampler/aml_audio_resample_manager.c
-	aml_resampler/aml_audio_resampler.c
-	aml_resampler/aml_resample_wrap.cpp
-	aml_resampler/audio_android_resample_api.c
-	aml_resampler/audio_simple_resample_api.c
-	aml_speed/aml_audio_speed_manager.c
-	aml_speed/audio_sonic_speed_api.c
-	aml_speed/sonic_speed_wrapper.c
-	aml_speed/sonic/sonic.c
+	decoder/aml_aac_dec_api.c
+	decoder/aml_ddp_dec_api.c
+	decoder/aml_dec_api.c
+	decoder/aml_dtshd_dec_api.c
+	decoder/aml_dtsx_dec_api.c
+	decoder/aml_mpeg_dec_api.c
+	decoder/aml_pcm_dec_api.c
+	decoder/aml_adpcm_dec_api.c
+	decoder/aml_flac_dec_api.c
+	decoder/aml_vorbis_dec_api.c
+	utils/parser/ac3_parser_utils.c
+	utils/parser/aml_ac3_parser.c
+	utils/parser/aml_audio_ac3parser.c
+	utils/parser/aml_audio_ac4parser.c
+	utils/parser/aml_audio_bitsparser.c
+	utils/parser/aml_audio_matparser.c
+	utils/parser/aml_audio_heaacparser.c
+	utils/resampler/aml_audio_resample_manager.c
+	utils/resampler/aml_audio_resampler.c
+	utils/resampler/aml_resample_wrap.cpp
+	utils/resampler/audio_android_resample_api.c
+	utils/resampler/audio_simple_resample_api.c
+	utils/speed/aml_audio_speed_manager.c
+	utils/speed/audio_sonic_speed_api.c
+	utils/speed/sonic_speed_wrapper.c
+	utils/speed/sonic/sonic.c
 	audio_hal/alsa_config_parameters.c
 	audio_hal/alsa_manager.c
 	audio_hal/audio_bt_sco.c
@@ -150,8 +150,8 @@ add_library(audio_hal SHARED
 	audio_hal/aml_audio_stream.c
 	audio_hal/aml_audio_spdifout.c
 	audio_hal/aml_audio_timer.c
-	audio_hal/aml_avsync_tuning.c
-	audio_hal/audio_format_parse.c
+	input/tv_patch_avsync.c
+	input/tv_patch_format_parser.c
 	audio_hal/audio_hw.c
 	audio_hal/audio_hw_ms12_common.c
 	audio_hal/audio_hw_ms12_v2.c
@@ -161,7 +161,6 @@ add_library(audio_hal SHARED
 	audio_hal/audio_hwsync.c
 	audio_hal/audio_hw_utils.c
 	audio_hal/audio_port.c
-	audio_hal/audio_post_process.c
 	audio_hal/audio_virtual_buf.c
 	audio_hal/dolby_lib_api.c
 	audio_hal/hw_avsync.c
@@ -169,20 +168,17 @@ add_library(audio_hal SHARED
 	audio_hal/aml_audio_dev2mix_process.c
 	audio_hal/aml_audio_ms12_render.c
 	audio_hal/aml_audio_nonms12_render.c
-	audio_hal/aml_audio_spdifdec.c
 	audio_hal/aml_esmode_sync.c
 	audio_hal/audio_mediasync_wrap.c
-	audio_hal/audio_hdmi_util.c
-	audio_hal/aml_audio_hal_avsync.c
-	audio_hal/tinyalsa_ext.c
+	input/hdmirx_utils.c
+	input/dtv_patch_hal_avsync.c
+	input/tv_patch.c
+	input/tv_patch_ctrl.c
 	audio_hal/aml_config_parser.c
 	audio_hal/aml_config_data.c
-	audio_hal/audio_effect_if.c
 	audio_hal/earc_utils.c
-	audio_hal/aml_avsync_stub.c
-	audio_hal/hal_scaletempo.c
-	audio_hal/aml_audio_aec.c
 	audio_hal/hal_clipmeta.c
+	audio_hal/aml_audio_scaletempo.c
 	utils/cJSON/cJSON.c
 	utils/aml_hw_mixer.c
 	utils/alsa_device_parser.c
@@ -200,6 +196,11 @@ add_library(audio_hal SHARED
 	utils/tinyalsa/pcm.c
 	utils/tinyalsa/mixer.c
 	utils/channels.c
+	utils/aml_audio_spdifdec.c
+	utils/aml_avsync_stub.c
+	vendor_process/audio_post_process.c
+	vendor_process/audio_effect_if.c
+	vendor_process/aml_audio_aec.c
 	${BASIC_UTILS_FILES}
 	${BASIC_CUTILS_FILES}
 	#rcaudio/audio_hal_thunks.cpp
@@ -219,14 +220,14 @@ endif()
 message(WARNING "Audio_hal CMAKE_SYSTEM_PROCESSOR is ${CMAKE_SYSTEM_PROCESSOR}")
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(arm)")
 set(PREBUILD_STATIC_LIBS
-	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/lib_aml_ng.a
-	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/Amlogic_DRC_Param_Generator.a
-	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/Amlogic_EQ_Param_Generator.a)
+	${CMAKE_SOURCE_DIR}/aml_aq_hw/lib_aml_ng.a
+	${CMAKE_SOURCE_DIR}/aml_aq_hw/Amlogic_DRC_Param_Generator.a
+	${CMAKE_SOURCE_DIR}/aml_aq_hw/Amlogic_EQ_Param_Generator.a)
 else ()
 set(PREBUILD_STATIC_LIBS
-	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/lib_aml_ng64.a
-	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/Amlogic_DRC_Param_Generator64.a
-	${CMAKE_SOURCE_DIR}/amlogic_AQ_tools/Amlogic_EQ_Param_Generator64.a)
+	${CMAKE_SOURCE_DIR}/aml_aq_hw/lib_aml_ng64.a
+	${CMAKE_SOURCE_DIR}/aml_aq_hw/Amlogic_DRC_Param_Generator64.a
+	${CMAKE_SOURCE_DIR}/aml_aq_hw/Amlogic_EQ_Param_Generator64.a)
 endif ()
 
 set_target_properties(audio_hal PROPERTIES
@@ -239,19 +240,20 @@ target_include_directories(audio_hal PRIVATE
 	./include/utils
 	./include/basic_utils
 	./include/basic_utils/utils
-	./aml_speed/include
-	./aml_speed
-	./aml_resampler/include
-	./aml_resampler
-	./aml_adecs/include
-	./aml_adecs
-	./aml_parser/include
-	./aml_parser
+	./utils/speed/include
+	./utils/speed
+	./utils/resampler/include
+	./utils/resampler
+	./decoder
+	./utils/parser/include
+	./utils/parser
 	./utils/include
 	./utils/include/spdif
 	./utils/tinyalsa/include
 	./utils/cJSON
-	./amlogic_AQ_tools
+	./vendor_process/include
+	./input/include
+	./aml_aq_hw
 	./dtv_audio_utils/audio_read_api
 	./audio_hal
 	${AML_BUILD_DIR})
@@ -263,16 +265,16 @@ target_link_libraries(audio_hal
 	-lcutils -lamaudioutils -llog -lexpat -lpthread -ldl -lstdc++ -lrt -Wl,-z,defs)
 
 if(USE_MS12_V26)
-	target_include_directories(audio_hal PRIVATE ./libms12_v26/include)
+	target_include_directories(audio_hal PRIVATE ./decoder/libms12_v26/include)
 else()
-	target_include_directories(audio_hal PRIVATE ./libms12_v24/include)
+	target_include_directories(audio_hal PRIVATE ./decoder/libms12_v24/include)
 endif()
 
 if(USE_EQ_DRC)
 	target_include_directories(audio_hal PRIVATE
-		./include/amlogic_AQ_tools
-		./amlogic_AQ_tools
-		./amlogic_AQ_tools/ini)
+		./include/aml_aq_hw
+		./aml_aq_hw
+		./aml_aq_hw/ini)
 	target_link_libraries(audio_hal ${PREBUILD_STATIC_LIBS})
 	target_compile_options(audio_hal PRIVATE -DAML_EQ_DRC)
 endif()
@@ -307,6 +309,6 @@ install(FILES audio_hal/mixer_paths.xml
 	DESTINATION /etc)
 
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(arm)")
-install(PROGRAMS amlogic_AQ_tools/Amlogic_DRC_Param_Generator amlogic_AQ_tools/Amlogic_EQ_Param_Generator
+install(PROGRAMS aml_aq_hw/Amlogic_DRC_Param_Generator aml_aq_hw/Amlogic_EQ_Param_Generator
 	DESTINATION /usr/bin)
 endif ()

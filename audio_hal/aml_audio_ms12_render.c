@@ -25,7 +25,7 @@
 
 #include "audio_hw.h"
 #include "audio_hw_utils.h"
-#include "audio_dtv_utils.h"
+#include "dtv_patch_utils.h"
 
 #include "dolby_lib_api.h"
 #include "aml_volume_utils.h"
@@ -35,7 +35,7 @@
 
 #include "aml_audio_ms12_sync.h"
 #include "aml_esmode_sync.h"
-#include "aml_audio_hal_avsync.h"
+#include "dtv_patch_hal_avsync.h"
 
 #define MS12_MAIN_WRITE_LOOP_THRESHOLD                  (2000)
 

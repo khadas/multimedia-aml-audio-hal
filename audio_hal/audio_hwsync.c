@@ -39,7 +39,6 @@
 #include "aml_audio_ms12_sync.h"
 #include "aml_audio_timer.h"
 
-#include "tinyalsa_ext.h"
 
 #include "aml_android_utils.h"
 #define MSYNC_CALLBACK_WAIT_TIMEOUT_US (4000*1000)
@@ -133,7 +132,7 @@ int audio_header_find_frame(audio_header_t *p_header,
                 if ((3 == p_header->version_num) && (HW_AVSYNC_HEADER_SIZE_V3 == p_header->hw_sync_header_cnt)) {
                     p_header->clip_front = hwsync_header_get_clip_front(p_header->hw_sync_header);
                     p_header->clip_back  = hwsync_header_get_clip_back(p_header->hw_sync_header);
-                    AM_LOGI("clip_front:%lld, clip_back:%lld", p_header->clip_front, p_header->clip_back);
+                    AM_LOGI_IF(debug_enable, "clip_front:%lld, clip_back:%lld", p_header->clip_front, p_header->clip_back);
                 }
 
                 if ((in_bytes - remain) > p_header->hw_sync_header_cnt) {

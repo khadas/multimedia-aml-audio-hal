@@ -31,7 +31,7 @@
 
 
 static aml_audio_delay_st g_stAudioOutputDelay[AML_DELAY_OUTPORT_BUTT];
-static int g_u32OutDelayMaxDefault[AML_DELAY_OUTPORT_BUTT] = {1000, 1000, 1000, 1000, 1000, 1000};
+static int g_u32OutDelayMaxDefault[AML_DELAY_OUTPORT_BUTT] = {1000, 1000, 1000, 1000, 1000};
 static bool g_bAudioDelayInit = false;
 
 int aml_audio_delay_init(int s32MaxDelayMs)

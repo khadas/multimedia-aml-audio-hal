@@ -21,7 +21,7 @@ extern "C" {
 #include <string.h>
 #include <cutils/log.h>
 #include <aml_ringbuffer.h>
-#include "audio_format_parse.h"
+#include "tv_patch_format_parser.h"
 #include "aml_malloc_debug.h"
 
 /*************************************************

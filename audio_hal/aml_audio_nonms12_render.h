@@ -26,5 +26,9 @@
 int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffer *abuffer);
 bool aml_decoder_output_compatible(struct audio_stream_out *stream, audio_format_t sink_format, audio_format_t optical_format);
 int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t format, aml_dec_config_t * dec_config);
+int dca_set_out_ch_internal(int ch_num);
+void aml_audio_nonms12_output(struct audio_stream_out *stream);
+int aml_audio_nonms12_dec_render(struct audio_stream_out *stream, struct audio_buffer *abuffer);
+
 #endif
 
