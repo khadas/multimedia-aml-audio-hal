@@ -2867,7 +2867,7 @@ Aml_MS12_SyncPolicy_t mediasync_ms12_process(struct audio_stream_out *stream_out
             audio_sync_policy.s32CurFrame = 0;
             AM_LOGI("insert frames:%d", insert_frames);
             break;
-        case DTVSYNC_AUDIO_ADJUST_CLOCK:
+        case MEDIASYNC_AUDIO_ADJUST_CLOCK:
             //aml_dtvsync_ms12_adjust_clock(stream_out, async_policy->param1);
             adev->underrun_mute_flag = false;
             break;

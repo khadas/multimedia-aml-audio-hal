@@ -628,7 +628,6 @@ struct aml_audio_device {
     /* user setting picture mode end */
 
     uint64_t  sys_audio_frame_written;
-    void* hw_mediasync;
     struct aec_t *aec;
     struct aec_context *aml_aec;
     bool bt_wbs;

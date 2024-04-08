@@ -1270,14 +1270,16 @@ static void hwsync_mediasync_outset(struct aml_audio_device *adev, struct aml_st
         }
     }
 
-    if (adev->hw_mediasync == NULL) {
-        adev->hw_mediasync = mediasync_wrap_create();
+    audio_mediasync_t *mediasync_ctx = out->avsync_ctx->mediasync_ctx;
+
+    if (NULL == mediasync_ctx->handle) {
+        mediasync_ctx->handle = mediasync_wrap_create();
     }
     else
     {
         //media sync seek call the out_flush ,add for flush
-        mediasync_wrap_destroy(adev->hw_mediasync);
-        adev->hw_mediasync = mediasync_wrap_create();
+        mediasync_wrap_destroy(mediasync_ctx->handle);
+        mediasync_ctx->handle = mediasync_wrap_create();
     }
 
     bool ret_set_id = false;
@@ -1285,19 +1287,19 @@ static void hwsync_mediasync_outset(struct aml_audio_device *adev, struct aml_st
     int audio_sync_mode = 0;
     struct mediasync_audio_format audio_format={0};
     pthread_mutex_lock(&(out->avsync_ctx->lock));
-    out->avsync_ctx->mediasync_ctx->handle = adev->hw_mediasync;
-    out->avsync_ctx->mediasync_ctx->mediasync_id = hw_sync_id;
+    mediasync_ctx->mediasync_id = hw_sync_id;
     out->avsync_ctx->get_tuning_latency = get_latency_pts;
     pthread_mutex_unlock(&(out->avsync_ctx->lock));
-    mediasync_wrap_setParameter(adev->hw_mediasync, MEDIASYNC_KEY_ISOMXTUNNELMODE, &audio_sync_mode);
-    mediasync_wrap_bindInstance(out->avsync_ctx->mediasync_ctx->handle, hw_sync_id, MEDIA_AUDIO);
-    mediasync_wrap_setParameter(adev->hw_mediasync, MEDIASYNC_KEY_HASAUDIO, &has_audio);
+    mediasync_wrap_setParameter(mediasync_ctx->handle, MEDIASYNC_KEY_ISOMXTUNNELMODE, &audio_sync_mode);
+    mediasync_wrap_bindInstance(mediasync_ctx->handle, hw_sync_id, MEDIA_AUDIO);
+    mediasync_wrap_setParameter(mediasync_ctx->handle, MEDIASYNC_KEY_HASAUDIO, &has_audio);
     audio_format.format = out->hal_format;
-    mediasync_wrap_setParameter(adev->hw_mediasync, MEDIASYNC_KEY_AUDIOFORMAT, &audio_format);
+    mediasync_wrap_setParameter(mediasync_ctx->handle, MEDIASYNC_KEY_AUDIOFORMAT, &audio_format);
     out->output_speed = 1.0f;
     *sync_enable = ret_set_id ? 1 : 0;
     out->with_header = true;
-    AM_LOGI("The current sync type: MediaSync %d,%d,%x, hw_mediasync:%p, out->with_header:%d", *sync_enable, hw_sync_id, out->hal_format, adev->hw_mediasync, out->with_header);
+    AM_LOGI("The current sync type: MediaSync %d,%d,%x, mediasync_handle:%p, out->with_header:%d",
+            *sync_enable, hw_sync_id, out->hal_format, mediasync_ctx->handle, out->with_header);
     return;
 }
 
@@ -4061,7 +4063,6 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
         if (out->avsync_ctx->mediasync_ctx) {
             if (out->avsync_ctx->mediasync_ctx->handle) {
                 mediasync_wrap_destroy(out->avsync_ctx->mediasync_ctx->handle);
-                adev->hw_mediasync = NULL;
             }
             aml_audio_free(out->avsync_ctx->mediasync_ctx);
         }
@@ -5908,6 +5909,7 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
 
     if (!strcmp (keys, AUDIO_PARAMETER_HW_AV_SYNC) ) {
         ALOGI ("get hw_av_sync id\n");
+#if 0 //only for android cbs
         if (adev->hw_mediasync == NULL) {
             adev->hw_mediasync = mediasync_wrap_create();
         }
@@ -5920,6 +5922,7 @@ static char * adev_get_parameters (const struct audio_hw_device *dev,
                 return strdup (temp_buf);
             }
         }
+#endif
         return strdup ("hw_av_sync=12345678");
     }
     // ALOGI ("adev_get_parameters keys: %s \n", keys);
@@ -10111,7 +10114,7 @@ static int adev_close(hw_device_t *device)
         aml_dtv_audio_instances_t *dtv_audio_instances = (aml_dtv_audio_instances_t *)adev->aml_dtv_audio_instances;
         for (int index = 0; index < DVB_DEMUX_SUPPORT_MAX_NUM; index ++) {
             aml_dtvsync_t *dtvsync =  &dtv_audio_instances->dtvsync[index];
-            pthread_mutex_destroy(&dtvsync->ms_lock);
+            pthread_mutex_destroy(&dtvsync->lock);
         }
         if (dtv_audio_instances->paudiofd != -1)
         {
@@ -10562,7 +10565,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
         dtv_audio_instances->paudiofd = -1;
         for (int index = 0; index < DVB_DEMUX_SUPPORT_MAX_NUM; index ++) {
             aml_dtvsync_t *dtvsync =  &dtv_audio_instances->dtvsync[index];
-            pthread_mutex_init(&dtvsync->ms_lock, NULL);
+            pthread_mutex_init(&dtvsync->lock, NULL);
         }
         if (!adev->is_multi_demux) {
             dtv_audio_instances->paudiofd = open( "/tmp/paudiofifo", O_RDONLY | O_NONBLOCK);

@@ -75,6 +75,14 @@ typedef enum {
 } mediasync_time_unit;
 
 typedef enum {
+    MEDIA_VIDEO_TIME = 0,
+    MEDIA_AUDIO_TIME = 1,
+    MEDIA_DMXPCR_TIME = 2,
+    MEDIA_STC_TIME = 3,
+    MEDIA_TIME_TYPE_MAX = 255,
+} media_time_type;
+
+typedef enum {
     MEDIASYNC_AUDIO_UNKNOWN = 0,
     MEDIASYNC_AUDIO_NORMAL_OUTPUT,
     MEDIASYNC_AUDIO_DROP_PCM,
@@ -127,6 +135,7 @@ bool mediasync_wrap_getPlaybackRate(void* handle, float *rate);
 bool mediasync_wrap_getMediaTime(void* handle, int64_t realUs,
 								int64_t *outMediaUs,
 								bool allowPastMaxTime);
+int mediasync_wrap_GetMediaTimeByType(void* handle, media_time_type mediaTimeType, mediasync_time_unit tunit,int64_t* mediaTime);
 bool mediasync_wrap_setParameter(void* handle, mediasync_parameter type, void* arg);
 bool mediasync_wrap_getParameter(void* handle, mediasync_parameter type, void* arg);
 bool mediasync_wrap_queueAudioFrame(void* handle, struct mediasync_audio_queue_info* info);

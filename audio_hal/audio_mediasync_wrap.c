@@ -55,9 +55,8 @@ typedef mediasync_result (*MediaSync_updateAnchor_func)(void* handle, int64_t an
                                                         int64_t maxTimeMediaUs);
 typedef mediasync_result (*MediaSync_setPlaybackRate_func)(void* handle, float rate);
 typedef mediasync_result (*MediaSync_getPlaybackRate_func)(void* handle, float *rate);
-typedef mediasync_result (*MediaSync_getMediaTime_func)(void* handle, int64_t realUs,
-                                int64_t *outMediaUs,
-                                bool allowPastMaxTime);
+typedef mediasync_result (*MediaSync_getMediaTime_func)(void* handle, int64_t realUs, int64_t *outMediaUs, bool allowPastMaxTime);
+typedef mediasync_result (*MediaSync_GetMediaTimeByType)(void* handle, media_time_type mediaTimeType, mediasync_time_unit tunit,int64_t* mediaTime);
 typedef mediasync_result (*MediaSync_getRealTimeFor_func)(void* handle, int64_t targetMediaUs, int64_t *outRealUs);
 typedef mediasync_result (*MediaSync_getRealTimeForNextVsync_func)(void* handle, int64_t *outRealUs);
 typedef mediasync_result (*MediaSync_getTrackMediaTime_func)(void* handle, int64_t *outMediaUs);
@@ -88,6 +87,7 @@ static MediaSync_updateAnchor_func gMediaSync_updateAnchor = NULL;
 static MediaSync_setPlaybackRate_func gMediaSync_setPlaybackRate = NULL;
 static MediaSync_getPlaybackRate_func gMediaSync_getPlaybackRate = NULL;
 static MediaSync_getMediaTime_func gMediaSync_getMediaTime = NULL;
+static MediaSync_GetMediaTimeByType gMediaSync_GetMediaTimeByType = NULL;
 static MediaSync_getRealTimeFor_func gMediaSync_getRealTimeFor = NULL;
 static MediaSync_getRealTimeForNextVsync_func gMediaSync_getRealTimeForNextVsync = NULL;
 static MediaSync_getTrackMediaTime_func gMediaSync_getTrackMediaTime = NULL;
@@ -202,6 +202,14 @@ static bool mediasync_wrap_create_init()
         ALOGE(" dlsym MediaSync_getMediaTime failed, err=%s \n", dlerror());
         return err;
     }
+
+    gMediaSync_GetMediaTimeByType =
+    (MediaSync_GetMediaTimeByType)dlsym(glibHandle, "MediaSync_GetMediaTimeByType");
+    if (gMediaSync_GetMediaTimeByType == NULL) {
+        ALOGE(" dlsym gMediaSync_GetMediaTimeByType failed, err=%s \n", dlerror());
+        return err;
+    }
+
     gMediaSync_getRealTimeFor =
     (MediaSync_getRealTimeFor_func)dlsym(glibHandle, "MediaSync_getRealTimeFor");
     if (gMediaSync_getRealTimeFor == NULL) {
@@ -413,6 +421,18 @@ bool mediasync_wrap_getMediaTime(void* handle, int64_t realUs,
         ALOGE("[%s] no handle\n", __func__);
      }
      return false;
+}
+
+int mediasync_wrap_GetMediaTimeByType(void* handle, media_time_type mediaTimeType,
+                                            mediasync_time_unit tunit,int64_t* mediaTime) {
+    if (handle != NULL) {
+        mediasync_result ret = gMediaSync_GetMediaTimeByType(handle, mediaTimeType, tunit, mediaTime);
+        if (ret == AM_MEDIASYNC_OK) {
+           return 0;
+        }
+    }
+
+    return -1;
 }
 
 bool mediasync_wrap_setParameter(void* handle, mediasync_parameter type, void* arg) {

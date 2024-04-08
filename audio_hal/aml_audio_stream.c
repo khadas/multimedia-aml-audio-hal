@@ -791,13 +791,9 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
                 pstPatch->dtv_resample.input_sr, pstPatch->dtv_resample.output_sr,pstPatch->dtv_resample.channels);
         if (pstPatch->dtvsync)
         {
-            dprintf(fd, "[AML_HAL] mediasync %p,mediasync_new %p,mediasync_id %d,cur_outapts %"PRId64",out_start_apts %"PRId64",out_end_apts %"PRId64"\n",
-                    pstPatch->dtvsync->mediasync,pstPatch->dtvsync->mediasync_new,
-                    pstPatch->dtvsync->mediasync_id,pstPatch->dtvsync->cur_outapts,
-                    pstPatch->dtvsync->out_start_apts,pstPatch->dtvsync->out_end_apts);
-            dprintf(fd, "[AML_HAL] apolicy %d,param1 %d,param2 %d\n",
-                    pstPatch->dtvsync->apolicy.audiopolicy,pstPatch->dtvsync->apolicy.param1,
-                    pstPatch->dtvsync->apolicy.param2);
+            dprintf(fd, "[AML_HAL] mediasync_handle %p,mediasync_id %d\n",
+                    pstPatch->dtvsync->mediasync_handle,
+                    pstPatch->dtvsync->mediasync_id);
         }
         if (pstPatch->cur_package)
         {
