@@ -3271,6 +3271,7 @@ int dolby_ms12_main_open(struct audio_stream_out *stream)
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     unsigned int sample_rate = aml_out->hal_rate;
     audio_format_t hal_internal_format = ms12_get_audio_hal_format(aml_out->hal_internal_format);
+    struct aml_audio_patch * patch = adev->audio_patch;
 
     /*
     when HDMITX send pause frame,we treated as INVALID format.
@@ -3304,7 +3305,6 @@ int dolby_ms12_main_open(struct audio_stream_out *stream)
         sample_rate = DDP_OUTPUT_SAMPLE_RATE;
     }
 #ifdef USE_DTV
-    struct aml_audio_patch * patch = adev->audio_patch;
     aml_demux_audiopara_t * demux_info = NULL;
     if (patch) {
         demux_info = (aml_demux_audiopara_t *)patch->demux_info;
