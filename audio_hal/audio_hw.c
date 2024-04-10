@@ -7082,11 +7082,26 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
                     return -ENOMEM;
                 }
             }
-
+            hp_tmp_buf = (int16_t *)adev->hp_output_buf;
             effect_tmp_buf = (int16_t *)adev->effect_buf;
             spk_tmp_buf = (int32_t *)adev->spk_output_buf;
-            hp_tmp_buf = (int16_t *)adev->hp_output_buf;
-            memcpy(hp_tmp_buf, tmp_buffer, bytes);
+
+            bool dap_processing = is_audio_postprocessing_add_dolbyms12_dap(adev) && adev->ms12.dolby_ms12_enable;
+            if (dap_processing) {
+                if (adev->debug_flag > 1) {
+                    AM_LOGI("Get HP/SPDIF data from ring buffer");
+                }
+                int read_space = get_buffer_read_space(&adev->ms12.spdif_ring_buffer);
+                if (adev->ms12.spdif_ring_buffer.size && read_space >= (int)bytes) {
+                    ring_buffer_read(&adev->ms12.spdif_ring_buffer, (unsigned char*)hp_tmp_buf, bytes);
+                } else {
+                    AM_LOGE("get hp/spdif pcm data fail, ring buf size(%d), read space(%d)",
+                        adev->ms12.spdif_ring_buffer.size, read_space);
+                }
+            } else {
+                memcpy(hp_tmp_buf, tmp_buffer, bytes);
+            }
+
             ps32SpdifTempBuffer = (int32_t *)adev->spdif_output_buf;
 #ifdef ENABLE_AVSYNC_TUNING
             tuning_spker_latency(adev, effect_tmp_buf, tmp_buffer, bytes);
@@ -7153,7 +7168,7 @@ ssize_t audio_hal_data_processing(struct audio_stream_out *stream,
             }
 
             apply_volume_16to32(volume, effect_tmp_buf, spk_tmp_buf, bytes);
-            apply_volume_16to32(source_gain, tmp_buffer, ps32SpdifTempBuffer, bytes);
+            apply_volume_16to32(source_gain, hp_tmp_buf, ps32SpdifTempBuffer, bytes);
             apply_volume(adev->sink_gain[OUTPORT_HEADPHONE], hp_tmp_buf, sizeof(uint16_t), bytes);
 
 #ifdef ADD_AUDIO_DELAY_INTERFACE
