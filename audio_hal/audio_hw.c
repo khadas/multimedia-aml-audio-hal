@@ -8775,12 +8775,16 @@ pheader_rewrite:
             ALOGE("APTS exeed the max 32bit value");
         }
     }
-    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) && (true != aml_out->with_header)
-        && (NULL != aml_out->avsync_ctx->mediasync_ctx))  //DTV
-    {
-        pthread_mutex_lock(&(aml_out->avsync_ctx->lock));
-        cur_pts = aml_out->avsync_ctx->mediasync_ctx->in_apts;
-        pthread_mutex_unlock(&(aml_out->avsync_ctx->lock));
+
+    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)) {
+        if (NULL == aml_out->avsync_ctx->mediasync_ctx) {
+            AM_LOGE("mediasync_ctx is null error, cleanup avsync_type!");
+            aml_out->avsync_type = AVSYNC_TYPE_NULL;
+        } else if (true != aml_out->with_header) {  //DTV
+            pthread_mutex_lock(&(aml_out->avsync_ctx->lock));
+            cur_pts = aml_out->avsync_ctx->mediasync_ctx->in_apts;
+            pthread_mutex_unlock(&(aml_out->avsync_ctx->lock));
+        }
     }
 
     if (aml_out->write && write_bytes > 0) {
