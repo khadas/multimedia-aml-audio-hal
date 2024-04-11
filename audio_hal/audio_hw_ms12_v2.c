@@ -967,9 +967,6 @@ int get_the_dolby_ms12_prepared(
     dolby_ms12_set_associated_audio_mixing(associate_audio_mixing_enable);
     dolby_ms12_set_user_control_value_for_mixing_main_and_associated_audio(adev->mixing_level);
 
-
-    /*set the continuous output flag*/
-    set_dolby_ms12_continuous_mode((bool)adev->continuous_audio_mode);
     dolby_ms12_set_atmos_lock_flag(adev->atoms_lock_flag);
 
     /*set the dolby ms12 debug level*/
