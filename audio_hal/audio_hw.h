@@ -582,6 +582,8 @@ struct aml_audio_device {
     int tsync_fd;
     bool raw_to_pcm_flag;
     bool is_netflix;
+    bool is_netflix_hide;
+    uint64_t netflix_hide_fadeout_startTime;
     int dtv_aformat;
     unsigned int dtv_i2s_clock;
     unsigned int dtv_spidif_clock;

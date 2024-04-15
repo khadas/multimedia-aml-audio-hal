@@ -4824,13 +4824,16 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     ret = str_parms_get_str (parms, "is_netflix", value, sizeof (value) );
     if (ret >= 0) {
         if (strcmp(value, "true") == 0) {
+            adev->is_netflix_hide = false;
             adev->is_netflix = 1;
         } else {
+            if (adev->is_netflix)
+                adev->is_netflix_hide = true;
             adev->is_netflix = 0;
             adev->gap_passthrough_state = GAP_PASSTHROUGH_STATE_IDLE;
             adev->gap_offset = 0;
         }
-        ALOGI("%s:%d is_netflix %d(%s)", __FUNCTION__, __LINE__, adev->is_netflix, value);
+        ALOGI("%s:%d is_netflix %d(%s) hide:%d", __FUNCTION__, __LINE__, adev->is_netflix, value, adev->is_netflix_hide);
 
         set_ms12_encoder_chmod_locking(&(adev->ms12), adev->is_netflix);
         set_ms12_acmod2ch_lock(&(adev->ms12), !adev->is_netflix);
@@ -8287,6 +8290,24 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
                 aml_audio_data_handle(stream, buffer, bytes);
             }
 
+            // SUSP-008-TC2 Test Steps 8 pop
+            if (adev->is_netflix_hide && STREAM_PCM_NORMAL == aml_out->usecase) {
+                audio_fade_func((void *)buffer, bytes, 0);
+                adev->netflix_hide_fadeout_startTime = aml_audio_get_systime()/1000;
+                adev->is_netflix_hide = false;
+                ALOGI("%s aux audio fade out. starTime:%llu", __func__, adev->netflix_hide_fadeout_startTime);
+            } else {
+                if (adev->netflix_hide_fadeout_startTime) {
+                    uint64_t currentTime = aml_audio_get_systime()/1000;
+                    if (currentTime - adev->netflix_hide_fadeout_startTime < 500) {
+                        memset((void *)buffer, 0, bytes);
+                    } else {
+                        adev->netflix_hide_fadeout_startTime = 0;
+                        ALOGI("%s aux audio memset done. currentTime:%llu", __func__, currentTime);
+                    }
+                }
+            }
+
             while (bytes_remaining && adev->ms12.dolby_ms12_enable && retry < 20) {
                 size_t used_size = 0;
                 ret = dolby_ms12_system_process(stream, (char *)buffer + bytes_written, bytes_remaining, &used_size);
@@ -10297,6 +10318,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     adev->hw_device.dump = adev_dump;
     adev->hdmi_format = AUTO;
     adev->is_hdmi_arc_interact_done = false;
+    adev->is_netflix_hide = false;
 
     card = alsa_device_get_card_index();
     if ((card < 0) || (card > 7)) {
