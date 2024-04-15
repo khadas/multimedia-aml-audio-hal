@@ -1927,7 +1927,7 @@ static void *audio_dtv_patch_process_threadloop(void *data)
 
                 //non-pip case ,Make sure you get the first new data
                 //Always hold a current package in input_stream thread,so need release it.
-                if (!IsPipRun(dtv_audio_instances) && aml_dev->is_multi_demux) {
+                if (!IsPipRun(dtv_audio_instances)) {
                     release_dtv_input_stream_thread(patch);
                 }
                 release_dtv_output_stream_thread(patch);
