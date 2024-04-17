@@ -2660,11 +2660,6 @@ int mat_bitstream_output(void *buffer, void *priv_data, size_t size)
     if (adev->optical_format == AUDIO_FORMAT_PCM_16_BIT) {
         return 0;
     }
-    if (is_earc_connected && (aml_out->hal_ch >= 6 && aml_out->hal_internal_format == AUDIO_FORMAT_PCM_SUB_16_BIT)) {
-        //for pcm multi channel when connected earc,
-        //not use mat output and the data send to alsa/earc by mc_pcm_output, Hazel FIXME.
-        return 0;
-    }
 
     if (adev->patch_src ==  SRC_DTV && aml_out->need_drop_size > 0) {
         if (adev->debug_flag > 1)
@@ -3547,14 +3542,9 @@ bool is_support_ms12_reset(struct audio_stream_out *stream) {
 bool is_bypass_dolbyms12(struct audio_stream_out *stream)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
-    struct aml_audio_device *adev = aml_out->dev;
-    audio_format_t hal_internal_format = ms12_get_audio_hal_format(aml_out->hal_internal_format);
     bool is_dts = is_dts_format(aml_out->hal_internal_format);
-    bool is_dolby_audio = is_dolby_format(aml_out->hal_internal_format);
 
-    return (is_dts
-            || is_high_rate_pcm(stream)
-            || (is_multi_channel_pcm(stream) && !(adev->is_netflix && aml_out->is_normal_pcm) && (adev->hdmi_format == BYPASS)));
+    return is_dts;
 }
 
 bool is_audio_postprocessing_add_dolbyms12_dap(struct aml_audio_device *adev)
