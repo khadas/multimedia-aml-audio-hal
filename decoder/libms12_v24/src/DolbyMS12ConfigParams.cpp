@@ -41,7 +41,7 @@
 namespace android
 {
 
-#define MAX_ARGC 100
+#define MAX_ARGC 150
 #define MAX_ARGV_STRING_LEN 256
 
 //here the file path is fake
@@ -1764,25 +1764,26 @@ char **DolbyMS12ConfigParams::UpdateDolbyMS12RuntimeConfigParams(int *argc, char
     ALOGD("+%s()", __FUNCTION__);
     ALOGD("ms12 runtime cmd: %s", cmd);
 
-    strcpy(mConfigParams[0], "ms12_runtime");
+    strcpy(mConfigParams[RUNTIME_CONFIG_PARAMS_INDEX], "ms12_runtime");
 
     *argc = 1;
-    mParamNum = 1;
+    int runTimeNum = 1;
 
     std::string token;
     std::istringstream cmd_string(cmd);
-    int index = 1, val;
+    int val = 1;
     char *opt = NULL;
+    int index = RUNTIME_CONFIG_PARAMS_INDEX;
 
     while (cmd_string >> token) {
-        strncpy(mConfigParams[mParamNum], token.c_str(), MAX_ARGV_STRING_LEN);
-        mConfigParams[mParamNum][MAX_ARGV_STRING_LEN - 1] = '\0';
-        ALOGI("argv[%d] = %s", mParamNum, mConfigParams[mParamNum]);
-        mParamNum++;
+        strncpy(mConfigParams[runTimeNum + RUNTIME_CONFIG_PARAMS_INDEX], token.c_str(), MAX_ARGV_STRING_LEN);
+        mConfigParams[runTimeNum + RUNTIME_CONFIG_PARAMS_INDEX][MAX_ARGV_STRING_LEN - 1] = '\0';
+        ALOGI("argv[%d] = %s", runTimeNum, mConfigParams[runTimeNum + RUNTIME_CONFIG_PARAMS_INDEX]);
+        runTimeNum++;
         (*argc)++;
     }
 
-    while (index < *argc) {
+    while (index < *argc + RUNTIME_CONFIG_PARAMS_INDEX) {
         if (!opt) {
             if ((mConfigParams[index][0] == '-') && (mConfigParams[index][1] < '0' || mConfigParams[index][1] > '9')) {
                 opt = mConfigParams[index] + 1;
@@ -2075,7 +2076,7 @@ eq_error:
     }
 
     ALOGD("-%s()", __FUNCTION__);
-    return mConfigParams;
+    return &mConfigParams[RUNTIME_CONFIG_PARAMS_INDEX];
 }
 
 #if 0
@@ -2156,12 +2157,12 @@ void DolbyMS12ConfigParams::CleanupConfigParams(char **ConfigParams, int max_raw
     return ;
 }
 
-void DolbyMS12ConfigParams::ResetConfigParams(void)
+void DolbyMS12ConfigParams::ResetInitConfigParams(void)
 {
     ALOGD("+%s() line %d\n", __FUNCTION__, __LINE__);
     int i = 0;
     if (mConfigParams) {
-        for (i = 0; i < MAX_ARGC; i++) {
+        for (i = 0; i < RUNTIME_CONFIG_PARAMS_INDEX; i++) {
             if (mConfigParams[i]) {
                 memset(mConfigParams[i], 0, MAX_ARGV_STRING_LEN);
             }
@@ -2172,6 +2173,21 @@ void DolbyMS12ConfigParams::ResetConfigParams(void)
     mHasSystemInput = false;
     mMainFlags = 1;
     ALOGD("%s() mHasAssociateInput %d mHasSystemInput %d\n", __FUNCTION__, mHasAssociateInput, mHasSystemInput);
+    ALOGD("-%s() line %d\n", __FUNCTION__, __LINE__);
+    return ;
+}
+
+void DolbyMS12ConfigParams::ResetRuntimeConfigParams(void)
+{
+    ALOGD("+%s() line %d\n", __FUNCTION__, __LINE__);
+    int i = 0;
+    if (mConfigParams) {
+        for (i = RUNTIME_CONFIG_PARAMS_INDEX; i < MAX_ARGC; i++) {
+            if (mConfigParams[i]) {
+                memset(mConfigParams[i], 0, MAX_ARGV_STRING_LEN);
+            }
+        }
+    }
     ALOGD("-%s() line %d\n", __FUNCTION__, __LINE__);
     return ;
 }

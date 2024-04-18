@@ -362,16 +362,23 @@ extern "C" audio_channel_mask_t dolby_ms12_config_params_get_dolby_config_output
     }
 }
 
-extern "C" void dolby_ms12_config_params_reset_config_params(void)
+extern "C" void dolby_ms12_config_params_reset_init_config_params(void)
 {
     ALOGV("%s()\n", __FUNCTION__);
     android::DolbyMS12ConfigParams *config_param = getInstance();
     if (config_param) {
-        config_param->ResetConfigParams();
+        config_param->ResetInitConfigParams();
     }
 }
 
-
+extern "C" void dolby_ms12_config_params_reset_runtime_config_params(void)
+{
+    ALOGV("%s()\n", __FUNCTION__);
+    android::DolbyMS12ConfigParams *config_param = getInstance();
+    if (config_param) {
+        config_param->ResetRuntimeConfigParams();
+    }
+}
 
 /*****************************************************************************************************************/
 /*Begin*/

@@ -41,6 +41,8 @@
 #define DEFAULT_DUMMY2_DDP_FILE_NAME "dummy.ac3"
 #define DEFAULT_DAP_TUNING_FILE_NAME "/vendor/etc/ms12_tuning.dat"
 
+#define RUNTIME_CONFIG_PARAMS_INDEX 100
+
 
 #ifdef __cplusplus
 namespace android
@@ -124,8 +126,9 @@ public:
     {
         return mDolbyMS12OutChannelMask[MS12_INPUT_MAIN];
     }
-    virtual void ResetConfigParams(void);
+    virtual void ResetInitConfigParams(void);
     //associate flags
+    virtual void ResetRuntimeConfigParams(void);
     virtual void setAssociateFlag(bool flag)
     {
         ALOGI("%s() Associate flag %d\n", __FUNCTION__, flag);

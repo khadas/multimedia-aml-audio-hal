@@ -175,7 +175,9 @@ audio_channel_mask_t dolby_ms12_config_params_get_dolby_config_output_channelmas
 /**
  * @brief reset the dolby_ms12_init() input params
  */
-void dolby_ms12_config_params_reset_config_params(void);
+void dolby_ms12_config_params_reset_init_config_params(void);
+
+void dolby_ms12_config_params_reset_runtime_config_params(void);
 
 /**
  * @brief cleanup the ms12 config params
