@@ -604,7 +604,7 @@ typedef uint32_t audio_hw_sync_t;
 
 /** @TODO export from .hal */
 typedef enum {
-    NONE    = 0x0,
+    AUDIO_MMAP_BUFFER_NONE    = 0x0,
     /**
      * Only set this flag if applications can access the audio buffer memory
      * shared with the backend (usually DSP) _without_ security issue.
