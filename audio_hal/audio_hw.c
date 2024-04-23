@@ -9538,6 +9538,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
         dtv_audio_instances->demux_info[index].media_presentation_id = -1;
         dtv_audio_instances->demux_info[index].media_first_lang = -1;
         dtv_audio_instances->demux_info[index].media_second_lang = -1;
+        dtv_audio_instances->demux_info[index].ad_dmx_init = false;
     }
 
     if ((src_config->ext.device.type == AUDIO_DEVICE_IN_WIRED_HEADSET) || (src_config->ext.device.type == AUDIO_DEVICE_IN_BLUETOOTH_BLE)) {

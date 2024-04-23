@@ -368,7 +368,7 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetADAudioParam(int aid, 
     ALOGI("AM_DMX_SetPesFilter aparam.flags %0x",aparam.flags);
     AmDmxDevice->AM_DMX_SetPesFilter(fid_audio, &aparam);
     mDemuxPara.aud_ad_fd = fid_audio;
-    ALOGI("aud_ad_fd %d",fid_audio);
+    ALOGI("%s:%d, aud_ad_fd %d", __func__, __LINE__, fid_audio);
     //AmDmxDevice->AM_DMX_StartFilter(fid_audio);
     return AM_Dmx_SUCCESS;
 }
@@ -398,7 +398,7 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperStopAD() {
        ALOGE("AmDmxDevice is NULL");
        return AM_Dmx_ERROR;
     }
-    AmDmxDevice->AM_DMX_StopFilter(mDemuxPara.aud_fd);
+    AmDmxDevice->AM_DMX_StopFilter(mDemuxPara.aud_ad_fd);
     return AM_Dmx_SUCCESS;
 }
 
@@ -407,7 +407,7 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperCloseAD() {
        ALOGE("AmDmxDevice is NULL");
        return AM_Dmx_ERROR;
     }
-    AmDmxDevice->AM_DMX_FreeFilter(mDemuxPara.aud_fd);
+    AmDmxDevice->AM_DMX_FreeFilter(mDemuxPara.aud_ad_fd);
     return AM_Dmx_SUCCESS;
 }
 
@@ -492,7 +492,7 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperSetAudioParam(int aid, AM
     ALOGI("[%s():%d]AM_DMX_SetPesFilter aparam.flags %0x, dmx_buffer_size: 0x%x", __func__, __LINE__, aparam.flags, dmx_buffer_size);
     AmDmxDevice->AM_DMX_SetPesFilter(fid_audio, &aparam);
     mDemuxPara.aud_fd = fid_audio;
-    ALOGI("fid_audio %d",fid_audio);
+    ALOGI("%s:%d, fid_audio %d", __func__, __LINE__, fid_audio);
     return AM_Dmx_SUCCESS;
 }
 
@@ -510,6 +510,7 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperStartMain() {
        ALOGE("AmDmxDevice is NULL");
        return AM_Dmx_ERROR;
     }
+    ALOGI("%s:%d, aud_fd %d", __func__, __LINE__, mDemuxPara.aud_fd);
     AmDmxDevice->AM_DMX_StartFilter(mDemuxPara.aud_fd);
     filering_aud_pid = mDemuxPara.aud_id;
     return AM_Dmx_SUCCESS;

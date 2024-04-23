@@ -3,9 +3,7 @@ LIB_DIR?=$(M_PREFIX)/lib
 HEADERS_DIR?=$(M_PREFIX)/include
 AML_BUILD_DIR?=.
 
-TARGET_SRCS=utils/tsp_utils.c \
-    utils/tsplinux.c \
-    audio_data_read/uio_audio_read.c \
+TARGET_SRCS= audio_data_read/uio_audio_read.c \
     avutils/amthreadpool.c \
     avutils/itemlist.c \
     avutils/amsysfsutils.c \

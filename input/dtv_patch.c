@@ -210,6 +210,7 @@ void  clean_dtv_demux_info(aml_demux_audiopara_t *demux_info) {
     demux_info->media_first_lang  = -1;
     demux_info->media_second_lang  = -1;
     demux_info->ad_package_status  = -1;
+    demux_info->ad_dmx_init = false;
 }
 
 int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
@@ -451,7 +452,7 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                     }
                 }
             } else if (val == AUDIO_DTV_PATCH_CMD_CLOSE) {
-                AM_LOGI("AUDIO_DTV_PATCH_CMD_CLOSE demux_hanle %p,%d,%p,%p\n",demux_handle,adev->is_multi_demux, dtvsync->mediasync_new, dtvsync->mediasync);
+                AM_LOGI("AUDIO_DTV_PATCH_CMD_CLOSE demux_hanle %p,%d,%p,%p. ad_dmx_init: %d\n",demux_handle,adev->is_multi_demux, dtvsync->mediasync_new, dtvsync->mediasync, demux_info->ad_dmx_init);
 
                 //wait stop done, need wait input & output thread exit here for 40ms ease at stop cmd process
                 int wait_count = 0;
@@ -472,9 +473,10 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                         Stop_Dmx_Main_Audio(demux_handle);
                         Destroy_Dmx_Main_Audio(demux_handle);
 
-                        if (patch->ad_output_thread_created) {
+                        if (demux_info->ad_dmx_init) {
                             Stop_Dmx_AD_Audio(demux_handle);
                             Destroy_Dmx_AD_Audio(demux_handle);
+                            demux_info->ad_dmx_init = false;
                         }
                         Close_Dmx_Audio(demux_handle);
                         demux_handle = NULL;
@@ -492,12 +494,13 @@ int dtv_patch_handle_event(struct audio_hw_device *dev,int cmd, int val) {
                     }
                 } else {
                     if (demux_handle) {
-                        if (patch->ad_output_thread_created) {
+                        if (demux_info->ad_dmx_init) {
                             pthread_mutex_lock(&adev->dtv_lock);
                             Stop_Dmx_AD_Audio(demux_handle);
                             Destroy_Dmx_AD_Audio(demux_handle);
                             Close_Dmx_Audio(demux_handle);
                             pthread_mutex_unlock(&adev->dtv_lock);
+                            demux_info->ad_dmx_init = false;
                         }
                         demux_handle = NULL;
                         dtv_audio_instances->demux_handle[path_id] = NULL;
@@ -1872,6 +1875,7 @@ static void *audio_dtv_patch_process_threadloop(void *data)
                     dtv_audio_instances->demux_handle[path_id] = patch->demux_handle;
                     Init_Dmx_AD_Audio(patch->demux_handle, demux_info->ad_fmt, demux_info->ad_pid, 1);
                 }
+                demux_info->ad_dmx_init = true;
                 AM_LOGI("path_id %d demux_handle %p, demux_info->ad_pid:%d",path_id, patch->demux_handle, demux_info->ad_pid);
                 ad_start_flag = Start_Dmx_AD_Audio(patch->demux_handle);
                 if (0 == ad_start_flag) {

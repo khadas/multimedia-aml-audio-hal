@@ -46,6 +46,7 @@ typedef struct aml_demux__audiopara {
     struct package *dtv_ad_package;
     uint8_t ad_fade;
     uint8_t ad_pan;
+    bool ad_dmx_init;
 } aml_demux_audiopara_t;
 
 

@@ -14,12 +14,14 @@
 #include "log/log.h"
 #include <cutils/properties.h>
 #else
+#include <cutils/log.h>
+#include <cutils/properties.h>
 
 #ifdef __cplusplus
 #include  <limits>
 #endif
 
-#include "tsplinux.h"
+//#include "tsplinux.h"
 #endif
 
 
