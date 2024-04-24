@@ -313,13 +313,14 @@ static int mad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer
            memset(mad_dec->remain_data, 0 , MAD_REMAIN_BUFFER_SIZE);
            dec_pcm_data->data_len = 0;
            return bytes;
-        } else {
-            if (!mad_dec->remain_size)
-                mad_dec->remain_data_pts = abuffer->pts;
-            memcpy(mad_dec->remain_data + mad_dec->remain_size, buffer, bytes);
-            mad_dec->remain_size += bytes;
         }
-
+        if (true == abuffer->b_pts_valid)
+        {
+            AM_LOGI_IF(aml_dec->debug_level, "remain_data_pts_aline 0x%llx -> abuffer->pts 0x%llx ,abuffer->b_pts_valid:%d", mad_dec->remain_data_pts, abuffer->pts, abuffer->b_pts_valid);
+            mad_dec->remain_data_pts = abuffer->pts;
+        }
+        memcpy(mad_dec->remain_data + mad_dec->remain_size, buffer, bytes);
+        mad_dec->remain_size += bytes;
     }
     dec_pcm_data->data_len = 0;
 
