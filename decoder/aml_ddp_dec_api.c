@@ -481,7 +481,7 @@ int dcv_decode_ad_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
         } else { //write fail need retry
            write_retry++;
            aml_audio_sleep(20000);
-           AM_LOGI("ret %d, used %d, total_used %d, left %d, sleep 10, retry write", ret, used, total_used, abuffer->size - total_used);
+           AM_LOGI("ret %d, used %d, total_used %d, left %"PRId32", sleep 10, retry write", ret, used, total_used, abuffer->size - total_used);
         }
     } while ((total_used < abuffer->size) && (AD_WRITE_RETRY_TIMES > write_retry));
 
@@ -936,7 +936,7 @@ int dcv_decoder_process_patch(aml_dec_t * aml_dec, struct audio_buffer *abuffer)
     ret = ((total_used_size - last_remain_size) > bytes) ? bytes : (total_used_size - last_remain_size);
     dec_pcm_data->pts = abuffer->pts;
 
-    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%"PRIx64" (%"PRIu64" ms) pcm len %d, buffer len %d, used_size_return %d",
         dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, ret);
 
     return ret;

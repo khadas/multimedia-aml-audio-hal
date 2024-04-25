@@ -26,6 +26,7 @@
 #include <string.h>
 #include <alsa_device_parser.h>
 #include <aml_android_utils.h>
+#include <IpcBuffer/IpcBuffer_c.h>
 
 #include "audio_port.h"
 #include "alsa_device_parser.h"
@@ -151,7 +152,7 @@ int send_inport_message(input_port *port, PORT_MSG msg)
 int send_outport_message(output_port *port, PORT_MSG msg, void *info, int info_len)
 {
     port_message *p_msg = aml_audio_calloc(1, sizeof(port_message) + info_len);
-    R_CHECK_POINTER_LEGAL(-ENOMEM, p_msg, "no memory, size:%d", sizeof(port_message));
+    R_CHECK_POINTER_LEGAL(-ENOMEM, p_msg, "no memory, size:%zu", sizeof(port_message));
 
     p_msg->msg_what = msg;
     if (info_len > 0) {
@@ -666,28 +667,28 @@ static ssize_t output_port_post_process(output_port *port, void *buffer, int byt
     if (adev->effect_buf_size < bytes) {
         adev->effect_buf = aml_audio_realloc(adev->effect_buf, bytes);
         if (!adev->effect_buf) {
-            ALOGE ("realloc effect buf failed size %zu", bytes);
+            ALOGE ("realloc effect buf failed size %d", bytes);
             return -ENOMEM;
         } else {
-            ALOGI("realloc effect_buf size from %zu to %zu", adev->effect_buf_size, bytes);
+            ALOGI("realloc effect_buf size from %zu to %d", adev->effect_buf_size, bytes);
         }
         adev->effect_buf_size = bytes;
 
         adev->spk_output_buf = aml_audio_realloc(adev->spk_output_buf, bytes * 2);
         if (!adev->spk_output_buf) {
-            ALOGE ("realloc headphone buf failed size %zu", bytes);
+            ALOGE ("realloc headphone buf failed size %d", bytes);
             return -ENOMEM;
         }
         // 16bit -> 32bit, need realloc
         adev->spdif_output_buf = aml_audio_realloc(adev->spdif_output_buf, bytes * 2);
         if (!adev->spdif_output_buf) {
-            ALOGE ("realloc spdif buf failed size %zu", bytes);
+            ALOGE ("realloc spdif buf failed size %d", bytes);
             return -ENOMEM;
         }
 
         adev->hp_output_buf = aml_audio_realloc(adev->hp_output_buf, bytes);
         if (!adev->hp_output_buf) {
-            ALOGE ("realloc hp buf failed size %zu", bytes);
+            ALOGE ("realloc hp buf failed size %d", bytes);
             return -ENOMEM;
         }
     }
@@ -750,11 +751,11 @@ static ssize_t output_port_post_process(output_port *port, void *buffer, int byt
     if (port->processed_bytes < 8 * bytes) {
         buf_proc = aml_audio_realloc(buf_proc, 8 * bytes);
         if (!buf_proc) {
-            ALOGE("%s: realloc buf_proc buf failed size = %zu",
+            ALOGE("%s: realloc buf_proc buf failed size = %d",
                 __func__, 8 * bytes);
             return -ENOMEM;
         } else {
-            ALOGI("%s: realloc buf_proc size from %zu to %zu",
+            ALOGI("%s: realloc buf_proc size from %zu to %d",
                 __func__, port->processed_bytes, 8 * bytes);
         }
         port->processed_bytes = 8 * bytes;
@@ -1016,7 +1017,7 @@ output_port *new_output_port(
         AM_LOGE("port_index:%d invalid", port_index);
         return NULL;
     }
-    ALOGI("%s(), config channels %d, rate %d, bytes per frame %d",
+    ALOGI("%s(), config channels %"PRIu32", rate %"PRIu32", bytes per frame %zu",
             __func__, config->channelCnt, config->sampleRate,
             audio_bytes_per_sample(config->format));
     port = aml_audio_calloc(1, sizeof(output_port));

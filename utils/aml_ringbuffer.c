@@ -157,7 +157,7 @@ Input: rbuffer: the dest ring buffer
 Output:
 Return: data space has been written
 *************************************************/
-size_t ring_buffer_write(struct ring_buffer *rbuffer, unsigned char* data, size_t bytes, int cover)
+size_t ring_buffer_write(struct ring_buffer *rbuffer, const unsigned char* data, size_t bytes, int cover)
 {
     struct ring_buffer *buf = rbuffer;
     size_t write_space, written_bytes;

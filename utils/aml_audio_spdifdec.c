@@ -442,7 +442,7 @@ static int aml_spdif_decoder_addbytes
     , int32_t *buf_left
     , int32_t *buf_offset
     , int32_t *used_size
-    , void **output_buf
+    , const void **output_buf
     , int32_t *out_size)
 {
     struct aml_spdif_decoder *spdif_dec_handle = (struct aml_spdif_decoder *)phandle;
@@ -587,7 +587,7 @@ ERROR:
 
 
 
-int aml_spdif_decoder_process(void *phandle, const void *inbuf, int32_t n_bytes_inbuf, int32_t *used_size, void **output_buf, int32_t *out_size)
+int aml_spdif_decoder_process(void *phandle, const void *inbuf, int32_t n_bytes_inbuf, int32_t *used_size, const void **output_buf, int32_t *out_size)
 {
     struct aml_spdif_decoder *spdif_dec_handle = (struct aml_spdif_decoder *)phandle;
     uint8_t *spdifdec_buf = NULL;

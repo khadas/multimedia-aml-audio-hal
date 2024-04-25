@@ -316,7 +316,7 @@ static int mad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer
         }
         if (true == abuffer->b_pts_valid)
         {
-            AM_LOGI_IF(aml_dec->debug_level, "remain_data_pts_aline 0x%llx -> abuffer->pts 0x%llx ,abuffer->b_pts_valid:%d", mad_dec->remain_data_pts, abuffer->pts, abuffer->b_pts_valid);
+            AM_LOGI_IF(aml_dec->debug_level, "remain_data_pts_aline 0x%"PRIu64" -> abuffer->pts 0x%"PRIu64" ,abuffer->b_pts_valid:%d", mad_dec->remain_data_pts, abuffer->pts, abuffer->b_pts_valid);
             mad_dec->remain_data_pts = abuffer->pts;
         }
         memcpy(mad_dec->remain_data + mad_dec->remain_size, buffer, bytes);
@@ -391,7 +391,7 @@ static int mad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer
     ad_dec_pcm_data->data_len  = 0;
     dump_mad_data(dec_pcm_data->buf, dec_pcm_data->data_len, "/data/mad_output.pcm");
 
-    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%"PRIx64" (%"PRIu64" ms) pcm len %d, buffer len %d, used_size_return %d",
         dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, used_size_return);
     return used_size_return;
 }

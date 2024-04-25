@@ -24,6 +24,8 @@
 #include "hal_clipmeta.h"
 #include "audio_hw_utils.h"
 #include "aml_android_utils.h"
+#include "audio_hw_ms12_v2.h"
+
 
 /*|->..............org data buffer.............<-|*
  *|->clip_front<-|..remain buffer..|->clip_back<-|*/
@@ -64,7 +66,7 @@ void hal_clip_buf_by_meta(abuffer_info_t *abuff, uint64_t clip_front, uint64_t c
 {
     if ((NULL == abuff) || ((0 == clip_front) && (0 == clip_back)))
     {
-        ALOGE("[%s,%d], abuff:%p, clip_front:%lld, clip_back:%lld", __func__, __LINE__, abuff, clip_front, clip_back);
+        ALOGE("[%s,%d], abuff:%p, clip_front:%"PRIu64", clip_back:%"PRIu64"", __func__, __LINE__, abuff, clip_front, clip_back);
         return;
     }
 
@@ -84,7 +86,7 @@ void hal_clip_buf_by_meta(abuffer_info_t *abuff, uint64_t clip_front, uint64_t c
     uint32_t discarded_samples_from_front = clip_front * sample_rate / 1000000000;   //clip_front (ns)
     uint32_t discarded_samples_from_end   = clip_back * sample_rate / 1000000000;
 
-    ALOGI("[%s:%d] IN, front_ns(%lld), back_ns(%lld), total_size:%d, output_samples:%d, sample_size:%d, sample_rate:%d", __FUNCTION__, __LINE__,
+    ALOGI("[%s:%d] IN, front_ns(%"PRIu64"), back_ns(%"PRIu64"), total_size:%d, output_samples:%d, sample_size:%d, sample_rate:%d", __FUNCTION__, __LINE__,
         clip_front, clip_back, total_size, abuff->output_samples, abuff->sample_size, sample_rate);
 
     for (int ch = 0; ch < nchannel; ch++)
@@ -96,7 +98,7 @@ void hal_clip_buf_by_meta(abuffer_info_t *abuff, uint64_t clip_front, uint64_t c
     //update output samples
     abuff->output_samples = remain_samples;
 
-    ALOGI("[%s:%d] OUT, front(%lld ns, %d), back(%lld ns, %d), total_size:%d, org_samples:%d, remain_samples:%d, sample_rate:%d", __FUNCTION__, __LINE__,
+    ALOGI("[%s:%d] OUT, front(%"PRIu64" ns, %d), back(%"PRIu64" ns, %d), total_size:%d, org_samples:%d, remain_samples:%d, sample_rate:%d", __FUNCTION__, __LINE__,
         clip_front, discarded_samples_from_front, clip_back, discarded_samples_from_end,
         total_size, org_samples, remain_samples, sample_rate);
 
@@ -108,7 +110,7 @@ clip_meta_t *hal_clip_meta_init(void)
     clip_meta_t *clip_meta = aml_audio_malloc(sizeof(clip_meta_t));
     if (NULL == clip_meta)
     {
-        ALOGE("[%s:%d], size:%d, malloc fail!!!", __func__, __LINE__, sizeof(clip_meta_t));
+        ALOGE("[%s:%d], size:%zu, malloc fail!!!", __func__, __LINE__, sizeof(clip_meta_t));
         return NULL;
     }
 
@@ -180,7 +182,7 @@ void hal_set_clip_info(clip_meta_t *clip_meta, unsigned long long offset, uint64
         ALOGE("[%s:%d], clip tbl overflow!!", __func__, __LINE__);
     }
 
-    ALOGI("[%s:%d], i:%d, offset:%lld, clip_front:%lld, clip_back:%lld", __func__, __LINE__, i, offset, clip_front, clip_back);
+    ALOGI("[%s:%d], i:%d, offset:%lld, clip_front:%"PRIu64", clip_back:%"PRIu64"", __func__, __LINE__, i, offset, clip_front, clip_back);
     return;
 }
 
@@ -217,7 +219,7 @@ int hal_get_clip_tbl_by_offset(clip_meta_t *clip_meta, unsigned long long offset
         clip_tbl[match_i].valid  = 0;
         clip_tbl_out->clip_front = clip_tbl[match_i].clip_front;
         clip_tbl_out->clip_back  = clip_tbl[match_i].clip_back;
-        ALOGI("[%s:%d]match_i:%d, offset:%lld, clip_tbl[%d].offset:%lld, clip_front:%lld, clip_back:%lld", __func__, __LINE__,
+        ALOGI("[%s:%d]match_i:%d, offset:%lld, clip_tbl[%d].offset:%lld, clip_front:%"PRIu64", clip_back:%"PRIu64"", __func__, __LINE__,
                 match_i, offset, match_i, clip_tbl[match_i].offset, clip_tbl_out->clip_front, clip_tbl_out->clip_back);
     }
     else
@@ -249,7 +251,7 @@ void hal_abuffer_clip_process(struct audio_stream_out *stream, abuffer_info_t *a
         consume_payload = consume_payload * aml_out->hal_rate / 48000;
     }
 
-    AM_LOGI("consume_payload:%lld", consume_payload);
+    AM_LOGI("consume_payload:%"PRIu64"", consume_payload);
 
     ret = hal_get_clip_tbl_by_offset(clip_meta, consume_payload, &clip_tbl_out);
     if (0 != ret)

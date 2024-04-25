@@ -310,7 +310,7 @@ static int faad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffe
     aml_faad_config_t *aac_config = NULL;
     AudioInfo pAudioInfo,pADAudioInfo;
     int bytes = abuffer->size;
-    char * buffer = abuffer->buffer;
+    const char * buffer = abuffer->buffer;
     if (aml_dec == NULL) {
         ALOGE("%s aml_dec is NULL", __func__);
         return -1;
@@ -331,7 +331,7 @@ static int faad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffe
     if (bytes > 0) {
         if (true == abuffer->b_pts_valid)
         {
-            AM_LOGI_IF(aml_dec->debug_level, "remain_data_pts_aline 0x%llx -> abuffer->pts 0x%llx ,abuffer->b_pts_valid:%d", aac_dec->remain_data_pts, abuffer->pts, abuffer->b_pts_valid);
+            AM_LOGI_IF(aml_dec->debug_level, "remain_data_pts_aline 0x%"PRIx64" -> abuffer->pts 0x%"PRIx64" ,abuffer->b_pts_valid:%d", aac_dec->remain_data_pts, abuffer->pts, abuffer->b_pts_valid);
             aac_dec->remain_data_pts = abuffer->pts;
         }
         memcpy(aac_dec->remain_data + aac_dec->remain_size, buffer, bytes);
@@ -421,7 +421,7 @@ static int faad_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffe
     }
     ad_dec_pcm_data->data_len  = 0;
     dump_faad_data(dec_pcm_data->buf, dec_pcm_data->data_len, "/data/faad_output.pcm");
-    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%"PRIx64" (%"PRId64" ms) pcm len %d, buffer len %d, used_size_return %d",
         dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, used_size_return);
     return used_size_return;
 }

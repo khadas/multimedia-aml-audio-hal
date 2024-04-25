@@ -341,7 +341,7 @@ static int vorbis_decoder_process(aml_dec_t *aml_decoder, struct audio_buffer *a
     dec_pcm_data->pts = abuffer->pts;
     dump_vorbis_data(dec_pcm_data->buf, dec_pcm_data->data_len, "/data/vorbis_output.pcm");
 
-    AM_LOGI_IF(aml_decoder->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+    AM_LOGI_IF(aml_decoder->debug_level, "pts: 0x%"PRIx64" (%"PRIu64" ms) pcm len %d, buffer len %d, used_size_return %d",
         dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, used_size_return);
     return used_size_return;
 }

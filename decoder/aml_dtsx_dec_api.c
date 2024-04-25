@@ -1506,7 +1506,7 @@ int dtsx_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer)
 {
     dtsx_dec_t *dtsx_dec = NULL;
     int bytes = abuffer->size;
-    char * buffer = abuffer->buffer;
+    const char * buffer = abuffer->buffer;
     struct aml_audio_device *adev = NULL;
     struct ring_buffer *input_rbuffer = NULL;
     dec_data_info_t *dec_pcm_data = NULL;

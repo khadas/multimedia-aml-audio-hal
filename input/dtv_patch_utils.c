@@ -212,7 +212,7 @@ AD_PACK_STATUS_T check_ad_package_status(int64_t main_pts, int64_t ad_pts, aml_d
     int timems_diff = llabs(main_pts - ad_pts) / 90;
 
     if (timems_diff > AD_PACK_STATUS_UNNORMAL_THRESHOLD_MS) {
-        ALOGI("main_pts %lld ad_pts %lld timems_diff %d it is impossible so drop ad data ", main_pts, ad_pts, timems_diff);
+        ALOGI("main_pts %"PRId64" ad_pts %"PRId64" timems_diff %d it is impossible so drop ad data ", main_pts, ad_pts, timems_diff);
         return AD_PACK_STATUS_DROP;
     }
     AD_PACK_STATUS_T ad_status = demux_info->ad_package_status;

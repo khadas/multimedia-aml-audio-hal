@@ -39,7 +39,7 @@ struct heaac_parser_info {
 
 int aml_heaac_parser_open(void **pparser_handle);
 int aml_heaac_parser_close(void *parser_handle);
-int aml_heaac_parser_process(void *parser_handle, const void *buffer, int32_t numBytes, int32_t *used_size, void **output_buf, int32_t *out_size, struct heaac_parser_info * heaac_info);
+int aml_heaac_parser_process(void *parser_handle, const void *buffer, int32_t numBytes, int32_t *used_size, const void **output_buf, int32_t *out_size, struct heaac_parser_info * heaac_info);
 int aml_heaac_parser_reset(void *parser_handle);
 
 

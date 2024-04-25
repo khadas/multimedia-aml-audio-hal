@@ -142,14 +142,18 @@ int aml_sysfs_get_int16(const char *path,unsigned *value)
 unsigned long amsysfs_get_sysfs_ulong(const char *path)
 {
 	int fd;
+	ssize_t ret;
 	char bcmd[24] = "";
 	unsigned long num = 0;
-    if ((fd = open(path, O_RDONLY)) >= 0) {
-		read(fd, bcmd, sizeof(bcmd));
+	if ((fd = open(path, O_RDONLY)) >= 0) {
+		ret = read(fd, bcmd, sizeof(bcmd));
+		if (ret < 0) {
+			ALOGE("%s:read file error.", __func__);
+		}
 		num = strtoul(bcmd, NULL, 0);
 		close(fd);
 	} else {
-		LOGE("unable to open file %s,err: %s\n", path, strerror(errno));
+		ALOGE("unable to open file %s,err: %s\n", path, strerror(errno));
 	}
 	return num;
 }

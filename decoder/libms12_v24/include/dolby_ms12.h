@@ -289,7 +289,8 @@ int dolby_ms12_set_dolby_compression_format(int compression_format);
 
 /*@@
     @brief set the scheduler state
-dolby_ms12_register_scaletempo_callbackint dolby_ms12_set_scheduler_state(int sch_state);
+*/
+int dolby_ms12_set_scheduler_state(int sch_state);
 
 /*@@
     @brief get PCM's nframes which outputed by decoder

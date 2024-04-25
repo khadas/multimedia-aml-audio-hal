@@ -35,7 +35,7 @@ typedef struct ring_buffer {
 #define UNCOVER_WRITE    0
 #define COVER_WRITE      1
 
-size_t ring_buffer_write(struct ring_buffer *rbuffer, unsigned char* data, size_t bytes, int cover);
+size_t ring_buffer_write(struct ring_buffer *rbuffer,const unsigned char* data, size_t bytes, int cover);
 size_t ring_buffer_read(struct ring_buffer *rbuffer, unsigned char* buffer, size_t bytes);
 int ring_buffer_init(struct ring_buffer *rbuffer, int buffer_size);
 int ring_buffer_release(struct ring_buffer *rbuffer);

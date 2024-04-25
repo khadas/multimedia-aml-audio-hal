@@ -571,7 +571,7 @@ static size_t mc_compact_channel(void *input, size_t bytes, void *output)
     return frames * 6 * sizeof(short);
 }
 
-int aml_audio_spdifout_processs(void *phandle, void *buffer, size_t byte)
+int aml_audio_spdifout_process(void *phandle, const void *buffer, size_t byte)
 {
     int ret = -1;
     struct spdifout_handle *spdifout_phandle = (struct spdifout_handle *)phandle;

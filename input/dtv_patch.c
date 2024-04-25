@@ -37,6 +37,7 @@
 #include <system/audio.h>
 #include <time.h>
 #include <utils/Timers.h>
+#include <sys/ioctl.h>
 
 #if ANDROID_PLATFORM_SDK_VERSION >= 25 // 8.0
 #include <system/audio-base.h>
@@ -577,7 +578,7 @@ int dtv_patch_get_latency(struct aml_audio_device *aml_dev)
     int64_t last_queue_es_apts = 0;
     if (aml_dev->is_multi_demux) {
         if (Get_Audio_LastES_Apts(patch->demux_handle, &last_queue_es_apts) == 0) {
-             AM_LOGI("last_queue_es_apts %lld",last_queue_es_apts);
+             AM_LOGI("last_queue_es_apts %"PRId64"",last_queue_es_apts);
              patch->last_chenkin_apts = last_queue_es_apts;
         }
         latencyms = (patch->last_chenkin_apts - patch->dtvsync->cur_outapts) / 90;
@@ -740,7 +741,7 @@ int GetInputSizeandpts(aml_dtv_audio_instances_t *dtv_audio_instances,int64_t* p
         retlen=read(dtv_audio_instances->paudiofd, &driverpackage, sizeof(driver_audio_packets_info));
         * pts = driverpackage.packetsPts;
         if (aml_dev->debug_flag > 0)
-            AM_LOGI("paudiofd:%d,%d,%llx \n",retlen,driverpackage.packetsSize,driverpackage.packetsPts);
+            AM_LOGI("paudiofd:%d,%d,%"PRId64" \n",retlen,driverpackage.packetsSize,driverpackage.packetsPts);
         usleep(2000);
     }
     while (retlen != sizeof(driver_audio_packets_info)  && !patch->input_thread_exit);
@@ -1003,7 +1004,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                                     }
                                 } else {
                                    trycount = 0;
-                                   AM_LOGI_IF(aml_dev->debug_flag, "main size %d, pts %0llx(%llx), pts flag %d", mEsData->size, mEsData->pts, patch->last_valid_main_pts, mEsData->pts_dts_flag);
+                                   AM_LOGI_IF(aml_dev->debug_flag, "main size %d, pts %"PRIx64"(%"PRIx64"), pts flag %d", mEsData->size, mEsData->pts, patch->last_valid_main_pts, mEsData->pts_dts_flag);
                                    patch->pts_dts_flag = mEsData->pts_dts_flag;
                                    if (NULL_INT64 != mEsData->pts) {
                                         patch->last_valid_main_pts = mEsData->pts;
@@ -1036,7 +1037,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                                         demux_info->ad_package_status = AD_PACK_STATUS_HOLD;
                                         break;
                                     } else {
-                                        AM_LOGI_IF(aml_dev->debug_flag, "ad size %d pts %0llx(%llx)", mAdEsData->size, mAdEsData->pts, patch->last_valid_ad_pts);
+                                        AM_LOGI_IF(aml_dev->debug_flag, "ad size %d pts %"PRIx64"(%"PRIx64")", mAdEsData->size, mAdEsData->pts, patch->last_valid_ad_pts);
                                         if (NULL_INT64 != mAdEsData->pts) {
                                              patch->last_valid_ad_pts = mAdEsData->pts;
                                         } else {
@@ -1134,7 +1135,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                             audio_queue_info.isworkingchannel = false;
                         audio_queue_info.tunit = MEDIASYNC_UNIT_PTS;
                         mediasync_wrap_queueAudioFrame(Dtvsync->mediasync, &audio_queue_info);
-                        AM_LOGI_IF(aml_dev->debug_flag, "queue pts:%llx, size:%d, dur:%d isneedupdate %d, ret %d\n",
+                        AM_LOGI_IF(aml_dev->debug_flag, "queue pts:%"PRIx64", size:%d, dur:%d isneedupdate %d, ret %d\n",
                                  dtv_package->pts, dtv_package->size, Dtvsync->duration,audio_queue_info.isneedupdate, nRet);
                         if (path_index != dtv_audio_instances->demux_index_working) {
                             AM_LOGI_IF(aml_dev->debug_flag, "path_index  %d dtv_audio_instances->demux_index_working %d",
@@ -1175,7 +1176,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                         pthread_mutex_lock(&patch->mutex);
                         ret = dtv_package_add(list, dtv_package);
                         if (ret == 0) {
-                            AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_package %p, pts:%llx, size:%d. num %d", dtv_package, dtv_package->pts, dtv_package->size, list->pack_num);
+                            AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_package %p, pts:%"PRIx64", size:%d. num %d", dtv_package, dtv_package->pts, dtv_package->size, list->pack_num);
                             pthread_cond_signal(&patch->cond);
                             pthread_mutex_unlock(&patch->mutex);
                             dtv_package = NULL;
@@ -1197,7 +1198,7 @@ void *audio_dtv_patch_input_threadloop(void *data)
                         pthread_mutex_lock(&patch->assoc_mutex);
                         ret = dtv_package_add(ad_list, dtv_ad_package);
                         if (ret == 0) {
-                            AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_ad_package %p, pts:%llx, size:%d. num %d", dtv_ad_package, dtv_ad_package->pts, dtv_ad_package->size, ad_list->pack_num);
+                            AM_LOGI_IF(aml_dev->debug_flag, "pthread_cond_signal dtv_ad_package %p, pts:%"PRIx64", size:%d. num %d", dtv_ad_package, dtv_ad_package->pts, dtv_ad_package->size, ad_list->pack_num);
                             pthread_cond_signal(&patch->ad_cond);
                             pthread_mutex_unlock(&patch->assoc_mutex);
                             dtv_ad_package = NULL;
@@ -1421,7 +1422,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
             continue;
         } else {
             patch->cur_package = p_package;
-            AM_LOGI_IF(aml_dev->debug_flag, "package(%p) pts:%llx, size:%d, first_apts_flag:%d, num %d", p_package, p_package->pts, p_package->size,
+            AM_LOGI_IF(aml_dev->debug_flag, "package(%p) pts:%"PRIu64", size:%d, first_apts_flag:%d, num %d", p_package, p_package->pts, p_package->size,
                       patch->dtv_first_apts_flag, list->pack_num);
             /* if first package pts is invalid, we need drop it */
             if ((!patch->dtv_first_apts_flag) && (NULL_INT64 == p_package->pts))
@@ -1455,7 +1456,7 @@ void *audio_dtv_patch_output_threadloop(void *data)
                     }
                 }
             }
-            AM_LOGI_IF(aml_dev->debug_flag, "lookup pts:%lld,%lld,%llx,%llx \n", checkout_pts.offset,checkout_pts.pts_90k,patch->cur_package->pts,patch->last_valid_pts);
+            AM_LOGI_IF(aml_dev->debug_flag, "lookup pts:%"PRIu64",%"PRIu64",%"PRIu64",%lu \n", checkout_pts.offset,checkout_pts.pts_90k,patch->cur_package->pts,patch->last_valid_pts);
         }
 
         if ((aml_out->avsync_ctx) && (aml_out->avsync_ctx->mediasync_ctx)) {
@@ -1593,7 +1594,7 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
                 set_ms12_ad_mixing_enable(&(aml_dev->ms12), aml_dev->associate_audio_mixing_enable);
                 set_ms12_ad_mixing_level(&(aml_dev->ms12), aml_dev->mixing_level);
                 set_ms12_ad_vol(&(aml_dev->ms12), aml_dev->advol_level);
-                AM_LOGI("associate_audio_mixing_enable: associate_audio_mixing_enable:%d, advol_level:%, mixing_level:%d",
+                AM_LOGI("associate_audio_mixing_enable: associate_audio_mixing_enable:%d, advol_level:%d, mixing_level:%d",
                         aml_dev->associate_audio_mixing_enable, aml_dev->advol_level, aml_dev->mixing_level);
             }
             if (false == associate_audio_mixing_enable) {
@@ -1617,7 +1618,7 @@ void *audio_dtv_patch_ad_output_threadloop(void *data)
             continue;
         } else {
             patch->cur_ad_package = p_package;
-            AM_LOGI_IF(aml_dev->debug_flag, "ad package %p, pts:%llx(sz %d), num %d", p_package, p_package->pts, p_package->size, ad_list->pack_num);
+            AM_LOGI_IF(aml_dev->debug_flag, "ad package %p, pts:%"PRIx64"(sz %d), num %d", p_package, p_package->pts, p_package->size, ad_list->pack_num);
         }
 
         pthread_mutex_unlock(&patch->assoc_mutex);
@@ -1695,7 +1696,7 @@ static bool IsPipRun(aml_dtv_audio_instances_t * dtv_audio_instances)
     return ret > 1;
 }
 
-static void *audio_dtv_patch_process_threadloop(void *data)
+static int audio_dtv_patch_process_threadloop(void *data)
 {
     struct aml_audio_patch *patch = (struct aml_audio_patch *)data;
     struct audio_hw_device *dev = patch->dev;
@@ -2026,7 +2027,7 @@ exit:
 static int create_dtv_output_stream_thread(struct aml_audio_patch *patch)
 {
     int ret = 0;
-    AM_LOGI("++ main:%d, ad:%d %d\n", patch->output_thread_created, patch->ad_output_thread_created);
+    AM_LOGI("++ main:%u, ad:%u\n", patch->output_thread_created, patch->ad_output_thread_created);
 
     if (patch->output_thread_created == 0) {
         patch->output_thread_exit = 0;
@@ -2049,7 +2050,7 @@ static int create_dtv_output_stream_thread(struct aml_audio_patch *patch)
 static int release_dtv_output_stream_thread(struct aml_audio_patch *patch)
 {
     int ret = 0;
-    AM_LOGI("++ main:%d, ad:%d, %d\n", patch->output_thread_created, patch->ad_output_thread_created);
+    AM_LOGI("++ main:%u, ad:%u\n", patch->output_thread_created, patch->ad_output_thread_created);
     if (patch->output_thread_created == 1) {
         patch->output_thread_exit = 1;
         pthread_cond_signal(&patch->cond);
@@ -2202,7 +2203,7 @@ int create_dtv_patch_l(struct audio_hw_device *dev, audio_devices_t input,
     }
 
     ret = pthread_create(&(patch->audio_cmd_process_threadID), NULL,
-                         audio_dtv_patch_process_threadloop, patch);
+                        (void *)audio_dtv_patch_process_threadloop, patch);
     if (ret != 0) {
         AM_LOGE("Create process thread fail!");
         goto err;
@@ -2335,7 +2336,7 @@ void dtv_in_write(struct audio_stream_out *stream, const void* buffer, size_t by
     int abuf_level = 0;
 
     if (stream == NULL || buffer == NULL || bytes == 0) {
-        AM_LOGW("stream:%p or buffer:%p is null, or bytes:%d = 0.", stream, buffer, bytes);
+        AM_LOGW("stream:%p or buffer:%p is null, or bytes:%zu = 0.", stream, buffer, bytes);
         return;
     }
     if ((adev->patch_src == SRC_DTV) && (patch->dtvin_buffer_inited == 1)) {
@@ -2356,7 +2357,7 @@ int dtv_in_read(struct audio_stream_in *stream, void* buffer, size_t bytes)
     struct aml_audio_device *adev = in->dev;
 
     if (stream == NULL || buffer == NULL || bytes == 0) {
-        AM_LOGW("stream:%p or buffer:%p is null, or bytes:%d = 0.", stream, buffer, bytes);
+        AM_LOGW("stream:%p or buffer:%p is null, or bytes:%zu = 0.", stream, buffer, bytes);
         return bytes;
     }
 

@@ -1009,7 +1009,7 @@ static int parse_heaac_loas_frame_header(struct audio_bit_parser * bit_parser, c
 }
 
 
-int aml_heaac_parser_process(void *parser_handle, const void *in_buffer, int32_t numBytes, int32_t *used_size, void **output_buf, int32_t *out_size, struct heaac_parser_info * heaac_info)
+int aml_heaac_parser_process(void *parser_handle, const void *in_buffer, int32_t numBytes, int32_t *used_size, const void **output_buf, int32_t *out_size, struct heaac_parser_info * heaac_info)
 {
     struct aml_heaac_parser *heaac_parser_handle = (struct aml_heaac_parser *)parser_handle;
     size_t remain = 0;

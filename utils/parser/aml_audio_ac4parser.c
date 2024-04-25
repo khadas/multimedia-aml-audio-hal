@@ -268,7 +268,7 @@ static int parse_ac4_frame_header(struct audio_bit_parser * bit_parser, const un
 }
 
 
-int aml_ac4_parser_process(void *parser_handle, const void *in_buffer, int32_t numBytes, int32_t *used_size, void **output_buf, int32_t *out_size, struct ac4_parser_info * ac4_info)
+int aml_ac4_parser_process(void *parser_handle, const void *in_buffer, int32_t numBytes, int32_t *used_size, const void **output_buf, int32_t *out_size, struct ac4_parser_info * ac4_info)
 {
     struct aml_ac4_parser *ac4_parser_handle = (struct aml_ac4_parser *)parser_handle;
     size_t remain = 0;

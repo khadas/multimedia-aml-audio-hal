@@ -45,7 +45,7 @@ AM_ErrorCode_t AmLinuxDvd::dvb_open(AM_DMX_Device *dev) {
     int i;
 
     if (!dev) {
-        ALOGE("[%s:%d] dev is %p", dev);
+        ALOGE("[%s:%d] dev is %p", __func__, __LINE__, dev);
         return AM_FAILURE;
     }
 
@@ -77,7 +77,7 @@ AM_ErrorCode_t AmLinuxDvd::dvb_close(AM_DMX_Device *dev) {
         free(dmx);
         return AM_SUCCESS;
     } else {
-        ALOGE("[%s:%d] dev is %p", dev);
+        ALOGE("[%s:%d] dev is %p", __func__, __LINE__, dev);
         return AM_FAILURE;
     }
 }
@@ -100,7 +100,7 @@ AM_ErrorCode_t AmLinuxDvd::dvb_alloc_filter(AM_DMX_Device *dev, AM_DMX_Filter *f
 
         return AM_SUCCESS;
     } else {
-        ALOGE("[%s:%d] dev is %p, filter is %p", dev, filter);
+        ALOGE("[%s:%d] dev is %p, filter is %p", __func__, __LINE__, dev, filter);
         return AM_FAILURE;
     }
 }
@@ -116,7 +116,7 @@ AM_ErrorCode_t AmLinuxDvd::dvb_free_filter(AM_DMX_Device *dev, AM_DMX_Filter *fi
 
         return AM_SUCCESS;
     } else {
-        ALOGE("[%s:%d] dev is %p, filter is %p", dev, filter);
+        ALOGE("[%s:%d] dev is %p, filter is %p", __func__, __LINE__, dev, filter);
         return AM_FAILURE;
     }
 }
@@ -225,7 +225,11 @@ AM_ErrorCode_t AmLinuxDvd::dvb_set_buf_size(AM_DMX_Device *dev, AM_DMX_Filter *f
 AM_ErrorCode_t AmLinuxDvd::dvb_poll_exit(AM_DMX_Device *dev) {
     DVBDmx_t *dmx = (DVBDmx_t*)dev->drv_data;
     int64_t pad = 1;
-    write(dmx->evtfd, &pad, sizeof(pad));
+    ssize_t ret = 0;
+    ret = write(dmx->evtfd, &pad, sizeof(pad));
+    if (ret < 0) {
+        ALOGE("[%s:%d] write file error", __func__, __LINE__);
+    }
     ALOGI("[%s:%d]dev %p, dmx %p", __func__, __LINE__, dev, dmx);
     return AM_SUCCESS;
 }

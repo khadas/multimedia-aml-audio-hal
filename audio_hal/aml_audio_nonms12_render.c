@@ -116,7 +116,7 @@ ssize_t aml_audio_spdif_output(struct audio_stream_out *stream, void **spdifout_
     }
 
     ALOGV("[%s:%d] format =0x%x length =%d", __func__, __LINE__, data_info->data_format, data_info->data_len);
-    aml_audio_spdifout_processs(*spdifout_handle, data_info->buf, data_info->data_len);
+    aml_audio_spdifout_process(*spdifout_handle, data_info->buf, data_info->data_len);
 
     return ret;
 }
@@ -176,7 +176,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
 
     /* check the input apts and set valid flag */
     if ((NULL_INT64 == ainput.pts) || (ainput.pts == aml_dec->last_in_frame_pts)) {
-        AM_LOGI_IF(adev->debug_flag, "ainput.pts(0x%llx)->out_frame_pts(0x%llx)", ainput.pts, aml_dec->out_frame_pts);
+        AM_LOGI_IF(adev->debug_flag, "ainput.pts(0x%"PRIx64")->out_frame_pts(0x%"PRIx64")", ainput.pts, aml_dec->out_frame_pts);
 
         /* if input apts invalid use the out_frame_pts instead */
         ainput.pts            = aml_dec->out_frame_pts;
@@ -198,7 +198,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
         ainput.buffer += used_size;
         ainput.size = left_bytes;
 
-        AM_LOGI_IF(adev->debug_flag, "in pts:0x%llx (%lld ms) size: %d", ainput.pts, ainput.pts/90, ainput.size);
+        AM_LOGI_IF(adev->debug_flag, "in pts:0x%"PRIx64" (%"PRIu64" ms) size: %"PRId32"", ainput.pts, ainput.pts/90, ainput.size);
         int decoder_ret = -1;
         decoder_ret = aml_decoder_process(aml_dec, &ainput, &used_size);
         if (decoder_ret == AML_DEC_RETURN_TYPE_CACHE_DATA) {
@@ -217,7 +217,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
            and when pts valid is true, the aml dec will aligned output apts with input pts add cached frames for the input pts may not continue */
         ainput.b_pts_valid     = false;
         aml_dec->out_frame_pts = ainput.pts;
-        AM_LOGI_IF(adev->debug_flag, "out pts:0x%llx (%lld ms) pcm len =%d raw len=%d used_size %d total used size %d left_bytes =%d",
+        AM_LOGI_IF(adev->debug_flag, "out pts:0x%"PRIx64" (%"PRIu64" ms) pcm len =%d raw len=%d used_size %d total used size %d left_bytes =%d",
             dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len,dec_raw_data->data_len,
             used_size, dec_used_size, left_bytes);
 
@@ -226,7 +226,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
             continue;
         }
 
-        AM_LOGI_IF(adev->debug_flag, "used_size %d total used size %d left_bytes =%d pcm len =%d raw len=%d, bytes:%lld",
+        AM_LOGI_IF(adev->debug_flag, "used_size %d total used size %d left_bytes =%d pcm len =%d raw len=%d, bytes:%"PRId32"",
             used_size, dec_used_size, left_bytes, dec_pcm_data->data_len, dec_raw_data->data_len, abuffer->size);
 
         if (aml_dec->format == AUDIO_FORMAT_PCM_32_BIT)
@@ -262,7 +262,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
                 clip_flag = true;
             }
 
-            AM_LOGI_IF(adev->debug_flag, "input_bytes_size:%lld, dec_cachedsize:%lld, offset:%d, consumedsize:%lld, remain_samples:%d, bpf:%d, ch:%d, sr:%d, data_len:%d, pcm_len:%d",
+            AM_LOGI_IF(adev->debug_flag, "input_bytes_size:%"PRIu64", dec_cachedsize:%"PRIu64", offset:%d, consumedsize:%"PRIu64", remain_samples:%d, bpf:%d, ch:%d, sr:%d, data_len:%d, pcm_len:%d",
                 aml_out->input_bytes_size, aml_out->dec_cachedsize, offset, aml_out->consumedsize,
                 remain_samples, bpf, dec_pcm_data->data_ch, dec_pcm_data->data_sr, dec_pcm_data->data_len, pcm_len);
         }
@@ -342,8 +342,8 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
             }
             avsync_ctx->mediasync_ctx->out_start_apts = aml_dec->out_frame_pts;
             avsync_ctx->mediasync_ctx->cur_outapts    = aml_dec->out_frame_pts - tuning_delay;
-            AM_LOGI_IF(adev->debug_flag, "sr:%d, ch:%d, format:0x%x, in_apts:%lld(%llx), "
-                "out_pts:%lld, out_frames:%d, cur_outapts:%lld",
+            AM_LOGI_IF(adev->debug_flag, "sr:%d, ch:%d, format:0x%x, in_apts:%"PRIu64"(%"PRIx64"), "
+                "out_pts:%"PRId64", out_frames:%d, cur_outapts:%"PRId64"",
                 dec_pcm_data->data_sr, dec_pcm_data->data_ch, dec_pcm_data->data_format,
                 ainput.pts, ainput.pts, aml_dec->out_frame_pts, out_frames, avsync_ctx->mediasync_ctx->cur_outapts);
 

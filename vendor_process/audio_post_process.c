@@ -17,6 +17,7 @@
 #include "audio_post_process.h"
 #include "aml_dec_api.h"
 #include "aml_dtshd_dec_api.h"
+#include "aml_audio_nonms12_render.h"
 #ifdef DTS_VX_V4_ENABLE
 #include "Virtualx_v4.h"
 #else

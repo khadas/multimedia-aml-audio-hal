@@ -62,6 +62,8 @@
 #define HWSYNC_PTS_EOS UINT64_MAX
 #define HWSYNC_PTS_NA  (UINT64_MAX-1)
 
+struct audio_stream_out;
+
 enum hwsync_status {
     CONTINUATION,  // good sync condition
     ADJUSTMENT,    // can be adjusted by discarding or padding data

@@ -523,7 +523,7 @@ write:
     if (debug_enable || (aml_out->alsa_write_cnt % 1000) == 0) {
         snd_pcm_sframes_t frames = 0;
         ret = pcm_ioctl(aml_out->pcm, SNDRV_PCM_IOCTL_DELAY, &frames);
-        ALOGI("[%s:%d] alsa format =0x%x delay frames =%ld total frames=%lld", __func__, __LINE__, aml_out->alsa_output_format, frames, aml_out->alsa_write_frames);
+        ALOGI("[%s:%d] alsa format =0x%x delay frames =%ld total frames=%"PRIu64"", __func__, __LINE__, aml_out->alsa_output_format, frames, aml_out->alsa_write_frames);
     }
 
 
@@ -973,7 +973,7 @@ size_t aml_alsa_output_write_new(void *handle, const void *buffer, size_t bytes)
     if (debug_enable || (alsa_handle->write_cnt % 1000) == 0) {
         snd_pcm_sframes_t frames = 0;
         ret = pcm_ioctl(alsa_handle->pcm, SNDRV_PCM_IOCTL_DELAY, &frames);
-        ALOGI("alsa format =0x%x delay frames =%ld total frames=%lld", alsa_handle->format, frames, alsa_handle->write_frames);
+        ALOGI("alsa format =0x%x delay frames =%ld total frames=%"PRIu64"", alsa_handle->format, frames, alsa_handle->write_frames);
     }
 
 #if 0

@@ -19,7 +19,7 @@
 
 int aml_spdif_decoder_open(void **spdifdec_handle);
 int aml_spdif_decoder_close(void *phandle);
-int aml_spdif_decoder_process(void *phandle, const void *inbuf, int32_t n_bytes_inbuf, int32_t *used_size, void **output_buf, int32_t *out_size);
+int aml_spdif_decoder_process(void *phandle, const void *inbuf, int32_t n_bytes_inbuf, int32_t *used_size, const void **output_buf, int32_t *out_size);
 int aml_spdif_decoder_getformat(void *phandle);
 int aml_spdif_decoder_reset(void *phandle);
 

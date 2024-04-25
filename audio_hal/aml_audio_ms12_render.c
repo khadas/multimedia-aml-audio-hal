@@ -36,6 +36,7 @@
 #include "aml_audio_ms12_sync.h"
 #include "aml_esmode_sync.h"
 #include "dtv_patch_hal_avsync.h"
+#include "amlAudioMixer.h"
 
 #define MS12_MAIN_WRITE_LOOP_THRESHOLD                  (2000)
 
@@ -60,7 +61,7 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio
     unsigned long long all_zero_len = 0;
     audio_format_t output_format = get_output_format (stream);
     if (adev->debug_flag) {
-        AM_LOGD("hal_format:%#x, output_format:0x%x, sink_format:0x%x, apts:0x%llx, size:%d",
+        AM_LOGD("hal_format:%#x, output_format:0x%x, sink_format:0x%x, apts:0x%"PRIu64", size:%"PRId32"",
             aml_out->hal_format, output_format, adev->sink_format, abuffer->pts, abuffer->size);
     }
 
@@ -93,7 +94,7 @@ int aml_audio_ms12_process_wrapper(struct audio_stream_out *stream, struct audio
         total_write = 0;
 re_write:
         if (adev->debug_flag) {
-            ALOGI("%s dolby_ms12_main_process before write_bytes %zu, pts %llx!\n", __func__, write_bytes, abuffer->pts);
+            ALOGI("%s dolby_ms12_main_process before write_bytes %d, pts %"PRIu64"!\n", __func__, write_bytes, abuffer->pts);
         }
 
         used_size = 0;
@@ -104,7 +105,7 @@ re_write:
             }
             if (used_size < abuffer->size && write_retry < MS12_MAIN_WRITE_LOOP_THRESHOLD) {
                 if (adev->debug_flag) {
-                    ALOGI("%s dolby_ms12_main_process used  %zu,write total %zu,left %zu\n", __FUNCTION__, used_size, abuffer->size, abuffer->size - used_size);
+                    ALOGI("%s dolby_ms12_main_process used  %zu,write total %"PRId32",left %zu\n", __FUNCTION__, used_size, abuffer->size, abuffer->size - used_size);
                 }
                 abuffer->buffer += used_size;
                 abuffer->size -= used_size;
@@ -121,7 +122,7 @@ re_write:
                 }
             }
             if (write_retry >= MS12_MAIN_WRITE_LOOP_THRESHOLD) {
-                ALOGE("%s main write retry time output,left %zu", __func__, abuffer->size);
+                ALOGE("%s main write retry time output,left %"PRId32"", __func__, abuffer->size);
                 //bytes -= write_bytes;
                 ms12_write_failed = 1;
             }
@@ -177,7 +178,7 @@ int aml_audio_amldec_process(struct audio_stream_out *stream, struct audio_buffe
 
     /* check the input apts and set valid flag */
     if ((NULL_INT64 == ainput.pts) || (ainput.pts == aml_dec->last_in_frame_pts)) {
-        AM_LOGI_IF(adev->debug_flag, "ainput.pts(0x%llx)->out_frame_pts(0x%llx)", ainput.pts, aml_dec->out_frame_pts);
+        AM_LOGI_IF(adev->debug_flag, "ainput.pts(0x%"PRIx64")->out_frame_pts(0x%"PRIx64")", ainput.pts, aml_dec->out_frame_pts);
 
         /* if input apts invalid use the out_frame_pts instead */
         ainput.pts            = aml_dec->out_frame_pts;
@@ -194,12 +195,12 @@ int aml_audio_amldec_process(struct audio_stream_out *stream, struct audio_buffe
     int left_bytes    = ainput.size;
     struct audio_buffer out_abuffer = {0};
 
-    AM_LOGI_IF(adev->debug_flag, "new_in_pts:0x%llx (%lld ms) size: %d", ainput.pts, ainput.pts/90, ainput.size);
+    AM_LOGI_IF(adev->debug_flag, "new_in_pts:0x%"PRIx64" (%"PRId64" ms) size: %"PRId32"", ainput.pts, ainput.pts/90, ainput.size);
     do {
         ainput.buffer += used_size;
         ainput.size   = left_bytes;
 
-        AM_LOGI_IF(adev->debug_flag, "in pts:0x%llx (%lld ms) size: %d", ainput.pts, ainput.pts/90, ainput.size);
+        AM_LOGI_IF(adev->debug_flag, "in pts:0x%"PRIx64" (%"PRId64" ms) size: %"PRId32"", ainput.pts, ainput.pts/90, ainput.size);
         ret = aml_decoder_process(aml_dec, &ainput, &used_size);
         if (0 > ret) {
             AM_LOGW("aml_decoder_process error, ret:%d", ret);
@@ -213,7 +214,7 @@ int aml_audio_amldec_process(struct audio_stream_out *stream, struct audio_buffe
         ainput.b_pts_valid     = false;
         aml_dec->out_frame_pts = ainput.pts;
 
-        AM_LOGI_IF(adev->debug_flag, "out pts:0x%llx (%lld ms) pcm len =%d raw len=%d used_size %d total used size %d left_bytes =%d",
+        AM_LOGI_IF(adev->debug_flag, "out pts:0x%"PRIx64" (%"PRId64" ms) pcm len =%d raw len=%d used_size %d total used size %d left_bytes =%d",
             dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len,dec_raw_data->data_len,
             used_size, dec_used_size, left_bytes);
 
@@ -297,7 +298,7 @@ int aml_audio_ad_render(struct audio_stream_out *stream, struct audio_buffer *ab
         aml_dec_t *aml_dec = aml_out->aml_dec;
         int used = 0;
         ret = aml_decoder_ad_process(stream, abuffer, &used);
-        AM_LOGI_IF(adev->debug_flag, "ad_frame_size %d used %d, ret %d", abuffer->size, used, ret);
+        AM_LOGI_IF(adev->debug_flag, "ad_frame_size %"PRId32" used %d, ret %d", abuffer->size, used, ret);
         goto exit;
     }
 
@@ -329,7 +330,7 @@ int aml_audio_ad_render(struct audio_stream_out *stream, struct audio_buffer *ab
         ainput.buffer += used_size;
         ainput.size   = left_bytes;
 
-        AM_LOGI_IF(adev->debug_flag, "out %p,in pts:0x%llx (%lld ms) size: %d, used %d, total used %d", aml_out,
+        AM_LOGI_IF(adev->debug_flag, "out %p,in pts:0x%"PRIx64" (%"PRId64" ms) size: %"PRId32", used %d, total used %d", aml_out,
             ainput.pts, ainput.pts/90, ainput.size, used_size, dec_used_size);
         ret = aml_decoder_process(aml_dec, &ainput, &used_size);
         if (0 > ret) {

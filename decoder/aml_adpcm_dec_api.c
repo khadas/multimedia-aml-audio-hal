@@ -410,7 +410,7 @@ static int adpcm_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuff
             ALOGV("[%s:%d]realloc outbuf_max_len  from %zu to %zu\n", __FUNCTION__, __LINE__, dec_pcm_data->buf_size, downmix_size);
             dec_pcm_data->buf = aml_audio_realloc(dec_pcm_data->buf, downmix_size);
             if (dec_pcm_data->buf == NULL) {
-                ALOGE("[%s:%d]realloc pcm buffer failed size %zu\n", __FUNCTION__, __LINE__, downmix_size);
+                ALOGE("[%s:%d]realloc pcm buffer failed size %u\n", __FUNCTION__, __LINE__, downmix_size);
                 return AML_DEC_RETURN_TYPE_FAIL;
             }
             dec_pcm_data->buf_size = downmix_size;
@@ -445,7 +445,7 @@ static int adpcm_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuff
     dec_pcm_data->data_ch = 2;
     dec_pcm_data->data_format = adpcm_config->pcm_format;
     dec_pcm_data->pts = abuffer->pts;
-    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%"PRIx64" (%"PRIu64" ms) pcm len %d, buffer len %d, used_size_return %d",
         dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, used_size_return);
 
     return used_size;

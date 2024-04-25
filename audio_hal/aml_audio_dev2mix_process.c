@@ -27,6 +27,7 @@
 #include "aml_audio_dev2mix_process.h"
 #include "alsa_manager.h"
 #include "alsa_config_parameters.h"
+#include "tv_patch_ctrl.h"
 
 struct aml_audio_parser {
     ring_buffer_t           aml_ringbuffer;
@@ -193,7 +194,7 @@ size_t aml_dev2mix_parser_process(struct aml_stream_in *in, unsigned char *buffe
         }
         if (time_out_cnt++ >= 100) {
             memset(buffer, 0, bytes);
-            ALOGW("[%s:%d] alsa read decode timeout 100 times, read_bytes:%d, bytes:%d", __func__, __LINE__, read_bytes, bytes);
+            ALOGW("[%s:%d] alsa read decode timeout 100 times, read_bytes:%zu, bytes:%zu", __func__, __LINE__, read_bytes, bytes);
             break;
         }
     } while (read_bytes < bytes);

@@ -74,8 +74,8 @@ int uio_init_new(int  *fd_uio)
     phys_size = 0;
     int pagesize = getpagesize();
     int phys_start;
-    //  int phys_size;
-    int phys_offset;
+    //  long phys_size;
+    long phys_offset;
     //  volatile unsigned memmap;
     int addr_offset;
 
@@ -93,7 +93,7 @@ int uio_init_new(int  *fd_uio)
     phys_offset = get_num_infile(ASTREAM_OFFSET);
     addr_offset = get_num_infile(ADDR_OFFSET);
 
-    ALOGI("add=%08x, size=%08x, phy_offset=%08x, addr_offset=%d\n",
+    ALOGI("add=%08x, size=%08x, phy_offset=%08lx, addr_offset=%d\n",
        phys_start, phys_size, phys_offset, addr_offset);
 
     phys_size = (phys_size + pagesize - 1) & (~(pagesize - 1));
@@ -108,7 +108,7 @@ int uio_init_new(int  *fd_uio)
     }
     if (phys_offset == 0)
         phys_offset = ((AIU_AIFIFO_CTRL + addr_offset) << 2) & (pagesize - 1);
-    reg_base = (volatile unsigned*)((unsigned)memmap + phys_offset);
+    reg_base = (volatile unsigned*)((unsigned long int)memmap + phys_offset);
     pthread_mutex_unlock(&uio_mutex);
 
     return 0;

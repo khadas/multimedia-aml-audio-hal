@@ -37,7 +37,7 @@ static inline short CLIP16(int r)
            r;
 }
 
-static void downmix_4ch_to_2ch(void *in_buf, void *out_buf, int bytes, int audio_format) {
+static void downmix_4ch_to_2ch(const void *in_buf, void *out_buf, int bytes, int audio_format) {
     int frames_num = 0;
     int channel = 4;
     int i = 0;
@@ -57,7 +57,7 @@ static void downmix_4ch_to_2ch(void *in_buf, void *out_buf, int bytes, int audio
     return;
 }
 
-static void downmix_6ch_to_2ch(void *in_buf, void *out_buf, int bytes, int audio_format) {
+static void downmix_6ch_to_2ch(const void *in_buf, void *out_buf, int bytes, int audio_format) {
     int frames_num = 0;
     int channel = 6;
     int i = 0;
@@ -79,7 +79,7 @@ static void downmix_6ch_to_2ch(void *in_buf, void *out_buf, int bytes, int audio
     return;
 }
 
-static void downmix_8ch_to_2ch(void *in_buf, void *out_buf, int bytes, int audio_format) {
+static void downmix_8ch_to_2ch(const void *in_buf, void *out_buf, int bytes, int audio_format) {
     int frames_num = 0;
     int channel = 8;
     int i = 0;
@@ -377,10 +377,10 @@ static aml_dec_return_type_t convert_data_from_be_to_16bit_le(aml_dec_t * aml_de
     pcm_dec = (struct pcm_dec_t *)aml_dec;
     pcm_config = &pcm_dec->pcm_config;
     if (dec_pcm_data->buf_size < in_bytes * 2) { // the max out buffer size is that input is 1ch 16bit
-        ALOGI("%s() realloc outbuf_max_len  from %zu to %zu\n", __FUNCTION__, dec_pcm_data->buf_size, in_bytes * 2);
+        ALOGI("%s() realloc outbuf_max_len  from %d to %d\n", __FUNCTION__, dec_pcm_data->buf_size, in_bytes * 2);
         dec_pcm_data->buf = aml_audio_realloc(dec_pcm_data->buf, in_bytes * 2);
         if (dec_pcm_data->buf == NULL) {
-            ALOGE("%s() realloc pcm buffer failed size %zu\n", __FUNCTION__, in_bytes * 2);
+            ALOGE("%s() realloc pcm buffer failed size %d\n", __FUNCTION__, in_bytes * 2);
             return AML_DEC_RETURN_TYPE_FAIL;
         }
         dec_pcm_data->buf_size = in_bytes * 2;
@@ -511,10 +511,10 @@ static aml_dec_return_type_t u8pcm_process(aml_dec_t * aml_dec, const char*buffe
     dec_data_info_t *dec_pcm_data = &aml_dec->dec_pcm_data;
 
     if (dec_pcm_data->buf_size < in_bytes * 2) { // the max out buffer size is that input is 1ch 16bit
-        ALOGI("%s() realloc outbuf_max_len from %zu to %zu\n", __FUNCTION__, dec_pcm_data->buf_size, in_bytes * 2);
+        ALOGI("%s() realloc outbuf_max_len from %d to %d\n", __FUNCTION__, dec_pcm_data->buf_size, in_bytes * 2);
         dec_pcm_data->buf = aml_audio_realloc(dec_pcm_data->buf, in_bytes * 2);
         if (dec_pcm_data->buf == NULL) {
-            ALOGE("%s() realloc pcm buffer failed size %zu\n", __FUNCTION__, in_bytes * 2);
+            ALOGE("%s() realloc pcm buffer failed size %d\n", __FUNCTION__, in_bytes * 2);
             return AML_DEC_RETURN_TYPE_FAIL;
         }
         dec_pcm_data->buf_size = in_bytes * 2;
@@ -530,7 +530,7 @@ static aml_dec_return_type_t u8pcm_process(aml_dec_t * aml_dec, const char*buffe
     return AML_DEC_RETURN_TYPE_OK;
 }
 
-static void pcm32bit_to_16bit (void *in_buf, void *out_buf, int bytes, int audio_format)
+static void pcm32bit_to_16bit (const void *in_buf, void *out_buf, int bytes, int audio_format)
 {
     if (audio_format == AUDIO_FORMAT_PCM_32_BIT) {
         int32_t *input32 = (int32_t *)in_buf;
@@ -592,10 +592,10 @@ static int pcm_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer
         downmix_size = bytes / downmix_conf;
 
         if (dec_pcm_data->buf_size < downmix_size) {
-            ALOGI("realloc outbuf_max_len  from %zu to %zu\n", dec_pcm_data->buf_size, downmix_size);
+            ALOGI("realloc outbuf_max_len  from %d to %d\n", dec_pcm_data->buf_size, downmix_size);
             dec_pcm_data->buf = aml_audio_realloc(dec_pcm_data->buf, downmix_size);
             if (dec_pcm_data->buf == NULL) {
-                ALOGE("realloc pcm buffer failed size %zu\n", downmix_size);
+                ALOGE("realloc pcm buffer failed size %d\n", downmix_size);
                 return AML_DEC_RETURN_TYPE_FAIL;
             }
             dec_pcm_data->buf_size = downmix_size;
@@ -637,10 +637,10 @@ static int pcm_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer
 
     if (pcm_config->max_out_channels >= pcm_config->channel) {
         if (raw_in_data->buf_size < bytes) {
-            ALOGI("realloc outbuf_max_len  from %zu to %zu\n", raw_in_data->buf_size, bytes);
+            ALOGI("realloc outbuf_max_len  from %d to %d\n", raw_in_data->buf_size, bytes);
             raw_in_data->buf = aml_audio_realloc(raw_in_data->buf, bytes);
             if (raw_in_data->buf == NULL) {
-                ALOGE("realloc pcm buffer failed size %zu\n", bytes);
+                ALOGE("realloc pcm buffer failed size %d\n", bytes);
                 return AML_DEC_RETURN_TYPE_FAIL;
             }
             raw_in_data->buf_size = bytes;
@@ -656,7 +656,7 @@ static int pcm_decoder_process(aml_dec_t * aml_dec, struct audio_buffer *abuffer
 
     dec_pcm_data->pts = abuffer->pts;
 
-    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d, used_size_return %d",
+    AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%"PRIx64" (%"PRId64" ms) pcm len %d, buffer len %d, used_size_return %d",
         dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size, in_bytes);
 
     return in_bytes;

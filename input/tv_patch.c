@@ -52,6 +52,9 @@
 #include "audio_port.h"
 #include "amlAudioMixer.h"
 #include "audio_hw_ms12_common.h"
+#include "aml_audio_ms12_bypass.h"
+#include "aml_audio_dev2mix_process.h"
+
 
 static int get_audio_patch_by_src_dev(struct audio_hw_device *dev, audio_devices_t dev_type, struct audio_patch **p_audio_patch)
 {
@@ -574,7 +577,7 @@ void *audio_patch_output_threadloop(void *data)
             }
 
             if (need_drop_size >0) {
-                AM_LOGE("data error, we drop data(%d) pos_sync_word(%d) find_sync_word(%d) read_space(%d)(%d) out_buf_size(%d), write_bytes(%d)",
+                AM_LOGE("data error, we drop data(%d) pos_sync_word(%d) find_sync_word(%d) read_space(%d)(%d) out_buf_size(%zu), write_bytes(%d)",
                     need_drop_size, pos_sync_word, find_iec_sync_word, ring_buffer_read_space, ringbuffer->size, patch->out_buf_size, write_bytes);
                 int drop_size = ring_buffer_seek(ringbuffer, need_drop_size);
                 if (drop_size != need_drop_size) {
@@ -812,7 +815,7 @@ int release_patch(struct aml_audio_device *aml_dev)
     return 0;
 }
 
-int create_patch(struct aml_audio_device *dev,
+int create_patch(struct audio_hw_device *dev,
                         audio_devices_t input,
                         audio_devices_t output)
 {

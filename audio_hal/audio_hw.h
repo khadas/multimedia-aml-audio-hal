@@ -1188,6 +1188,8 @@ int adev_ms12_prepare(struct audio_hw_device *dev);
 
 void adev_ms12_cleanup(struct audio_hw_device *dev);
 
+void *aml_adev_get_handle(void);
+
 int ms12_clipmeta(void *priv_data, void *info, unsigned long long offset);
 
 /* 'bytes' are the number of bytes written to audio FIFO, for which 'timestamp' is valid.

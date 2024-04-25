@@ -38,7 +38,7 @@
 #include "dolby_lib_api.h"
 #include "aml_audio_ms12_sync.h"
 #include "aml_audio_timer.h"
-
+#include "audio_hw_ms12_v2.h"
 
 #include "aml_android_utils.h"
 #define MSYNC_CALLBACK_WAIT_TIMEOUT_US (4000*1000)
@@ -72,7 +72,7 @@ audio_header_t *audio_header_info_init(void)
 {
     audio_header_t *p_header = aml_audio_calloc(1, sizeof(audio_header_t));
     if (NULL == p_header) {
-        AM_LOGE("malloc pheader failed, size(%d)", sizeof(audio_header_t));
+        AM_LOGE("malloc pheader failed, size(%zu)", sizeof(audio_header_t));
         return NULL;
     }
     audio_header_info_reset(p_header);
@@ -132,7 +132,7 @@ int audio_header_find_frame(audio_header_t *p_header,
                 if ((3 == p_header->version_num) && (HW_AVSYNC_HEADER_SIZE_V3 == p_header->hw_sync_header_cnt)) {
                     p_header->clip_front = hwsync_header_get_clip_front(p_header->hw_sync_header);
                     p_header->clip_back  = hwsync_header_get_clip_back(p_header->hw_sync_header);
-                    AM_LOGI_IF(debug_enable, "clip_front:%lld, clip_back:%lld", p_header->clip_front, p_header->clip_back);
+                    AM_LOGI_IF(debug_enable, "clip_front:%"PRIu64", clip_back:%"PRIu64"", p_header->clip_front, p_header->clip_back);
                 }
 
                 if ((in_bytes - remain) > p_header->hw_sync_header_cnt) {
@@ -171,8 +171,8 @@ int audio_header_find_frame(audio_header_t *p_header,
                     pts = pts * 90 / 1000000;
                 time_diff = get_pts_gap(pts, p_header->last_apts_from_header) / 90;
                 if (debug_enable) {
-                    ALOGI("pts 0x%"PRIx64",frame len %u\n", pts, p_header->hw_sync_body_cnt);
-                    ALOGI("last pts 0x%"PRIx64",diff %lld ms\n", p_header->last_apts_from_header, time_diff);
+                    ALOGI("pts 0x%"PRIx64",frame len %"PRIu32"\n", pts, p_header->hw_sync_body_cnt);
+                    ALOGI("last pts 0x%"PRIx64",diff %"PRIu64" ms\n", p_header->last_apts_from_header, time_diff);
                 }
                 if (p_header->hw_sync_frame_size > HWSYNC_MAX_BODY_SIZE) {
                     ALOGE("pheader frame body %d bigger than pre-defined size %d, need check !!!!!\n",
@@ -229,7 +229,7 @@ avsync_ctx_t *avsync_ctx_init(void)
     avsync_ctx_t *avsync_ctx = aml_audio_calloc(1, sizeof(avsync_ctx_t));
     if (NULL == avsync_ctx)
     {
-        AM_LOGI("calloc size:%d, error!", sizeof(avsync_ctx_t));
+        AM_LOGI("calloc size:%zu, error!", sizeof(avsync_ctx_t));
         return NULL;
     }
 
@@ -289,7 +289,7 @@ audio_mediasync_t *mediasync_ctx_init(void)
     audio_mediasync_t *mediasync_ctx = aml_audio_calloc(1, sizeof(audio_mediasync_t));
     if (NULL == mediasync_ctx)
     {
-        AM_LOGI("calloc size:%d, error!", sizeof(audio_mediasync_t));
+        AM_LOGI("calloc size:%zu, error!", sizeof(audio_mediasync_t));
         return NULL;
     }
 
@@ -309,7 +309,7 @@ audio_msync_t *msync_ctx_init(void)
     audio_msync_t *msync_ctx = aml_audio_calloc(1, sizeof(audio_msync_t));
     if (NULL == msync_ctx)
     {
-        AM_LOGI("calloc size:%d, error!", sizeof(audio_msync_t));
+        AM_LOGI("calloc size:%zu, error!", sizeof(audio_msync_t));
         return NULL;
     }
 
@@ -359,7 +359,7 @@ bool skip_check_when_gap(struct audio_stream_out *stream, size_t offset, uint64_
          && (!adev->gap_ignore_pts)
          && ((int)(offset - (adev->gap_offset & 0xffffffff)) >= 0)) {
         /* when PTS gap exists (Netflix specific), skip APTS reset between [adev->gap_pts, adev->gap_pts + 500ms] */
-        AM_LOGI("gap_pts = 0x%llx", apts);
+        AM_LOGI("gap_pts = 0x%"PRIu64"", apts);
         adev->gap_pts = apts;
         adev->gap_ignore_pts = true;
         set_ms12_main_audio_mute(&adev->ms12, true, 32);
@@ -367,7 +367,7 @@ bool skip_check_when_gap(struct audio_stream_out *stream, size_t offset, uint64_
 
     if (adev->gap_ignore_pts) {
         if (pts_gap(apts, adev->gap_pts) < 90 * 500) {
-            AM_LOGI("gap_pts = 0x%llx, adev->gap_pts:0x%x, skip", apts, adev->gap_pts);
+            AM_LOGI("gap_pts = 0x%"PRIu64", adev->gap_pts:0x%x, skip", apts, adev->gap_pts);
             return true;
         } else {
             AM_LOGI("gap process done, recovered APTS/PCR checking");
@@ -535,7 +535,7 @@ int avsync_checkin_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t apts)
         return -1;
     }
     if (debug_enable) {
-        ALOGI("++ %s checkin ,offset %zu,apts 0x%llx", __func__, offset, apts);
+        ALOGI("++ %s checkin ,offset %zu,apts 0x%"PRIx64"", __func__, offset, apts);
     }
     pthread_mutex_lock(&avsync_ctx->lock);
     pts_tab = avsync_ctx->pts_tab;
@@ -547,7 +547,7 @@ int avsync_checkin_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t apts)
              */
             pts_tab[i].pts = apts;
             if (debug_enable) {
-                ALOGI("%s:%d checkin done,offset %zu,apts 0x%llx", __func__, __LINE__, offset, apts);
+                ALOGI("%s:%d checkin done,offset %zu,apts 0x%"PRIx64"", __func__, __LINE__, offset, apts);
             }
             ret = 0;
             break;
@@ -556,7 +556,7 @@ int avsync_checkin_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t apts)
             pts_tab[i].offset = offset;
             pts_tab[i].valid = 1;
             if (debug_enable) {
-                ALOGI("%s:%d checkin done,offset %zu,apts 0x%llx", __func__, __LINE__, offset, apts);
+                ALOGI("%s:%d checkin done,offset %zu,apts 0x%"PRIx64"", __func__, __LINE__, offset, apts);
             }
             ret = 0;
             break;
@@ -625,7 +625,7 @@ int avsync_lookup_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t *p_apts
                 nearest_offset = pts_tab[i].offset;
                 ret = 0;
                 if (debug_enable) {
-                    ALOGI("%s pts checkout done,offset %zu,align %zu,pts 0x%llx",
+                    ALOGI("%s pts checkout done,offset %zu,align %zu,pts 0x%"PRIx64"",
                           __func__, offset, align, *p_apts);
                 }
                 break;
@@ -658,7 +658,7 @@ int avsync_lookup_apts(avsync_ctx_t *avsync_ctx, size_t offset, uint64_t *p_apts
             }
 #endif
             if (debug_enable)
-                ALOGI("find nearest pts 0x%llx offset %u align %zu", *p_apts, nearest_offset, align);
+                ALOGI("find nearest pts 0x%"PRIx64" offset %"PRIu32" align %zu", *p_apts, nearest_offset, align);
         } else {
             ALOGE("%s,apts lookup failed,align %zu,offset %zu", __func__, align, offset);
         }

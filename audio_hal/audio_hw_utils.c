@@ -1444,7 +1444,7 @@ int aml_audio_data_handle(struct audio_stream_out *stream, const void* buffer, s
                     ret = aml_audio_data_detect((int16_t *)((int8_t *)buffer + detected_size), unit_size , AML_DETECT_VALUE);
                     if (false == ret) {
                         out->audio_data_handle_state = AUDIO_DATA_HANDLE_DETECTED;
-                        ALOGD("%s  detected the nonzero data, remaing_size:%zu  detected_size:%zu", __func__, remaining_size, detected_size);
+                        ALOGD("%s  detected the nonzero data, remaining_size:%zu  detected_size:%d", __func__, remaining_size, detected_size);
                         break;
                     }
 

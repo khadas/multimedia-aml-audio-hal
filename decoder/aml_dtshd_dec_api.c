@@ -874,7 +874,7 @@ int dca_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer)
 {
     struct dca_dts_dec *dts_dec = NULL;
     int bytes = abuffer->size;
-    char * buffer = abuffer->buffer;
+    const char * buffer = abuffer->buffer;
     struct aml_audio_device *adev = NULL;
     struct ring_buffer *input_rbuffer = NULL;
     dec_data_info_t *dec_pcm_data = NULL;
@@ -1000,7 +1000,7 @@ int dca_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer)
         }
         dec_pcm_data->pts = abuffer->pts;
 
-        AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%llx (%lld ms) pcm len %d, buffer len %d",
+        AM_LOGI_IF(aml_dec->debug_level, "pts: 0x%"PRIx64" (%"PRIu64" ms) pcm len %d, buffer len %d",
             dec_pcm_data->pts, dec_pcm_data->pts/90, dec_pcm_data->data_len, dec_pcm_data->buf_size);
         return AML_DEC_RETURN_TYPE_NEED_DEC_AGAIN;
     } else if (frame_size == 0) {

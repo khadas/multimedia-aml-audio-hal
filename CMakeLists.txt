@@ -267,7 +267,8 @@ target_include_directories(audio_hal PRIVATE
 	./audio_hal
 	${AML_BUILD_DIR})
 
-target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations -funwind-tables -fasynchronous-unwind-tables -fPIC -g)
+target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT
+	-Werror -Wno-error=discarded-qualifiers -Wno-deprecated-declarations -funwind-tables -fasynchronous-unwind-tables -fPIC -g)
 
 if(USE_DTV)
 	target_include_directories(audio_hal PRIVATE

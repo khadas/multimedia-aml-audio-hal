@@ -39,6 +39,7 @@
 #include "alsa_config_parameters.h"
 #include "audio_hwsync.h"
 #include "aml_esmode_sync.h"
+#include "amlAudioMixer.h"
 
 #define DD_MUTE_FRAME_SIZE 1536
 #define EAC3_IEC61937_FRAME_SIZE 24576
@@ -210,7 +211,7 @@ bool aml_audio_spdif_insertpcm_es(struct audio_stream_out *stream,  void **spdif
 
     if (insert_size <=  out_buf_size) {
         memset(out_buf, 0, out_buf_size);
-        aml_audio_spdifout_processs(*spdifout_handle, out_buf, insert_size);
+        aml_audio_spdifout_process(*spdifout_handle, out_buf, insert_size);
         return true;
     }
 
@@ -225,7 +226,7 @@ bool aml_audio_spdif_insertpcm_es(struct audio_stream_out *stream,  void **spdif
 
     for (int i = 0; i < t1; i++) {
         memset(out_buf, 0, out_buf_size);
-        aml_audio_spdifout_processs(*spdifout_handle, out_buf, out_buf_size);
+        aml_audio_spdifout_process(*spdifout_handle, out_buf, out_buf_size);
     }
     return true;
 }
@@ -257,7 +258,7 @@ bool aml_hwsynces_spdif_insertraw(struct audio_stream_out *stream,  void **spdif
         ALOGI("non-packet ddp size = %d\n", size);
     }
     for (int i = 0; i < t1; i++)
-        aml_audio_spdifout_processs(*spdifout_handle, buffer, size);
+        aml_audio_spdifout_process(*spdifout_handle, buffer, size);
     return  true;
 }
 
@@ -345,7 +346,7 @@ int mediasync_get_policy(struct audio_stream_out *stream)
         }
 
         if (debug_flag || m_audiopolicy.audiopolicy != MEDIASYNC_AUDIO_NORMAL_OUTPUT) {
-            ALOGI("m_audiopolicy=%d=%s, param1=%u, param2=%u, org_pts=0x%llx, cur_pts=0x%llx",
+            ALOGI("m_audiopolicy=%d=%s, param1=%u, param2=%u, org_pts=0x%"PRIx64", cur_pts=0x%"PRIx64"",
                 m_audiopolicy.audiopolicy, mediasyncAudiopolicyType2Str(m_audiopolicy.audiopolicy),
                 m_audiopolicy.param1, m_audiopolicy.param2,
                 p_mediasync->out_start_apts, p_mediasync->cur_outapts);
@@ -371,7 +372,7 @@ int mediasync_get_policy(struct audio_stream_out *stream)
     p_mediasync->apolicy.audiopolicy= (audio_policy)m_audiopolicy.audiopolicy;
     p_mediasync->apolicy.param1 = m_audiopolicy.param1;
     p_mediasync->apolicy.param2 = m_audiopolicy.param2;
-    return;
+    return 0;
 }
 
 int aml_process_resample(struct audio_stream_out *stream,

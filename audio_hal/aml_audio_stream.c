@@ -617,7 +617,7 @@ void aml_stream_out_dump(struct aml_stream_out *aml_out, int fd)
         uint64_t frames;
         struct timespec timestamp;
         aml_out->stream.get_presentation_position((const struct audio_stream_out *)aml_out, &frames, &timestamp);
-        dprintf(fd, "\t\t-presentaion_position:%llu    | sec:%ld  nsec:%ld\n", frames, timestamp.tv_sec, timestamp.tv_nsec);
+        dprintf(fd, "\t\t-presentation_position:%"PRIu64"    | sec:%ld  nsec:%ld\n", frames, timestamp.tv_sec, timestamp.tv_nsec);
     }
 }
 
@@ -791,7 +791,7 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
                 pstPatch->dtv_resample.input_sr, pstPatch->dtv_resample.output_sr,pstPatch->dtv_resample.channels);
         if (pstPatch->dtvsync)
         {
-            dprintf(fd, "[AML_HAL] mediasync %p,mediasync_new %p,mediasync_id %d,cur_outapts %lld,out_start_apts %lld,out_end_apts %lld\n",
+            dprintf(fd, "[AML_HAL] mediasync %p,mediasync_new %p,mediasync_id %d,cur_outapts %"PRId64",out_start_apts %"PRId64",out_end_apts %"PRId64"\n",
                     pstPatch->dtvsync->mediasync,pstPatch->dtvsync->mediasync_new,
                     pstPatch->dtvsync->mediasync_id,pstPatch->dtvsync->cur_outapts,
                     pstPatch->dtvsync->out_start_apts,pstPatch->dtvsync->out_end_apts);
@@ -801,13 +801,13 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
         }
         if (pstPatch->cur_package)
         {
-            dprintf(fd, "[AML_HAL] main data:%p,size %d,next %p,pts %lldn",
+            dprintf(fd, "[AML_HAL] main data:%p,size %d,next %p,pts %"PRIu64"\n",
                     pstPatch->cur_package->data,pstPatch->cur_package->size,
                     pstPatch->cur_package->next,pstPatch->cur_package->pts);
         }
         if (pstPatch->cur_ad_package)
         {
-            dprintf(fd, "[AML_HAL] ad data:%p,size %d,next %p,pts %lld\n",
+            dprintf(fd, "[AML_HAL] ad data:%p,size %d,next %p,pts %"PRIu64"\n",
                     pstPatch->cur_ad_package->data,pstPatch->cur_ad_package->size,
                     pstPatch->cur_ad_package->next,pstPatch->cur_ad_package->pts);
         }
@@ -833,7 +833,7 @@ static void audio_patch_dump(struct aml_audio_device* aml_dev, int fd)
                     dtv_aml_out->dec_config.advol_level,dtv_aml_out->dec_config.mixer_level,
                     dtv_aml_out->dec_config.ad_fade,dtv_aml_out->dec_config.ad_pan);
             if (aml_dec) {
-                dprintf(fd, "[AML_HAL] format:%d,ad_data %p,ad_size %d,out_frame_pts %lld,status %d,\n",
+                dprintf(fd, "[AML_HAL] format:%d,ad_data %p,ad_size %d,out_frame_pts %"PRId64",status %d,\n",
                         aml_dec->format,aml_dec->ad_data,aml_dec->ad_size,aml_dec->out_frame_pts,aml_dec->status);
                 dprintf(fd, "[AML_HAL] frame_cnt:%d,fragment_left_size %d,dev %p \n",
                         aml_dec->frame_cnt,aml_dec->fragment_left_size,aml_dec->dev);

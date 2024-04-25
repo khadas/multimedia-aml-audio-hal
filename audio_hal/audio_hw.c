@@ -352,7 +352,7 @@ static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
                                                          const void *in_buf,
                                                          int32_t in_size,
                                                          int32_t *used_size,
-                                                         void **output_buf,
+                                                         const void **output_buf,
                                                          int32_t *out_size,
                                                          int *frame_dur)
 {
@@ -373,7 +373,7 @@ static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
         void * dolby_inbuf = NULL;
         int32_t dolby_buf_size = 0;
         int temp_used_size = 0;
-        void * temp_main_frame_buffer = NULL;
+        const void * temp_main_frame_buffer = NULL;
         int temp_main_frame_size = 0;
         if (!aml_out->spdif_dec_handle) {
             ret = aml_spdif_decoder_open(&aml_out->spdif_dec_handle);
@@ -395,7 +395,7 @@ static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
         audio_format_t output_format = aml_spdif_decoder_getformat(aml_out->spdif_dec_handle);
         if (output_format == AUDIO_FORMAT_E_AC3
             || output_format == AUDIO_FORMAT_AC3) {
-            void* dolby_inbuf = *output_buf;
+            const void* dolby_inbuf = *output_buf;
             int32_t dolby_buf_size = *out_size;
 
             if (!aml_out->ac3_parser_handle) {
@@ -940,14 +940,14 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
      * multiple of 16 frames, as audioflinger expects audio buffers to
      * be a multiple of 16 frames
      */
-    size_t size = out->config.period_size;
+    int size = out->config.period_size;
     size_t buffer_size = 0;
     int ret = 0;
     switch (out->hal_internal_format) {
     case AUDIO_FORMAT_AC3:
         if (stream->get_format(stream) == AUDIO_FORMAT_IEC61937) {
             size = AC3_PERIOD_SIZE;
-            ALOGI("%s AUDIO_FORMAT_IEC61937 %zu)", __FUNCTION__, size);
+            ALOGI("%s AUDIO_FORMAT_IEC61937 %d)", __FUNCTION__, size);
             if ((eDolbyDcvLib == adev->dolby_lib_type) &&
                 (out->flags & AUDIO_OUTPUT_FLAG_DIRECT)) {
                 // local file playback, data from audio flinger direct mode
@@ -955,7 +955,7 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
                 // to match with it, set the size to 1536
                 // (ms12 decoder doesn't encounter this issue, so only handle with DCV decoder case)
                 size = AC3_PERIOD_SIZE / 4;
-                ALOGI("%s AUDIO_FORMAT_IEC61937(DIRECT) (eDolbyDcvLib) size = %zu)", __FUNCTION__, size);
+                ALOGI("%s AUDIO_FORMAT_IEC61937(DIRECT) (eDolbyDcvLib) size = %d)", __FUNCTION__, size);
             }
         } else if (out->flags & AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO) {
             size = AC3_PERIOD_SIZE;
@@ -989,7 +989,7 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
         if (eDolbyDcvLib == adev->dolby_lib_type_last) {
             if (stream->get_format(stream) == AUDIO_FORMAT_IEC61937) {
                 size = PLAYBACK_PERIOD_COUNT * DEFAULT_PLAYBACK_PERIOD_SIZE;
-                ALOGI("%s eac3 eDolbyDcvLib = size%zu)", __FUNCTION__, size);
+                ALOGI("%s eac3 eDolbyDcvLib = size%d)", __FUNCTION__, size);
             }
         }
         /*netflix ddp size is 768, if we change to a big value, then
@@ -1028,7 +1028,7 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
         } else {
             size = DTSHD_PERIOD_SIZE * 8;
         }
-        ALOGI("%s AUDIO_FORMAT_DTS buffer size = %zuframes", __FUNCTION__, size);
+        ALOGI("%s AUDIO_FORMAT_DTS buffer size = %d frames", __FUNCTION__, size);
         break;
     case AUDIO_FORMAT_DTS_HD:
         if (stream->get_format(stream) == AUDIO_FORMAT_IEC61937) {
@@ -1036,7 +1036,7 @@ static size_t out_get_buffer_size (const struct audio_stream *stream)
         } else {
             size = DTSHD_PERIOD_SIZE * 8;
         }
-        ALOGI("%s AUDIO_FORMAT_DTS_HD buffer size = %zuframes", __FUNCTION__, size);
+        ALOGI("%s AUDIO_FORMAT_DTS_HD buffer size = %d frames", __FUNCTION__, size);
         break;
 #if 0
     case AUDIO_FORMAT_PCM:
@@ -2950,8 +2950,8 @@ static char * in_get_parameters (const struct audio_stream *stream, const char *
         sprintf (temp_buf, "period_cnt=%d;period_sz=%d", in->config.period_count, in->config.period_size);
         return strdup (temp_buf);
     } else if (strstr (keys, "get_aml_source_latency")) {
-        sprintf (temp_buf, "aml_source_latency_ms=%zu", in_get_latency_frames((const struct audio_stream_in *)in));
-        ALOGI ("in_get_parameters %zu", in_get_latency_frames((const struct audio_stream_in *)in));
+        sprintf (temp_buf, "aml_source_latency_ms=%u", in_get_latency_frames((const struct audio_stream_in *)in));
+        ALOGI ("in_get_parameters %u", in_get_latency_frames((const struct audio_stream_in *)in));
         return strdup (temp_buf);
     }
     return strdup ("");
@@ -7889,7 +7889,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
     abuffer_out.iec_data_buf = NULL;
 
     if (adev->debug_flag) {
-        ALOGI("[%s:%d] out:%p bytes:%zu,format:%#x,conti:%d,with_header:%d", __func__, __LINE__,
+        ALOGI("[%s:%d] out:%p bytes:%"PRId32",format:%#x,conti:%d,with_header:%d", __func__, __LINE__,
               aml_out, abuffer->size, aml_out->hal_internal_format,adev->continuous_audio_mode,aml_out->with_header);
         ALOGI("[%s:%d] hal_format:%#x, out_usecase:%s", __func__, __LINE__,
             aml_out->hal_format, usecase2Str(aml_out->usecase));
@@ -8103,7 +8103,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
     }
 
     int parser_count = 0;
-    AM_LOGI_IF(adev->debug_flag, "======== parser_in_size(%d) total_used_size(%d) b_pts_valid(%d) pts(%lldms)\n",
+    AM_LOGI_IF(adev->debug_flag, "======== parser_in_size(%d) total_used_size(%d) b_pts_valid(%d) pts(%"PRIu64"ms)\n",
         parser_in_size, total_used_size, abuffer->b_pts_valid, abuffer->pts/90);
     if (aml_out->hal_format == AUDIO_FORMAT_IEC61937) {
         abuffer_out.iec_data_buf = abuffer->buffer;
@@ -8140,7 +8140,7 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
         parser_count++;
         AM_LOGI_IF(adev->debug_flag, "After parser [%d]current_used_size %d, total_used_size %d, p %p", parser_count, current_used_size, total_used_size, p);
         if (p != NULL) {
-            AM_LOGI_IF(adev->debug_flag, "After parser in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%d) b_pts_valid(%d) pts(%lldms) dur %d",
+            AM_LOGI_IF(adev->debug_flag, "After parser in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%"PRId32") b_pts_valid(%d) pts(%"PRIu64"ms) dur %d",
                 parser_in_buf, abuffer_out.buffer, *p, *(p+1),
                 *(p+2),*(p+3),abuffer_out.size, abuffer_out.b_pts_valid, abuffer_out.pts/90, frame_duration);
 
@@ -8195,7 +8195,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
 
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-    ALOGI("[%lld.%9ld -- %d] mixer_aux_buffer_write %u", (long long)ts.tv_sec, ts.tv_nsec, gettid(), bytes);
+    ALOGI("[%lld.%9ld -- %d] mixer_aux_buffer_write %zu", (long long)ts.tv_sec, ts.tv_nsec, gettid(), bytes);
 
     if (eDolbyMS12Lib == adev->dolby_lib_type && continuous_mode(adev)) {
         enter_ns = aml_audio_get_systime_ns();
@@ -8329,7 +8329,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
                 audio_fade_func((void *)buffer, bytes, 0);
                 adev->netflix_hide_fadeout_startTime = aml_audio_get_systime()/1000;
                 adev->is_netflix_hide = false;
-                ALOGI("%s aux audio fade out. starTime:%llu", __func__, adev->netflix_hide_fadeout_startTime);
+                ALOGI("%s aux audio fade out. starTime:%"PRIu64"", __func__, adev->netflix_hide_fadeout_startTime);
             } else {
                 if (adev->netflix_hide_fadeout_startTime) {
                     uint64_t currentTime = aml_audio_get_systime()/1000;
@@ -8337,7 +8337,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
                         memset((void *)buffer, 0, bytes);
                     } else {
                         adev->netflix_hide_fadeout_startTime = 0;
-                        ALOGI("%s aux audio memset done. currentTime:%llu", __func__, currentTime);
+                        ALOGI("%s aux audio memset done. currentTime:%"PRIu64"", __func__, currentTime);
                     }
                 }
             }
@@ -8358,7 +8358,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
             }
             if (bytes_remaining) {
                 ms12->sys_audio_skip += bytes_remaining / frame_size;
-                ALOGI("bytes_remaining =%d totoal skip =%lld", bytes_remaining, ms12->sys_audio_skip);
+                ALOGI("bytes_remaining =%zu totoal skip =%"PRIu64"", bytes_remaining, ms12->sys_audio_skip);
             }
         }
     } else {
@@ -8409,7 +8409,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
     }
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-    ALOGI_IF(eDolbyMS12Lib == adev->dolby_lib_type, "[%lld.%9ld] write %d bytes, system level %d ms", (long long)ts.tv_sec, ts.tv_nsec, bytes, dolby_ms12_get_system_buffer_avail(NULL) / frame_size / 48);
+    ALOGI_IF(eDolbyMS12Lib == adev->dolby_lib_type, "[%lld.%9ld] write %zu bytes, system level %zu ms", (long long)ts.tv_sec, ts.tv_nsec, bytes, dolby_ms12_get_system_buffer_avail(NULL) / frame_size / 48);
 
 
 #ifndef BUILD_LINUX
@@ -8448,11 +8448,11 @@ ssize_t mixer_ad_buffer_write (struct audio_stream_out *stream, struct audio_buf
         return -1;
     }
 
-    AM_LOGI_IF(adev->debug_flag, "useSubMix:%d, db_lib:%d, hal_format:0x%x, usecase:0x%x, out:%p, in %d",
+    AM_LOGI_IF(adev->debug_flag, "useSubMix:%d, db_lib:%d, hal_format:0x%x, usecase:0x%x, out:%p, in %zu",
             adev->useSubMix, adev->dolby_lib_type, aml_out->hal_format, aml_out->usecase, aml_out, total_bytes);
 
     if (abuffer->buffer == NULL || abuffer->size == 0) {
-        AM_LOGE ("invalid abuffer content, buf %p, sz %d\n", abuffer->buffer, abuffer->size);
+        AM_LOGE ("invalid abuffer content, buf %p, sz %"PRId32"\n", abuffer->buffer, abuffer->size);
         return -1;
     }
 
@@ -8483,7 +8483,7 @@ ssize_t mixer_ad_buffer_write (struct audio_stream_out *stream, struct audio_buf
         parser_count++;
         AM_LOGI_IF(adev->debug_flag, "After parser [%d]current_used_size %d, total_used_size %d, p %p", parser_count, current_parser_size, total_parser_size, p);
         if (p != NULL) {
-            AM_LOGI_IF(adev->debug_flag, "After parser in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%d) used %d, total used %d, dur %d",
+            AM_LOGI_IF(adev->debug_flag, "After parser in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%"PRId32") used %d, total used %d, dur %d",
                 parser_in_buf, abuffer_out.buffer, *p, *(p+1),
                 *(p+2),*(p+3),abuffer_out.size, current_parser_size, total_parser_size, frame_duration);
 
@@ -8492,7 +8492,7 @@ ssize_t mixer_ad_buffer_write (struct audio_stream_out *stream, struct audio_buf
         }
     }
 ad_exit:
-    AM_LOGI_IF(adev->debug_flag, "return %zu!\n", total_parser_size);
+    AM_LOGI_IF(adev->debug_flag, "return %d!\n", total_parser_size);
     return total_parser_size;
 }
 
@@ -8805,7 +8805,7 @@ pheader_rewrite:
                     AM_LOGE("dolby_ms12_register_callback CALLBACK_CLIP_META fail!!");
                 }
             }
-            AM_LOGI("inbytes:%d, outbytes:%d, offset:%lld, clip_front:%lld, clip_back:%lld", bytes, write_bytes,
+            AM_LOGI("inbytes:%zu, outbytes:%zu, offset:%"PRIu64", clip_front:%"PRIu64", clip_back:%"PRIu64"", bytes, write_bytes,
                     aml_out->clip_offset, aml_out->pheader->clip_front, aml_out->pheader->clip_back);
             aml_out->clip_offset = aml_out->payload_offset;
             hal_set_clip_info(aml_out->clip_meta, aml_out->clip_offset, aml_out->pheader->clip_front, aml_out->pheader->clip_back);
@@ -8823,7 +8823,7 @@ pheader_rewrite:
             }
         }
         if (adev->debug_flag > 1) {
-            ALOGI("[%s:%d], inputsize:%d, pheader_cost:%zu, cur_pts:0x%llx (%lld ms), outsize:%d", __func__, __LINE__, bytes, pheader_cost, cur_pts, cur_pts/90, pheader_outsize);
+            ALOGI("[%s:%d], inputsize:%zu, pheader_cost:%zu, cur_pts:0x%"PRIx64" (%"PRIu64" ms), outsize:%d", __func__, __LINE__, bytes, pheader_cost, cur_pts, cur_pts/90, pheader_outsize);
         }
 
         if ((cur_pts > 0xffffffff) && (cur_pts != HWSYNC_PTS_NA) && (cur_pts != HWSYNC_PTS_EOS)) {
@@ -9656,7 +9656,7 @@ static int adev_create_audio_patch(struct audio_hw_device *dev,
                     else
                         release_patch(aml_dev);
                 }
-                ret = create_patch(aml_dev, src_config->ext.device.type, aml_dev->out_device);
+                ret = create_patch(dev, src_config->ext.device.type, aml_dev->out_device);
                 if (ret) {
                     ALOGE("[%s:%d] create patch failed, all out dev:%#x.", __func__, __LINE__, aml_dev->out_device);
                     ret = -EINVAL;

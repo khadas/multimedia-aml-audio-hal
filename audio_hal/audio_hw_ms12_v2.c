@@ -1596,10 +1596,10 @@ int ms12_ad_process (struct audio_stream_out *stream, struct audio_buffer *abuff
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     int dolby_ms12_input_bytes = 0, write_retry = 0;
-    void *associate_frame_buffer = abuffer->buffer;
+    const void *associate_frame_buffer = abuffer->buffer;
     int associate_frame_size     = abuffer->size;
 
-    AM_LOGI_IF(adev->debug_flag, "input ms12 ad bytes %d, pts 0x%llx", associate_frame_size, abuffer->pts);
+    AM_LOGI_IF(adev->debug_flag, "input ms12 ad bytes %d, pts 0x%"PRIx64"", associate_frame_size, abuffer->pts);
 
     /*set the dolby ms12 debug level*/
     dolby_ms12_enable_debug();
@@ -1941,7 +1941,7 @@ static ssize_t aml_ms12_spdif_output_new (struct audio_stream_out *stream,
                                 int sample_rate,
                                 int data_ch,
                                 int ch_mask,
-                                void *buffer,
+                                const void *buffer,
                                 size_t byte)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
@@ -2011,7 +2011,7 @@ static ssize_t aml_ms12_spdif_output_new (struct audio_stream_out *stream,
         }
     }
 
-    ret = aml_audio_spdifout_processs(bitstream_desc->spdifout_handle, buffer, byte);
+    ret = aml_audio_spdifout_process(bitstream_desc->spdifout_handle, buffer, byte);
 
     /*it is earc output*/
     if (OUTPORT_HDMI_ARC == adev->active_outport) {
@@ -2021,7 +2021,7 @@ static ssize_t aml_ms12_spdif_output_new (struct audio_stream_out *stream,
 }
 
 
-int mat_bypass_process(struct audio_stream_out *stream, void *buffer, size_t bytes) {
+int mat_bypass_process(struct audio_stream_out *stream, const void *buffer, size_t bytes) {
     int ret = 0;
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
@@ -2048,7 +2048,7 @@ int mat_bypass_process(struct audio_stream_out *stream, void *buffer, size_t byt
             pthread_mutex_lock(&adev->ms12.bitstream_a_lock);
             bitstream_out = &ms12->bitstream_out[BITSTREAM_OUTPUT_A];
             /* send these IEC61937 data to alsa */
-            AM_LOGI_IF(adev->debug_flag, "bitstream(%p) bypass MAT size(%d) out_format(%x)(%x) sample_rate(%d)(%d)",
+            AM_LOGI_IF(adev->debug_flag, "bitstream(%p) bypass MAT size(%zu) out_format(%x)(%x) sample_rate(%d)(%d)",
                 bitstream_out, bytes, output_format, aml_out->hal_internal_format, sample_rate, bitstream_out->sample_rate);
             ret = aml_ms12_spdif_output_new(stream, bitstream_out, output_format, aml_out->hal_internal_format, sample_rate, data_ch, ch_mask, buffer, bytes);
             pthread_mutex_unlock(&adev->ms12.bitstream_a_lock);
@@ -2058,7 +2058,7 @@ int mat_bypass_process(struct audio_stream_out *stream, void *buffer, size_t byt
     return 0;
 }
 
-int ac3_and_eac3_bypass_process(struct audio_stream_out *stream, void *buffer, size_t bytes) {
+int ac3_and_eac3_bypass_process(struct audio_stream_out *stream, const void *buffer, size_t bytes) {
     int ret = 0;
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
@@ -2084,7 +2084,7 @@ int ac3_and_eac3_bypass_process(struct audio_stream_out *stream, void *buffer, s
          }
         pthread_mutex_lock(&adev->ms12.bitstream_a_lock);
         bitstream_out = &ms12->bitstream_out[BITSTREAM_OUTPUT_A];
-        AM_LOGI_IF(adev->debug_flag, "bitstream(%p) bypass AC3/EAC3 size(%d) out_format(%x)(%x) sample_rate(%d)(%d)",
+        AM_LOGI_IF(adev->debug_flag, "bitstream(%p) bypass AC3/EAC3 size(%zu) out_format(%x)(%x) sample_rate(%d)(%d)",
             bitstream_out, bytes, output_format, aml_out->hal_internal_format, sample_rate, bitstream_out->sample_rate);
         ret = aml_ms12_spdif_output_new(stream, bitstream_out, output_format, aml_out->hal_internal_format, sample_rate, data_ch, ch_mask, buffer, bytes);
         pthread_mutex_unlock(&adev->ms12.bitstream_a_lock);
@@ -2093,7 +2093,7 @@ int ac3_and_eac3_bypass_process(struct audio_stream_out *stream, void *buffer, s
     return ret;
 }
 
-int dolby_truehd_bypass_process(struct audio_stream_out *stream, void *buffer, size_t bytes) {
+int dolby_truehd_bypass_process(struct audio_stream_out *stream, const void *buffer, size_t bytes) {
     int ret = 0;
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
@@ -2160,7 +2160,7 @@ int dolby_truehd_bypass_process(struct audio_stream_out *stream, void *buffer, s
         if (ms12->mat_enc_handle && buffer && bytes) {
             int offset = 0;
             int nbytes_consumed = 0;
-            unsigned char *pbuf = (unsigned char *)buffer;
+            const unsigned char *pbuf = (unsigned char *)buffer;
             memset(ms12->mat_enc_out_buffer, 0, ms12->matenc_maxoutbufsize);
             while (offset < bytes) {
                 ret = dolby_ms12_mat_encoder_process
@@ -2219,7 +2219,7 @@ int dolby_truehd_bypass_process(struct audio_stream_out *stream, void *buffer, s
     return 0;
 }
 
-int dolby_ms12_bypass_process(struct audio_stream_out *stream, void *buffer, size_t bytes) {
+int dolby_ms12_bypass_process(struct audio_stream_out *stream, const void *buffer, size_t bytes) {
     int ret = 0;
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream;
     struct aml_audio_device *adev = aml_out->dev;
@@ -2988,8 +2988,8 @@ Aml_MS12_SyncPolicy_t ms12_avsync_callback(void *priv_data, unsigned long long u
 
         delay_pts_diff = (delay_frame + stDelay.u32DelayFrame) * 90 / 48;
         new_apts = apts + same_pts_diff - delay_pts_diff;
-        AM_LOGI_IF(adev->debug_flag, "lookup_apts=0x%llx(%lld ms), new_apts=0x%llx(%lld ms), pts_diff=%x, DecOutFrame=%llu, "
-                                     "decoded_frame=%lld, DelayFrame=%d(%d ms), last_output_apts:%llu",
+        AM_LOGI_IF(adev->debug_flag, "lookup_apts=0x%"PRIx64"(%"PRId64" ms), new_apts=0x%"PRIx64"(%"PRId64" ms), pts_diff=%x, DecOutFrame=%llu, "
+                                     "decoded_frame=%"PRIu64", DelayFrame=%d(%d ms), last_output_apts:%"PRIu64"",
                                     apts, apts / 90, new_apts, new_apts / 90, delay_pts_diff, u64DecOutFrame, decoded_frame,
                                     stDelay.u32DelayFrame, stDelay.u32DelayFrame / 48, avsync_ctx->last_output_apts);
 
@@ -3833,10 +3833,10 @@ static int ms12_update_decoded_info_process(struct audio_stream_out *stream, voi
     struct aml_audio_device *adev = aml_out->dev;
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     int32_t temp_spdif_dec_used_size = 0;
-    void *main_frames_buffer = input_buffer;
+    const void *main_frames_buffer = input_buffer;
     int main_frames_size = input_bytes;
     int temp_used_size = 0;
-    void * temp_main_frame_buffer = NULL;
+    const void * temp_main_frame_buffer = NULL;
     int temp_main_frame_size = 0;
     struct ac3_parser_info ac3_info = { 0 };
     uint64_t decoded_frames = 0;

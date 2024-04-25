@@ -18,7 +18,7 @@
 #define _TV_PATCH_H_
 #include <cutils/str_parms.h>
 
-int create_patch(struct aml_audio_device *aml_dev, audio_devices_t input, audio_devices_t output);
+int create_patch(struct audio_hw_device *aml_dev, audio_devices_t input, audio_devices_t output);
 int release_patch(struct aml_audio_device *aml_dev);
 int set_tv_source_switch_parameters(struct audio_hw_device *dev, struct str_parms *parms);
 
