@@ -1491,6 +1491,19 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
         goto exit;
     }
 
+    int input_eos_value = 0;
+    ret = str_parms_get_int (parms, AUDIO_PARAMETER_STREAM_INPUT_END_OF_STREAM, &input_eos_value);
+    if (ret >= 0) {
+        if (input_eos_value == 0) {
+            out->eos = false;
+        } else {
+            out->eos = true;
+        }
+        AM_LOGI (" Amlogic_HAL - input_eos value changed, value: %d ", out->eos);
+        ret = 0;
+        goto exit;
+    }
+
     int frame_size = 0;
     ret = str_parms_get_int (parms, AUDIO_PARAMETER_STREAM_FRAME_COUNT, &frame_size);
     if (ret >= 0) {
@@ -1723,6 +1736,10 @@ static char *out_get_parameters(const struct audio_stream *stream, const char *k
             return strdup (temp_buf);
         }
         return strdup ("");
+    } else if (strstr (keys, "decoder_end_of_stream")) {
+        sprintf (temp_buf, "decoder_end_of_stream=%d", aml_out->eos);
+        AM_LOGI("%s", temp_buf);
+        return strdup (temp_buf);
     } else {
         ALOGE("%s() keys %s is not supported! TODO!\n", __func__, keys);
         return strdup ("");

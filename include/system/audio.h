@@ -1646,6 +1646,7 @@ __END_DECLS
 #define AUDIO_PARAMETER_STREAM_FRAME_COUNT "frame_count"     /* size_t */
 #define AUDIO_PARAMETER_STREAM_INPUT_SOURCE "input_source"   /* audio_source_t */
 #define AUDIO_PARAMETER_STREAM_SAMPLING_RATE "sampling_rate" /* uint32_t */
+#define AUDIO_PARAMETER_STREAM_INPUT_END_OF_STREAM "input_end_of_stream" /*  */
 
 /* Request the presentation id to be decoded by a next gen audio decoder */
 #define AUDIO_PARAMETER_STREAM_PRESENTATION_ID "presentation_id" /* int32_t */
