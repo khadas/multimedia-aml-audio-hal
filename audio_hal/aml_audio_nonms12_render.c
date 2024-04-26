@@ -963,7 +963,9 @@ int aml_decoder_config_prepare(struct audio_stream_out *stream, audio_format_t f
         break;
     }
     case AUDIO_FORMAT_AAC:
-    case AUDIO_FORMAT_AAC_LATM: {
+    case AUDIO_FORMAT_AAC_LATM:
+    case AUDIO_FORMAT_HE_AAC_V1:
+    case AUDIO_FORMAT_HE_AAC_V2:{
         faad_decoder_config_prepare(stream, &dec_config->faad_config);
         break;
     }
