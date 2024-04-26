@@ -621,9 +621,9 @@ int aml_audio_spdifout_processs(void *phandle, void *buffer, size_t byte)
     } else if (spdifout_phandle->audio_format == AUDIO_FORMAT_MAT) {
         aml_audio_delay_process(AML_DELAY_OUTPORT_SPDIF_B_RAW,
                 (void *) output_buffer, output_buffer_bytes, spdifout_phandle->audio_format, spdifout_phandle->sample_rate);
-    } else {
+    }/* else {
         ALOGI("Only support spdif/hdmi/arc DD/DDP/MAT raw delay, format=0x%x", spdifout_phandle->audio_format);
-    }
+    }*/
 #endif
 
     if ((aml_dev->patch_src == SRC_DTV && aml_dev->audio_patch) &&

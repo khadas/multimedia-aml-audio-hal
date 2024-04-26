@@ -83,7 +83,7 @@
 #define AML_DTSX_PROP_DUMP_MIXED_PCM                "vendor.media.audio.dtsdump.mixed.pcm"
 #define AML_DTSX_PROP_DUMP_OUTPUT_PCM               "vendor.media.audio.dtsdump.output.pcm"
 #define AML_DTSX_PROP_DUMP_OUTPUT_RAW               "vendor.media.audio.dtsdump.output.raw"
-#define AML_DTSX_DUMP_FILE_DIR                      "/tmp/audio_dump/"
+#define AML_DTSX_DUMP_FILE_DIR                      "/data/vendor/audiohal/"
 
 #define AML_DTSX_FTOC_SYNC(__cur_syncword) \
 (__cur_syncword == AML_DTSX_SYNCWORD_STANDALONE_METADATA || __cur_syncword == AML_DTSX_SYNCWORD_STANDALONE_METADATA_M\
