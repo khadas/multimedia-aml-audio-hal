@@ -271,7 +271,7 @@ int aml_audio_ms12_render(struct audio_stream_out *stream, struct audio_buffer *
     if (is_dolby_ms12_support_compression_format(aml_out->hal_internal_format)
         || is_multi_channel_pcm(stream)) { //dolby_dec
         return_bytes = aml_audio_ms12_process_wrapper(stream, abuffer);
-        if ((aml_out->alsa_status_changed) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)) {
+        if ((aml_out->alsa_status_changed) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) && aml_out->avsync_ctx->mediasync_ctx) {
             ALOGI("[%s:%d] aml_out->alsa_running_status %d", __FUNCTION__, __LINE__, aml_out->alsa_running_status);
             mediasync_wrap_setParameter(aml_out->avsync_ctx->mediasync_ctx->handle, MEDIASYNC_KEY_ALSAREADY, &aml_out->alsa_running_status);
             aml_out->alsa_status_changed = false;

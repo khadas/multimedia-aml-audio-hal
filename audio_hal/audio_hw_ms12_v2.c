@@ -2821,6 +2821,9 @@ Aml_MS12_SyncPolicy_t mediasync_ms12_process(struct audio_stream_out *stream_out
     struct aml_stream_out *aml_out = (struct aml_stream_out *)stream_out;
     struct aml_audio_device *adev = aml_out->dev;
     Aml_MS12_SyncPolicy_t audio_sync_policy = {MS12_SYNC_AUDIO_NORMAL_OUTPUT, 0, 0};
+    if (aml_out->avsync_ctx == NULL || aml_out->avsync_ctx->mediasync_ctx == NULL) {
+        return audio_sync_policy;
+    }
     struct mediasync_audio_policy *async_policy = &(aml_out->avsync_ctx->mediasync_ctx->apolicy);
 
     if (aml_out->alsa_status_changed) {
@@ -3004,9 +3007,13 @@ Aml_MS12_SyncPolicy_t ms12_avsync_callback(void *priv_data, unsigned long long u
         switch (aml_out->avsync_type)
         {
             case AVSYNC_TYPE_MEDIASYNC:
-                avsync_ctx->mediasync_ctx->out_start_apts = new_apts;
-                avsync_ctx->mediasync_ctx->cur_outapts    = new_apts - latency_pts;
-                audio_sync_policy = mediasync_ms12_process(stream_out);
+                if (avsync_ctx->mediasync_ctx) {
+                    avsync_ctx->mediasync_ctx->out_start_apts = new_apts;
+                    avsync_ctx->mediasync_ctx->cur_outapts    = new_apts - latency_pts;
+                    audio_sync_policy = mediasync_ms12_process(stream_out);
+                } else {
+                    AM_LOGE("mediasync_ctx is %p", avsync_ctx->mediasync_ctx);
+                }
                 break;
             case AVSYNC_TYPE_MSYNC:
                 audio_sync_policy = msync_ms12_process(stream_out, new_apts - latency_pts);

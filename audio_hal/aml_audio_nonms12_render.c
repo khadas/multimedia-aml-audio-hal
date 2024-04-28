@@ -334,7 +334,7 @@ int aml_audio_nonms12_render(struct audio_stream_out *stream, struct audio_buffe
         }
 
         /* may move outside the decoder loop, when parser flow completed later. */
-        if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)) {
+        if ((NULL != aml_out->avsync_ctx) && (aml_out->avsync_ctx->mediasync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)) {
             avsync_ctx_t *avsync_ctx = aml_out->avsync_ctx;
             int tuning_delay = 0;
             if (NULL != avsync_ctx->get_tuning_latency) {

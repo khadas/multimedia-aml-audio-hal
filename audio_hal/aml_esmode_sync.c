@@ -329,7 +329,10 @@ int mediasync_get_policy(struct audio_stream_out *stream)
     pthread_mutex_lock(&(aml_out->avsync_ctx->lock));
     audio_mediasync_t *p_mediasync = aml_out->avsync_ctx->mediasync_ctx;
     pthread_mutex_unlock(&(aml_out->avsync_ctx->lock));
-
+    if (p_mediasync == NULL) {
+        AM_LOGE("p_mediasync is NULL, out %p", aml_out);
+        return 0;
+    }
     do {
         if (true == aml_out->will_pause || true == aml_out->pause_status) {
             break;
@@ -408,7 +411,9 @@ sync_process_res mediasync_nonms12_process(struct audio_stream_out *stream)
     struct aml_audio_device *adev = aml_out->dev;
     aml_dec_t *aml_dec = aml_out->aml_dec;
     sync_process_res ret = ESSYNC_AUDIO_OUTPUT;
-
+    if (aml_out->avsync_ctx == NULL || aml_out->avsync_ctx->mediasync_ctx == NULL) {
+        return ret;
+    }
     struct mediasync_audio_policy *async_policy = &(aml_out->avsync_ctx->mediasync_ctx->apolicy);
 
     if (aml_out->alsa_status_changed) {

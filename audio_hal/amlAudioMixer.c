@@ -776,8 +776,9 @@ static int mixer_inports_read(struct amlAudioMixer *audio_mixer)
                 in_port->last_volume = in_port->volume;
                 if (fade_out) {
                     struct aml_stream_out *out = (struct aml_stream_out *)in_port->notify_cbk_data;
-                    AM_LOGI("output port:%s fade out, pausing->pausing_1, tsync pause audio", mixerInputType2Str(type));
-                    mediasync_wrap_setPause(out->avsync_ctx->mediasync_ctx->handle, true);
+                    AM_LOGI("output port:%s fade out, pausing->pausing_1, tsync pause audio. mediasync_ctx %p", mixerInputType2Str(type), out->avsync_ctx->mediasync_ctx);
+                    if (out->avsync_ctx->mediasync_ctx)
+                        mediasync_wrap_setPause(out->avsync_ctx->mediasync_ctx->handle, true);
                     audio_fade_func(in_port->data, ret, 0);
                     set_inport_state(in_port, PAUSED);
                     /* Mute the last data to prevent gap. */

@@ -1317,16 +1317,18 @@ static void playback_rate_set (struct audio_stream *stream, float rate)
     switch (aml_out->avsync_type)
     {
         case AVSYNC_TYPE_MEDIASYNC:
-            if ((NULL == aml_out->avsync_ctx) || (NULL == aml_out->avsync_ctx->mediasync_ctx->handle))
-            {
+            if ((NULL == aml_out->avsync_ctx) ||
+                (NULL == aml_out->avsync_ctx->mediasync_ctx) ||
+                (NULL == aml_out->avsync_ctx->mediasync_ctx->handle)) {
                 AM_LOGE("mediasync handle NULL fail");
                 goto exit;
             }
             mediasync_wrap_setPlaybackRate(aml_out->avsync_ctx->mediasync_ctx->handle, rate);
             break;
         case AVSYNC_TYPE_MSYNC:
-            if ((NULL == aml_out->avsync_ctx) || (NULL == aml_out->avsync_ctx->msync_ctx->msync_session))
-            {
+            if ((NULL == aml_out->avsync_ctx) ||
+                (NULL == aml_out->avsync_ctx->msync_ctx) ||
+                (NULL == aml_out->avsync_ctx->msync_ctx->msync_session)) {
                 AM_LOGE("msync_session NULL fail");
                 goto exit;
             }
@@ -1896,7 +1898,7 @@ static int out_pause (struct audio_stream_out *stream)
 exit1:
     out->pause_status = true;
 
-    if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MSYNC == out->avsync_type)) {
+    if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MSYNC == out->avsync_type) && out->avsync_ctx->msync_ctx) {
         if (out->pheader) {
             uint32_t apts32 = out->pheader->last_apts_from_header;
             int latency = out_get_latency(stream);
@@ -1910,7 +1912,7 @@ exit1:
         av_sync_pause(out->avsync_ctx->msync_ctx->msync_session, true);
     }
 exit:
-    if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == out->avsync_type)) {
+    if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == out->avsync_type) && out->avsync_ctx->mediasync_ctx) {
         mediasync_wrap_setPause(out->avsync_ctx->mediasync_ctx->handle, true);
     }
 
@@ -1963,13 +1965,13 @@ static int out_resume (struct audio_stream_out *stream)
     if (out->need_sync) {
         ALOGI ("init hal mixer when pheader resume\n");
         aml_hal_mixer_init(&adev->hal_mixer);
-        if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == out->avsync_type)) {
+        if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == out->avsync_type) && out->avsync_ctx->mediasync_ctx) {
             mediasync_wrap_setPause(out->avsync_ctx->mediasync_ctx->handle, false);
         }
     }
     out->pause_status = false;
 
-    if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MSYNC == out->avsync_type)) {
+    if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MSYNC == out->avsync_type) && out->avsync_ctx->msync_ctx) {
         av_sync_pause(out->avsync_ctx->msync_ctx->msync_session, false);
     }
 
@@ -2012,7 +2014,7 @@ static int out_pause_new (struct audio_stream_out *stream)
     }
 
     if (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) {
-        if (eDolbyMS12Lib != aml_dev->dolby_lib_type) {
+        if (eDolbyMS12Lib != aml_dev->dolby_lib_type && aml_out->avsync_ctx->mediasync_ctx) {
             mediasync_wrap_setPause(aml_out->avsync_ctx->mediasync_ctx->handle, true);
         }
     }
@@ -2056,11 +2058,11 @@ exit:
     aml_audio_sleep(32000);
 
     /* do avsync pause after 32ms sleep for to avoid the system clock stop early than dolby fading out finish in dolby continue mode. ##SWPL-108005 */
-    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MSYNC == aml_out->avsync_type)) {
+    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MSYNC == aml_out->avsync_type) && aml_out->avsync_ctx->msync_ctx) {
         av_sync_pause(aml_out->avsync_ctx->msync_ctx->msync_session, true);
     }
 
-    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)) {
+    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) && aml_out->avsync_ctx->mediasync_ctx) {
         mediasync_wrap_setPause(aml_out->avsync_ctx->mediasync_ctx->handle, true);
     }
 
@@ -2125,10 +2127,10 @@ static int out_resume_new (struct audio_stream_out *stream)
         goto exit;
     }
 
-    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MSYNC == aml_out->avsync_type)) {
+    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MSYNC == aml_out->avsync_type) && aml_out->avsync_ctx->msync_ctx) {
         av_sync_pause(aml_out->avsync_ctx->msync_ctx->msync_session, false);
     }
-    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type)) {
+    if ((NULL != aml_out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == aml_out->avsync_type) && aml_out->avsync_ctx->mediasync_ctx) {
         mediasync_wrap_setPause(aml_out->avsync_ctx->mediasync_ctx->handle, false);
     }
 
@@ -2226,10 +2228,10 @@ static int out_flush_new (struct audio_stream_out *stream)
     }
 
     if (true == out->pause_status) {
-        if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MSYNC == out->avsync_type)) {
+        if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MSYNC == out->avsync_type) && out->avsync_ctx->msync_ctx) {
             av_sync_pause(out->avsync_ctx->msync_ctx->msync_session, false);
         }
-        if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == out->avsync_type)) {
+        if ((NULL != out->avsync_ctx) && (AVSYNC_TYPE_MEDIASYNC == out->avsync_type) && out->avsync_ctx->mediasync_ctx) {
             mediasync_wrap_setPause(out->avsync_ctx->mediasync_ctx->handle, false);
         }
     }

@@ -691,6 +691,10 @@ av_sync_policy_e get_and_map_avsync_policy(avsync_ctx_t *avsync_ctx, int avsync_
         case AVSYNC_TYPE_MEDIASYNC:
             {
                 audio_mediasync_t *mediasync_ctx = avsync_ctx->mediasync_ctx;
+                if (NULL == mediasync_ctx) {
+                    AM_LOGE("mediasync_ctx is %p", mediasync_ctx);
+                    return audio_sync_policy;
+                }
                 switch (mediasync_ctx->apolicy.audiopolicy)
                 {
                     case MEDIASYNC_AUDIO_DROP_PCM:
@@ -720,6 +724,10 @@ av_sync_policy_e get_and_map_avsync_policy(avsync_ctx_t *avsync_ctx, int avsync_
         case AVSYNC_TYPE_MSYNC:
             {
                 audio_msync_t *msync_ctx = avsync_ctx->msync_ctx;
+                if (NULL == msync_ctx) {
+                    AM_LOGE("msync_ctx is %p", msync_ctx);
+                    return audio_sync_policy;
+                }
                 switch (msync_ctx->msync_action)
                 {
                     case AV_SYNC_AA_DROP:
