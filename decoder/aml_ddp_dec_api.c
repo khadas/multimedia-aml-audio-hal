@@ -385,8 +385,7 @@ static int dcv_decoder_init(int decoding_mode, aml_dec_control_type_t digital_ra
     ddp_decoder_ad_process = (int (*)(char * , int , int *, void *))
                           dlsym(gDDPDecoderLibHandler, "ddp_decoder_ad_process");
     if (ddp_decoder_ad_process == NULL) {
-        ALOGE("%s,cant find decoder lib,%s\n", __FUNCTION__, dlerror());
-        goto Error;
+        ALOGW("%s,cant find decoder lib,%s\n", __FUNCTION__, dlerror());
     } else {
         ALOGE("<%s::%d>--[ddp_decoder_ad_process:]", __FUNCTION__, __LINE__);
     }

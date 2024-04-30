@@ -9050,7 +9050,7 @@ int adev_open_output_stream_new(struct audio_hw_device *dev,
             on_notify_cbk, aml_out, on_input_avail_cbk, aml_out, NULL, NULL, 1.0);
         AM_LOGI("direct port:%s", mixerInputType2Str(get_input_port_type(&aml_out->audioCfg, aml_out->flags)));
     }
-    if (!adev->useSubMix && is_dts_format(aml_out->hal_internal_format) && adev->dolby_lib_type_last) {
+    if (!adev->useSubMix && is_dts_format(aml_out->hal_internal_format) && adev->dolby_lib_type_last == eDolbyMS12Lib) {
         adev->useSubMix = true;
         ret = initHalSubMixing(MIXER_LPCM, adev, adev->is_TV);
         adev->raw_to_pcm_flag = false;
