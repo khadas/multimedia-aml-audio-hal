@@ -31,7 +31,7 @@ static void getVideoEsData(AmHwMultiDemuxWrapper* mDemuxWrapper,int fid,const ui
     mEsData->data = (uint8_t*)malloc(len);
     memcpy(mEsData->data,data,len);
     {
-        TSPMutex::Autolock l(mDemuxWrapper->mVideoEsDataQueueLock);
+        Mutex::Autolock l(mDemuxWrapper->mVideoEsDataQueueLock);
         mDemuxWrapper->queueEsData(mDemuxWrapper->mVideoEsDataQueue,mEsData);
     }
 
@@ -93,7 +93,7 @@ static void getAudioEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, const 
     }
 
     {
-        TSPMutex::Autolock l(mDemuxWrapper->mAudioEsDataQueueLock);
+        Mutex::Autolock l(mDemuxWrapper->mAudioEsDataQueueLock);
         mDemuxWrapper->queueEsData(mDemuxWrapper->mAudioEsDataQueue,mEsData);
     }
     //sp<TSPMessage> msg = mDemuxWrapper->dupNotify();
@@ -133,7 +133,7 @@ static void getAudioADEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, cons
             return;
         }
         {
-            TSPMutex::Autolock l(mDemuxWrapper->mAudioADEsDataQueueLock);
+            Mutex::Autolock l(mDemuxWrapper->mAudioADEsDataQueueLock);
             mDemuxWrapper->queueEsData(mDemuxWrapper->mAudioADEsDataQueue,mEsData);
         }
     }
@@ -152,7 +152,7 @@ static void getAudioADEsData(AmHwMultiDemuxWrapper* mDemuxWrapper, int fid, cons
         mEsData->adpan= paddata->pan;
         ALOGV("\ngetADAudioEsData %d mEsData->size %d mEsData->pts %lld\n",len,mEsData->size,mEsData->pts);
         {
-            TSPMutex::Autolock l(mDemuxWrapper->mAudioADEsDataQueueLock);
+            Mutex::Autolock l(mDemuxWrapper->mAudioADEsDataQueueLock);
             mDemuxWrapper->queueEsData(mDemuxWrapper->mAudioADEsDataQueue,mEsData);
         }
     }
@@ -189,15 +189,15 @@ AmHwMultiDemuxWrapper::~AmHwMultiDemuxWrapper() {
     filering_aud_pid  = 0x1fff;
     filering_aud_ad_pid  = 0x1fff;
     {
-        TSPMutex::Autolock l(mVideoEsDataQueueLock);
+        Mutex::Autolock l(mVideoEsDataQueueLock);
         clearPendingEsData(mVideoEsDataQueue);
     }
     {
-        TSPMutex::Autolock l(mAudioEsDataQueueLock);
+        Mutex::Autolock l(mAudioEsDataQueueLock);
         clearPendingEsData(mAudioEsDataQueue);
     }
     {
-        TSPMutex::Autolock l(mAudioADEsDataQueueLock);
+        Mutex::Autolock l(mAudioADEsDataQueueLock);
         clearPendingEsData(mAudioADEsDataQueue);
     }
 }
@@ -241,13 +241,13 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperReadData(int pid, mEsData
     (void) timeout;
     *mEsData = NULL;
     if (pid == mDemuxPara.vid_id) {
-        TSPMutex::Autolock l(mVideoEsDataQueueLock);
+        Mutex::Autolock l(mVideoEsDataQueueLock);
         *mEsData = dequeueEsData(mVideoEsDataQueue);
     } else if (pid == mDemuxPara.aud_id){
-        TSPMutex::Autolock l(mAudioEsDataQueueLock);
+        Mutex::Autolock l(mAudioEsDataQueueLock);
         *mEsData = dequeueEsData(mAudioEsDataQueue);
     } else if (pid == mDemuxPara.aud_ad_id) {
-        TSPMutex::Autolock l(mAudioADEsDataQueueLock);
+        Mutex::Autolock l(mAudioADEsDataQueueLock);
         *mEsData = dequeueEsData(mAudioADEsDataQueue);
     }
     return AM_Dmx_SUCCESS;
@@ -256,11 +256,11 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperReadData(int pid, mEsData
 AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperFlushData(int pid) {
     (void) pid;
     {
-        TSPMutex::Autolock l(mAudioEsDataQueueLock);
+        Mutex::Autolock l(mAudioEsDataQueueLock);
         clearPendingEsData(mAudioEsDataQueue);
     }
     {
-        TSPMutex::Autolock l(mAudioADEsDataQueueLock);
+        Mutex::Autolock l(mAudioADEsDataQueueLock);
         clearPendingEsData(mAudioADEsDataQueue);
     }
     return AM_Dmx_SUCCESS;
@@ -582,19 +582,15 @@ AM_DmxErrorCode_t AmHwMultiDemuxWrapper::AmDemuxWrapperClose(void) {
     return AM_Dmx_SUCCESS;
 }
 
-void AmHwMultiDemuxWrapper::AmDemuxSetNotify(const sp<TSPMessage> & msg) {
-     mNotify = msg;
-}
-
 AM_DmxErrorCode_t AmHwMultiDemuxWrapper::queueEsData(List<mEsDataInfo*>& mEsDataQueue,mEsDataInfo *mEsData) {
-   // TSPMutex::Autolock l(mEsDataQueueLock);
+   // Mutex::Autolock l(mEsDataQueueLock);
     mEsDataQueue.push_back(mEsData);
     return AM_Dmx_SUCCESS;
 }
 
 mEsDataInfo* AmHwMultiDemuxWrapper::dequeueEsData(List<mEsDataInfo*>& mEsDataQueue) {
     //Mutex::Autolock autoLock(mPacketQueueLock);
-   //TSPMutex::Autolock l(mEsDataQueueLock);
+   //Mutex::Autolock l(mEsDataQueueLock);
     if (!mEsDataQueue.empty()) {
         mEsDataInfo *mEsData = *mEsDataQueue.begin();
         mEsDataQueue.erase(mEsDataQueue.begin());
@@ -604,7 +600,7 @@ mEsDataInfo* AmHwMultiDemuxWrapper::dequeueEsData(List<mEsDataInfo*>& mEsDataQue
 }
 
 AM_DmxErrorCode_t AmHwMultiDemuxWrapper::clearPendingEsData(List<mEsDataInfo*>& mEsDataQueue) {
-   // TSPMutex::Autolock l(mEsDataQueueLock);
+   // Mutex::Autolock l(mEsDataQueueLock);
     List<mEsDataInfo *>::iterator it = mEsDataQueue.begin();
     while (it != mEsDataQueue.end()) {
         mEsDataInfo *mEsData = *it;

@@ -6,7 +6,6 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
-#include <am_mem.h>
 #include <AmLinuxDvb.h>
 #include <AmDmx.h>
 #include <dmx.h>

@@ -1,8 +1,6 @@
 #ifndef AMDEMUX_WRAPPER_H
 #define AMDEMUX_WRAPPER_H
-//#include <VideodecWrapper.h>
-#include <Mutex.h>
-#include <TSPMessage.h>
+#include <inttypes.h>
 
 extern "C" {
 
@@ -105,15 +103,6 @@ public:
    virtual  AmDemuxWrapper* get(void) {
         return this;
    }
-   virtual void AmDemuxSetNotify(const sp<TSPMessage> & msg) {
-        (void) msg;
-   }
- //  virtual sp<TSPMessage> dupNotify() const { return mNotify->dup();}
-//protected:
-  // virtual sp<TSPMessage> dupNotify() const { return mNotify->dup();}
-  // sp<TSPMessage> mNotify;
-//private:
-   // sp<TSPMessage> mNotify;
 };
 
 #else
@@ -143,16 +132,8 @@ public:
    virtual  AmDemuxWrapper* get(void) {
         return this;
    }
-   virtual void AmDemuxSetNotify(const sp<TSPMessage> & msg) {
-        (void) msg;
    }
 
- //  virtual sp<TSPMessage> dupNotify() const { return mNotify->dup();}
-//protected:
-  // virtual sp<TSPMessage> dupNotify() const { return mNotify->dup();}
-  // sp<TSPMessage> mNotify;
-//private:
-   // sp<TSPMessage> mNotify;
 };
 #endif
 #endif

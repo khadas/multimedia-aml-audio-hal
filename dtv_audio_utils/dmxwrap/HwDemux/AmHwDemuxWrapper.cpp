@@ -14,7 +14,6 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
-#include <TSPMessage.h>
 #include <AmDemuxWrapper.h>
 #include <AmHwDemuxWrapper.h>
 #include <cutils/log.h>
@@ -398,7 +397,7 @@ AM_DmxErrorCode_t Inject_Stop(Am_DemuxWrapper_OpenPara_t **mpara)
 
 AmHwDemuxWrapper::AmHwDemuxWrapper() {
     ALOGE("%s at # %d\n",__FUNCTION__,__LINE__);
-    TSPMutex::Autolock l(mMutex);
+    Mutex::Autolock l(mMutex);
     mDmxDevNo = DMX_DEV_UNKNOWN;
     mDSCDevNo = DSC_DEV_UNKNOWN;
     mAvDevNo = AV_DEV_UNKNOWN;
@@ -416,7 +415,7 @@ AmHwDemuxWrapper::AmHwDemuxWrapper() {
 AmHwDemuxWrapper::~AmHwDemuxWrapper()
 {
     ALOGV("%s at # %d\n",__FUNCTION__,__LINE__);
-    TSPMutex::Autolock l(mMutex);
+    Mutex::Autolock l(mMutex);
 }
 
 AM_DmxErrorCode_t AmHwDemuxWrapper::AmDemuxWrapperOpen (
@@ -425,7 +424,7 @@ AM_DmxErrorCode_t AmHwDemuxWrapper::AmDemuxWrapperOpen (
 
     ALOGV("%s at # %d device_type %d\n",__FUNCTION__,__LINE__,para->device_type);
 
-    TSPMutex::Autolock l(mMutex);
+    Mutex::Autolock l(mMutex);
     AM_DmxErrorCode_t ret = AM_Dmx_SUCCESS;
     mPara.device_type = para->device_type ;
     if (para->device_type == (int )TS_FROM_MEMORY/*data from memory*/) {
@@ -451,7 +450,7 @@ AM_DmxErrorCode_t AmHwDemuxWrapper::AmDemuxWrapperOpen (
 AM_DmxErrorCode_t AmHwDemuxWrapper::AmDemuxWrapperSetTSSource(
                   Am_DemuxWrapper_OpenPara_t *para,const AM_DevSource_t src) {
     ALOGV("%s at # %d\n",__FUNCTION__,__LINE__);
-    TSPMutex::Autolock l(mMutex);
+    Mutex::Autolock l(mMutex);
     AM_DmxErrorCode_t ret = AM_Dmx_SUCCESS;
     (void) para;
     (void) src;

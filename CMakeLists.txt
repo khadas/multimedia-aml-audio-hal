@@ -74,10 +74,20 @@ endif()
 if(USE_DTV)
     list(APPEND DTV_FILES input/dtv_patch.c)
     list(APPEND DTV_FILES input/dtv_patch_utils.c)
-    list(APPEND DVB_AUDIO_INC ./dtv_audio_utils/sync)
     list(APPEND DVB_AUDIO_INC ./dtv_audio_utils/dmxwrap/MultiHwDemux)
-    list(APPEND DVB_AUDIO_LIBS -L./dtv_audio_utils -ldvbaudioutils)
-
+    list(APPEND DTV_FILES dtv_audio_utils/dmxwrap/AmDemuxWrapper.cpp)
+    list(APPEND DTV_FILES dtv_audio_utils/dmxwrap/HwDemux/AmHwDemuxWrapper.cpp)
+    list(APPEND DTV_FILES dtv_audio_utils/dmxwrap/MultiHwDemux/AmHwMultiDemuxWrapper.cpp)
+    list(APPEND DTV_FILES dtv_audio_utils/dmxwrap/MultiHwDemux/AmLinuxDvb.cpp)
+    list(APPEND DTV_FILES dtv_audio_utils/dmxwrap/MultiHwDemux/AmDmx.cpp)
+    list(APPEND DTV_FILES dtv_audio_utils/audio_data_read/dmx_audio_es.cpp)
+    list(APPEND DTV_FILES dtv_audio_utils/audio_data_read/uio_audio_read.c)
+    list(APPEND DVB_AUDIO_INC dtv_audio_utils)
+    list(APPEND DVB_AUDIO_INC dtv_audio_utils/include)
+    list(APPEND DVB_AUDIO_INC dtv_audio_utils/dmxwrap)
+    list(APPEND DVB_AUDIO_INC dtv_audio_utils/dmxwrap/HwDemux)
+    list(APPEND DVB_AUDIO_INC dtv_audio_utils/dmxwrap/MultiHwDemux)
+    list(APPEND DVB_AUDIO_INC dtv_audio_utils/audio_read_api)
     add_definitions(-DUSE_DTV)
 endif()
 
@@ -203,7 +213,6 @@ add_library(audio_hal SHARED
 	vendor_process/aml_audio_aec.c
 	${BASIC_UTILS_FILES}
 	${BASIC_CUTILS_FILES}
-	#rcaudio/audio_hal_thunks.cpp
     ${DTV_FILES}
     ${EQ_DRC_FILES}
 )
@@ -260,6 +269,15 @@ target_include_directories(audio_hal PRIVATE
 
 target_compile_options(audio_hal PRIVATE -D_GNU_SOURCE -DTV_AUDIO_OUTPUT -Wno-deprecated-declarations -funwind-tables -fasynchronous-unwind-tables -fPIC -g)
 
+if(USE_DTV)
+	target_include_directories(audio_hal PRIVATE
+		${DTV_INC}
+		${DVB_AUDIO_INC})
+	target_link_libraries(audio_hal
+		${DTV_LIBS}
+		${DVB_AUDIO_LIBS})
+endif()
+
 target_link_libraries(audio_hal
 	audioprocessing spdifenc ms12v2
 	-lcutils -lamaudioutils -llog -lexpat -lpthread -ldl -lstdc++ -lrt -Wl,-z,defs)
@@ -277,15 +295,6 @@ if(USE_EQ_DRC)
 		./aml_aq_hw/ini)
 	target_link_libraries(audio_hal ${PREBUILD_STATIC_LIBS})
 	target_compile_options(audio_hal PRIVATE -DAML_EQ_DRC)
-endif()
-
-if(USE_DTV)
-	target_include_directories(audio_hal PRIVATE
-		${DTV_INC}
-		${DVB_AUDIO_INC})
-	target_link_libraries(audio_hal
-		${DTV_LIBS}
-		${DVB_AUDIO_LIBS})
 endif()
 
 if(USE_MEDIA_INFO)

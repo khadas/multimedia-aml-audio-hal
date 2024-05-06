@@ -10,10 +10,10 @@
 #ifndef AMHWDEMUX_WRAPPER_H
 #define AMHWDEMUX_WRAPPER_H
 //#include <VideodecWrapper.h>
-#include "AmDemuxWrapper.h"
 #include <Mutex.h>
-#include <TSPMessage.h>
+#include "AmDemuxWrapper.h"
 
+using namespace android;
 extern "C" {
 
 }
@@ -140,8 +140,7 @@ public:
    virtual  AM_DmxErrorCode_t AmDemuxWrapperClose();
 
 private:
-   TSPMutex          mMutex;
-   mutable TSPMutex  mLock;
+   Mutex          mMutex;
    AM_DMX_DevNo_t mDmxDevNo;
    AM_DSC_DevNo_t mDSCDevNo;
    AM_AV_DevNo_t  mAvDevNo;

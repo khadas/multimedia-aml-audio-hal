@@ -1,6 +1,5 @@
 //#define printf_LEVEL 5
 
-//#include "am_mem.h"
 //#include <am_misc.h>
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AmLinuxDvb"
@@ -25,7 +24,6 @@
 #include <AmDmx.h>
 #include <sys/eventfd.h>
 #include <dmx.h>
-#include <TSPHandler.h>
 
 #include <inttypes.h>
 
@@ -329,7 +327,7 @@ int AmLinuxDvd::dvr_data_write(uint8_t *buf, int size,uint64_t timeout)
     int ret;
     int left = size;
     uint8_t *p = buf;
-    int64_t nowUs = TSPLooper::GetNowUs();
+    int64_t nowUs = systemTime(SYSTEM_TIME_MONOTONIC) / 1000ll;
     timeout *= 10;
     while (left > 0)
     {
@@ -350,7 +348,7 @@ int AmLinuxDvd::dvr_data_write(uint8_t *buf, int size,uint64_t timeout)
 
         left -= ret;
         p += ret;
-        if (TSPLooper::GetNowUs() - nowUs > timeout) {
+        if (systemTime(SYSTEM_TIME_MONOTONIC) / 1000ll - nowUs > timeout) {
             ALOGE("dvr_data_write timeout %" PRIu64 " \n",timeout);
             break;
         }

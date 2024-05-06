@@ -4,7 +4,6 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
-#include <TSPMessage.h>
 #include <AmDemuxWrapper.h>
 
 AmDemuxWrapper::AmDemuxWrapper() {

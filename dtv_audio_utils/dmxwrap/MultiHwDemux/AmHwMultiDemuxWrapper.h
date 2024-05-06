@@ -1,9 +1,12 @@
 #ifndef AM_HWMULTI_DEMUX_WRAPPER_H
 #define AM_HWMULTI_DEMUX_WRAPPER_H
 
-#include "RefBase.h"
+#include <List.h>
+#include <Mutex.h>
+#include <StrongPointer.h>
 #include "AmDemuxWrapper.h"
 
+using namespace android;
 
 namespace audio_dmx {
 #define ENV_DMX_LOW_MEM "LOW_MEM_PLATFORM"
@@ -48,15 +51,13 @@ public:
    virtual  AM_DmxErrorCode_t AmDemuxWrapperCloseMain() ;
    virtual  AM_DmxErrorCode_t AmDemuxWrapperStop(void);
    virtual  AM_DmxErrorCode_t AmDemuxWrapperClose(void);
-   virtual void AmDemuxSetNotify(const sp<TSPMessage> & msg);
-   virtual sp<TSPMessage> dupNotify() const { return mNotify->dup();}
    AM_DmxErrorCode_t queueEsData(List<mEsDataInfo*>& mEsDataQueue,mEsDataInfo *mEsData) ;
    mEsDataInfo* dequeueEsData(List<mEsDataInfo*>& mEsDataQueue);
    AM_DmxErrorCode_t clearPendingEsData(List<mEsDataInfo*>& mEsDataQueue);
-   TSPMutex mVideoEsDataQueueLock;
-   TSPMutex mAudioEsDataQueueLock;
-   TSPMutex mAudioADEsDataQueueLock;
-   TSPMutex mDemuxHandleLock;
+   Mutex mVideoEsDataQueueLock;
+   Mutex mAudioEsDataQueueLock;
+   Mutex mAudioADEsDataQueueLock;
+   Mutex mDemuxHandleLock;
    List<mEsDataInfo*> mVideoEsDataQueue;
    List<mEsDataInfo*> mAudioEsDataQueue;
    List<mEsDataInfo*> mAudioADEsDataQueue;
@@ -69,7 +70,6 @@ public:
    sp<AM_DMX_Device> AmDmxDevice;
    // int mEsDataInfoSize;
    Am_DemuxWrapper_OpenPara_t  mDemuxPara;
-   sp<TSPMessage> mNotify;
 };
 
 }

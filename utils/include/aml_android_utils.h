@@ -40,6 +40,7 @@ void aml_property_decrease(char *string, char *str2);
 int aml_sysfs_get_int(const char *path);
 int aml_sysfs_get_int16(const char *path, unsigned *value);
 int aml_sysfs_get_str(const char *path, char *buf, int count);
+unsigned long amsysfs_get_sysfs_ulong(const char *path);
 int aml_sysfs_set_int(const char *path, int value);
 int aml_sysfs_set_str(const char *path, const char *value);
 
