@@ -105,6 +105,7 @@ struct aml_heaac_parser {
     int32_t buf_remain;
     uint32_t status;
     struct audio_bit_parser bit_parser;
+    bool format_checked_flag;
 };
 
 int aml_heaac_parser_open(void **pparser_handle)
@@ -127,6 +128,7 @@ int aml_heaac_parser_open(void **pparser_handle)
     }
     parser_handle->status     = PARSER_SYNCING;
     parser_handle->buf_remain = 0;
+    parser_handle->format_checked_flag = 0;
     *pparser_handle = parser_handle;
     ALOGI("%s exit =%p", __func__, parser_handle);
     return 0;
@@ -158,6 +160,7 @@ int aml_heaac_parser_reset(void *parser_handle)
     if (heaac_parser_handle) {
         heaac_parser_handle->status = PARSER_SYNCING;
         heaac_parser_handle->buf_remain = 0;
+        heaac_parser_handle->format_checked_flag = 0;
     }
     ALOGI("%s exit", __func__);
     return 0;
@@ -1008,6 +1011,125 @@ static int parse_heaac_loas_frame_header(struct audio_bit_parser * bit_parser, c
     return 0;
 }
 
+/*
+ *  check the real aac format from the raw data
+ * return  0:adts  1:latm  -1: invalid aac format
+ */
+int aml_heaac_parser_sniff_format(const void *in_buffer, int32_t numBytes)
+{
+     int loas_sync_word_offset = -1, adts_sync_word_offset = -1, ret = 0;
+     struct heaac_parser_info loas_heaac_info = {0}, adts_heaac_info = {0};
+     struct audio_bit_parser bit_parser = {0};
+     if (numBytes < 8) {
+         ALOGE("invalid input data size %d", numBytes);
+         return -1;
+     }
+
+     int buffer_offset = 0;
+     while (!loas_heaac_info.is_loas) {
+        ret = seek_heaac_loas_sync_word((char*)in_buffer + buffer_offset, numBytes - buffer_offset);
+        if (ret != -1) {
+            buffer_offset += ret;
+            loas_sync_word_offset = buffer_offset;
+            if (numBytes - buffer_offset >= 8) {
+                ret = parse_heaac_loas_frame_header(&bit_parser, (const unsigned char *)in_buffer + buffer_offset, numBytes - buffer_offset, &loas_heaac_info);
+                if (ret != 0) {
+                    loas_heaac_info.is_loas = 0;
+                    buffer_offset++;
+                } else {
+                    ALOGI("sniff aac format loas success !!!");
+                    loas_heaac_info.is_loas = 1;
+                    break;
+                }
+            } else {
+               loas_heaac_info.is_loas = 0;
+               break;
+            }
+        } else {
+            loas_heaac_info.is_loas = 0;
+            break;
+        }
+     }
+
+     buffer_offset = 0;
+     while (!adts_heaac_info.is_adts) {
+        ret = seek_heaac_adts_sync_word((char*)in_buffer + buffer_offset, numBytes - buffer_offset);
+        if (ret != -1) {
+            buffer_offset += ret;
+            adts_sync_word_offset = buffer_offset;
+            if (numBytes - buffer_offset >= 8) {
+                ret = parse_heaac_adts_frame_header(&bit_parser, (const unsigned char *)in_buffer + buffer_offset, numBytes - buffer_offset, &adts_heaac_info);
+                if (ret != 0) {
+                    adts_heaac_info.is_adts = 0;
+                    buffer_offset++;
+                } else {
+                    //double check the adts frame
+                    if (adts_heaac_info.frame_size  < numBytes - buffer_offset - 2) {
+                        ret = seek_heaac_adts_sync_word((char*)in_buffer + buffer_offset + adts_heaac_info.frame_size, numBytes - buffer_offset - adts_heaac_info.frame_size);
+                        if (ret == 0) {
+                            ALOGI("sniff aac format adts success !!!");
+                            adts_heaac_info.is_adts = 1;
+                            break;
+                        } else {
+                            ALOGI("adts_heaac_info.frame_size %d data left %d ", adts_heaac_info.frame_size,  numBytes - buffer_offset);
+                            adts_heaac_info.is_adts = 0;
+                            buffer_offset++;
+                        }
+                    } else {
+                        adts_heaac_info.is_adts = 0;
+                        buffer_offset++;
+                    }
+                }
+            } else {
+                adts_heaac_info.is_adts = 0;
+                break;
+            }
+        } else {
+            adts_heaac_info.is_adts = 0;
+            break;
+        }
+
+    }
+
+    if (loas_heaac_info.is_loas == 0 && adts_heaac_info.is_adts == 0) {
+        if (loas_sync_word_offset == -1 && adts_sync_word_offset == -1) {
+            ALOGI("sniff aac format failed!!!");
+            return -1;
+        } else {
+           if (loas_sync_word_offset == -1) {
+                ALOGI("guess it is adts adts_sync_word_offset %d", adts_sync_word_offset);
+                return 0;
+           }
+           if (adts_sync_word_offset == -1) {
+                ALOGI("guess it is loas loas_sync_word_offset %d",loas_sync_word_offset);
+                return 1;
+           }
+           if (loas_sync_word_offset > adts_sync_word_offset) {
+               ALOGI("loas_sync_word_offset %d > adts_sync_word_offset %d  guess it is adts %d", loas_sync_word_offset, adts_sync_word_offset,__LINE__);
+               return 0;
+           } else {
+               ALOGI("loas_sync_word_offset %d < adts_sync_word_offset %d guess it is loas %d", loas_sync_word_offset, adts_sync_word_offset,__LINE__);
+               return 1;
+           }
+        }
+    } else if (loas_heaac_info.is_loas == 0 && adts_heaac_info.is_adts == 1) {
+        ALOGI("loas_sync_word_offset %d adts_sync_word_offset %d,guess it is adts %d", loas_sync_word_offset, adts_sync_word_offset,__LINE__);
+        return 0;
+    } else if (loas_heaac_info.is_loas == 1 && adts_heaac_info.is_adts == 0) {
+        ALOGI("loas_sync_word_offset %d adts_sync_word_offset %d,guess it is loas %d", loas_sync_word_offset, adts_sync_word_offset,__LINE__);
+        return 1;
+    } else if (loas_heaac_info.is_loas == 1 && adts_heaac_info.is_adts == 1) {
+        if (loas_sync_word_offset > adts_sync_word_offset) {
+            ALOGI("loas_sync_word_offset %d > adts_sync_word_offset %d  guess it is adts %d", loas_sync_word_offset, adts_sync_word_offset,__LINE__);
+            return 0;
+        } else {
+            ALOGI("loas_sync_word_offset %d < adts_sync_word_offset %d guess it is loas %d", loas_sync_word_offset, adts_sync_word_offset,__LINE__);
+            return 1;
+        }
+    }
+    ALOGW("cost numBytes %d do not find aac frame header !!!", numBytes);
+    return -1;
+}
 
 int aml_heaac_parser_process(void *parser_handle, const void *in_buffer, int32_t numBytes, int32_t *used_size, const void **output_buf, int32_t *out_size, struct heaac_parser_info * heaac_info)
 {
@@ -1043,13 +1165,28 @@ int aml_heaac_parser_process(void *parser_handle, const void *in_buffer, int32_t
     parser_buf = heaac_parser_handle->buf;
     buf_left   = numBytes;
     *used_size = 0;
-    bool is_loas = false;
-    bool is_adts = false;
+    bool is_loas = 0;
+    bool is_adts = 0;
+    if (!heaac_parser_handle->format_checked_flag) {
+        ret = aml_heaac_parser_sniff_format(in_buffer, numBytes);
+        if (ret != -1) {
+            if (ret == 0) {
+                heaac_info->is_loas = 0;
+                heaac_info->is_adts = 1;
+            }
+            if (ret == 1) {
+                heaac_info->is_loas = 1;
+                heaac_info->is_adts = 0;
+            }
+            heaac_parser_handle->format_checked_flag = 1;
+        }
+    }
 resync:
     is_loas = heaac_info->is_loas;
     is_adts = heaac_info->is_adts;
     if (heaac_info->debug_print) {
-        ALOGI("%s input buf size %d status %d is_loas %d is_adts %d\n", __func__, numBytes, heaac_parser_handle->status, is_loas, is_adts);
+        ALOGI("%s input buf size %d status %d is_loas %d is_adts %d heaac_parser_handle->buf_remain %d format_checked %d\n", __func__,
+            numBytes, heaac_parser_handle->status, is_loas, is_adts, heaac_parser_handle->buf_remain, heaac_parser_handle->format_checked_flag);
     }
     /*we need at least HEAAC_HEADER_SIZE bytes*/
     if (heaac_parser_handle->buf_remain < HEAAC_HEADER_SIZE) {
@@ -1082,11 +1219,18 @@ resync:
                     ALOGD("%s line %d sync_word_offset %d", __func__, __LINE__, sync_word_offset);
                     if (sync_word_offset >= 0) {
                         ALOGD("%s line %d frame 4bytes 0x%x 0x%x 0x%x 0x%x\n",
-                            __func__, __LINE__, buffer[sync_word_offset], buffer[sync_word_offset + 1], buffer[sync_word_offset + 2], buffer[sync_word_offset + 3]);
+                            __func__, __LINE__, parser_buf[sync_word_offset], parser_buf[sync_word_offset + 1], parser_buf[sync_word_offset + 2], parser_buf[sync_word_offset + 3]);
                     }
                 }
             } else if (is_adts) {
                 sync_word_offset = seek_heaac_adts_sync_word((char*)parser_buf, heaac_parser_handle->buf_remain);
+                if (heaac_info->debug_print) {
+                    ALOGD("%s line %d sync_word_offset %d", __func__, __LINE__, sync_word_offset);
+                    if (sync_word_offset >= 0) {
+                        ALOGD("%s line %d frame 4bytes 0x%x 0x%x 0x%x 0x%x\n",
+                            __func__, __LINE__, parser_buf[sync_word_offset], parser_buf[sync_word_offset + 1], parser_buf[sync_word_offset + 2], parser_buf[sync_word_offset + 3]);
+                    }
+                }
             }
             /*if we don't find the header in period bytes, move the last 1 bytes to header*/
             if (sync_word_offset < 0) {
@@ -1147,6 +1291,13 @@ resync:
         }
     } else if (is_adts) {
         sync_word_offset = seek_heaac_adts_sync_word((char*)parser_buf, heaac_parser_handle->buf_remain);
+        if (heaac_info->debug_print) {
+            ALOGD("%s line %d sync_word_offset %d", __func__, __LINE__, sync_word_offset);
+            if (sync_word_offset >= 0) {
+                ALOGD("%s line %d frame 4bytes 0x%x 0x%x 0x%x 0x%x\n",
+                    __func__, __LINE__, parser_buf[sync_word_offset], parser_buf[sync_word_offset + 1], parser_buf[sync_word_offset + 2], parser_buf[sync_word_offset + 3]);
+            }
+        }
     }
 
     if (sync_word_offset != 0) {
@@ -1180,8 +1331,23 @@ resync:
             }
         }
 #endif
+    if (ret != 0) {
+         heaac_parser_handle->format_checked_flag = 0;
+         heaac_parser_handle->buf_remain = 0;
+         heaac_parser_handle->status = PARSER_SYNCING;
+         heaac_info->is_loas = 0;
+         goto error;
+    }
+
     } else if (is_adts) {
         ret = parse_heaac_adts_frame_header(&heaac_parser_handle->bit_parser, parser_buf, heaac_parser_handle->buf_remain, heaac_info);
+        if (ret != 0) {
+            heaac_parser_handle->format_checked_flag = 0;
+            heaac_parser_handle->buf_remain = 0;
+            heaac_parser_handle->status = PARSER_SYNCING;
+            heaac_info->is_adts = 0;
+            goto error;
+        }
     }
 
     /*check whether the input data has a complete heaac frame*/
@@ -1191,7 +1357,7 @@ resync:
         if (is_loas && heaac_info->frame_size > 0) {
             if (buf_left >= (heaac_info->frame_size - heaac_parser_handle->buf_remain)) {
                 buf_offset += (heaac_info->frame_size - heaac_parser_handle->buf_remain);
-                if (buf_offset > numBytes) {
+                if (buf_offset >= numBytes) {
                    buf_left = 0;
                    *used_size = numBytes;
                 } else {
@@ -1208,6 +1374,8 @@ resync:
     frame_size = heaac_info->frame_size;
 
     /*we have a complete payload*/
+    if (heaac_info->debug_print)
+        ALOGI("buf_remain %d buf_left %d frame_size %d",heaac_parser_handle->buf_remain, buf_left, frame_size);
     if ((heaac_parser_handle->buf_remain + buf_left) >= frame_size) {
         need_size = frame_size - (heaac_parser_handle->buf_remain);
         if (need_size >= 0) {
@@ -1275,7 +1443,7 @@ resync:
         goto error;
     }
     if (heaac_info->debug_print) {
-        ALOGD("%s line %d parser_handle %p return success!\n", __func__, __LINE__, heaac_parser_handle);
+        ALOGD("%s line %d parser_handle %p used %d return success!\n", __func__, __LINE__, heaac_parser_handle, *used_size);
     }
     return 0;
 

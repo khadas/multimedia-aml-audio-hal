@@ -469,13 +469,13 @@ static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
                 }
             }
             aml_out->heaac_info.debug_print = adev->debug_flag;
-            if (audio_format == AUDIO_FORMAT_AAC_LATM || audio_format == AUDIO_FORMAT_HE_AAC_V1) {
+            /*if (audio_format == AUDIO_FORMAT_AAC_LATM || audio_format == AUDIO_FORMAT_HE_AAC_V1) {
                 aml_out->heaac_info.is_loas = 1;
                 aml_out->heaac_info.is_adts = 0;
             } else if (audio_format == AUDIO_FORMAT_AAC || audio_format == AUDIO_FORMAT_HE_AAC_V2) {
                 aml_out->heaac_info.is_loas = 0;
                 aml_out->heaac_info.is_adts = 1;
-            }
+            }*/
 
             ret = aml_heaac_parser_process(aml_out->heaac_parser_handle,
                                        in_buf,
@@ -493,8 +493,16 @@ static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
             int sample_rate;
             int channels;
             int sample_size = aml_out->heaac_info.frame_size;
+            if (aml_out->heaac_info.is_loas) {
+                aml_out->hal_internal_format = AUDIO_FORMAT_HE_AAC_V1;
+                aml_out->hal_format = AUDIO_FORMAT_HE_AAC_V1;
+            }
+            if (aml_out->heaac_info.is_adts) {
+                 aml_out->hal_internal_format = AUDIO_FORMAT_HE_AAC_V2;
+                 aml_out->hal_format = AUDIO_FORMAT_HE_AAC_V2;
+            }
 
-            if (audio_format == AUDIO_FORMAT_AAC_LATM || audio_format == AUDIO_FORMAT_HE_AAC_V1) {
+            if (aml_out->hal_format == AUDIO_FORMAT_AAC_LATM || aml_out->hal_format == AUDIO_FORMAT_HE_AAC_V1) {
                 sample_rate = aml_out->heaac_info.sampleRateHz;
                 channels = aml_out->heaac_info.channel_mask;
                 //aac_info.samples = 2048;
@@ -506,10 +514,10 @@ static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
             }
 
             AM_LOGI_IF(adev->debug_flag, "out_size %d in_size %d used_size %d, dur %x,"
-                        " framesize:%d, sample_rate:%d, channel_mask:%d, sampleRateHz:%d, channelCount:%d, numSubframes:%d",
+                        " framesize:%d, sample_rate:%d, channel_mask:%d, sampleRateHz:%d, channelCount:%d, numSubframes:%d, fmt %x",
                         *out_size, in_size, *used_size, *frame_dur,
                         aml_out->heaac_info.frame_size, aml_out->heaac_info.sample_rate, aml_out->heaac_info.channel_mask,
-                        aml_out->heaac_info.sampleRateHz, aml_out->heaac_info.channelCount, aml_out->heaac_info.numSubframes);
+                        aml_out->heaac_info.sampleRateHz, aml_out->heaac_info.channelCount, aml_out->heaac_info.numSubframes, aml_out->hal_format);
 
         } else {// no parser
         *output_buf = in_buf;
