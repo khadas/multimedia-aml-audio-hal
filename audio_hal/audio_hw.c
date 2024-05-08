@@ -8146,6 +8146,8 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
             AM_LOGI_IF(adev->debug_flag, "After parser in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%"PRId32") b_pts_valid(%d) pts(%"PRIu64"ms) dur %d",
                 parser_in_buf, abuffer_out.buffer, *p, *(p+1),
                 *(p+2),*(p+3),abuffer_out.size, abuffer_out.b_pts_valid, abuffer_out.pts/90, frame_duration);
+            if (patch)
+                patch->in_read_frame_size = abuffer_out.size;
 
             if (eDolbyMS12Lib == adev->dolby_lib_type) {
                 return_bytes = aml_audio_ms12_render(stream, &abuffer_out);

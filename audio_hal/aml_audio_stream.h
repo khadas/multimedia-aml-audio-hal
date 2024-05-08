@@ -305,6 +305,7 @@ struct aml_audio_patch {
     audio_devices_t input_src;
     audio_format_t  aformat;
     int input_sample_rate;
+    int in_read_frame_size;
     audio_channel_mask_t chanmask;
     audio_channel_mask_t in_chanmask;
     int in_sample_rate;
