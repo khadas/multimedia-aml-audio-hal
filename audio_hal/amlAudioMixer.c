@@ -1775,7 +1775,7 @@ ssize_t out_write_direct_pcm(struct audio_stream_out *stream, const void *buffer
     uint64_t us_since_last_write = 0;
     //uint64_t begin_time, end_time;
     ssize_t written = 0;
-    size_t remain = 0;
+    ssize_t remain = 0;
     int frame_size = 4;
     int64_t throttle_timeus = 0;//aml_audio_get_throttle_timeus(bytes);
 
