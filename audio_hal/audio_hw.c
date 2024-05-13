@@ -8210,7 +8210,7 @@ ssize_t mixer_aux_buffer_write(struct audio_stream_out *stream, struct audio_buf
         aml_out->status = STREAM_MIXING;
     }
 
-    if (aml_out->standby && eDolbyMS12Lib == adev->dolby_lib_type) {
+    if (aml_out->standby) {
         ALOGI("%s(), standby to unstandby", __func__);
         aml_out->audio_data_handle_state = AUDIO_DATA_HANDLE_START;
         aml_out->standby = false;

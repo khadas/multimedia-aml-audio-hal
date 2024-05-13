@@ -1470,6 +1470,7 @@ int aml_audio_data_handle(struct audio_stream_out *stream, const void* buffer, s
                     out->audio_data_handle_state = AUDIO_DATA_HANDLE_FINISHED;
                 }
                 break;
+            case AUDIO_DATA_HANDLE_NONE:
             case AUDIO_DATA_HANDLE_FINISHED:
                 out->audio_data_handle_state = AUDIO_DATA_HANDLE_FINISHED;
                 ALOGD("%s  handle finished", __func__);
