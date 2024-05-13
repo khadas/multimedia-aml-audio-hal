@@ -10713,7 +10713,9 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
     //set msync log level
     log_set_level(AVS_LOG_INFO);
 
-    adev->hdmitx_src = aml_get_jason_int_value("HDMITX_Src_Select", -1);
+    adev->hdmitx_multi_ch_src = aml_get_jason_int_value("HDMITX_Multi_CH_Src_Select", -1);
+    adev->hdmitx_hbr_src      = aml_get_jason_int_value("HDMITX_HBR_Src_Select", -1);
+    adev->hdmitx_src          = aml_get_jason_int_value("HDMITX_Src_Select", -1);
     if (adev->hdmitx_src != -1) {
         adev->spdif_independent = true;
     }

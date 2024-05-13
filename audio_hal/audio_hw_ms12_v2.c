@@ -2688,7 +2688,7 @@ int mat_bitstream_output(void *buffer, void *priv_data, size_t size)
         pthread_mutex_lock(&adev->ms12.bitstream_a_lock);
         bitstream_out = &ms12->bitstream_out[BITSTREAM_OUTPUT_A];
     }
-    ret = aml_ms12_spdif_output_new(stream_out, bitstream_out, output_format, output_format, DDP_OUTPUT_SAMPLE_RATE, 2, AUDIO_CHANNEL_OUT_STEREO, buffer, size);
+    ret = aml_ms12_spdif_output_new(stream_out, bitstream_out, output_format, output_format, DDP_OUTPUT_SAMPLE_RATE, 8, AUDIO_CHANNEL_OUT_7POINT1, buffer, size);
     if (bitstream_id == BITSTREAM_OUTPUT_A) {
         pthread_mutex_unlock(&adev->ms12.bitstream_a_lock);
     }

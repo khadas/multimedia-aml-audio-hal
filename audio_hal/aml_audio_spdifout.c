@@ -92,10 +92,16 @@ static int select_digital_device(struct spdifout_handle *phandle) {
             } else {
                 /*for ddp, we need use spdif_b, then select hdmi to spdif_b, then spdif can output dd*/
                 device_id = DIGITAL_DEVICE2;
+                if (phandle->audio_format == AUDIO_FORMAT_MAT && aml_dev->hdmitx_hbr_src >= AML_TDM_A_TO_HDMITX) {
+                    device_id = TDM_DEVICE;
+                }
             }
         } else {
             /*defaut we only use spdif_a to output spdif/hdmi*/
             device_id = DIGITAL_DEVICE;
+            if (phandle->audio_format == AUDIO_FORMAT_MAT && aml_dev->hdmitx_hbr_src >= AML_TDM_A_TO_HDMITX) {
+                device_id = TDM_DEVICE;
+            }
         }
         if (audio_is_linear_pcm(phandle->audio_format)) {
             if (phandle->channel_mask == AUDIO_CHANNEL_OUT_5POINT1 || phandle->channel_mask == AUDIO_CHANNEL_OUT_7POINT1)
@@ -377,6 +383,9 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
         memset(&device_config, 0, sizeof(aml_device_config_t));
         /*config stream info*/
         stream_config.config.channel_mask = spdif_config->channel_mask;
+        if (spdif_config->data_ch == 8 && spdif_config->rate == 192000 && !(aml_dev->hdmitx_hbr_src >= AML_TDM_A_TO_HDMITX)) {
+            stream_config.config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+        }
         /*earc only supports 8 channel multi channel, if the channel is not 2 and 8, we need convert it to 8 channel*/
         if (EARC_DEVICE == device_id) {
             if (spdif_config->data_ch == 2 || spdif_config->data_ch == 8) {
@@ -395,7 +404,7 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
 
         } else if (TDM_DEVICE == device_id) {
             /* MC PCM output from MS12 is hard coded to 8ch */
-            if (spdif_config->data_ch == 8) {
+            if (spdif_config->data_ch == 8 && phandle->audio_format != AUDIO_FORMAT_MAT) {
                 phandle->post_process_type = MC_POST_PROCESS_COMPACT_CHANNEL;
             }
         }
@@ -417,17 +426,24 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
         /*set spdif format*/
         if (phandle->spdif_port == PORT_SPDIF) {
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_FORMAT, aml_spdif_format);
-            ALOGI("%s set spdif format 0x%x", __func__, aml_spdif_format);
+            AM_LOGI("set spdif format 0x%x", aml_spdif_format);
         } else if (phandle->spdif_port == PORT_I2S2HDMI) {
+            enum AML_SRC_TO_HDMITX hdmitx_src = AML_TDM_B_TO_HDMITX;
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_I2S2HDMI_FORMAT, aml_spdif_format);
-            aml_audio_select_spdif_to_hdmi(AML_TDM_C_TO_HDMITX);
+            if (aml_spdif_format = AML_TRUE_HD && aml_dev->hdmitx_hbr_src >= AML_TDM_A_TO_HDMITX)
+                hdmitx_src = aml_dev->hdmitx_hbr_src;
+            else if (aml_spdif_format = AML_MULTI_CH_LPCM && aml_dev->hdmitx_multi_ch_src >= AML_TDM_A_TO_HDMITX)
+                hdmitx_src = aml_dev->hdmitx_multi_ch_src;
+            else
+                AM_LOGW("invalid format %d for I2S to HDMITX", aml_spdif_format);
+            aml_audio_select_spdif_to_hdmi(hdmitx_src);
             phandle->restore_hdmitx_selection = 1;
-            ALOGI("%s set i2s to hdmi format 0x%x", __func__, aml_spdif_format);
+            AM_LOGI("set i2s: %d to hdmi format 0x%x", hdmitx_src - AML_TDM_A_TO_HDMITX, aml_spdif_format);
         } else if (phandle->spdif_port == PORT_SPDIFB) {
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_SPDIF_B_FORMAT, aml_spdif_format);
             aml_audio_select_spdif_to_hdmi(AML_SPDIF_B_TO_HDMITX);
             phandle->restore_hdmitx_selection = 1;
-            ALOGI("%s set spdif_b format 0x%x", __func__, aml_spdif_format);
+            AM_LOGI("set spdif_b format 0x%x", aml_spdif_format);
         } else if (phandle->spdif_port == PORT_EARC) {
 
             if (aml_arc_format == AML_AUDIO_CODING_TYPE_DTS && spdif_config->is_dtscd) {

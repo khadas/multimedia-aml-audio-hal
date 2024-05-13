@@ -20,6 +20,7 @@
 
 /* number of periods for low power playback */
 #define PLAYBACK_PERIOD_COUNT                           (4)
+#define PLAYBACK_PERIOD_COUNT_16                        (16)
 /* number of periods for capture */
 #define CAPTURE_PERIOD_COUNT                            (4)
 #define OUTPUT_BUFFER_SIZE                              (6 * 1024)

@@ -807,8 +807,13 @@ int aml_alsa_output_open_new(void **handle, aml_stream_config_t * stream_config,
     format = stream_config->config.offload_info.format;
     channels = audio_channel_count_from_out_mask(stream_config->config.channel_mask);
     rate     = stream_config->config.sample_rate;
-    get_hardware_config_parameters(config, format, adev->default_alsa_ch/*channels*/, rate, platform_is_tv,
-                stream_config->config.format == AUDIO_FORMAT_IEC61937, adev->game_mode);
+    if (audio_is_linear_pcm(format)) {
+        get_hardware_config_parameters(config, format, adev->default_alsa_ch, rate, platform_is_tv,
+                    stream_config->config.format == AUDIO_FORMAT_IEC61937, adev->game_mode);
+    } else {
+        get_hardware_config_parameters(config, format, channels, rate, platform_is_tv,
+                    stream_config->config.format == AUDIO_FORMAT_IEC61937, adev->game_mode);
+    }
 
     config->channels = channels;
     config->rate     = rate;

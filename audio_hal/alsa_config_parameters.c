@@ -60,24 +60,28 @@ static void get_dts_hd_hardware_config_parameters(
 */
 static void get_mat_hardware_config_parameters(
     struct pcm_config *hardware_config
-    , unsigned int channels __unused
+    , unsigned int channels
     , unsigned int rate
     , bool is_iec61937_input)
 {
-    hardware_config->channels = 2;
+    hardware_config->channels = channels;
     hardware_config->format = PCM_FORMAT_S16_LE;
     // for android P, p212 platform found that the rate should not muliply by 4
     hardware_config->rate = rate;
     hardware_config->period_count = PLAYBACK_PERIOD_COUNT;
     //hardware_config->period_size = PERIOD_SIZE /* * 4 */;
     if (is_iec61937_input) {
-        hardware_config->period_size = 6144 * 4; /* period_size in frame unit, MAT IEC61937 frame size (61440) bytes */
+        hardware_config->period_size = 6144 * 2; /* period_size in frame unit, MAT IEC61937 frame size (61440) bytes */
         hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count/4*3;
     } else {
-        hardware_config->period_size = 6144 * 2; /* period_size in frame unit, MAT IEC61937 frame size (61440) bytes */
+        if (channels == 8) {
+            hardware_config->period_count = PLAYBACK_PERIOD_COUNT_16;
+            hardware_config->period_size = 1024;
+        } else {
+            hardware_config->period_size = 6144 * 2; /* period_size in frame unit, MAT IEC61937 frame size (61440) bytes */
+        }
         hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count/2;
     }
-
     hardware_config->avail_min = 0;
 
     return ;
@@ -199,8 +203,7 @@ int get_hardware_config_parameters(
     }
     //MAT
     else if (output_format == AUDIO_FORMAT_MAT) {
-        get_mat_hardware_config_parameters(final_config, 2, rate, is_iec61937_input);
-
+        get_mat_hardware_config_parameters(final_config, channels, rate, is_iec61937_input);
     }
     //DTS-HD/TRUE-HD
     else if ((output_format == AUDIO_FORMAT_DTS_HD) || (output_format == AUDIO_FORMAT_DOLBY_TRUEHD)) {
