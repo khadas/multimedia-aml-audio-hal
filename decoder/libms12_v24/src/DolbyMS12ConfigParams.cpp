@@ -135,7 +135,7 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
 
     //HE-AAC SWITCHES
     , mAssocInstance(0)/* Error restricting associated instance to 2 channels (-as: 0,1), -as 0 will make HEAAC can handle 6ch. */
-    , mDefDialnormVal(108)
+    , mDefDialnormVal(92)
     , mDualMonoreproductionMode(0)
     , mAribChannelMappingFlag(0)
 

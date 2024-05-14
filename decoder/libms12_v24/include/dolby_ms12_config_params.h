@@ -455,7 +455,7 @@ void dolby_ms12_set_heaac_associated_instance_restricted_to_2channels(int val);
 
 /**
  * @brief [he-aac] Default dialnorm value (dB/4)
- * 0 - 127; Default = 108 (-27dB)
+ * 0 - 127; Default = 92 (-23dB)
  */
 void dolby_ms12_set_heaac_default_dialnorm_value(int val);
 

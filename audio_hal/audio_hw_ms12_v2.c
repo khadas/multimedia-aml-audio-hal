@@ -706,6 +706,14 @@ void dynamic_set_dap_drc_parameters(struct dolby_ms12_desc *ms12, unsigned int m
     if (aml_audio_get_drc_mode(&drc_mode, &drc_cut, &drc_boost, mode_control) == 0) {
         dolby_ms12_dap_drc_mode = (drc_mode == DDPI_UDC_COMP_LINE) ? DOLBY_DRC_LINE_MODE : DOLBY_DRC_RF_MODE;
     }
+    /*
+     * if main input is hdmi-in/dtv/other-source PCM
+     * would not go through the DRC processing
+     * DRC LineMode means to bypass DRC processing.
+     */
+    if (audio_is_linear_pcm(ms12->main_input_fmt)) {
+        dolby_ms12_dap_drc_mode = DOLBY_DRC_LINE_MODE;
+    }
     set_ms12_drc_boost_value(ms12, drc_boost);
     set_ms12_drc_cut_value(ms12, drc_cut);
 #ifdef MS12_V26_ENABLE
@@ -1360,6 +1368,9 @@ int dolby_ms12_main_process(
 
         /* dynamically set the drc parameters mode/cut/boost */
         dynamic_set_dolby_ms12_drc_parameters(ms12, adev->decoder_drc_control);
+        if (ms12->output_config & MS12_OUTPUT_MASK_DAP) {
+            dynamic_set_dap_drc_parameters(ms12, adev->dap_drc_control);
+        }
     }
     pthread_mutex_unlock(&ms12->lock);
     pthread_mutex_lock(&ms12->main_lock);
