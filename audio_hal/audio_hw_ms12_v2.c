@@ -1056,7 +1056,7 @@ int get_the_dolby_ms12_prepared(
             , adev->default_alsa_ch
             , ms12->output_samplerate
             , out->is_tv_platform
-            , continuous_mode(adev)
+            , false
             , adev->game_mode);
 
         if (continuous_mode(adev)) {
@@ -2028,7 +2028,7 @@ int mat_bypass_process(struct audio_stream_out *stream, const void *buffer, size
     struct dolby_ms12_desc *ms12 = &(adev->ms12);
     struct bitstream_out_desc *bitstream_out = &ms12->bitstream_out[BITSTREAM_OUTPUT_A];
     bool is_mat = (aml_out->hal_internal_format == AUDIO_FORMAT_MAT);
-    audio_format_t output_format = AUDIO_FORMAT_IEC61937; //suppose MAT encoder always output IEC61937 format.
+    audio_format_t output_format = aml_out->hal_format;
     ALOGV("output_format=0x%x hal_format=0x%#x internal=0x%x, ms12->is_bypass_ms12 = ", output_format, aml_out->hal_format, aml_out->hal_internal_format, is_ms12_passthrough(stream));
     //audio_format_t hal_internal_format = ms12_get_audio_hal_format(aml_out->hal_internal_format);
     /*

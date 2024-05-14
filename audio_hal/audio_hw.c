@@ -2668,8 +2668,9 @@ int start_input_stream(struct aml_stream_in *in)
     port = select_port_by_device(in);
     /* check to update alsa device by port */
     alsa_device = alsa_device_update_pcm_index(port, CAPTURE);
-    ALOGD("*%s, open alsa_card(%d %d) alsa_device(%d), in_device:0x%x\n",
-        __func__, card, port, alsa_device, adev->in_device);
+    in->config.stop_threshold = in->config.period_size * in->config.period_count;
+    AM_LOGD("open alsa_card(%d %d) alsa_device(%d), in_device:0x%x, period_size(%d), period_count(%d), stop_threshold(%d)\n",
+        card, port, alsa_device, adev->in_device, in->config.period_size, in->config.period_count, in->config.stop_threshold);
 
     in->pcm = pcm_open(card, alsa_device, PCM_IN | PCM_MONOTONIC | PCM_NONEBLOCK, &in->config);
     if (!pcm_is_ready(in->pcm)) {
@@ -2678,7 +2679,7 @@ int start_input_stream(struct aml_stream_in *in)
         adev->active_input = NULL;
         return -ENOMEM;
     }
-    ALOGD("pcm_open in: card(%d), port(%d)", card, port);
+    AM_LOGD("pcm_open in: card(%d), port(%d)", card, port);
 
     if (in->requested_rate != in->config.rate) {
         ret = add_in_stream_resampler(in);

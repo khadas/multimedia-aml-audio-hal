@@ -175,7 +175,7 @@ int aml_alsa_output_open(struct audio_stream_out *stream) {
                 , adev->default_alsa_ch/*audio_channel_count_from_out_mask(aml_out->hal_channel_mask)*/
                 , aml_out->config.rate
                 , aml_out->is_tv_platform
-                , continuous_mode(adev)
+                , false
                 , adev->game_mode);
             switch (output_format) {
                 case AUDIO_FORMAT_E_AC3:
@@ -804,13 +804,11 @@ int aml_alsa_output_open_new(void **handle, aml_stream_config_t * stream_config,
     }
 
     config = &alsa_handle->config;
-    if (stream_config->config.format == AUDIO_FORMAT_IEC61937) {
-        format = stream_config->config.offload_info.format;
-    }
+    format = stream_config->config.offload_info.format;
     channels = audio_channel_count_from_out_mask(stream_config->config.channel_mask);
     rate     = stream_config->config.sample_rate;
     get_hardware_config_parameters(config, format, adev->default_alsa_ch/*channels*/, rate, platform_is_tv,
-                continuous_mode(adev), adev->game_mode);
+                stream_config->config.format == AUDIO_FORMAT_IEC61937, adev->game_mode);
 
     config->channels = channels;
     config->rate     = rate;
@@ -910,9 +908,9 @@ size_t aml_alsa_output_write_new(void *handle, const void *buffer, size_t bytes)
     alsa_handle = (alsa_handle_t *)handle;
     struct aml_audio_device *adev = (struct aml_audio_device *)adev_get_handle();
     int debug_enable = aml_audio_get_alsa_debug();
-    if (alsa_handle->pcm == NULL || alsa_handle == NULL || buffer == NULL || bytes == 0) {
-        ALOGW("[%s:%d] invalid param, pcm:%p, alsa_handle:%p, buffer:%p, bytes:%zu",
-            __func__, __LINE__, alsa_handle->pcm, alsa_handle, buffer, bytes);
+    if (alsa_handle == NULL || alsa_handle->pcm == NULL || buffer == NULL || bytes == 0) {
+        AM_LOGE("invalid param, alsa_handle:%p, pcm:%p, buffer:%p, bytes:%zu",
+            alsa_handle, alsa_handle?alsa_handle->pcm:0, buffer, bytes);
         return -1;
     }
 #if 0
@@ -944,11 +942,12 @@ size_t aml_alsa_output_write_new(void *handle, const void *buffer, size_t bytes)
         }
     }
 #endif
+
     {
         struct snd_pcm_status status;
         pcm_ioctl(alsa_handle->pcm, SNDRV_PCM_IOCTL_STATUS, &status);
-        if (status.state == PCM_STATE_XRUN) {
-            ALOGW("[%s:%d] format =0x%x alsa underrun", __func__, __LINE__, alsa_handle->format);
+        if (status.state != PCM_STATE_RUNNING) {
+            AM_LOGW("format =0x%x alsa underrun(%d), state(%d)", alsa_handle->format, status.state==PCM_STATE_XRUN, status.state);
         }
     }
     if (aml_audio_property_get_bool(ALSA_DUMP_PROPERTY, false)) {
@@ -973,7 +972,7 @@ size_t aml_alsa_output_write_new(void *handle, const void *buffer, size_t bytes)
     if (debug_enable || (alsa_handle->write_cnt % 1000) == 0) {
         snd_pcm_sframes_t frames = 0;
         ret = pcm_ioctl(alsa_handle->pcm, SNDRV_PCM_IOCTL_DELAY, &frames);
-        ALOGI("alsa format =0x%x delay frames =%ld total frames=%"PRIu64"", alsa_handle->format, frames, alsa_handle->write_frames);
+        ALOGI("alsa format =0x%x delay frames =%ld total frames=%"PRIu64" write_bytes=%zu write_frame=%d", alsa_handle->format, frames, alsa_handle->write_frames, bytes, pcm_bytes_to_frames(alsa_handle->pcm, bytes));
     }
 
 #if 0

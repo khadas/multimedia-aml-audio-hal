@@ -400,7 +400,7 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
             }
         }
         stream_config.config.sample_rate  = spdif_config->rate;
-        stream_config.config.format       = AUDIO_FORMAT_IEC61937;
+        stream_config.config.format       = spdif_config->audio_format;
         stream_config.config.offload_info.format = audio_format;
 
         device_config.device_port = alsa_device_get_port_index(device_id);

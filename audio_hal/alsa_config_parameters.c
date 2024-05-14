@@ -61,7 +61,8 @@ static void get_dts_hd_hardware_config_parameters(
 static void get_mat_hardware_config_parameters(
     struct pcm_config *hardware_config
     , unsigned int channels __unused
-    , unsigned int rate)
+    , unsigned int rate
+    , bool is_iec61937_input)
 {
     hardware_config->channels = 2;
     hardware_config->format = PCM_FORMAT_S16_LE;
@@ -69,8 +70,14 @@ static void get_mat_hardware_config_parameters(
     hardware_config->rate = rate;
     hardware_config->period_count = PLAYBACK_PERIOD_COUNT;
     //hardware_config->period_size = PERIOD_SIZE /* * 4 */;
-    hardware_config->period_size = 6144 * 2; /* period_size in frame unit, MAT IEC61937 frame size (61440) bytes */
-    hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count/2;
+    if (is_iec61937_input) {
+        hardware_config->period_size = 6144 * 4; /* period_size in frame unit, MAT IEC61937 frame size (61440) bytes */
+        hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count/4*3;
+    } else {
+        hardware_config->period_size = 6144 * 2; /* period_size in frame unit, MAT IEC61937 frame size (61440) bytes */
+        hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count/2;
+    }
+
     hardware_config->avail_min = 0;
 
     return ;
@@ -82,20 +89,15 @@ static void get_mat_hardware_config_parameters(
 static void get_ddp_hardware_config_parameters(
     struct pcm_config *hardware_config
     , unsigned int channels __unused
-    , unsigned int rate
-    , bool continuous_mode)
+    , unsigned int rate)
 {
     hardware_config->channels = 2;
     hardware_config->format = PCM_FORMAT_S16_LE;
     hardware_config->rate = rate /* * 4 */;
     hardware_config->period_count = PLAYBACK_PERIOD_COUNT;
-    if (continuous_mode) {
-        hardware_config->period_size = PERIOD_SIZE * 4 * 2;
-        hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 4;
-    } else {
-        hardware_config->period_size = PERIOD_SIZE * 4;
-        hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 2;
-    }
+    hardware_config->period_size = PERIOD_SIZE * 4 * 2;
+    hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 4;
+
     hardware_config->avail_min = 0;
 
     return ;
@@ -107,20 +109,15 @@ static void get_ddp_hardware_config_parameters(
 static void get_dd_hardware_config_parameters(
     struct pcm_config *hardware_config
     , unsigned int channels __unused
-    , unsigned int rate
-    , bool continuous_mode)
+    , unsigned int rate)
 {
     hardware_config->channels = 2;
     hardware_config->format = PCM_FORMAT_S16_LE;
     hardware_config->rate = rate;
     hardware_config->period_size = PERIOD_SIZE;
-    if (continuous_mode) {
-        hardware_config->period_count = PLAYBACK_PERIOD_COUNT * 2;
-        hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 4;
-    } else {
-        hardware_config->period_count = PLAYBACK_PERIOD_COUNT;
-        hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 2;
-    }
+    hardware_config->period_count = PLAYBACK_PERIOD_COUNT * 2;
+    hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 4;
+
     hardware_config->avail_min = 0;
 
     return ;
@@ -134,7 +131,6 @@ static void get_pcm_hardware_config_parameters(
     , unsigned int channels
     , unsigned int rate
     , bool platform_is_tv
-    , bool continuous_mode
     , bool game_mode)
 {
     if (platform_is_tv == false) {
@@ -161,7 +157,7 @@ static void get_pcm_hardware_config_parameters(
     the configuration will return fail when channel > 8 as need larger dma buffer size.
     to save mem, we use low buffer memory when 8 ch + speaker product.
    */
-    if (continuous_mode && channels <= 8) {
+    if (channels <= 8) {
         hardware_config->period_count = PLAYBACK_PERIOD_COUNT * 2;
         hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count / 8;
     } else {
@@ -188,32 +184,32 @@ int get_hardware_config_parameters(
     , unsigned int channels
     , unsigned int rate
     , bool platform_is_tv
-    , bool continuous_mode
+    , bool is_iec61937_input
     , bool game_mode)
 {
-    ALOGI("%s()\n", __FUNCTION__);
+    ALOGI("%s() is_iec61937_input(%d)\n", __FUNCTION__, is_iec61937_input);
     //DD+
     /* for raw data, we fixed to 2ch as it use spdif module */
     if (output_format == AUDIO_FORMAT_E_AC3) {
-        get_ddp_hardware_config_parameters(final_config, 2, rate, continuous_mode);
+        get_ddp_hardware_config_parameters(final_config, 2, rate);
     }
     //DD
     else if (output_format == AUDIO_FORMAT_AC3) {
-        get_dd_hardware_config_parameters(final_config, 2, rate, continuous_mode);
+        get_dd_hardware_config_parameters(final_config, 2, rate);
     }
     //MAT
     else if (output_format == AUDIO_FORMAT_MAT) {
-        get_mat_hardware_config_parameters(final_config, 2, rate);
+        get_mat_hardware_config_parameters(final_config, 2, rate, is_iec61937_input);
 
     }
     //DTS-HD/TRUE-HD
     else if ((output_format == AUDIO_FORMAT_DTS_HD) || (output_format == AUDIO_FORMAT_DOLBY_TRUEHD)) {
-        get_dd_hardware_config_parameters(final_config, 2, rate, continuous_mode);
+        get_dd_hardware_config_parameters(final_config, 2, rate);
     }
     //PCM
     else {
         get_pcm_hardware_config_parameters(final_config, channels, rate,
-                platform_is_tv, continuous_mode, game_mode);
+                platform_is_tv, game_mode);
     }
     ALOGI("%s() channels %d format %d period_count %d period_size %d rate %d\n",
             __FUNCTION__, final_config->channels, final_config->format, final_config->period_count,

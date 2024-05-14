@@ -583,7 +583,7 @@ void *audio_patch_output_threadloop(void *data)
                 if (drop_size != need_drop_size) {
                     AM_LOGE("drop fail, need_drop_size(%d) actual drop_size(%d)", need_drop_size, drop_size);
                 }
-
+                continue;
             }
         }
         if (get_buffer_read_space(ringbuffer) >= (write_bytes * period_mul)) {

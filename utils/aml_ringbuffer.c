@@ -259,6 +259,9 @@ int ring_buffer_seek(struct ring_buffer *rbuffer, int bytes)
         if (seek_bytes > bytes) {
             seek_bytes = bytes;
         }
+        if (seek_bytes > 0) {
+            buf->last_is_write = 0;
+        }
         buf->rd = update_pointer(buf->rd, seek_bytes, buf->start_addr, buf->size);
     } else {
         seek_bytes = get_write_space(buf->wr, buf->rd, buf->size, buf->last_is_write);

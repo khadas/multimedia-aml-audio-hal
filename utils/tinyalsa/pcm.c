@@ -633,6 +633,7 @@ int pcm_read(struct pcm *pcm, void *data, unsigned int count)
                     pcm->running = 0;
                 }
                 pcm->underruns++;
+                ALOGI("pcm_read: pcm(%p) underrun(%d)", pcm, pcm->underruns);
                 continue;
             }
             if (errno == EAGAIN && (pcm->flags & PCM_NONEBLOCK)) {
@@ -955,7 +956,7 @@ struct pcm *pcm_open(unsigned int card, unsigned int device,
     snprintf(fn, sizeof(fn), "/dev/snd/pcmC%uD%u%c", card, device,
              flags & PCM_IN ? 'c' : 'p');
 
-    ALOGI("pcm_open: flag = %x, card = %d, device = %d", flags, card, device);
+    ALOGI("pcm_open: pcm(%p) flag = %x, card = %d, device = %d", pcm, flags, card, device);
 
     pcm->flags = flags;
     pcm->fd = open(fn, O_RDWR|O_NONBLOCK);
