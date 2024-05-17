@@ -79,6 +79,10 @@ struct dolby_ms12_desc {
     pthread_mutex_t ms12_argv_lock;
     int dolby_ms12_init_argc;
     char **dolby_ms12_init_argv;
+    int dolby_ms12_codec_argc;
+    char **dolby_ms12_codec_argv;
+    int dolby_ms12_encoder_argc;
+    char **dolby_ms12_encoder_argv;
     void *dolby_ms12_ptr;
     int dolby_ms12_out_max_size;
     /*
