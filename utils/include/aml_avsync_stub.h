@@ -150,7 +150,7 @@ struct underflow_config {
     int time_thresh; /* underflow check time threshold in ms */
 };
 
-enum { AVS_LOG_TRACE, AVS_LOG_DEBUG, AVS_LOG_INFO, AVS_LOG_WARN, AVS_LOG_ERROR, AVS_LOG_FATAL };
+enum avs_log_level { AVS_LOG_TRACE, AVS_LOG_DEBUG, AVS_LOG_INFO, AVS_LOG_WARN, AVS_LOG_ERROR, AVS_LOG_FATAL };
 
 
 /* Open a new session and create the ID
@@ -392,6 +392,15 @@ int av_sync_get_pcr_clock(void *sync, pts90K *pts, uint64_t *mono_clock);
  *   0 for OK, or error code
  */
 int av_sync_get_clock(void *sync, pts90K *pts);
+
+/* set log level
+ * Params:
+ *   @level: log level
+ * Return:
+ *   0 for OK, or error code
+ */
+void log_set_level(enum avs_log_level level);
+
 
 /* set session name for debugging purpose
  * The session name will be listed from /sys/class/aml_msync/list_session

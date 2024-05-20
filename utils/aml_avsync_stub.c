@@ -76,7 +76,7 @@ int av_sync_get_clock(void *sync, pts90K *pts)
     return -1;
 }
 
-void log_set_level(int level)
+void log_set_level(enum avs_log_level level)
 {
     ALOGE("[%s():%d] stub function error!", __func__, __LINE__);
     return;
@@ -85,7 +85,7 @@ void log_set_level(int level)
 int av_sync_set_speed(void *sync, float speed)
 {
     ALOGE("[%s():%d] stub function error!", __func__, __LINE__);
-    return;
+    return 0;
 }
 
 #endif

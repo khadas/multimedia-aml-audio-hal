@@ -87,6 +87,14 @@
 #define AVSYNC_NONMS12_AUDIO_HAL_EARC_LATENCY_DDP (-40)
 #define NULL_INT64 0xffffffffffffffff
 
+enum audio_digital_mode {
+  AML_HAL_PCM = 0,
+  AML_HAL_DD = 1,
+  AML_HAL_AUTO = 2,
+  AML_HAL_BYPASS = 3,
+  AML_HAL_DDP = 4,
+};
+
 char *aml_audio_property_get_str(const char *key, char *value, const char *default_value);
 bool aml_audio_property_get_bool(const char *key, const bool default_value);
 int aml_audio_property_get_int(const char *key, const int default_value);
@@ -151,6 +159,8 @@ float aml_audio_get_s_gain_by_src(struct aml_audio_device *adev, enum patch_src_
 int android_dev_convert_to_hal_dev(audio_devices_t android_dev, int *hal_dev_port);
 enum patch_src_assortion android_input_dev_convert_to_hal_patch_src(audio_devices_t android_dev);
 enum input_source android_input_dev_convert_to_hal_input_src(audio_devices_t android_dev);
+enum digital_format get_digital_mode(struct aml_mixer_handle *mixer_handle);
+enum OUT_PORT get_output_select(struct aml_mixer_handle *mixer_handle);
 
 const char* patchSrc2Str(enum patch_src_assortion type);
 const char* usecase2Str(stream_usecase_t type);

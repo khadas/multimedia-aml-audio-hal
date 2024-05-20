@@ -84,7 +84,7 @@ Input: current_pointer: the current write pointer
 Output:
 Return: 0 for success
 *************************************************/
-static int write_to_buffer(unsigned char *current_pointer, unsigned char *data, int bytes,
+static int write_to_buffer(unsigned char *current_pointer, const unsigned char *data, int bytes,
         unsigned char *start_addr, int total_size)
 {
     int left_bytes = start_addr + total_size - current_pointer;

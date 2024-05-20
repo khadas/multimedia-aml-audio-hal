@@ -77,14 +77,6 @@ static const char *str_compmode[] = {"custom mode, analog dialnorm","custom mode
 #define DD_MUTE_FRAME_SIZE 1536
 #define DDP_MUTE_FRAME_SIZE 6144
 
-enum audio_digital_mode {
-  AML_HAL_PCM = 0,
-  AML_HAL_DD = 1,
-  AML_HAL_AUTO = 2,
-  AML_HAL_BYPASS = 3,
-  AML_HAL_DDP = 4,
-};
-
 enum audio_output_select {
     AUDIO_OUTPUT_CVBS = 0,
     AUDIO_OUTPUT_HDMI = 1,

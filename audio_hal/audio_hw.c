@@ -8704,8 +8704,8 @@ ssize_t out_write_new(struct audio_stream_out *stream,
     }
 
 #ifdef NO_SERVER
-    int digital_mode = 0;
-    int output_sel = 0;
+    enum digital_format digital_mode = AML_HAL_PCM;
+    enum OUT_PORT output_sel = OUTPORT_SPEAKER;
 
     digital_mode = get_digital_mode(&adev->alsa_mixer);
     ret = set_hdmi_format(adev, digital_mode);
