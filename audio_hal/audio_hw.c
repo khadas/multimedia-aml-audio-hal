@@ -1301,7 +1301,7 @@ static void hwsync_mediasync_outset(struct aml_audio_device *adev, struct aml_st
     return;
 }
 
-static void playback_rate_set (struct audio_stream *stream, float rate)
+void out_set_playback_rate (struct audio_stream *stream, float rate)
 {
     struct aml_stream_out *aml_out = (struct aml_stream_out *) stream;
     struct aml_audio_device *adev = aml_out->dev;
@@ -1656,7 +1656,7 @@ static int out_set_parameters (struct audio_stream *stream, const char *kvpairs)
     if (ret >= 0) {
         float rate = atof(value);
         ALOGI("change rate to %f, format:0x%x, enable %d", rate, out->hal_format, out->enable_scaletempo);
-        playback_rate_set(stream, rate);
+        out_set_playback_rate(stream, rate);
         goto exit;
     }
 

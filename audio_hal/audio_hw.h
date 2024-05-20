@@ -1193,6 +1193,7 @@ void adev_ms12_cleanup(struct audio_hw_device *dev);
 void *aml_adev_get_handle(void);
 
 int ms12_clipmeta(void *priv_data, void *info, unsigned long long offset);
+void out_set_playback_rate (struct audio_stream *stream, float rate);
 
 /* 'bytes' are the number of bytes written to audio FIFO, for which 'timestamp' is valid.
  * 'available' is the number of frames available to read (for input) or yet to be played

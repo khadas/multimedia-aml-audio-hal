@@ -2872,8 +2872,12 @@ Aml_MS12_SyncPolicy_t mediasync_ms12_process(struct audio_stream_out *stream_out
             adev->underrun_mute_flag = false;
             break;
         case MEDIASYNC_AUDIO_RESAMPLE:
-            //aml_dtvsync_ms12_process_resample(stream_out, async_policy);
+        {
+            float rate = (float)async_policy->param1/(float)(async_policy->param2);
+            AM_LOGI("MEDIASYNC_AUDIO_RESAMPLE, param1=%u, param2=%u, rate=%f", async_policy->param1, async_policy->param2, rate);
+            out_set_playback_rate((struct audio_stream *)aml_out, rate);
             break;
+        }
         case MEDIASYNC_AUDIO_MUTE:
             adev->underrun_mute_flag = true;
             break;
