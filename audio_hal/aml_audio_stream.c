@@ -49,7 +49,7 @@
 #define min(a,b)            (((a) < (b)) ? (a) : (b))
 #define FMT_UPDATE_THRESHOLD_MAX    (10)
 #define DOLBY_FMT_UPDATE_THRESHOLD  (5)
-#define DTS_FMT_UPDATE_THRESHOLD    (1)
+#define DTS_FMT_UPDATE_THRESHOLD    (5)
 #define AED_DEFAULT_VOLUME          (831)
 
 #define DOLBY_DCV_LIB_PATH_A        "/usr/lib/libHwAudio_dcvdec.so"
