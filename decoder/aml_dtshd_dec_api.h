@@ -35,8 +35,6 @@ struct dts_frame_info {
     int syncword_pos;
     int check_pos;
     bool is_little_endian;
-    bool is_dts_es;
-    bool is_extension_check;
     int iec61937_data_type;
     int size;
 };

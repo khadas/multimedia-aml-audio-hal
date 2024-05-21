@@ -141,113 +141,6 @@ static int _dts_frame_scan(struct dca_dts_dec *dts_dec);
 static int _dts_pcm_output(struct dca_dts_dec *dts_dec);
 static int _dts_raw_output(struct dca_dts_dec *dts_dec);
 static int _dts_stream_type_mapping(unsigned int stream_type);
-static int _dts_extension_check(unsigned char *buffer, int size);
-
-static int _dts_extension_check(unsigned char *buffer, int size)
-{
-    int i = 0;
-    unsigned int u32Temp = 0;
-    bool is_cpf_present = false;
-    bool is_little_endian = false;
-    bool is_core_present = false;
-    bool is_exss_present = false;
-    int cpf_offset = 4;     // dts syncword(4)
-    int pcmr_offset = 12;   // dts syncword(4) + metadata offset(8)
-
-    /*
-        Check Policy:   Present:1  Absent:0
-                CoreSSOnly    CoreSS+ES    CoreSS+ExSS    ExSSOnly
-        CoreSS       1             1           1             0
-        ExSS         0             0           1             1
-        bES          0             1          1/0            0
-    */
-
-    if (size < pcmr_offset) {
-        return -1;
-    }
-    ALOGV("sky_debug: frame_size: 0x%x \n", size);
-    for (i = 0; i < (size - 3); i++) {
-        u32Temp = 0;
-
-        u32Temp  = buffer[i + 0];
-        u32Temp <<= 8;
-        u32Temp |= buffer[i + 1];
-        u32Temp <<= 8;
-        u32Temp |= buffer[i + 2];
-        u32Temp <<= 8;
-        u32Temp |= buffer[i + 3];
-
-        if (i == 0) {
-            if (u32Temp == AML_DCA_SW_CORE_16) {
-                is_little_endian = true;
-                is_core_present = true;
-            } else if (u32Temp == AML_DCA_SW_CORE_16M) {
-                is_little_endian = false;
-                is_core_present = true;
-            } else {
-                ALOGV("sky_debug syncword 0x%x \n", u32Temp);
-            }
-        }
-
-        // check ES flag present or not.
-        if (is_core_present && !is_exss_present) {
-            if (i == cpf_offset && !is_little_endian) {
-                if (buffer[cpf_offset] & 0x02) {
-                    ALOGV("sky_debug: check cpf present, big_endian\n");
-                    is_cpf_present = true;
-                }
-            } else if (i == (cpf_offset + 1) && is_little_endian) {
-                if (buffer[cpf_offset + 1] & 0x02) {
-                    is_cpf_present = true;
-                    ALOGV("sky_debug: check cpf present, little_endian\n");
-                }
-            }
-
-            // check bES flag. (48Khz 5.1 bitstream with ES)
-            if (i == pcmr_offset && !is_cpf_present && !is_little_endian) {
-                if (buffer[pcmr_offset] & 0x40) {
-                    ALOGV("sky_debug: cpf 0 big_endian\n");
-                    return 1;
-                }
-            } else if (i == (pcmr_offset + 1) && !is_cpf_present && is_little_endian) {
-                if (buffer[pcmr_offset + 1] & 0x40) {
-                    ALOGV("sky_debug: cpf 0 little_endian\n");
-                    return 1;
-                }
-            } else if (i == (pcmr_offset + 1) && is_cpf_present && !is_little_endian) {
-                if (buffer[pcmr_offset + 1] & 0x20) {
-                    ALOGV("sky_debug: cpf 1 big_endian\n");
-                    return 1;
-                }
-            } else if (i == (pcmr_offset + 2) && is_cpf_present && is_little_endian) {
-                if (buffer[pcmr_offset + 2] & 0x20) {
-                    ALOGV("sky_debug: cpf 1 little_endian\n");
-                    return 1;
-                }
-            }
-        }
-
-        /* 16-bit extension stream */
-        if (!is_little_endian &&
-            (u32Temp == AML_DTS_EXT_SYNCWORD_XCH || u32Temp == AML_DTS_EXT_SYNCWORD_XXCH ||
-             u32Temp == AML_DTS_EXT_SYNCWORD_X96 || u32Temp == AML_DTS_EXT_SYNCWORD_XBR ||
-             u32Temp == AML_DTS_EXT_SYNCWORD_LBR || u32Temp ==AML_DTS_EXT_SYNCWORD_XLL ||
-             u32Temp == AML_DCA_SW_SUBSTREAM_M)) {
-            ALOGV("sky_debug: dts extension present big_endian sync:0x%x\n", u32Temp);
-            is_exss_present = true;
-            return 1;
-        } else if (is_little_endian &&
-            (u32Temp == AML_DTS_EXT_SYNCWORD_XCH || u32Temp == AML_DTS_EXT_SYNCWORD_XXCHM ||
-             u32Temp == AML_DTS_EXT_SYNCWORD_X96M || u32Temp == AML_DTS_EXT_SYNCWORD_XBRM ||
-             u32Temp == AML_DTS_EXT_SYNCWORD_LBRM || u32Temp ==AML_DTS_EXT_SYNCWORD_XLLM ||
-             u32Temp == AML_DCA_SW_SUBSTREAM)) {
-            is_exss_present = true;
-            ALOGV("sky_debug: dts extension present little_endian sync:0x%x\n", u32Temp);
-            return 1;
-        }
-    }
-    return 0;
-}
 
 static int _dts_syncword_scan(unsigned char *read_pointer, unsigned int *pTemp0)
 {
@@ -727,8 +620,6 @@ int dca_decoder_init_patch(aml_dec_t **ppaml_dec, aml_dec_config_t *dec_config)
     dts_dec->frame_info.syncword_pos = 0;
     dts_dec->frame_info.check_pos = 0;
     dts_dec->frame_info.is_little_endian = false;
-    dts_dec->frame_info.is_dts_es = false;
-    dts_dec->frame_info.is_extension_check = 0;
     dts_dec->frame_info.iec61937_data_type = 0;
     dts_dec->frame_info.size = 0;
 
@@ -961,14 +852,6 @@ int dca_decoder_process_patch(aml_dec_t *aml_dec, struct audio_buffer *abuffer)
         }
 
         if ((dts_dec->outlen_raw > 0) && (used_size > 0)) {
-            if (!dts_dec->frame_info.is_extension_check) {
-                dts_dec->frame_info.is_dts_es = _dts_extension_check(dts_dec->inbuf, frame_size);
-                dts_dec->frame_info.is_extension_check = true;
-            }
-
-            if (dts_dec->frame_info.is_dts_es) {
-                memset(dec_raw_data->buf, 0, dts_dec->outlen_raw);
-            }
             _dts_raw_output(dts_dec);
         }
 
