@@ -81,7 +81,6 @@
 #include "tv_patch_avsync.h"
 #include "aml_ng.h"
 #include "aml_audio_timer.h"
-#include "audio_dtv_ad.h"
 #include "aml_audio_ease.h"
 #include "aml_audio_spdifout.h"
 #include "aml_config_parser.h"

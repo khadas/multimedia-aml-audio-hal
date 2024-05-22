@@ -60,7 +60,6 @@
 #include "audio_hw_ms12_v2.h"
 #endif
 #include "dolby_lib_api.h"
-#include "audio_dtv_ad.h"
 #include "alsa_config_parameters.h"
 #include "alsa_device_parser.h"
 #include "dtv_patch_hal_avsync.h"

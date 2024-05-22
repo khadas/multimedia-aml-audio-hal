@@ -56,7 +56,6 @@
 #include "audio_hw_utils.h"
 #include "aml_audio_resampler.h"
 #include "dolby_lib_api.h"
-#include "audio_dtv_ad.h"
 #include "alsa_device_parser.h"
 #include "dtv_patch_hal_avsync.h"
 
