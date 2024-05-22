@@ -560,14 +560,14 @@ static int parseAudioMuxElement(struct audio_bit_parser *bit_parser, struct heaa
         }
     } else if (!heaac_info->streamMuxRead) {
         ALOGE("%s line %d useSameStreamMux %d streamMuxRead %d bit offset %d\n", __func__, __LINE__, useSameStreamMux, heaac_info->streamMuxRead, aml_audio_bitparser_getPosition(bit_parser));
-        return -1; // Parsing cannot continue without StreamMuxConfig information.
+        return -2; // Parsing cannot continue without StreamMuxConfig information.
     }
 
     if (heaac_info->audioMuxVersionA == 0) {
         if (heaac_info->numSubframes != 0) {
             //throw new ParserException();
             ALOGE("numSubframes %d illegal\n", heaac_info->numSubframes);
-            return -1;
+            //return -1;
         }
         int muxSlotLengthBytes = parsePayloadLengthInfo(bit_parser, heaac_info);
         parsePayloadMux(bit_parser, muxSlotLengthBytes);
@@ -949,14 +949,20 @@ static int parse_heaac_adts_frame_header(struct audio_bit_parser * bit_parser, c
     frame_size = aac_frame_length;
     if ((frame_size == 0) || (frame_size >= 8191)) {
         ALOGE("Invalid HEAAC ADTS frame size 0");
+        heaac_info->frame_size = 0;
+        heaac_info->sample_rate = 0;
+        heaac_info->channel_mask = 0;
         return -1;
     }
-    heaac_info->samples = (number_of_raw_data_blocks_in_frame + 1) * 1024;
+
     heaac_info->frame_size = frame_size;
     heaac_info->sample_rate = convert_sampling_frequency_index_to_samplerate(sampling_frequency_index);
     heaac_info->channel_mask = convert_channel_configuration_to_channelmask(channel_configuration);
     if (heaac_info->sample_rate == -1 || heaac_info->channel_mask == -1) {
         ALOGE("Invalid HEAAC ADTS frame sampling_frequency_index %u and  channel_configuration %u", sampling_frequency_index, channel_configuration);
+        heaac_info->frame_size = 0;
+        heaac_info->sample_rate = 0;
+        heaac_info->channel_mask = 0;
         return -1;
     }
     if (heaac_info->debug_print) {
@@ -999,7 +1005,8 @@ static int parse_heaac_loas_frame_header(struct audio_bit_parser * bit_parser, c
     ret = parseAudioMuxElement(bit_parser, heaac_info);
     if (ret) {
         ALOGE("%s line %d parse_AudioMuxElement ret %d frame 4bytes 0x%x 0x%x 0x%x 0x%x\n", __func__, __LINE__, ret, frameBuf[0], frameBuf[1], frameBuf[2], frameBuf[3]);
-        return -1;
+        //heaac_info->frame_size = 0;
+        return ret;
     }
     //heaac_info->sample_rate = heaac_info->sampleRateHz; // todo
     //heaac_info->channel_mask = heaac_info->channelCount; // todo
@@ -1015,7 +1022,7 @@ static int parse_heaac_loas_frame_header(struct audio_bit_parser * bit_parser, c
  *  check the real aac format from the raw data
  * return  0:adts  1:latm  -1: invalid aac format
  */
-int aml_heaac_parser_sniff_format(const void *in_buffer, int32_t numBytes)
+int aml_heaac_parser_sniff_format(void *in_buffer, int32_t numBytes)
 {
      int loas_sync_word_offset = -1, adts_sync_word_offset = -1, ret = 0;
      struct heaac_parser_info loas_heaac_info = {0}, adts_heaac_info = {0};
@@ -1034,8 +1041,14 @@ int aml_heaac_parser_sniff_format(const void *in_buffer, int32_t numBytes)
             if (numBytes - buffer_offset >= 8) {
                 ret = parse_heaac_loas_frame_header(&bit_parser, (const unsigned char *)in_buffer + buffer_offset, numBytes - buffer_offset, &loas_heaac_info);
                 if (ret != 0) {
-                    loas_heaac_info.is_loas = 0;
-                    buffer_offset++;
+                    if (ret == -1) {
+                        loas_heaac_info.is_loas = 0;
+                        buffer_offset++;
+                    } else {
+                        ALOGI("guess it is aac format loas!!!");
+                        loas_heaac_info.is_loas = 1;
+                        break;
+                    }
                 } else {
                     ALOGI("sniff aac format loas success !!!");
                     loas_heaac_info.is_loas = 1;
@@ -1167,8 +1180,10 @@ int aml_heaac_parser_process(void *parser_handle, const void *in_buffer, int32_t
     *used_size = 0;
     bool is_loas = 0;
     bool is_adts = 0;
+
+resync:
     if (!heaac_parser_handle->format_checked_flag) {
-        ret = aml_heaac_parser_sniff_format(in_buffer, numBytes);
+        ret = aml_heaac_parser_sniff_format((void *)(buffer + buf_offset), numBytes - buf_offset);
         if (ret != -1) {
             if (ret == 0) {
                 heaac_info->is_loas = 0;
@@ -1181,7 +1196,6 @@ int aml_heaac_parser_process(void *parser_handle, const void *in_buffer, int32_t
             heaac_parser_handle->format_checked_flag = 1;
         }
     }
-resync:
     is_loas = heaac_info->is_loas;
     is_adts = heaac_info->is_adts;
     if (heaac_info->debug_print) {
@@ -1312,49 +1326,30 @@ resync:
      */
     if (is_loas) {
         ret = parse_heaac_loas_frame_header(&heaac_parser_handle->bit_parser, parser_buf, heaac_parser_handle->buf_remain, heaac_info);
-#if 0 //do not parse adts header for we need trust the input format here.
         if (ret != 0) {
-            sync_word_offset = seek_heaac_adts_sync_word((char*)in_buffer, numBytes);
-            ALOGI("guess it is adts format sync_word_offset %d", sync_word_offset);
-            if (sync_word_offset >= 0) {
-                ret = parse_heaac_adts_frame_header(&heaac_parser_handle->bit_parser, (const unsigned char *)in_buffer + sync_word_offset, numBytes - sync_word_offset, heaac_info);
-            }
-            /* strict limit for the special adts stream */
-            if (ret == 0 && sync_word_offset == 0) {
-               heaac_info->is_adts = true;
-               heaac_info->is_loas = false;
-               heaac_parser_handle->buf_remain = 0;
-               heaac_parser_handle->status = PARSER_SYNCING;
-               buf_offset  = 0;
-               buf_left = numBytes - buf_offset;
-               goto resync;
+            if (ret == -1) {
+                heaac_parser_handle->format_checked_flag = 0;
+                heaac_info->is_loas = 0;
             }
         }
-#endif
-    if (ret != 0) {
-         heaac_parser_handle->format_checked_flag = 0;
-         heaac_parser_handle->buf_remain = 0;
-         heaac_parser_handle->status = PARSER_SYNCING;
-         heaac_info->is_loas = 0;
-         goto error;
     }
-
-    } else if (is_adts) {
+    else if (is_adts) {
         ret = parse_heaac_adts_frame_header(&heaac_parser_handle->bit_parser, parser_buf, heaac_parser_handle->buf_remain, heaac_info);
         if (ret != 0) {
             heaac_parser_handle->format_checked_flag = 0;
             heaac_parser_handle->buf_remain = 0;
             heaac_parser_handle->status = PARSER_SYNCING;
             heaac_info->is_adts = 0;
+            numBytes = buf_offset;
             goto error;
         }
     }
 
     /*check whether the input data has a complete heaac frame*/
     if (ret != 0 || heaac_info->frame_size == 0) {
-        ALOGE("%s wrong frame size=%d ", __func__, heaac_info->frame_size);
+        ALOGE("%s wrong frame size=%d buf remain=%d left=%d", __func__, heaac_info->frame_size, heaac_parser_handle->buf_remain, buf_left);
         heaac_parser_handle->status = PARSER_SYNCING;
-        if (is_loas && heaac_info->frame_size > 0) {
+        if (is_loas && heaac_info->frame_size > heaac_parser_handle->buf_remain) {
             if (buf_left >= (heaac_info->frame_size - heaac_parser_handle->buf_remain)) {
                 buf_offset += (heaac_info->frame_size - heaac_parser_handle->buf_remain);
                 if (buf_offset >= numBytes) {
