@@ -120,7 +120,8 @@ static int select_digital_device(struct spdifout_handle *phandle) {
                  */
                 if (phandle->audio_format == AUDIO_FORMAT_E_AC3 ||
                     phandle->audio_format == AUDIO_FORMAT_MAT ||
-                    (audio_is_linear_pcm(phandle->audio_format) && (phandle->in_data_ch == 8 || phandle->in_data_ch == 6))) {
+                    (audio_is_linear_pcm(phandle->audio_format) && (phandle->in_data_ch == 8 || phandle->in_data_ch == 6)) ||
+                    (phandle->audio_format == AUDIO_FORMAT_DTS_HD && (phandle->in_data_ch == 8))) {
                     device_id = EARC_DEVICE;
                 } else if (phandle->audio_format == AUDIO_FORMAT_AC3) {
                     if (aml_dev->optical_format == AUDIO_FORMAT_E_AC3) {
@@ -362,6 +363,8 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
     phandle->audio_format = audio_format;
     phandle->channel_mask = spdif_config->channel_mask;
     phandle->sample_rate = spdif_config->rate;
+    phandle->out_data_ch = spdif_config->data_ch;
+    phandle->in_data_ch  = spdif_config->data_ch;
 
     if (!phandle->spdif_enc_init && phandle->need_spdif_enc) {
         ret = aml_spdif_encoder_open(&phandle->spdif_enc_handle, phandle->audio_format);
@@ -660,7 +663,7 @@ int aml_audio_spdifout_process(void *phandle, const void *buffer, size_t byte)
     write_p = output_buffer;
     write_size = output_buffer_bytes;
 
-    if ((spdifout_phandle->post_process_type >= 0) && (spdifout_phandle->post_process_type < MC_POST_PROCESS_MAX) && mc_post_process_funcs[spdifout_phandle->post_process_type]) {
+    if (audio_is_linear_pcm(spdifout_phandle->audio_format) && (spdifout_phandle->post_process_type >= 0) && (spdifout_phandle->post_process_type < MC_POST_PROCESS_MAX) && mc_post_process_funcs[spdifout_phandle->post_process_type]) {
         switch (spdifout_phandle->post_process_type) {
             case MC_POST_PROCESS_EXTEND_CHANNEL:
                 /* TODO: prepare output buffer */

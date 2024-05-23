@@ -965,6 +965,8 @@ size_t aml_alsa_output_write_new(void *handle, const void *buffer, size_t bytes)
             snprintf(file_name, 128, "%s.%s", ALSA_OUTPUT_SPDIF_FILE, "mat");
         } else if (alsa_handle->format == AUDIO_FORMAT_DTS) {
             snprintf(file_name, 128, "%s.%s", ALSA_OUTPUT_SPDIF_FILE, "dts");
+        } else if (alsa_handle->format == AUDIO_FORMAT_DTS_HD) {
+            snprintf(file_name, 128, "%s.%s", ALSA_OUTPUT_SPDIF_FILE, "dtshd");
         } else {
             snprintf(file_name, 128, "%s.%s", ALSA_OUTPUT_SPDIF_FILE, "pcm");
         }

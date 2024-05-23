@@ -529,7 +529,8 @@ static int aml_audio_parser_process_wrapper(struct audio_stream_out *stream,
     return ret;
 parser_error:
     *output_buf = in_buf;
-    *out_size = in_size;
+    *out_size   = 0;
+    *used_size = in_size;
     return ret;
 }
 
@@ -8126,34 +8127,42 @@ ssize_t mixer_main_buffer_write(struct audio_stream_out *stream, struct audio_bu
             abuffer->buffer, abuffer->size);
     }
     while (parser_in_size > total_used_size) {
-        /*AM_LOGI("Before parser  [%d]in_buf(%p) parser_in_buf(%d) total_used_size(%d)",
-            parser_count, parser_in_buf, parser_in_size, total_used_size);*/
-        ret = aml_audio_parser_process_wrapper(stream,
-                                                parser_in_buf + total_used_size,
-                                                parser_in_size - total_used_size,
-                                                &current_used_size,
-                                                &abuffer_out.buffer,
-                                                &abuffer_out.size,
-                                                &frame_duration);
-        if (ret != 0) {
-            AM_LOGE("aml_audio_parser_process_wrapper error");
-            break;
+        if (is_dts_format(aml_out->hal_internal_format)) {
+            abuffer_out.buffer = abuffer->buffer;
+            abuffer_out.size = abuffer->size;
+            total_used_size = parser_in_size;
+        } else {
+            /*AM_LOGI("Before parser  [%d]in_buf(%p) parser_in_buf(%d) total_used_size(%d)",
+                parser_count, parser_in_buf, parser_in_size, total_used_size);*/
+            ret = aml_audio_parser_process_wrapper(stream,
+                                                    parser_in_buf + total_used_size,
+                                                    parser_in_size - total_used_size,
+                                                    &current_used_size,
+                                                    &abuffer_out.buffer,
+                                                    &abuffer_out.size,
+                                                    &frame_duration);
+            if (ret != 0) {
+                AM_LOGE("aml_audio_parser_process_wrapper error");
+                break;
+            }
+            if (aml_audio_property_get_bool("vendor.media.audiohal.indump", false)) {
+                aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/after_parser.raw",
+                    abuffer_out.buffer, abuffer_out.size);
+            }
+            if (parser_count != 0) {
+                abuffer_out.b_pts_valid = false;
+            }
+            char *p = (char*)abuffer_out.buffer;
+            total_used_size += current_used_size;
+            parser_count++;
+            AM_LOGI_IF(adev->debug_flag, "After parser [%d]current_used_size %d, total_used_size %d, p %p", parser_count, current_used_size, total_used_size, p);
+            if (p != NULL && abuffer_out.size  != 0) {
+                AM_LOGI_IF(adev->debug_flag, "After parser in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%"PRId32") b_pts_valid(%d) pts(%"PRIu64"ms) dur %d",
+                    parser_in_buf, abuffer_out.buffer, *p, *(p+1),
+                    *(p+2),*(p+3),abuffer_out.size, abuffer_out.b_pts_valid, abuffer_out.pts/90, frame_duration);
+            }
         }
-        if (aml_audio_property_get_bool("vendor.media.audiohal.indump", false)) {
-            aml_audio_dump_audio_bitstreams("/data/vendor/audiohal/after_parser.raw",
-                abuffer_out.buffer, abuffer_out.size);
-        }
-        if (parser_count != 0) {
-            abuffer_out.b_pts_valid = false;
-        }
-        char *p = (char*)abuffer_out.buffer;
-        total_used_size += current_used_size;
-        parser_count++;
-        AM_LOGI_IF(adev->debug_flag, "After parser [%d]current_used_size %d, total_used_size %d, p %p", parser_count, current_used_size, total_used_size, p);
-        if (p != NULL) {
-            AM_LOGI_IF(adev->debug_flag, "After parser in_buf(%p) out_buf(%p)(%x,%x,%x,%x) out_size(%"PRId32") b_pts_valid(%d) pts(%"PRIu64"ms) dur %d",
-                parser_in_buf, abuffer_out.buffer, *p, *(p+1),
-                *(p+2),*(p+3),abuffer_out.size, abuffer_out.b_pts_valid, abuffer_out.pts/90, frame_duration);
+        if (abuffer_out.buffer != NULL && abuffer_out.size  != 0) {
             if (patch)
                 patch->in_read_frame_size = abuffer_out.size;
 

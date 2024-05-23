@@ -1057,8 +1057,8 @@ static int update_audio_hal_info(struct aml_audio_device *adev, audio_format_t f
         }
 
         update_type = adev->dts_hd.stream_type;
-        if (update_type != adev->audio_hal_info.update_type) {
-            adev->audio_hal_info.update_cnt = 0;
+        if (update_type != adev->audio_hal_info.update_type && update_type != TYPE_DTS) {
+            adev->audio_hal_info.update_cnt = DTS_FMT_UPDATE_THRESHOLD;
         }
     }
 

@@ -563,8 +563,8 @@ int set_arc_format(struct audio_hw_device *dev, char *value, size_t len)
     }
     memcpy(&adev->hdmi_arc_capability_desc, hdmi_desc, sizeof(struct aml_arc_hdmi_desc));
     if (fmt_desc) {
-        ALOGI("----[%s] support:%d, ch:%d, sample_mask:%#x, bit_rate:%d, atmos:%d", hdmiFormat2Str(fmt_desc->fmt),fmt_desc->is_support,
-            fmt_desc->max_channels, fmt_desc->sample_rate_mask, fmt_desc->max_bit_rate, fmt_desc->atmos_supported);
+        ALOGI("----[%s] support:%d, ch:%d, sample_mask:%#x, bit_rate:%d, atmos:%d. dts_vsdb_byte3:%d", hdmiFormat2Str(fmt_desc->fmt),fmt_desc->is_support,
+            fmt_desc->max_channels, fmt_desc->sample_rate_mask, fmt_desc->max_bit_rate, fmt_desc->atmos_supported, fmt_desc->dts_vsdb_byte3);
     }
     if (adev->bHDMIConnected)
         adev->is_hdmi_arc_interact_done = true;

@@ -128,6 +128,32 @@ static void get_dd_hardware_config_parameters(
 }
 
 /*
+ *@brief get the hardware config parameters when the output format is DTS HBR
+*/
+static void get_dts_hbr_hardware_config_parameters(
+    struct pcm_config *hardware_config
+    , unsigned int channels
+    , unsigned int rate)
+{
+    hardware_config->channels = channels;
+    hardware_config->format = PCM_FORMAT_S16_LE;
+    hardware_config->rate = rate;
+    if (channels == 8) {//for TDM
+        hardware_config->period_size = PERIOD_SIZE ;
+        hardware_config->period_count = PLAYBACK_PERIOD_COUNT * 4;
+    } else {//for spdif or eARC
+        hardware_config->period_size = PERIOD_SIZE ;
+        hardware_config->period_count = PLAYBACK_PERIOD_COUNT * 8;
+    }
+
+    hardware_config->start_threshold = hardware_config->period_size * hardware_config->period_count;
+
+    hardware_config->avail_min = 0;
+
+    return ;
+}
+
+/*
  *@brief get the hardware config parameters when the output format is PCM
 */
 static void get_pcm_hardware_config_parameters(
@@ -206,8 +232,12 @@ int get_hardware_config_parameters(
         get_mat_hardware_config_parameters(final_config, channels, rate, is_iec61937_input);
     }
     //DTS-HD/TRUE-HD
-    else if ((output_format == AUDIO_FORMAT_DTS_HD) || (output_format == AUDIO_FORMAT_DOLBY_TRUEHD)) {
+    else if (output_format == AUDIO_FORMAT_DOLBY_TRUEHD) {
         get_dd_hardware_config_parameters(final_config, 2, rate);
+    }
+    //DTS HBR frame size is 65536
+    else if (output_format == AUDIO_FORMAT_DTS_HD) {
+        get_dts_hbr_hardware_config_parameters(final_config, channels, rate);
     }
     //PCM
     else {
