@@ -263,7 +263,7 @@ static int setPortConfig(struct audioCfg *cfg, struct audio_config *config)
     if (config->sample_rate == 0)
         config->sample_rate = 48000;
 
-    cfg->channelCnt = audio_channel_count_from_out_mask(config->channel_mask);
+    cfg->channelCnt = 2; // decoder downmix to 2ch;
     cfg->format = config->format;
     cfg->sampleRate = config->sample_rate;
     cfg->frame_size = cfg->channelCnt * audio_bytes_per_sample(config->format);
