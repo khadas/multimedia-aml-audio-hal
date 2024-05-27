@@ -10537,7 +10537,7 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 #endif
     adev->spdif_enable = true;
     adev->dolby_ms12_dap_init_mode = aml_get_jason_int_value(STB_MS12_DAP_MODE, 0);
-
+    adev->ms12_dynamic_sleep = aml_audio_property_get_bool("ro.vendor.media.audio.ms12.dynamic_sleep", false);
 
     /*for ms12 case, we set default continuous mode*/
     if (eDolbyMS12Lib == adev->dolby_lib_type) {

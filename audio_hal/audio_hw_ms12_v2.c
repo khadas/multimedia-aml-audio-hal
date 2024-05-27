@@ -1152,6 +1152,9 @@ int get_the_dolby_ms12_prepared(
      *          8: for mat encoder debug output
      */
     ms12->mat_enc_debug_enable = get_debug_value(AML_DEBUG_AUDIOHAL_MATENC);
+    set_ms12_alsa_limit_frame(ms12, MS12_ALSA_DEFAULT_LIMIT_FRAME);
+    set_ms12_scheduler_sleep(ms12, true);
+    ms12->scheduler_run_count = 0;
     ALOGI("--%s(), locked", __FUNCTION__);
     pthread_mutex_unlock(&ms12->lock);
     ALOGI("-%s()\n\n", __FUNCTION__);
@@ -2861,6 +2864,7 @@ Aml_MS12_SyncPolicy_t mediasync_ms12_process(struct audio_stream_out *stream_out
             AM_LOGI("drop frames:%d", drop_frames);
             break;
         case MEDIASYNC_AUDIO_INSERT:
+        case MEDIASYNC_AUDIO_HOLD:
             audio_sync_policy.eSyncPolicy = MS12_SYNC_AUDIO_INSERT;
             int insert_frames = async_policy->param1 / 1000 * 48;
             audio_sync_policy.s32TagFrame = insert_frames;
@@ -2993,7 +2997,6 @@ Aml_MS12_SyncPolicy_t ms12_avsync_callback(void *priv_data, unsigned long long u
             /* when last !normal output policy done, we need get new policy, so calc the increase frame no matter whether got the same apts */
             if (MS12_SYNC_AUDIO_DROP_PCM == syncpolicy_status.eSyncPolicy || MS12_SYNC_AUDIO_INSERT == syncpolicy_status.eSyncPolicy) {
                 same_pts_diff = (u64DecOutFrame - avsync_ctx->last_dec_out_frame) * 90 / 48;
-                delay_frame = 0;
                 AM_LOGI_IF(adev->debug_flag, "last policy:%d done need get new policy, same_pts_diff:%d", syncpolicy_status.eSyncPolicy, same_pts_diff);
             }
             else {
@@ -3143,6 +3146,45 @@ int ms12_output(void *buffer, void *priv_data, size_t size, aml_ms12_dec_info_t 
     return 0;
 }
 
+static void dolby_ms12_sleep(struct aml_audio_device *adev, struct dolby_ms12_desc *ms12, int alsa_delay_frame)
+{
+    int sleep_time_us = 1000;
+
+    if (ms12 == NULL) {
+        return;
+    }
+    if (adev->ms12_dynamic_sleep == false) {
+        if (ms12->scheduler_sleep_enable != true) {
+            set_ms12_scheduler_sleep(ms12, true);
+        }
+        return;
+    } else {
+        if (ms12->scheduler_sleep_enable != false) {
+            set_ms12_scheduler_sleep(ms12, false);
+        }
+    }
+
+    if (ms12->scheduler_run_count <= 300) {
+        // ms12 output is not stable, use default value
+    }
+#if 0
+    else if (adev->aaudio_low_latency == true) {
+        // low_latency mode, need alsa buffer level more stable.
+        sleep_time_us = 1000;
+    }
+#endif
+    else if (alsa_delay_frame > ms12->alsa_limit_frame/2) {
+        sleep_time_us = 2000;
+    } else if (alsa_delay_frame <= 6*48) {
+        // alsa buffer level too low ( <= 6ms), need to speed up
+        sleep_time_us = 0;
+    }
+
+    if (sleep_time_us > 0) {
+        usleep(sleep_time_us);
+    }
+}
+
 static void *dolby_ms12_threadloop(void *data)
 {
     ALOGI("+%s() ", __FUNCTION__);
@@ -3172,6 +3214,8 @@ static void *dolby_ms12_threadloop(void *data)
             int delayframe = aml_alsa_output_get_delayframe((struct audio_stream_out*)adev->ms12_out);
             dolby_ms12_set_alsa_delay_frame(delayframe);
             run_ret = dolby_ms12_scheduler_run(ms12->dolby_ms12_ptr);
+            ms12->scheduler_run_count++;
+            dolby_ms12_sleep(adev, ms12, delayframe);
         } else {
             ALOGE("%s() ms12->dolby_ms12_ptr is NULL, fatal error!", __FUNCTION__);
             break;
@@ -3950,4 +3994,20 @@ int ms12_clipmeta(void *priv_data, void *info, unsigned long long offset)
 
     hal_abuffer_clip_process(priv_data, (abuffer_info_t *)info, offset);
     return 0;
+}
+
+void set_ms12_alsa_limit_frame(struct dolby_ms12_desc *ms12, int limit_frame)
+{
+    if (ms12 && limit_frame >= 0) {
+        dolby_ms12_set_alsa_limit_frame(limit_frame);
+        ms12->alsa_limit_frame = limit_frame;
+    }
+}
+
+void set_ms12_scheduler_sleep(struct dolby_ms12_desc *ms12, bool enable_sleep)
+{
+    if (ms12) {
+        dolby_ms12_set_scheduler_sleep(enable_sleep);
+        ms12->scheduler_sleep_enable = enable_sleep;
+    }
 }

@@ -1479,5 +1479,34 @@ int DolbyMS12::DolbyMS12RegisterCallbackbytype(int type, void* callback, void *p
     ALOGI("ret %d, type:%d, callback:%p", ret, type, callback);
     return ret;
 }
+
+int DolbyMS12::DolbyMS12SetAlsaLimitFrame(int limit_frame)
+{
+    int ret = 0;
+    ALOGV("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12Config) {
+        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
+        return ret;
+    }
+
+    ret = (*FuncDolbyMS12Config)(MS12_CONFIG_ALSA_LIMIT_FRAME, (ms12_config_t *)&limit_frame);
+    ALOGV("-%s() ret %d", __FUNCTION__, ret);
+    return ret;
+}
+
+int DolbyMS12::DolbyMS12SetSchedulerSleep(int enable_sleep)
+{
+    int ret = 0;
+    ALOGV("+%s()", __FUNCTION__);
+    if (!FuncDolbyMS12Config) {
+        ALOGE("%s(), pls load lib first.\n", __FUNCTION__);
+        return ret;
+    }
+
+    ret = (*FuncDolbyMS12Config)(MS12_CONFIG_SCHEDULER_SLEEP, (ms12_config_t *)&enable_sleep);
+    ALOGV("-%s() ret %d", __FUNCTION__, ret);
+    return ret;
+}
+
 /*--------------------------------------------------------------------------*/
 }   // namespace android

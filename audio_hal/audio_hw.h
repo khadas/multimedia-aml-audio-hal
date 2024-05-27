@@ -694,6 +694,7 @@ struct aml_audio_device {
     bool user_setting_scaletempo;
 
     bool is_hdmi_arc_interact_done;
+    bool ms12_dynamic_sleep;
 };
 
 struct meta_data {

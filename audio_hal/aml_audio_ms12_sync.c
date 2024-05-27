@@ -468,7 +468,6 @@ int get_ms12_tuning_latency_pts(struct audio_stream_out *stream)
     struct aml_audio_device *adev = out->dev;
     int32_t total_latency_pts = 0;
     int32_t total_latency_ms  = 0;
-    int alsa_delay_ms         = 0;
     int tuning_delay_ms       = 0;
     int atmos_tuning_delay_ms = 0;
     int input_latency_ms      = 0;
@@ -476,8 +475,6 @@ int get_ms12_tuning_latency_pts(struct audio_stream_out *stream)
     int port_latency_ms       = 0;
     int bypass_delay_ms       = 0;
     int video_delay_ms        = 0;
-
-    alsa_delay_ms = (int32_t)out_get_ms12_latency_frames(stream, false) / 48;
 
     if (adev->is_netflix) {
         input_latency_ms = get_ms12_netflix_tunnel_input_latency(out->hal_internal_format);
@@ -511,11 +508,11 @@ int get_ms12_tuning_latency_pts(struct audio_stream_out *stream)
         video_delay_ms = get_ms12_tunnel_video_delay();
     }
 
-    total_latency_ms  = alsa_delay_ms + tuning_delay_ms + atmos_tuning_delay_ms + bypass_delay_ms + video_delay_ms;
+    total_latency_ms  = tuning_delay_ms + atmos_tuning_delay_ms + bypass_delay_ms + video_delay_ms;
     total_latency_pts = total_latency_ms * 90;    //90k
 
-    AM_LOGI_IF((adev->debug_flag > 1), "latency_pts:0x%x(%d ms), alsa delay(%d ms), tuning delay(%d ms), atmos(%d ms), bypass_delay(%d ms), video_delay(%d ms)",
-            total_latency_pts, total_latency_ms, alsa_delay_ms, tuning_delay_ms, atmos_tuning_delay_ms, bypass_delay_ms, video_delay_ms);
+    AM_LOGI_IF((adev->debug_flag > 1), "latency_pts:0x%x(%d ms), tuning_delay(%d ms), atmos(%d ms), bypass_delay(%d ms), video_delay(%d ms)",
+            total_latency_pts, total_latency_ms, tuning_delay_ms, atmos_tuning_delay_ms, bypass_delay_ms, video_delay_ms);
     return total_latency_pts;
 }
 

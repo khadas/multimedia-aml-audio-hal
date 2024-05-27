@@ -425,6 +425,11 @@ int dolby_ms12_register_callback_by_type(int type, void *callback, void *priv_da
 
 int dolby_ms12_get_main_underrun();
 
+int dolby_ms12_set_alsa_limit_frame(int limit_frame);
+
+int dolby_ms12_set_scheduler_sleep(int enable_sleep);
+
+
 #ifdef __cplusplus
 }
 #endif

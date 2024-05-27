@@ -352,6 +352,7 @@ int mediasync_get_policy(struct audio_stream_out *stream)
                 p_mediasync->out_start_apts, p_mediasync->cur_outapts);
         }
 
+#if 0
         if (m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD) {
             if (m_audiopolicy.param1 == -1) {
                 usleep(15000);
@@ -362,12 +363,13 @@ int mediasync_get_policy(struct audio_stream_out *stream)
                 usleep(m_audiopolicy.param1);
             }
         }
+#endif
 
         if ((true == aml_out->fast_quit) || adev->ms12_to_be_cleanup) {
             AM_LOGI("fast_quit, break now.");
             break;
         }
-    } while (aml_out->avsync_ctx && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
+    } while (0); //(aml_out->avsync_ctx && m_audiopolicy.audiopolicy == MEDIASYNC_AUDIO_HOLD);
 
     p_mediasync->apolicy.audiopolicy= (audio_policy)m_audiopolicy.audiopolicy;
     p_mediasync->apolicy.param1 = m_audiopolicy.param1;
