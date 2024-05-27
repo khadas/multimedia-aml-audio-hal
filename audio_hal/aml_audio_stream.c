@@ -116,7 +116,7 @@ static audio_format_t get_sink_capability (struct aml_audio_device *adev)
     audio_format_t sink_capability = AUDIO_FORMAT_PCM_16_BIT;
 
     //STB case
-    if (!adev->is_TV)
+    if (!adev->is_TV || adev->is_BDS)
     {
         char *cap = NULL;
         /*we should get the real audio cap, so we need it report the correct truehd info*/
@@ -376,7 +376,7 @@ void get_sink_format(struct audio_stream_out *stream)
     // "adev->active_outport" was set when HDMI ARC cable plug in/off
     // condition 1: ARC port, single output.
     // condition 2: for STB case with dolby-ms12 libs
-    if (adev->active_outport == OUTPORT_HDMI_ARC || !adev->is_TV) {
+    if (adev->active_outport == OUTPORT_HDMI_ARC || !adev->is_TV || adev->is_BDS) {
         ALOGI("%s() HDMI ARC or mbox + dvb case", __FUNCTION__);
         switch (adev->hdmi_format) {
         case PCM:

@@ -119,6 +119,66 @@ bool alsa_device_is_auge(void)
 	return false;
 }
 
+int alsa_device_get_card_index_by_name(void *name)
+{
+	FILE *mCardFile = NULL;
+	int mCardIndex = -1;
+	char* mRet = NULL;
+
+	if (!name)
+		return -1;
+
+	mCardFile = fopen(ALSASOUND_CARD_PATH, "r");
+	if (mCardFile) {
+		char tempbuffer[READ_BUFFER_SIZE];
+
+		while (!feof(mCardFile)) {
+			mRet = fgets(tempbuffer, READ_BUFFER_SIZE, mCardFile);
+
+			/* this line contain '[' character */
+			if (strchr(tempbuffer, '[')) {
+				char *Rch = strtok(tempbuffer, "[");
+				int id = atoi(Rch);
+				ALOGD("\tcurrent card id = %d, Rch = %s", id, Rch);
+				Rch = strtok(NULL, " ]");
+				ALOGD("\tcurrent sound card name = %s", Rch);
+				if (strcmp(Rch, name) == 0) {
+					ALOGD("\t sound cardIndex found = %d", id);
+					mCardIndex = id;
+					break;
+				}
+			}
+			memset((void *)tempbuffer, 0, READ_BUFFER_SIZE);
+		}
+		fclose(mCardFile);
+	}
+	return mCardIndex;
+}
+
+int alsa_device_get_pcm_index_by_name(void *name)
+{
+	FILE *mCardFile = NULL;
+	int mPcmIndex = -1;
+	char buf[100];
+	char str[2];
+
+	if (!name)
+		return -1;
+
+	mCardFile = fopen(ALSASOUND_PCM_PATH, "r");
+	while (fgets(buf, 100, mCardFile)) {
+		if (strstr(buf, name) != NULL) {
+			strncpy(str, buf + 3, 2);
+			mPcmIndex = atoi(str);
+			ALOGD("sound PcmIndex found = %d", mPcmIndex);
+			break;
+		}
+	}
+
+	return mPcmIndex;
+}
+
+
 /*
  * cat /proc/asound/cards
  *	 0 [AMLAUGESOUND   ]: AML-AUGESOUND - AML-AUGESOUND

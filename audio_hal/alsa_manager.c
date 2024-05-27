@@ -33,6 +33,7 @@
 #include "alsa_config_parameters.h"
 #include "dtv_patch.h"
 #include "aml_audio_timer.h"
+#include "aml_config_data.h"
 
 
 #define AML_ZERO_ADD_MIN_SIZE 1024
@@ -842,7 +843,17 @@ int aml_alsa_output_open_new(void **handle, aml_stream_config_t * stream_config,
         ALOGE("Wrong alsa_device ID\n");
         return -1;
     }
+
     pcm_index = alsa_device_update_pcm_index(alsa_port, PLAYBACK);
+    if (pcm_index < 0) {
+        int config_pcm_index;
+        config_pcm_index = aml_get_jason_int_value("HDMITX_HBR_PCM_INDEX", -1);
+        if (config_pcm_index == 2) {
+            pcm_index = config_pcm_index;
+            config->period_size = 2048;
+            config->start_threshold = 0;
+        }
+    }
 
     ALOGI("In pcm open ch=%d rate=%d\n", config->channels, config->rate);
     ALOGI("%s, audio open card(%d), device(%d) \n", __func__, card, pcm_index);

@@ -2679,8 +2679,9 @@ int start_input_stream(struct aml_stream_in *in)
     /* check to update alsa device by port */
     alsa_device = alsa_device_update_pcm_index(port, CAPTURE);
     in->config.stop_threshold = in->config.period_size * in->config.period_count;
-    AM_LOGD("open alsa_card(%d %d) alsa_device(%d), in_device:0x%x, period_size(%d), period_count(%d), stop_threshold(%d)\n",
-        card, port, alsa_device, adev->in_device, in->config.period_size, in->config.period_count, in->config.stop_threshold);
+    AM_LOGI("ALSA open card(%d) device(%d), in_device:0x%x, rate:%d channel:%d period_count(%d) period_size(%d) start_threshold(%d) stop_threshold(%d) \n",
+        card, alsa_device, adev->in_device, in->config.rate, in->config.channels, in->config.period_count,
+        in->config.period_size,in->config.start_threshold, in->config.stop_threshold);
 
     in->pcm = pcm_open(card, alsa_device, PCM_IN | PCM_MONOTONIC | PCM_NONEBLOCK, &in->config);
     if (!pcm_is_ready(in->pcm)) {
@@ -2689,7 +2690,6 @@ int start_input_stream(struct aml_stream_in *in)
         adev->active_input = NULL;
         return -ENOMEM;
     }
-    AM_LOGD("pcm_open in: card(%d), port(%d)", card, port);
 
     if (in->requested_rate != in->config.rate) {
         ret = add_in_stream_resampler(in);
@@ -10613,6 +10613,9 @@ static int adev_open(const hw_module_t* module, const char* name, hw_device_t** 
 #endif
 /*[SEI-zhaopf-2018-10-29] add for HBG remote audio support } */
 #ifdef BUILD_LINUX
+    adev->is_BDS = check_chip_name("t7", 2, &adev->alsa_mixer) ? true : false;
+    if (adev->is_BDS)
+        ALOGI("[%s:%d] BDS platform", __func__, __LINE__);
     adev->is_TV = aml_get_jason_int_value(TV_PLATFORM,0);
     if (adev->is_TV ) {
         adev->default_alsa_ch =  aml_audio_get_default_alsa_output_ch();

@@ -83,7 +83,7 @@ static int select_digital_device(struct spdifout_handle *phandle) {
      */
 
     AM_LOGI("dual_spdif_support:%d", aml_dev->dual_spdif_support);
-    if (!aml_dev->is_TV) {
+    if (!aml_dev->is_TV || aml_dev->is_BDS) {
         if (aml_dev->dual_spdif_support) {
             if (phandle->audio_format == AUDIO_FORMAT_AC3 ||
                 phandle->audio_format == AUDIO_FORMAT_DTS) {
@@ -421,7 +421,7 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
                 goto error;
             }
 
-        } else if (TDM_DEVICE == device_id) {
+        } else if (TDM_DEVICE == device_id && eDolbyMS12Lib == aml_dev->dolby_lib_type) {
             /* MC PCM output from MS12 is hard coded to 8ch */
             if (spdif_config->data_ch == 8 && audio_is_linear_pcm(audio_format)) {
                 phandle->post_process_type = MC_POST_PROCESS_COMPACT_CHANNEL;

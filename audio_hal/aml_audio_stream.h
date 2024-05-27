@@ -174,6 +174,34 @@ static inline bool is_dolby_format(audio_format_t format) {
     }
 }
 
+static inline bool is_aml_dec_support(audio_format_t format) {
+    switch (format) {
+    case AUDIO_FORMAT_AC3:
+    case AUDIO_FORMAT_E_AC3:
+    case AUDIO_FORMAT_DTS:
+    case AUDIO_FORMAT_DTS_HD:
+    case AUDIO_FORMAT_PCM_16_BIT:
+    case AUDIO_FORMAT_PCM_32_BIT:
+    case AUDIO_FORMAT_PCM_8_BIT:
+    case AUDIO_FORMAT_PCM_8_24_BIT:
+    case AUDIO_FORMAT_PCM_LPCM_DVD:
+    case AUDIO_FORMAT_PCM_LPCM_1394:
+    case AUDIO_FORMAT_PCM_LPCM_BLURAY:
+    case AUDIO_FORMAT_PCM_ADPCM_IMA_WAV:
+    case AUDIO_FORMAT_MP3:
+    case AUDIO_FORMAT_MP2:
+    case AUDIO_FORMAT_AAC:
+    case AUDIO_FORMAT_AAC_LATM:
+    case AUDIO_FORMAT_HE_AAC_V1:
+    case AUDIO_FORMAT_HE_AAC_V2:
+    case AUDIO_FORMAT_FLAC:
+    case AUDIO_FORMAT_VORBIS:
+        return true;
+    default:
+        return false;
+    }
+}
+
 static inline bool is_dts_format(audio_format_t format) {
     switch (format) {
     case AUDIO_FORMAT_DTS:

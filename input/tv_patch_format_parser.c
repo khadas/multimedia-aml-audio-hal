@@ -33,6 +33,7 @@
 
 #include "alsa_device_parser.h"
 #include "tv_patch_ctrl.h"
+#include "aml_config_data.h"
 
 #define AML_DCA_SW_CORE_16M             0x7ffe8001  ///< dts-cd 16bit 1024 framesize
 #define AML_DCA_SW_CORE_14M             0x1fffe800  ///< dts-cd 14bit 1024 or 512 framesize
@@ -499,7 +500,11 @@ static int get_config_by_params(struct pcm_config *config_in, bool normal_pcm)
         config_in->channels = 8;
     }
 
-    config_in->rate = 48000;
+    if (aml_get_jason_int_value("HDMITX_HBR_PCM_INDEX", -1) == 2) //for t7c use c0d2 both parser and playback mat/trueHD.
+        config_in->rate = 192000;
+    else
+        config_in->rate = 48000;
+
     config_in->format = PCM_FORMAT_S16_LE;
     config_in->period_size = PARSER_DEFAULT_PERIOD_SIZE;
     config_in->period_count = 16;
@@ -541,6 +546,8 @@ static int audio_type_parse_init(audio_type_parse_t *status)
     }
 
     if (audio_type_status->soft_parser) {
+        AM_LOGI("soft_parser open card(%d) device(%d) \n", audio_type_status->card, audio_type_status->device);
+        AM_LOGI("ALSA open configs: rate:%d channels:%d \n", audio_type_status->config_in.rate, audio_type_status->config_in.channels);
         in = pcm_open(audio_type_status->card, audio_type_status->device,
                       PCM_IN| PCM_NONEBLOCK, &audio_type_status->config_in);
         if (!pcm_is_ready(in)) {
@@ -674,8 +681,10 @@ static int reconfig_pcm_by_packet_type(audio_type_parse_t *audio_type_status,
             audio_type_status->in = NULL;
         }
 
-        ALOGI("%s(), reopen channels %d",
-            __func__, audio_type_status->config_in.channels);
+        AM_LOGI("reopen card(%d) device(%d) \n", audio_type_status->card, audio_type_status->device);
+        AM_LOGI("ALSA open configs: rate:%d channels:%d peirod_count:%d peirod_size:%d start_threshold:%d\n",
+            audio_type_status->config_in.rate, audio_type_status->config_in.channels, audio_type_status->config_in.period_count,
+            audio_type_status->config_in.period_size, audio_type_status->config_in.start_threshold);
         in = pcm_open(audio_type_status->card, audio_type_status->device,
                       PCM_IN | PCM_NONEBLOCK, &audio_type_status->config_in);
         if (!pcm_is_ready(in)) {

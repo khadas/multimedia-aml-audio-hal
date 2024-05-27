@@ -447,7 +447,6 @@ void *audio_patch_output_threadloop(void *data)
         audio_digital_input_format_check(patch);
         if (IS_DIGITAL_IN_HW(patch->input_src) && patch->digital_input_fmt_change) {
             AM_LOGI("HDMI format change from %x to %x", out->hal_internal_format, patch->aformat);
-
             //! close old stream
             if (out != NULL) {
                 aml_dev->hw_device.close_output_stream(patch->dev, &out->stream);

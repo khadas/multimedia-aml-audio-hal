@@ -575,6 +575,7 @@ struct aml_audio_device {
     struct aml_mixer_handle alsa_mixer;
     struct amlAudioMixer *audio_mixer;
     bool is_TV;
+    bool is_BDS;
     bool is_STB;
     bool is_SBR;
     bool useSubMix;

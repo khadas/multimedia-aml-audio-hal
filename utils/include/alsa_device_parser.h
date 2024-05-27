@@ -54,6 +54,8 @@ int alsa_device_update_pcm_index(int alsaPORT, int stream);
 
 int alsa_device_get_card_index_by_name(void *name);
 
+int alsa_device_get_pcm_index_by_name(void *name);
+
 bool is_earc_descrpt(void);
 
 #endif
