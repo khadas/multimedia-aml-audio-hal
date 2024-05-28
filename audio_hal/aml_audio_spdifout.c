@@ -333,6 +333,7 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
     int aml_spdif_format = AML_STEREO_PCM;
     audio_format_t audio_format = AUDIO_FORMAT_PCM_16_BIT;
     int aml_arc_format = AML_AUDIO_CODING_TYPE_STEREO_LPCM;
+    bool is_hbr_audio = false;
 
     if (spdif_config == NULL) {
         ALOGE("%s spdif_config is NULL", __func__);
@@ -384,22 +385,37 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
         aml_device_config_t device_config;
         memset(&stream_config, 0, sizeof(aml_stream_config_t));
         memset(&device_config, 0, sizeof(aml_device_config_t));
+
+        aml_spdif_format = halformat_convert_to_spdif(audio_format, stream_config.config.channel_mask);
+        aml_arc_format   = halformat_convert_to_arcformat(audio_format, stream_config.config.channel_mask);
+
+        if (aml_spdif_format == AML_TRUE_HD
+            || aml_spdif_format == AML_DTS_HD_MA
+            || aml_arc_format == AML_AUDIO_CODING_TYPE_MLP
+            || aml_arc_format == AML_DTS_HD_MA) {
+            is_hbr_audio = true;
+        }
+
         /*config stream info*/
         stream_config.config.channel_mask = spdif_config->channel_mask;
-        if (spdif_config->data_ch == 8 && spdif_config->rate == 192000 && !(aml_dev->hdmitx_hbr_src >= AML_TDM_A_TO_HDMITX)) {
+        if (is_hbr_audio && !(aml_dev->hdmitx_hbr_src >= AML_TDM_A_TO_HDMITX)) {
             stream_config.config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+            spdif_config->data_ch = 2;
         }
+
         /*earc only supports 8 channel multi channel, if the channel is not 2 and 8, we need convert it to 8 channel*/
         if (EARC_DEVICE == device_id) {
             if (spdif_config->data_ch == 2 || spdif_config->data_ch == 8) {
                 stream_config.config.channel_mask = audio_channel_out_mask_from_count(spdif_config->data_ch);
-                if (spdif_config->data_ch == 8) {
+                if (spdif_config->data_ch == 8 && audio_is_linear_pcm(audio_format)) {
                     phandle->post_process_type = MC_POST_PROCESS_SWAP_C_LFE;
                 }
             } else if (spdif_config->data_ch > 2 && spdif_config->data_ch < 8) {
                 stream_config.config.channel_mask = audio_channel_out_mask_from_count(8);
                 phandle->out_data_ch = 8;
-                phandle->post_process_type = MC_POST_PROCESS_EXTEND_CHANNEL;
+                if (audio_is_linear_pcm(audio_format)) {
+                    phandle->post_process_type = MC_POST_PROCESS_EXTEND_CHANNEL;
+                }
             } else {
                 ALOGE("%s EARC not support channel %d", __func__, spdif_config->data_ch);
                 goto error;
@@ -407,19 +423,17 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
 
         } else if (TDM_DEVICE == device_id) {
             /* MC PCM output from MS12 is hard coded to 8ch */
-            if (spdif_config->data_ch == 8 && phandle->audio_format != AUDIO_FORMAT_MAT) {
+            if (spdif_config->data_ch == 8 && audio_is_linear_pcm(audio_format)) {
                 phandle->post_process_type = MC_POST_PROCESS_COMPACT_CHANNEL;
             }
         }
+
         stream_config.config.sample_rate  = spdif_config->rate;
         stream_config.config.format       = spdif_config->audio_format;
         stream_config.config.offload_info.format = audio_format;
 
         device_config.device_port = alsa_device_get_port_index(device_id);
         phandle->spdif_port       = device_config.device_port;
-
-        aml_spdif_format = halformat_convert_to_spdif(audio_format, stream_config.config.channel_mask);
-        aml_arc_format   = halformat_convert_to_arcformat(audio_format, stream_config.config.channel_mask);
 
         /*for dts cd , we can't set the format as dts, we should set it as pcm*/
         if (aml_spdif_format == AML_DTS && spdif_config->is_dtscd) {
@@ -433,9 +447,9 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
         } else if (phandle->spdif_port == PORT_I2S2HDMI) {
             enum AML_SRC_TO_HDMITX hdmitx_src = AML_TDM_B_TO_HDMITX;
             aml_mixer_ctrl_set_int(&aml_dev->alsa_mixer, AML_MIXER_ID_I2S2HDMI_FORMAT, aml_spdif_format);
-            if (aml_spdif_format = AML_TRUE_HD && aml_dev->hdmitx_hbr_src >= AML_TDM_A_TO_HDMITX)
+            if (aml_spdif_format == AML_TRUE_HD && aml_dev->hdmitx_hbr_src >= AML_TDM_A_TO_HDMITX)
                 hdmitx_src = aml_dev->hdmitx_hbr_src;
-            else if (aml_spdif_format = AML_MULTI_CH_LPCM && aml_dev->hdmitx_multi_ch_src >= AML_TDM_A_TO_HDMITX)
+            else if (aml_spdif_format == AML_MULTI_CH_LPCM && aml_dev->hdmitx_multi_ch_src >= AML_TDM_A_TO_HDMITX)
                 hdmitx_src = aml_dev->hdmitx_multi_ch_src;
             else
                 AM_LOGW("invalid format %d for I2S to HDMITX", aml_spdif_format);
