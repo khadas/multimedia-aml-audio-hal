@@ -1157,7 +1157,7 @@ int pcm_stop(struct pcm *pcm)
 {
     if (ioctl(pcm->fd, SNDRV_PCM_IOCTL_DROP) < 0)
         return oops(pcm, errno, "cannot stop channel");
-
+    ALOGI("pcm_stop handle(%p)", pcm);
     pcm->prepared = 0;
     pcm->running = 0;
     return 0;

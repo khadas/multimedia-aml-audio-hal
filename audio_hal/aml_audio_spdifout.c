@@ -386,8 +386,8 @@ int aml_audio_spdifout_open(void **pphandle, spdif_config_t *spdif_config)
         memset(&stream_config, 0, sizeof(aml_stream_config_t));
         memset(&device_config, 0, sizeof(aml_device_config_t));
 
-        aml_spdif_format = halformat_convert_to_spdif(audio_format, stream_config.config.channel_mask);
-        aml_arc_format   = halformat_convert_to_arcformat(audio_format, stream_config.config.channel_mask);
+        aml_spdif_format = halformat_convert_to_spdif(audio_format, spdif_config->channel_mask);
+        aml_arc_format   = halformat_convert_to_arcformat(audio_format, spdif_config->channel_mask);
 
         if (aml_spdif_format == AML_TRUE_HD
             || aml_spdif_format == AML_DTS_HD_MA

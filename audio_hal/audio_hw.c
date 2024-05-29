@@ -4614,6 +4614,9 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
         set_device_connect_state(adev, parms, val, true);
         if (val & AUDIO_DEVICE_OUT_HDMI_ARC) {
             adev->raw_to_pcm_flag = true;
+            if (adev->useSubMix) {
+                subMixingOutputRestart(adev);
+            }
         }
 
         goto exit;
