@@ -4635,6 +4635,8 @@ static int adev_set_parameters (struct audio_hw_device *dev, const char *kvpairs
     ret = str_parms_get_int(parms, "HDMI ARC Switch", &val);
     if (ret >= 0) {
         aml_audio_update_arc_status(adev, (val != 0));
+        if (0 == val && adev->stream_write_data)
+            set_ms12_full_dap_disable(&adev->ms12, false);
         goto exit;
     }
 
