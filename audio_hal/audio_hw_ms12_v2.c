@@ -1077,9 +1077,7 @@ int get_the_dolby_ms12_prepared(
             ALOGI("%s() thread is builded, get dolby_ms12_threadID %ld\n", __FUNCTION__, ms12->dolby_ms12_threadID);
         }
         /*config the ms12 encoder output graph*/
-        dolby_ms12_config_params_reset_encoder_config_params();
-        ms12->dolby_ms12_encoder_argv = dolby_ms12_config_params_get_encoder_config_params(&ms12->dolby_ms12_encoder_argc);
-        dolby_ms12_encoder_open(ms12->dolby_ms12_ptr, ms12->dolby_ms12_encoder_argc, ms12->dolby_ms12_encoder_argv);
+        dolby_ms12_encoder_open(ms12->dolby_ms12_ptr, ms12->dolby_ms12_init_argc, ms12->dolby_ms12_init_argv);
         //n bytes of dowmix output pcm frame, 16bits_per_sample / stereo, it value is 4btes.
         ms12->nbytes_of_dmx_output_pcm_frame = nbytes_of_dolby_ms12_downmix_output_pcm_frame();
         ms12->hdmi_format = adev->hdmi_format;

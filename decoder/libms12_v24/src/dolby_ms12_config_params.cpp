@@ -166,6 +166,18 @@ extern "C" void dolby_ms12_config_params_set_channel_mask_ui(audio_channel_mask_
     }
 }
 
+/*config params begin*/
+/**/
+extern "C" int dolby_ms12_config_params_set_input_output_file_name(char **ConfigParams, int *row_index)
+{
+    android::DolbyMS12ConfigParams *config_param = getInstance();
+    if (config_param) {
+        return config_param->SetInputOutputFileName(ConfigParams, row_index);
+    } else {
+        return -1;
+    }
+}
+
 extern "C" int dolby_ms12_config_params_set_functional_switches(char **ConfigParams, int *row_index)
 {
     android::DolbyMS12ConfigParams *config_param = getInstance();
@@ -260,29 +272,6 @@ extern "C" char **dolby_ms12_config_params_get_config_params(int *argc)
         return NULL;
     }
 }
-
-extern "C" char **dolby_ms12_config_params_get_codec_config_params(int *argc)
-{
-    ALOGV("%s()\n", __FUNCTION__);
-    android::DolbyMS12ConfigParams *config_param = getInstance();
-    if (config_param) {
-        return config_param->GetDolbyMS12CodecConfigParams(argc);
-    } else {
-        return NULL;
-    }
-}
-
-extern "C" char **dolby_ms12_config_params_get_encoder_config_params(int *argc)
-{
-    ALOGV("%s()\n", __FUNCTION__);
-    android::DolbyMS12ConfigParams *config_param = getInstance();
-    if (config_param) {
-        return config_param->GetDolbyMS12EncoderConfigParams(argc);
-    } else {
-        return NULL;
-    }
-}
-
 
 #if 0
 extern "C" char **dolby_ms12_config_params_get_runtime_config_params(int *argc)
@@ -379,24 +368,6 @@ extern "C" void dolby_ms12_config_params_reset_init_config_params(void)
     android::DolbyMS12ConfigParams *config_param = getInstance();
     if (config_param) {
         config_param->ResetInitConfigParams();
-    }
-}
-
-extern "C" void dolby_ms12_config_params_reset_codec_config_params(void)
-{
-    ALOGV("%s()\n", __FUNCTION__);
-    android::DolbyMS12ConfigParams *config_param = getInstance();
-    if (config_param) {
-        config_param->ResetCodecConfigParams();
-    }
-}
-
-extern "C" void dolby_ms12_config_params_reset_encoder_config_params(void)
-{
-    ALOGV("%s()\n", __FUNCTION__);
-    android::DolbyMS12ConfigParams *config_param = getInstance();
-    if (config_param) {
-        config_param->ResetEncoderConfigParams();
     }
 }
 

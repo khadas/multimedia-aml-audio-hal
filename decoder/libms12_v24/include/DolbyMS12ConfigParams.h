@@ -82,9 +82,7 @@ public:
                                          , audio_channel_mask_t channel_mask
                                          , int sample_rate
                                          , int output_format);
-    virtual int SetContinuousInputOutputFileName(char **ConfigParams, int *row_index);
-    virtual int SetCodecInputFileName(char **ConfigParams, int *row_index);
-    virtual int SetEncoderOutputFileName(char **ConfigParams, int *row_index);
+    virtual int SetInputOutputFileName(char **ConfigParams, int *row_index);
     virtual int SetFunctionalSwitches(char **ConfigParams, int *row_index);
 #if 0
     virtual int SetFunctionalSwitchesRuntime(char **ConfigParams, int *row_index);
@@ -103,8 +101,6 @@ public:
     virtual int SetDAPContentSwitches(char **ConfigParams, int *row_index);
     virtual char *QueryDapParameters(const char *key);
     virtual char **GetDolbyMS12ConfigParams(int *argc);
-    virtual char **GetDolbyMS12CodecConfigParams(int *argc);
-    virtual char **GetDolbyMS12EncoderConfigParams(int *argc);
 #if 0
     virtual char **GetDolbyMS12RuntimeConfigParams(int *argc);
 #endif
@@ -131,9 +127,6 @@ public:
         return mDolbyMS12OutChannelMask[MS12_INPUT_MAIN];
     }
     virtual void ResetInitConfigParams(void);
-    virtual void ResetCodecConfigParams(void);
-    virtual void ResetEncoderConfigParams(void);
-
     //associate flags
     virtual void ResetRuntimeConfigParams(void);
     virtual void setAssociateFlag(bool flag)
@@ -619,8 +612,6 @@ private:
     // static android::Mutex mLock;
     // audio_devices_t mAudioSteamOutDevices;
     int mParamNum;
-    int mCodecParamNum;
-    int mEncoderParamNum;
 
     //dolby ms12 input
     audio_output_flags_t mAudioOutFlags;
@@ -631,8 +622,6 @@ private:
     int mDolbyMS12OutConfig;
     int mDolbyMS12OutSampleRate;
     char **mConfigParams;//[MAX_ARGC][MAX_ARGV_STRING_LEN];
-    char **mCodecConfigParams;
-    char **mEncoderConfigParams;
 
 
     // bool mMultiOutputFlag;

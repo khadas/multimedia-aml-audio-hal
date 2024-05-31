@@ -42,8 +42,6 @@ namespace android
 {
 
 #define MAX_ARGC 150
-#define MAX_CODEC_ARGC 50
-#define MAX_ENCODER_ARGC 50
 #define MAX_ARGV_STRING_LEN 256
 
 //here the file path is fake
@@ -95,9 +93,6 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     // mDolbyMS12GetOutProfile(NULL)
     // ,
     mParamNum(0)
-    , mCodecParamNum(0)
-    , mEncoderParamNum(0)
-
     , mAudioOutFlags(AUDIO_OUTPUT_FLAG_NONE)
     , mAudioStreamOutFormat(AUDIO_FORMAT_PCM_16_BIT)
     // , mAudioSteamOutDevices(AUDIO_DEVICE_OUT_SPEAKER)
@@ -109,8 +104,6 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
     , mDolbyMS12OutConfig(MS12_OUTPUT_MASK_DD)
     , mDolbyMS12OutSampleRate(48000)
     , mConfigParams(NULL)
-    , mCodecConfigParams(NULL)
-    , mEncoderConfigParams(NULL)
     // , mMultiOutputFlag(true)
     , mDRCBoost(100)
     , mDRCCut(100)
@@ -179,30 +172,15 @@ DolbyMS12ConfigParams::DolbyMS12ConfigParams():
           __FUNCTION__, mAudioOutFlags, mAudioStreamOutFormat, mHasAssociateInput, mHasSystemInput, mHasAppInput);
     mConfigParams = PrepareConfigParams(MAX_ARGC, MAX_ARGV_STRING_LEN);
     if (!mConfigParams) {
-        ALOGD("%s() line %d prepare mConfigParams array fail", __FUNCTION__, __LINE__);
+        ALOGD("%s() line %d prepare the array fail", __FUNCTION__, __LINE__);
         return;
     }
-
-    mCodecConfigParams = PrepareConfigParams(MAX_CODEC_ARGC, MAX_ARGV_STRING_LEN);
-    if (!mCodecConfigParams) {
-        ALOGD("%s() line %d prepare mCodecConfigParams array fail", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    mEncoderConfigParams = PrepareConfigParams(MAX_ENCODER_ARGC, MAX_ARGV_STRING_LEN);
-    if (!mEncoderConfigParams) {
-        ALOGD("%s() line %d prepare mEncoderConfigParams array fail", __FUNCTION__, __LINE__);
-        return;
-    }
-
     memset(mDolbyMain1FileName, 0, sizeof(mDolbyMain1FileName));
     memcpy(mDolbyMain1FileName, DEFAULT_MAIN_DDP_FILE_NAME, sizeof(DEFAULT_MAIN_DDP_FILE_NAME));
     memset(mDolbyMain2FileName, 0, sizeof(mDolbyMain2FileName));
     memcpy(mDolbyMain2FileName, DEFAULT_DUMMY_DDP_FILE_NAME, sizeof(DEFAULT_DUMMY_DDP_FILE_NAME));
     char params_bin[] = "ms12_exec";
     sprintf(mConfigParams[mParamNum++], "%s", params_bin);
-    sprintf(mCodecConfigParams[mCodecParamNum++], "%s", params_bin);
-    sprintf(mEncoderConfigParams[mEncoderParamNum++], "%s", params_bin);
 
     //TODO: use a system property to override default DAP tuning file name
     // If we detected DAP tuning file exists then DAP will be enabled with both
@@ -217,8 +195,6 @@ DolbyMS12ConfigParams::~DolbyMS12ConfigParams()
 {
     ALOGD("+%s()", __FUNCTION__);
     CleanupConfigParams(mConfigParams, MAX_ARGC);
-    CleanupConfigParams(mCodecConfigParams, MAX_ARGC);
-    CleanupConfigParams(mEncoderConfigParams, MAX_ARGC);
     ALOGD("-%s()", __FUNCTION__);
 }
 
@@ -276,7 +252,7 @@ void DolbyMS12ConfigParams::setInputCMDMask(const char *input_cmd)
     }
 }
 //input and output
-int DolbyMS12ConfigParams::SetCodecInputFileName(char **ConfigParams, int *row_index)
+int DolbyMS12ConfigParams::SetInputOutputFileName(char **ConfigParams, int *row_index)
 {
     ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
     mDolbyInputCMDMask = 0;
@@ -589,14 +565,21 @@ int DolbyMS12ConfigParams::SetCodecInputFileName(char **ConfigParams, int *row_i
             }
         }
     }
+    if (mHasSystemInput == true) {
+        sprintf(ConfigParams[*row_index], "%s", "-is");
+        setInputCMDMask("-is");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%s", DEFAULT_SYSTEM_PCM_FILE_NAME);
+        (*row_index)++;
+    }
 
-    ALOGV("-%s() line %d\n", __FUNCTION__, __LINE__);
-    return 0;
-}
-
-int DolbyMS12ConfigParams::SetEncoderOutputFileName(char **ConfigParams, int *row_index)
-{
-    ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
+    if (mHasAppInput == true) {
+        sprintf(ConfigParams[*row_index], "%s", "-ias");
+        setInputCMDMask("-ias");
+        (*row_index)++;
+        sprintf(ConfigParams[*row_index], "%s", DEFAULT_APPLICATION_PCM_FILE_NAME);
+        (*row_index)++;
+    }
 
     if (mDolbyMS12OutConfig & MS12_OUTPUT_MASK_DD) {
         sprintf(ConfigParams[*row_index], "%s", "-od");
@@ -616,29 +599,6 @@ int DolbyMS12ConfigParams::SetEncoderOutputFileName(char **ConfigParams, int *ro
         sprintf(ConfigParams[*row_index], "%s", "-omat");
         (*row_index)++;
         sprintf(ConfigParams[*row_index], "%s", DEFAULT_OUTPUT_MAT_FILE_NAME);
-        (*row_index)++;
-    }
-    ALOGV("-%s() line %d\n", __FUNCTION__, __LINE__);
-    return 0;
-}
-
-int DolbyMS12ConfigParams::SetContinuousInputOutputFileName(char **ConfigParams, int *row_index)
-{
-    ALOGV("+%s() line %d\n", __FUNCTION__, __LINE__);
-
-    if (mHasSystemInput == true) {
-        sprintf(ConfigParams[*row_index], "%s", "-is");
-        //setInputCMDMask("-is");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%s", DEFAULT_SYSTEM_PCM_FILE_NAME);
-        (*row_index)++;
-    }
-
-    if (mHasAppInput == true) {
-        sprintf(ConfigParams[*row_index], "%s", "-ias");
-        //setInputCMDMask("-ias");
-        (*row_index)++;
-        sprintf(ConfigParams[*row_index], "%s", DEFAULT_APPLICATION_PCM_FILE_NAME);
         (*row_index)++;
     }
 
@@ -1697,9 +1657,7 @@ char **DolbyMS12ConfigParams::GetDolbyMS12ConfigParams(int *argc)
     if (argc && mConfigParams) {
         char params_bin[] = "ms12_exec";
         sprintf(mConfigParams[mParamNum++], "%s", params_bin);
-        SetContinuousInputOutputFileName(mConfigParams, &mParamNum);
-        SetCodecInputFileName(mConfigParams, &mParamNum);
-        SetEncoderOutputFileName(mConfigParams, &mParamNum);
+        SetInputOutputFileName(mConfigParams, &mParamNum);
         SetFunctionalSwitches(mConfigParams, &mParamNum);
         SetAc4Switches(mConfigParams, &mParamNum);
         SetPCMSwitches(mConfigParams, &mParamNum);
@@ -1727,134 +1685,6 @@ char **DolbyMS12ConfigParams::GetDolbyMS12ConfigParams(int *argc)
 
     ALOGD("-%s()", __FUNCTION__);
     return mConfigParams;
-}
-
-char **DolbyMS12ConfigParams::GetDolbyMS12CodecConfigParams(int *argc)
-{
-    ALOGD("+%s()\n", __FUNCTION__);
-
-    if (argc && mCodecConfigParams) {
-        char params_bin[] = "ms12_exec";
-        sprintf(mCodecConfigParams[mCodecParamNum++], "%s", params_bin);
-
-        //! input param
-        SetCodecInputFileName(mCodecConfigParams, &mCodecParamNum);
-
-        //! heaac param
-        SetHEAACSwitches(mCodecConfigParams, &mCodecParamNum);
-
-        //! ac4 param
-        SetAc4Switches(mCodecConfigParams, &mCodecParamNum);
-
-        //! pcm param
-        SetPCMSwitches(mCodecConfigParams, &mCodecParamNum);
-
-        //! AD param
-        if (isAssociatedAudioControlSuitable()) {
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%s", "-xa");
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%d", mAssociatedAudioMixing);
-        }
-        if (isAssociatedAudioControlSuitable()) { //set this params when dual input.
-            if (mUserControlVal > 32) {
-                mUserControlVal = 32;
-            } else if (mUserControlVal < -32) {
-                mUserControlVal = -32;
-            }
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%s", "-xu");
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%d", mUserControlVal);
-       }
-
-         //! gain param
-        if (mMainFlags == true) {
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%s", "-main1_mixgain");
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%d,%d,%d", mMain1MixGain.target, mMain1MixGain.duration, mMain1MixGain.shape);//choose mid-val
-        }
-         if ((mHasAssociateInput == true) || (mActivateOTTSignal == true)) {
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%s", "-main2_mixgain");
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%d,%d,%d", mMain2MixGain.target, mMain2MixGain.duration, mMain2MixGain.shape);//choose mid-val
-        }
-
-        //! debug param
-        if ((mVerbosity >= 0) && (mVerbosity <= 3)) {
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%s", "-v");
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%d", mVerbosity);
-        }
-        if (mDBGOut) {
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%s", "-dbgout");
-            sprintf(mCodecConfigParams[mCodecParamNum++], "%d", mDBGOut);
-        }
-
-        *argc = mCodecParamNum;
-
-        int config_params_check = 1;
-        if (config_params_check) {
-            int i = 0;
-            for (i = 0; i < mCodecParamNum; i++) {
-                ALOGI("Codec param #%d: %s\n", i, mCodecConfigParams[i]);
-            }
-        }
-    }
-
-    ALOGD("-%s()", __FUNCTION__);
-    return mCodecConfigParams;
-}
-
-char **DolbyMS12ConfigParams::GetDolbyMS12EncoderConfigParams(int *argc)
-{
-    ALOGD("+%s()\n", __FUNCTION__);
-
-    if (argc && mEncoderConfigParams) {
-        char params_bin[] = "ms12_exec";
-        sprintf(mEncoderConfigParams[mEncoderParamNum++], "%s", params_bin);
-
-        //! encoder output param
-        SetEncoderOutputFileName(mEncoderConfigParams, &mEncoderParamNum);
-
-        if (mDolbyMS12OutConfig & (MS12_OUTPUT_MASK_DD|MS12_OUTPUT_MASK_DDP)) {
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%s", "-legacy_ddplus_out");
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%d", mIsLegacyDDPOut);
-        }
-
-        if (mHdmiOutputType) {
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%s", "-hdmi_output_type");
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%d", mHdmiOutputType);
-        }
-        /* Encoder channel mode locking */
-        if (1/*mLockingChannelModeENC == 1*/) {
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%s", "-chmod_locking");
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%d", mLockingChannelModeENC);
-        }
-        /* Encoder Atmos lock */
-        {
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%s", "-atmos_lock");
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%d", mAtmosLock);
-        }
-
-        //! debug param
-        if ((mVerbosity >= 0) && (mVerbosity <= 3)) {
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%s", "-v");
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%d", mVerbosity);
-        }
-        if (mDBGOut) {
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%s", "-dbgout");
-            sprintf(mEncoderConfigParams[mEncoderParamNum++], "%d", mDBGOut);
-        }
-
-        *argc = mEncoderParamNum;
-        ALOGV("%s() line %d argc %d\n", __FUNCTION__, __LINE__, *argc);
-        //here is to check the config params
-
-        int config_params_check = 1;
-        if (config_params_check) {
-            int i = 0;
-            for (i = 0; i < mEncoderParamNum; i++) {
-                ALOGI("Encoder param #%d: %s\n", i, mEncoderConfigParams[i]);
-            }
-        }
-    }
-
-    ALOGD("-%s()", __FUNCTION__);
-    return mEncoderConfigParams;
 }
 
 int DolbyMS12ConfigParams::ms_get_int_array_from_str(char **p_csv_string, int num_el, int *p_vals)
@@ -2343,38 +2173,6 @@ void DolbyMS12ConfigParams::ResetInitConfigParams(void)
     mHasSystemInput = false;
     mMainFlags = 1;
     ALOGD("%s() mHasAssociateInput %d mHasSystemInput %d\n", __FUNCTION__, mHasAssociateInput, mHasSystemInput);
-    ALOGD("-%s() line %d\n", __FUNCTION__, __LINE__);
-    return ;
-}
-
-void DolbyMS12ConfigParams::ResetCodecConfigParams(void)
-{
-    ALOGD("+%s() line %d\n", __FUNCTION__, __LINE__);
-    int i = 0;
-    if (mCodecConfigParams) {
-        for (i = 0; i < MAX_CODEC_ARGC; i++) {
-            if (mCodecConfigParams[i]) {
-                memset(mCodecConfigParams[i], 0, MAX_ARGV_STRING_LEN);
-            }
-        }
-    }
-    mCodecParamNum = 0;
-    ALOGD("-%s() line %d\n", __FUNCTION__, __LINE__);
-    return ;
-}
-
-void DolbyMS12ConfigParams::ResetEncoderConfigParams(void)
-{
-    ALOGD("+%s() line %d\n", __FUNCTION__, __LINE__);
-    int i = 0;
-    if (mEncoderConfigParams) {
-        for (i = 0; i < MAX_ENCODER_ARGC; i++) {
-            if (mEncoderConfigParams[i]) {
-                memset(mEncoderConfigParams[i], 0, MAX_ARGV_STRING_LEN);
-            }
-        }
-    }
-    mEncoderParamNum = 0;
     ALOGD("-%s() line %d\n", __FUNCTION__, __LINE__);
     return ;
 }
