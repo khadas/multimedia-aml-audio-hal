@@ -60,7 +60,7 @@ static cJSON *aml_createJsonRoot(const char *filename)
 
     fseek(fp, 0, SEEK_SET);
 
-    input = (char *)aml_audio_malloc(len + 10);
+    input = (char *)aml_audio_calloc(1, len + 256);
     if (input == NULL) {
         ALOGD("Cannot malloc the address size = %d\n", len);
         fclose(fp);
