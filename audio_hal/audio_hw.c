@@ -4062,6 +4062,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
     }
 
     if (!out->is_ms12_stream && out->avsync_ctx) {
+        pthread_mutex_lock(&(out->avsync_ctx->lock));
         if (out->avsync_ctx->msync_ctx) {
             if (out->avsync_ctx->msync_ctx->msync_session) {
                 msync_unblock_start(out->avsync_ctx->msync_ctx);
@@ -4075,6 +4076,7 @@ static void adev_close_output_stream(struct audio_hw_device *dev,
             }
             aml_audio_free(out->avsync_ctx->mediasync_ctx);
         }
+        pthread_mutex_unlock(&(out->avsync_ctx->lock));
         aml_audio_free(out->avsync_ctx);
         out->avsync_ctx = NULL;
     }

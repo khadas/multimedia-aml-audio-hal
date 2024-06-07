@@ -2838,6 +2838,8 @@ Aml_MS12_SyncPolicy_t mediasync_ms12_process(struct audio_stream_out *stream_out
     if (aml_out->avsync_ctx == NULL || aml_out->avsync_ctx->mediasync_ctx == NULL) {
         return audio_sync_policy;
     }
+
+    pthread_mutex_lock(&(aml_out->avsync_ctx->lock));
     struct mediasync_audio_policy *async_policy = &(aml_out->avsync_ctx->mediasync_ctx->apolicy);
 
     if (aml_out->alsa_status_changed) {
@@ -2892,7 +2894,7 @@ Aml_MS12_SyncPolicy_t mediasync_ms12_process(struct audio_stream_out *stream_out
             AM_LOGE("unknown policy:%d error!", async_policy->audiopolicy);
             break;
     }
-
+    pthread_mutex_unlock(&(aml_out->avsync_ctx->lock));
     return audio_sync_policy;
 }
 
